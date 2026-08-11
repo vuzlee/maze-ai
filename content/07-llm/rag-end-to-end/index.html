@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG đầu–cuối — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../index.html">← Tất cả bài</a> <span id="crumbTitle">LLM &amp; GenAI · RAG đầu–cuối</span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-rag" data-title="RAG đầu–cuối" data-tag="Truy xuất" data-blurb="Chunking, hybrid search, reranking, lost-in-the-middle, cây debug năm bước và cách đánh giá tách hai tầng.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · hệ thống truy xuất</p>
+  <h1>RAG<br><em>đầu–cuối</em></h1>
+  <p class="lede">Câu trả lời "em dùng LangChain với vector DB" không nói được gì. Bài này đi hết đường ống — <b>chunking</b>, embedding, index, <b>hybrid search</b>, reranking, dựng context, sinh chữ — và quan trọng nhất: <b>cây quyết định để debug</b> khi hệ thống trả lời sai, cùng cách đánh giá tách hai tầng.</p>
+</header>
+
+
+<section id="rag-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>OFFLINE — làm một lần, làm lại khi tài liệu đổi
+    tài liệu → đọc &amp; làm sạch → chunk → embedding → index
+                                              └→ index từ khoá (BM25)
+
+ONLINE — mỗi câu hỏi
+    câu hỏi → xử lý truy vấn → truy xuất (vector + từ khoá)
+            → hợp nhất → RERANK → chọn k đoạn → dựng prompt → LLM → câu trả lời + nguồn</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    RAG có <strong>hai hệ thống ghép lại</strong>: một hệ tìm kiếm và một hệ sinh chữ. Khi nó trả lời sai, việc đầu tiên là xác định <em>tầng nào sai</em> — vì cách chữa hoàn toàn khác nhau. Đây cũng là điều phân biệt câu trả lời có kinh nghiệm với câu trả lời đọc tài liệu.
+  </div>
+</section>
+
+<section id="rag-s2">
+  <div class="sh"><b>02</b><h2>RAG hay nhét hết vào context dài</h2></div>
+  <p>Với model có context 200k token, câu hỏi hợp lý là: cần RAG làm gì nữa?</p>
+  <table>
+    <tr><th>Tiêu chí</th><th>RAG</th><th>Context dài</th></tr>
+    <tr><td>Chi phí mỗi câu hỏi</td><td>Chỉ trả tiền cho vài nghìn token</td><td>Trả tiền cho toàn bộ context, mỗi lần gọi</td></tr>
+    <tr><td>Độ trễ</td><td>Thấp — prompt ngắn</td><td>Cao — phần prefill tỉ lệ với độ dài</td></tr>
+    <tr><td>Quy mô dữ liệu</td><td>Không giới hạn</td><td>Chặn cứng bởi cửa sổ context</td></tr>
+    <tr><td>Trích dẫn nguồn</td><td>Tự nhiên — biết đoạn nào được dùng</td><td>Khó xác định model đã dựa vào đâu</td></tr>
+    <tr><td>Độ chính xác khi tài liệu ít</td><td>Có thể bỏ sót nếu truy xuất kém</td><td><strong>Cao hơn</strong> — không có bước nào bỏ sót</td></tr>
+    <tr><td>Cập nhật dữ liệu</td><td>Chỉ nhúng lại phần đổi</td><td>Không cần gì</td></tr>
+  </table>
+  <div class="note">
+    <h4>Kết luận thực dụng</h4>
+    <strong>Tài liệu ít và cố định</strong> — dưới vài chục nghìn token, ví dụ một hợp đồng hay một tài liệu sản phẩm — thì nhét hết vào context đơn giản hơn và chính xác hơn. <strong>Kho lớn hoặc thay đổi liên tục</strong> thì RAG là lựa chọn duy nhất. Và cách làm phổ biến hiện nay là <em>kết hợp</em>: dùng RAG để thu hẹp xuống 20–50 đoạn rồi đưa hết vào context dài, thay vì chỉ 3–5 đoạn như trước.
+  </div>
+</section>
+
+<section id="rag-s3">
+  <div class="sh"><b>03</b><h2>Nạp tài liệu — bước quyết định trần chất lượng</h2></div>
+  <table>
+    <tr><th>Việc</th><th>Chi tiết</th><th>Bẫy</th></tr>
+    <tr><td>Đọc tài liệu</td><td>PDF, Word, HTML, bảng biểu, ảnh scan</td><td>PDF nhiều cột bị đọc lộn thứ tự; bảng biến thành chuỗi số vô nghĩa</td></tr>
+    <tr><td>Giữ cấu trúc</td><td>Tiêu đề, mục, cấp bậc</td><td>Mất tiêu đề thì đoạn văn không còn ngữ cảnh — không biết nó nói về sản phẩm nào</td></tr>
+    <tr><td>Gắn metadata</td><td>Nguồn, ngày, tác giả, mục, quyền truy cập</td><td>Không có metadata thì không lọc được theo thời gian hay theo quyền</td></tr>
+    <tr><td>Làm sạch</td><td>Bỏ đầu trang, chân trang, số trang, menu</td><td>Chuỗi lặp lại làm nhiễu embedding của mọi đoạn</td></tr>
+    <tr><td>Khử trùng lặp</td><td>Cùng nội dung ở nhiều file</td><td>Top-k bị chiếm bởi năm bản của cùng một đoạn</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Đây là bước bị coi nhẹ nhất và tốn kém nhất</h4>
+    Không kỹ thuật truy xuất nào cứu được một đoạn văn đã bị đọc sai từ PDF. <strong>Chất lượng nạp tài liệu là trần của toàn bộ hệ thống.</strong> Trong dự án thật, đây thường là phần chiếm nhiều thời gian nhất — và nói ra điều đó trong phỏng vấn là dấu hiệu rõ ràng của người đã làm RAG thật thay vì chạy demo.
+  </div>
+  <p>Một kỹ thuật đáng biết: <strong>chèn tiêu đề vào từng chunk</strong>. Đoạn văn "Thời hạn bảo hành là 24 tháng" không cho biết bảo hành cho sản phẩm nào. Ghép thêm đường dẫn tiêu đề — "Sản phẩm X &gt; Chính sách &gt; Bảo hành" — vào đầu chunk thì cả embedding lẫn LLM đều có ngữ cảnh.</p>
+</section>
+
+<section id="rag-s4">
+  <div class="sh"><b>04</b><h2>Chunking</h2></div>
+  <table>
+    <tr><th>Chiến lược</th><th>Cách làm</th><th>Phù hợp với</th></tr>
+    <tr><td>Kích thước cố định</td><td>Cắt mỗi N token, có overlap</td><td>Văn bản không cấu trúc; đơn giản nhất</td></tr>
+    <tr><td>Theo đoạn văn / câu</td><td>Cắt ở ranh giới tự nhiên</td><td>Văn bản viết tốt</td></tr>
+    <tr><td><strong>Theo cấu trúc</strong></td><td>Cắt theo tiêu đề, mục, hàng bảng</td><td><strong>Tài liệu kỹ thuật, quy định</strong> — thường tốt nhất</td></tr>
+    <tr><td>Theo ngữ nghĩa</td><td>Cắt ở chỗ embedding của các câu liền kề đổi đột ngột</td><td>Nghe hay nhưng đắt và ít khi thắng rõ so với cắt theo cấu trúc</td></tr>
+    <tr><td>Đa mức</td><td>Nhúng đoạn nhỏ để tìm, trả về đoạn lớn chứa nó để đọc</td><td>Khi cần cả độ chính xác tìm kiếm lẫn ngữ cảnh đầy đủ</td></tr>
+  </table>
+<pre><code>Đánh đổi của kích thước chunk:
+
+CHUNK NHỎ (100–200 token)
+  + embedding tập trung, tìm kiếm chính xác hơn
+  − mất ngữ cảnh; câu trả lời có thể bị cắt làm đôi
+
+CHUNK LỚN (800–1500 token)
+  + giữ đủ ngữ cảnh
+  − embedding bị loãng vì một vector phải đại diện nhiều ý
+  − tốn context của LLM cho phần không liên quan
+
+Khoảng thường dùng: 300–600 token, overlap 10–20%.</code></pre>
+  <div class="note key">
+    <h4>Vì sao cần overlap</h4>
+    Để câu trả lời không bị <strong>cắt ngang ranh giới chunk</strong>. Nếu thông tin cần thiết trải qua hai câu mà điểm cắt rơi đúng giữa, thì không chunk nào chứa đủ và hệ thống chắc chắn trả lời sai — dù embedding và index đều hoàn hảo. Đây là chế độ lỗi tinh vi nhất của RAG, và lab dưới đây cho bạn thấy nó xảy ra.
+  </div>
+  <p>Kỹ thuật <strong>đa mức</strong> đáng biết vì nó phá được đánh đổi trên: nhúng câu hoặc đoạn nhỏ để tìm kiếm chính xác, nhưng khi một đoạn nhỏ được chọn thì trả về cả mục lớn chứa nó cho LLM đọc. Vừa chính xác khi tìm, vừa đủ ngữ cảnh khi đọc.</p>
+</section>
+
+<section id="rag-s5">
+  <div class="sh"><b>05</b><h2>Lab: chunk và truy xuất</h2></div>
+  <p>Một tài liệu ngắn, một câu hỏi. Đổi kích thước chunk và overlap để xem đoạn chứa câu trả lời có <strong>còn nguyên</strong> trong một chunk nào không.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>kích thước chunk (ký tự)</label><input type="number" id="rsize" value="180" min="40" max="600" step="10"></div>
+      <div><label>overlap %</label><input type="number" id="rov" value="0" min="0" max="50" step="5"></div>
+      <div><label>số chunk lấy về (k)</label><input type="number" id="rk" value="2" min="1" max="5"></div>
+      <div><label>câu hỏi</label>
+        <select id="rq">
+          <option value="0" selected>Thời hạn bảo hành là bao lâu?</option>
+          <option value="1">Phí đổi hàng bao nhiêu?</option>
+          <option value="2">Có hỗ trợ trả góp không?</option>
+        </select>
+      </div>
+    </div>
+    <div id="rview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Cấu hình mặc định — <code>chunk = 180, overlap = 0</code> — đã <strong>thất bại</strong>: câu chứa đáp án bị cắt ngang giữa hai chunk nên không chunk nào chứa đủ, và hệ thống chắc chắn trả lời sai dù truy xuất hoạt động hoàn hảo. Tăng overlap lên <strong>30%</strong> để thấy nó được cứu; hoặc để overlap 20% và tăng chunk lên <strong>240</strong>. Đổi câu hỏi để thấy cùng một cấu hình cứu được câu này nhưng làm hỏng câu khác — đó là lý do phải đo recall trên một bộ câu hỏi thật thay vì thử một câu. Lab dùng độ trùng từ khoá thay cho embedding thật, nhưng chế độ lỗi thì giống hệ thống thật.
+    </p>
+  </div>
+</section>
+
+<section id="rag-s6">
+  <div class="sh"><b>06</b><h2>Embedding</h2></div>
+<pre><code>Chuyển đoạn văn thành vector. Đoạn nghĩa gần nhau → vector gần nhau.
+
+Độ tương đồng cosine:  cos(a, b) = (a·b) / (|a|·|b|)
+
+Nếu đã chuẩn hoá vector về độ dài 1 thì cosine = tích vô hướng
+→ tính nhanh hơn nhiều. Hầu hết vector DB giả định vector đã chuẩn hoá.</code></pre>
+  <table>
+    <tr><th>Quyết định</th><th>Lưu ý</th></tr>
+    <tr><td>Chọn model embedding</td><td>Kiểm tra nó có hỗ trợ tiếng Việt tốt không — nhiều model chỉ mạnh tiếng Anh</td></tr>
+    <tr><td>Số chiều</td><td>384 tới 1536. Nhiều chiều hơn thì hơi chính xác hơn nhưng tốn bộ nhớ và chậm hơn</td></tr>
+    <tr><td>Tiền tố bất đối xứng</td><td>Một số model yêu cầu thêm <code>"query: "</code> trước câu hỏi và <code>"passage: "</code> trước đoạn văn</td></tr>
+    <tr><td>Độ dài tối đa</td><td>Vượt giới hạn thì phần cuối bị cắt <em>âm thầm</em> — chunk lớn hơn giới hạn là mất dữ liệu</td></tr>
+    <tr><td>Đổi model embedding</td><td>Phải <strong>nhúng lại toàn bộ</strong> kho. Vector của hai model không so sánh được với nhau</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Hai bẫy im lặng</h4>
+    <p><strong>Quên tiền tố.</strong> Với model yêu cầu tiền tố bất đối xứng, bỏ nó không gây lỗi — chỉ làm chất lượng truy xuất tụt đáng kể mà không có dấu hiệu gì.</p>
+    <p><strong>Chunk dài hơn giới hạn model.</strong> Phần vượt bị cắt và không bao giờ được nhúng. Đoạn văn đó tồn tại trong kho nhưng nội dung cuối của nó vô hình với tìm kiếm.</p>
+  </div>
+</section>
+
+<section id="rag-s7">
+  <div class="sh"><b>07</b><h2>Vector index</h2></div>
+  <table>
+    <tr><th>Loại</th><th>Cơ chế</th><th>Recall</th><th>Bộ nhớ</th><th>Dùng khi</th></tr>
+    <tr><td>Flat</td><td>So sánh với <em>mọi</em> vector</td><td><strong>100%</strong></td><td>Toàn bộ vector</td><td>Dưới khoảng 100 nghìn vector — và thường là đủ</td></tr>
+    <tr><td><strong>HNSW</strong></td><td>Đồ thị nhiều tầng, đi theo láng giềng gần</td><td>Rất cao</td><td>Cao — lưu cả đồ thị</td><td>Mặc định cho quy mô trung bình</td></tr>
+    <tr><td>IVF</td><td>Chia thành cụm, chỉ tìm trong vài cụm gần nhất</td><td>Điều chỉnh được</td><td>Trung bình</td><td>Nhiều triệu vector</td></tr>
+    <tr><td>IVF-PQ</td><td>IVF cộng nén vector</td><td>Thấp hơn</td><td><strong>Rất thấp</strong></td><td>Hàng trăm triệu vector, bị chặn bởi RAM</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Điều đáng nói nhất về việc chọn index</h4>
+    <strong>Với dưới khoảng 100 nghìn chunk, hãy dùng flat.</strong> Tìm kiếm chính xác 100%, không có siêu tham số nào để dò sai, và độ trễ vẫn dưới vài chục mili giây. Rất nhiều hệ thống RAG thực tế nằm ở quy mô này. Chọn HNSW hay IVF khi chưa cần là tự thêm một nguồn lỗi — vì chúng là tìm kiếm <em>gần đúng</em>, nghĩa là đôi khi bỏ sót đúng đoạn cần thiết mà không có cách nào biết.
+  </div>
+  <p>Với HNSW, hai tham số quan trọng: <code>M</code> (số kết nối mỗi nút, ảnh hưởng bộ nhớ và chất lượng) và <code>ef_search</code> (số ứng viên xét lúc tìm — <strong>đây là núm đánh đổi recall với độ trễ</strong>, điều chỉnh được lúc chạy mà không phải dựng lại index).</p>
+</section>
+
+<section id="rag-s8">
+  <div class="sh"><b>08</b><h2>Hybrid search</h2></div>
+<pre><code>Vector search bắt được Ý NGHĨA:
+    "làm sao trả lại hàng"  →  tìm được đoạn nói về "quy trình đổi trả"
+
+BM25 (từ khoá) bắt được ĐÚNG CHỮ:
+    "mã lỗi E-4021"        →  vector search có thể bỏ sót hoàn toàn
+    tên riêng, mã sản phẩm, số hiệu văn bản, thuật ngữ hiếm</code></pre>
+  <p>Hai phương pháp <strong>bổ sung cho nhau</strong>, và điểm yếu của vector search là chỗ hay bị bỏ qua: nó nén cả đoạn văn vào một vector, nên một mã lỗi cụ thể chỉ là một chi tiết nhỏ bị làm loãng. BM25 thì khớp chính xác chuỗi đó.</p>
+<pre><code>Hợp nhất bằng Reciprocal Rank Fusion:
+
+    score(d) = Σ  1 / (k + rank_i(d))            với k thường là 60
+
+Ví dụ một đoạn xếp thứ 2 theo vector và thứ 5 theo BM25:
+    score = 1/62 + 1/65 = 0.0315
+
+RRF chỉ dùng THỨ HẠNG, không dùng điểm số thô
+→ không cần chuẩn hoá hai loại điểm về cùng thang, vốn là việc rất khó làm đúng.</code></pre>
+  <div class="note">
+    <h4>Vì sao RRF được ưa dùng</h4>
+    Điểm cosine nằm trong khoảng −1 tới 1 còn điểm BM25 không có giới hạn trên và phụ thuộc độ dài tài liệu. Chuẩn hoá hai thang này về cùng một cơ sở để cộng lại là bài toán không có lời giải sạch. RRF lách qua bằng cách chỉ dùng thứ hạng — đơn giản, không cần tinh chỉnh, và thực nghiệm cho thấy nó rất mạnh.
+  </div>
+</section>
+
+<section id="rag-s9">
+  <div class="sh"><b>09</b><h2>Reranking</h2></div>
+<pre><code>Bi-encoder (dùng cho embedding):
+    nhúng câu hỏi và đoạn văn RIÊNG rẽ, so sánh bằng cosine
+    → nhanh, nhúng trước được, tìm được trong hàng triệu đoạn
+    → nhưng hai bên không "nhìn thấy" nhau
+
+Cross-encoder (dùng cho rerank):
+    đưa CẢ HAI vào model cùng lúc: [câu hỏi] [SEP] [đoạn văn]
+    → attention chạy giữa mọi từ của câu hỏi và mọi từ của đoạn
+    → chính xác hơn nhiều
+    → nhưng phải chạy model cho TỪNG cặp, không nhúng trước được</code></pre>
+<pre><code>Đường ống hai tầng:
+
+    truy xuất top-50 bằng bi-encoder      (nhanh, recall cao)
+        ↓
+    rerank bằng cross-encoder → top-5     (chậm nhưng chỉ 50 cặp)
+        ↓
+    đưa vào LLM</code></pre>
+  <div class="note key">
+    <h4>Vì sao reranking là nâng cấp có lãi nhất</h4>
+    Theo kinh nghiệm phổ biến, thêm reranker cải thiện chất lượng RAG nhiều hơn hầu hết mọi tinh chỉnh khác — hơn cả việc đổi model embedding hay điều chỉnh chunk. Lý do là bi-encoder phải nén đoạn văn thành một vector <em>trước khi</em> biết câu hỏi là gì, còn cross-encoder được xem cả hai cùng lúc. Chi phí chỉ là độ trễ thêm vài chục mili giây cho 50 cặp.
+  </div>
+</section>
+
+<section id="rag-s10">
+  <div class="sh"><b>10</b><h2>Dựng context</h2></div>
+  <table>
+    <tr><th>Quyết định</th><th>Hướng dẫn</th></tr>
+    <tr><td>Số đoạn</td><td>3–10 sau rerank. Nhiều hơn thường làm loãng chứ không giúp thêm</td></tr>
+    <tr><td><strong>Thứ tự</strong></td><td>Đặt đoạn liên quan nhất ở <strong>đầu hoặc cuối</strong>, không để giữa</td></tr>
+    <tr><td>Kèm metadata</td><td>Nguồn, ngày, tiêu đề mục — để LLM trích dẫn được và biết cái nào mới hơn</td></tr>
+    <tr><td>Đánh số đoạn</td><td>Cho LLM tham chiếu bằng số khi trích dẫn</td></tr>
+    <tr><td>Ngân sách token</td><td>Chốt cứng; cắt bớt đoạn xếp cuối chứ không cắt giữa một đoạn</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Lost in the middle</h4>
+    Thực nghiệm cho thấy LLM chú ý <strong>kém nhất tới phần giữa</strong> của một context dài — thông tin ở đầu và cuối được dùng tốt hơn rõ rệt. Hệ quả trực tiếp: sau khi rerank, đừng xếp các đoạn theo thứ tự điểm giảm dần một cách máy móc. Đặt đoạn tốt nhất ở đầu <em>và</em> đoạn tốt thứ hai ở cuối là một mẹo đơn giản có hiệu quả đo được.
+  </div>
+  <p>Về việc <strong>xử lý câu hỏi</strong> trước khi truy xuất, hai kỹ thuật đáng biết: <em>viết lại truy vấn</em> cho hội thoại nhiều lượt — câu "còn cái kia thì sao?" không truy xuất được gì nếu không được viết lại thành câu hỏi đầy đủ; và <em>sinh nhiều truy vấn</em> từ một câu hỏi rồi hợp nhất kết quả, hữu ích khi câu hỏi có nhiều khía cạnh.</p>
+</section>
+
+<section id="rag-s11">
+  <div class="sh"><b>11</b><h2>Sinh chữ và trích dẫn</h2></div>
+<pre><code>Bạn là trợ lý trả lời dựa trên tài liệu được cung cấp.
+
+QUY TẮC:
+- Chỉ dùng thông tin trong các đoạn dưới đây.
+- Trích dẫn số đoạn cho mỗi khẳng định, dạng [1], [2].
+- Nếu các đoạn KHÔNG chứa đủ thông tin, hãy nói rõ điều đó
+  và đừng suy đoán.
+
+ĐOẠN 1 (nguồn: chính-sách-2026.pdf, mục Bảo hành):
+...
+
+CÂU HỎI: ...</code></pre>
+  <table>
+    <tr><th>Yêu cầu</th><th>Vì sao</th></tr>
+    <tr><td><strong>Bắt trích dẫn</strong></td><td>Người dùng kiểm chứng được; và bản thân việc phải trích dẫn làm giảm bịa đặt</td></tr>
+    <tr><td><strong>Cho phép từ chối</strong></td><td>Không có lối thoát này thì model buộc phải bịa khi không có bằng chứng</td></tr>
+    <tr><td>Ghi rõ nguồn và ngày</td><td>Khi hai đoạn xung đột, model biết cái nào mới hơn</td></tr>
+    <tr><td>Nói rõ khi thông tin xung đột</td><td>Tốt hơn là chọn bừa một bên</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Cho phép từ chối là thay đổi có tác dụng lớn nhất</h4>
+    Nếu prompt không nói rõ rằng "không tìm thấy" là một câu trả lời hợp lệ, model sẽ luôn cố tạo ra một câu trả lời từ bất cứ gì có trong context — kể cả khi các đoạn hoàn toàn không liên quan. Đây là nguồn bịa đặt lớn nhất trong hệ thống RAG, và nó nối trực tiếp với điểm ở bài fine-tuning: dữ liệu huấn luyện cũng cần có ví dụ từ chối.
+  </div>
+</section>
+
+<section id="rag-s12">
+  <div class="sh"><b>12</b><h2>Đánh giá — bắt buộc tách hai tầng</h2></div>
+<pre><code>Không tách thì không debug được. Đo riêng:
+
+TẦNG TRUY XUẤT — có lấy được đoạn đúng không?
+    recall@k     : đoạn chứa đáp án có nằm trong top-k không
+    MRR          : nó xếp thứ mấy
+    → cần một bộ dữ liệu vàng: (câu hỏi, đoạn nào chứa đáp án)
+
+TẦNG SINH CHỮ — có dùng đúng đoạn đó không?
+    faithfulness : câu trả lời có được các đoạn ủng hộ không, hay bịa
+    relevance    : có trả lời đúng câu hỏi không
+    citation     : trích dẫn có đúng đoạn không</code></pre>
+  <p><strong>Cách dựng bộ dữ liệu vàng</strong> — phần khó nhất và không tránh được:</p>
+  <ul>
+    <li>Lấy <strong>câu hỏi thật</strong> từ log người dùng, không tự nghĩ ra. Câu hỏi tự nghĩ luôn dễ hơn câu hỏi thật.</li>
+    <li>Với mỗi câu, người thật xác định đoạn nào chứa đáp án. 50–200 câu là đủ để bắt hầu hết vấn đề.</li>
+    <li>Giữ cả những câu <strong>không có đáp án</strong> trong kho — để kiểm tra hệ thống có biết từ chối hay không.</li>
+  </ul>
+  <div class="note">
+    <h4>Vì sao recall@k là chỉ số quan trọng nhất</h4>
+    Vì nó là <strong>trần</strong> của toàn hệ thống: nếu đoạn đúng không nằm trong context, LLM giỏi tới đâu cũng không trả lời đúng được. Nên khi cải thiện RAG, tôi luôn đo recall@k trước — nếu nó đang ở 60% thì mọi công sức tinh chỉnh prompt đều vô nghĩa so với việc sửa tầng truy xuất.
+  </div>
+</section>
+
+<section id="rag-s13">
+  <div class="sh"><b>13</b><h2>Cây debug — khi RAG trả lời sai</h2></div>
+<pre><code>Câu trả lời sai.
+
+1. Thông tin đó CÓ trong kho tài liệu không?
+   KHÔNG → đây là vấn đề dữ liệu, không phải vấn đề RAG. Bổ sung tài liệu.
+   CÓ    → tiếp
+
+2. Đoạn chứa đáp án có CÒN NGUYÊN sau khi chunk không?
+   KHÔNG → chunking cắt đứt thông tin. Tăng overlap, cắt theo cấu trúc.
+   CÓ    → tiếp
+
+3. Truy xuất có LẤY ĐƯỢC đoạn đó không? (đo recall@k)
+   KHÔNG → tầng truy xuất sai:
+            · thử hybrid search nếu câu hỏi có mã, tên riêng
+            · kiểm tra tiền tố của model embedding
+            · kiểm tra index có phải gần đúng và bỏ sót không
+            · thêm reranker
+   CÓ    → tiếp
+
+4. Đoạn đó có NẰM TRONG context gửi cho LLM không?
+   KHÔNG → bị cắt vì ngân sách token, hoặc xếp ngoài top-k. Tăng k.
+   CÓ    → tiếp
+
+5. LLM có DÙNG đoạn đó không?
+   KHÔNG → vấn đề ở tầng sinh chữ:
+            · đoạn bị đặt ở giữa context — đổi thứ tự
+            · prompt chưa đủ rõ về việc phải dựa vào tài liệu
+            · model quá yếu cho tác vụ
+   CÓ mà vẫn sai → hai đoạn xung đột, hoặc chính tài liệu sai</code></pre>
+  <div class="note key">
+    <h4>Đây là câu trả lời cho câu hỏi phỏng vấn hay gặp nhất về RAG</h4>
+    "Hệ thống RAG của em trả lời sai thì em debug thế nào?" — trả lời bằng năm bước có thứ tự này, thay vì nói "em kiểm tra lại prompt và đổi vector DB", là khác biệt rõ nhất giữa người đã vận hành hệ thống thật và người mới đọc tài liệu.
+  </div>
+</section>
+
+<section id="rag-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Không có bộ đánh giá</h4><p>Mọi thay đổi đều là phỏng đoán. 50 câu hỏi thật kèm đoạn đúng là đủ để bắt đầu.</p></div>
+    <div class="card bad"><h4>Chunk không overlap</h4><p>Câu trả lời bị cắt ngang ranh giới và không chunk nào chứa đủ.</p></div>
+    <div class="card bad"><h4>Chỉ dùng vector search</h4><p>Bỏ sót mã lỗi, tên riêng, số hiệu văn bản. Thêm BM25 và hợp nhất bằng RRF.</p></div>
+    <div class="card bad"><h4>Không cho model từ chối</h4><p>Nó buộc phải bịa khi context không chứa đáp án.</p></div>
+    <div class="card bad"><h4>Xếp đoạn tốt nhất vào giữa context</h4><p>Lost in the middle — model chú ý kém nhất ở đó.</p></div>
+    <div class="card bad"><h4>Đổi model embedding mà không nhúng lại kho</h4><p>Vector của hai model không so sánh được. Kết quả trở thành ngẫu nhiên.</p></div>
+  </div>
+</section>
+
+<section id="rag-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Hệ thống RAG trả lời sai — bạn debug thế nào?</summary>
+  <p>Tôi đi theo năm bước có thứ tự. Một: thông tin đó có trong kho không — nếu không thì đây là vấn đề dữ liệu chứ không phải RAG. Hai: đoạn chứa đáp án có còn nguyên sau khi chunk không — nếu bị cắt đôi thì không kỹ thuật truy xuất nào cứu được. Ba: truy xuất có lấy được nó không, đo bằng recall@k. Bốn: nó có nằm trong context gửi cho LLM không, hay bị cắt vì ngân sách token. Năm: LLM có dùng nó không — nếu có mà vẫn sai thì thường là hai đoạn xung đột hoặc chính tài liệu sai. Việc tách được <b>lỗi truy xuất</b> khỏi <b>lỗi sinh chữ</b> là điều quan trọng nhất, vì cách chữa hoàn toàn khác nhau.</p></details>
+
+  <details class="qa"><summary>Chunk size ảnh hưởng thế nào?</summary>
+  <p>Chunk nhỏ cho embedding tập trung nên tìm kiếm chính xác hơn, nhưng mất ngữ cảnh và có thể cắt đứt câu trả lời. Chunk lớn giữ đủ ngữ cảnh nhưng embedding bị loãng vì một vector phải đại diện nhiều ý, và tốn context của LLM cho phần không liên quan. Khoảng thường dùng là 300–600 token với overlap 10–20%. Overlap tồn tại để chống chế độ lỗi tinh vi nhất: thông tin trải qua hai câu mà điểm cắt rơi đúng giữa, khi đó không chunk nào chứa đủ và hệ thống chắc chắn sai dù truy xuất hoàn hảo. Cách phá đánh đổi này là chunking đa mức — nhúng đoạn nhỏ để tìm, trả về đoạn lớn để đọc.</p></details>
+
+  <details class="qa"><summary>Vì sao cần hybrid search chứ không chỉ vector?</summary>
+  <p>Vì vector search nén cả đoạn văn vào một vector nên các chi tiết chính xác bị làm loãng — mã lỗi, tên riêng, số hiệu văn bản, thuật ngữ hiếm đều dễ bị bỏ sót. BM25 khớp đúng chuỗi ký tự nên bắt được chính những thứ đó, còn vector bắt được ý nghĩa khi người dùng diễn đạt khác cách viết trong tài liệu. Hợp nhất bằng Reciprocal Rank Fusion — chỉ dùng thứ hạng thay vì điểm thô, nên không phải chuẩn hoá cosine với BM25 về cùng thang, vốn là việc không có lời giải sạch.</p></details>
+
+  <details class="qa"><summary>Reranking là gì và vì sao nó giúp nhiều?</summary>
+  <p>Embedding dùng bi-encoder: nhúng câu hỏi và đoạn văn riêng rẽ rồi so cosine, nên nhúng trước được và tìm được trong hàng triệu đoạn — nhưng hai bên không nhìn thấy nhau. Reranker dùng cross-encoder: đưa cả câu hỏi và đoạn văn vào model cùng lúc để attention chạy giữa mọi từ của hai bên, chính xác hơn nhiều nhưng phải chạy cho từng cặp. Nên đường ống hai tầng: bi-encoder lấy top-50 nhanh, cross-encoder rerank xuống top-5. Đây thường là nâng cấp có lãi nhất cho một hệ RAG, vì bi-encoder buộc phải nén đoạn văn thành vector <em>trước khi</em> biết câu hỏi là gì.</p></details>
+
+  <details class="qa"><summary>Với model có context 200k token, còn cần RAG không?</summary>
+  <p>Tuỳ quy mô dữ liệu. Nếu tài liệu chỉ vài chục nghìn token và cố định — một hợp đồng, một tài liệu sản phẩm — thì nhét hết vào context đơn giản hơn và chính xác hơn, vì không có bước nào bỏ sót. Nhưng với kho lớn thì RAG là lựa chọn duy nhất, và nó còn thắng ở ba điểm: chi phí mỗi câu hỏi chỉ tính trên vài nghìn token, độ trễ thấp hơn vì prefill ngắn, và biết được đoạn nào đã được dùng nên trích dẫn được. Cách làm phổ biến hiện nay là kết hợp: dùng RAG thu hẹp xuống 20–50 đoạn rồi đưa hết vào context dài.</p></details>
+
+  <details class="qa"><summary>Bạn đánh giá một hệ RAG thế nào?</summary>
+  <p>Tách hai tầng, bắt buộc. Tầng truy xuất đo recall@k và MRR — cần một bộ dữ liệu vàng gồm câu hỏi thật lấy từ log kèm nhãn đoạn nào chứa đáp án, khoảng 50–200 câu là đủ, và phải có cả những câu <em>không</em> có đáp án trong kho để kiểm tra hệ thống có biết từ chối. Tầng sinh chữ đo tính trung thực với ngữ cảnh, tính liên quan với câu hỏi, và trích dẫn có đúng đoạn. Recall@k là chỉ số tôi xem trước tiên vì nó là trần của cả hệ thống: đoạn đúng không có trong context thì LLM giỏi tới đâu cũng không trả lời đúng được.</p></details>
+</section>
+
+<footer>Deep dive · RAG đầu–cuối · lab dùng độ trùng từ khoá thay cho embedding thật; các chế độ lỗi được minh hoạ thì giống hệ thống thật.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../assets/catalog.js"></script>
+<script src="../../../assets/search-index.js"></script>
+<script src="../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

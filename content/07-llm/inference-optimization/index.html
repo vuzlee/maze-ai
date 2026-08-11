@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suy luận &amp; tối ưu chi phí — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../index.html">← Tất cả bài</a> <span id="crumbTitle">LLM &amp; GenAI · Suy luận &amp; tối ưu chi phí</span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-inference" data-title="Suy luận &amp; tối ưu chi phí" data-tag="Vận hành" data-blurb="Prefill so với decode, tính KV cache, GQA, continuous batching, speculative decoding, bảng giảm chi phí.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · vận hành</p>
+  <h1>Suy luận &amp;<br><em>tối ưu chi phí</em></h1>
+  <p class="lede">Một model đã huấn luyện xong thì mọi bài toán còn lại là kỹ thuật hệ thống. Bài này chốt khác biệt giữa <b>prefill và decode</b> — và vì sao nó quyết định mọi tối ưu, cách <b>tính dung lượng KV cache</b>, vì sao <b>continuous batching</b> tăng thông lượng nhiều lần, và bảng giảm chi phí xếp theo mức lãi.</p>
+</header>
+
+
+<section id="inference-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>Một request đi qua HAI pha có tính chất trái ngược:
+
+PREFILL   xử lý toàn bộ prompt một lượt
+          nhiều token cùng lúc → GIỚI HẠN BỞI PHÉP TÍNH
+          quyết định TTFT (thời gian tới token đầu tiên)
+
+DECODE    sinh từng token một, mỗi lần một token
+          phải đọc TOÀN BỘ trọng số cho mỗi token → GIỚI HẠN BỞI BỘ NHỚ
+          quyết định TPOT (thời gian mỗi token sau đó)
+
+→ Mọi kỹ thuật tối ưu đều nhằm vào MỘT trong hai pha, không phải cả hai.</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Prefill thiếu <strong>sức tính</strong>; decode thiếu <strong>băng thông bộ nhớ</strong>. Biết một tối ưu tác động vào pha nào là biết nó có giúp được bài toán của bạn hay không — và đó là điều phân biệt câu trả lời có hệ thống với việc kể tên công cụ.
+  </div>
+</section>
+
+<section id="inference-s2">
+  <div class="sh"><b>02</b><h2>Prefill và decode — vì sao khác nhau về bản chất</h2></div>
+<pre><code>PREFILL: prompt 2000 token, xử lý cùng lúc
+    mỗi trọng số được đọc MỘT lần và dùng cho 2000 token
+    → tỉ lệ phép tính / byte đọc RẤT CAO
+    → GPU chạy hết công suất tính toán
+
+DECODE: sinh token thứ 2001
+    mỗi trọng số được đọc MỘT lần và dùng cho ĐÚNG MỘT token
+    → tỉ lệ phép tính / byte đọc RẤT THẤP
+    → GPU đứng chờ bộ nhớ, phần lớn năng lực tính toán bỏ không</code></pre>
+<pre><code>Ước lượng thô cho model 7B ở fp16 (14 GB trọng số):
+
+Băng thông một GPU tầm trung ≈ 900 GB/s
+Thời gian đọc hết trọng số một lần ≈ 14 / 900 ≈ 15 ms
+→ với batch = 1, tốc độ sinh tối đa ≈ 65 token/giây
+
+Con số này KHÔNG phụ thuộc vào việc GPU mạnh bao nhiêu về FLOPs
+— nó bị chặn bởi băng thông.</code></pre>
+  <div class="note key">
+    <h4>Hệ quả quan trọng nhất của việc decode bị chặn bởi bộ nhớ</h4>
+    Với batch = 1, GPU đọc hết trọng số chỉ để sinh <em>một</em> token. Với batch = 32, nó đọc <strong>cùng một lượng trọng số</strong> nhưng sinh ra 32 token. Nghĩa là <strong>thông lượng tăng gần 32 lần mà độ trễ mỗi request gần như không đổi</strong> — cho tới khi chạm giới hạn tính toán. Đây là lý do batching là tối ưu có lãi nhất, và là nền của mọi hệ thống phục vụ LLM.
+  </div>
+</section>
+
+<section id="inference-s3">
+  <div class="sh"><b>03</b><h2>KV cache</h2></div>
+<pre><code>Không có cache: sinh token thứ n phải tính lại K và V cho cả n-1 token trước
+→ chi phí O(n²) cho cả câu, lặp lại công việc đã làm
+
+Có cache: lưu K và V của mọi token đã xử lý
+→ token mới chỉ tính K, V của CHÍNH NÓ rồi attend vào cache
+→ chi phí O(n) cho cả câu
+
+Cái giá: BỘ NHỚ. Và nó là ràng buộc chính của hệ thống phục vụ LLM.</code></pre>
+<pre><code>Công thức:
+
+    bytes = 2 × L × n_kv_heads × head_dim × seq_len × batch × bytes_mỗi_số
+            ↑ hệ số 2 cho K và V
+
+Ví dụ model 8B kiểu Llama-3 (L = 32, n_kv_heads = 8, head_dim = 128, fp16):
+
+    mỗi token: 2 × 32 × 8 × 128 × 2 byte = 131.072 byte = 128 KB
+    context 8.000 token, batch 1:  ~1 GB
+    context 8.000 token, batch 32: ~32 GB     ← lớn hơn cả trọng số model</code></pre>
+  <div class="note warn">
+    <h4>KV cache thường là thứ hết trước, không phải trọng số</h4>
+    Trọng số là <strong>hằng số</strong> — nạp một lần, dùng cho mọi request. KV cache <strong>tỉ lệ với batch × độ dài context</strong>, nên nó là phần tăng không giới hạn. Trên một GPU 80GB phục vụ model 8B, trọng số chỉ chiếm 16GB còn 64GB còn lại là hạn mức cho KV cache — và chính con số đó quyết định bạn phục vụ được bao nhiêu request đồng thời.
+  </div>
+</section>
+
+<section id="inference-s4">
+  <div class="sh"><b>04</b><h2>Lab: KV cache và chi phí</h2></div>
+  <div class="lab">
+    <div class="bar">
+      <div><label>số lớp</label><input type="number" id="iL" value="32" min="1"></div>
+      <div><label>head_dim</label><input type="number" id="ihd" value="128" min="8"></div>
+      <div><label>số head Q</label><input type="number" id="inq" value="32" min="1"></div>
+      <div><label>kiểu attention</label>
+        <select id="iatt">
+          <option value="mha">MHA — n_kv = n_q</option>
+          <option value="gqa" selected>GQA — n_kv = n_q / 4</option>
+          <option value="mqa">MQA — n_kv = 1</option>
+        </select>
+      </div>
+      <div><label>độ dài context</label><input type="number" id="iseq" value="8192" min="128"></div>
+      <div><label>batch</label><input type="number" id="ibs" value="32" min="1"></div>
+      <div><label>kiểu số</label>
+        <select id="idt"><option value="2" selected>fp16 — 2 byte</option><option value="1">int8 — 1 byte</option></select>
+      </div>
+      <div><label>VRAM khả dụng cho cache (GB)</label><input type="number" id="ivram" value="64" min="1"></div>
+    </div>
+    <div id="iview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Đổi kiểu attention từ GQA sang MHA: KV cache tăng <strong>bốn lần</strong> và số request đồng thời tối đa giảm bốn lần — cùng một GPU, cùng một model. Đó là lý do mọi model mới đều dùng GQA. Lượng tử hoá cache xuống int8 cho thêm một lần gấp đôi.
+    </p>
+  </div>
+</section>
+
+<section id="inference-s5">
+  <div class="sh"><b>05</b><h2>GQA và MQA — giảm KV cache từ kiến trúc</h2></div>
+<pre><code>MHA — Multi-Head Attention (Transformer gốc)
+    mỗi head Q có K, V riêng → n_kv = n_q = 32
+    KV cache lớn nhất, chất lượng chuẩn tham chiếu
+
+GQA — Grouped-Query Attention
+    nhiều head Q CHIA SẺ một cặp K, V → n_kv = 8 (4 head Q dùng chung)
+    KV cache giảm 4 lần, chất lượng gần như không đổi
+
+MQA — Multi-Query Attention
+    MỌI head Q chia sẻ MỘT cặp K, V → n_kv = 1
+    KV cache giảm 32 lần, nhưng chất lượng tụt rõ hơn</code></pre>
+  <table>
+    <tr><th></th><th>MHA</th><th>GQA</th><th>MQA</th></tr>
+    <tr><td>KV cache tương đối</td><td>1×</td><td><strong>1/4</strong></td><td>1/32</td></tr>
+    <tr><td>Chất lượng</td><td>Chuẩn</td><td>Gần bằng</td><td>Tụt nhận thấy được</td></tr>
+    <tr><td>Dùng ở</td><td>Model đời đầu</td><td><strong>Llama-2 70B, Llama-3, Mistral, gần như mọi model mới</strong></td><td>PaLM, một số model tối ưu cực đoan</td></tr>
+  </table>
+  <div class="note">
+    <h4>Vì sao GQA là điểm ngọt</h4>
+    Nó giảm KV cache bốn lần — tức phục vụ được bốn lần số request đồng thời trên cùng phần cứng — với mức mất chất lượng gần như không đo được. MQA giảm nhiều hơn nữa nhưng phải trả giá thật. Việc gần như toàn bộ model mới chọn GQA cho thấy đây là đánh đổi tốt nhất trong dải, và nói được điều này là dấu hiệu bạn hiểu kiến trúc được chọn <em>vì lý do vận hành</em>, không chỉ vì chất lượng.
+  </div>
+</section>
+
+<section id="inference-s6">
+  <div class="sh"><b>06</b><h2>Batching — static và continuous</h2></div>
+<pre><code>STATIC BATCHING (cách ngây thơ)
+    gom 8 request thành một batch, chạy tới khi TẤT CẢ xong
+
+    req A: ████                      xong sớm nhưng phải CHỜ
+    req B: ████████████████████      dài nhất, quyết định thời gian cả batch
+    req C: ██████                    chờ
+    req D: ███                        chờ
+           └── GPU chạy nhưng phần lớn khe đang xử lý request đã xong ──┘
+
+CONTINUOUS BATCHING (cách đúng)
+    lập lịch ở cấp TỪNG BƯỚC decode, không phải cấp request
+
+    req A: ████ → xong, RỜI batch ngay
+    req E:     ████████ → gia nhập vào chỗ A vừa trống
+    req B: ████████████████████
+    → GPU luôn kín chỗ</code></pre>
+  <p><strong>Vì sao chênh lệch lớn:</strong> độ dài phản hồi trong thực tế lệch rất mạnh — có request sinh 10 token, có request sinh 2000. Với static batching, cả batch bị giữ bởi request dài nhất, nên phần lớn khe trong batch chạy không tải. Continuous batching cho thông lượng cao hơn nhiều lần trên cùng phần cứng, và đây là đóng góp chính của các máy phục vụ như vLLM và TGI.</p>
+  <div class="note warn">
+    <h4>Đánh đổi giữa thông lượng và độ trễ</h4>
+    Batch lớn cho thông lượng cao nhưng làm <strong>TPOT tăng</strong> — mỗi bước decode phải tính cho nhiều request hơn. Nên phải chọn theo yêu cầu sản phẩm: chatbot cần token ra nhanh nên giữ batch vừa phải; xử lý hàng loạt thì đẩy batch lên tối đa. Nêu được đánh đổi này thay vì nói "batch càng lớn càng tốt" là điểm phân biệt rõ.
+  </div>
+</section>
+
+<section id="inference-s7">
+  <div class="sh"><b>07</b><h2>PagedAttention</h2></div>
+<pre><code>VẤN ĐỀ: không biết trước request sẽ sinh bao nhiêu token,
+nên phải cấp phát cache theo độ dài TỐI ĐA có thể.
+
+    request thực tế dùng 200 token, đã cấp phát cho 4096
+    → phân mảnh, phần lớn bộ nhớ đã cấp phát bị bỏ không
+
+GIẢI PHÁP: quản lý KV cache theo KHỐI cố định, như phân trang của hệ điều hành
+
+    cache logic:  [khối 0][khối 1][khối 2]...
+    cache vật lý: rải rác khắp VRAM, có bảng ánh xạ
+
+    → cấp phát theo nhu cầu thực, gần như không phân mảnh
+    → và các request có PREFIX GIỐNG NHAU dùng chung khối</code></pre>
+  <p>Lợi ích thứ hai — <strong>chia sẻ prefix</strong> — quan trọng hơn vẻ ngoài. Trong thực tế, hàng nghìn request thường dùng chung một system prompt dài. Với PagedAttention, phần KV cache của prefix đó được lưu <em>một lần</em> và mọi request trỏ vào cùng các khối, thay vì mỗi request giữ một bản riêng.</p>
+  <div class="note">
+    <h4>Cách nói gọn</h4>
+    "PagedAttention quản lý KV cache theo khối cố định giống phân trang bộ nhớ, nên không phải cấp phát trước theo độ dài tối đa — bỏ được phân mảnh, và cho phép nhiều request chia sẻ khối của phần prefix giống nhau. Kết quả là số request đồng thời tăng đáng kể trên cùng lượng VRAM."
+  </div>
+</section>
+
+<section id="inference-s8">
+  <div class="sh"><b>08</b><h2>Lượng tử hoá khi suy luận</h2></div>
+  <table>
+    <tr><th>Lượng tử hoá gì</th><th>Tác động</th><th>Ghi chú</th></tr>
+    <tr><td><strong>Trọng số</strong> — int8, int4</td><td>Model nhỏ hơn 2–4 lần; decode nhanh hơn vì đọc ít byte</td><td>Giúp đúng vào chỗ decode bị chặn: ít byte phải đọc hơn</td></tr>
+    <tr><td><strong>KV cache</strong> — int8, fp8</td><td>Cache nhỏ 2 lần → gấp đôi số request đồng thời</td><td>Thường mất rất ít chất lượng; đáng làm gần như luôn</td></tr>
+    <tr><td>Activation</td><td>Cần cho phần cứng chỉ tính số nguyên</td><td>Khó hơn, dễ mất chất lượng</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao lượng tử hoá trọng số giúp <em>tốc độ</em>, không chỉ dung lượng</h4>
+    Vì decode bị chặn bởi băng thông bộ nhớ. Trọng số int4 chỉ cần đọc <strong>1/4 số byte</strong> so với fp16, nên thời gian mỗi bước decode giảm gần tương ứng — dù số phép tính không đổi. Đây là trường hợp mà giảm bộ nhớ trực tiếp thành tăng tốc, khác hẳn với các bài toán bị chặn bởi tính toán. Nói được cơ chế này là câu trả lời ở mức hệ thống.
+  </div>
+  <p>Lưu ý về đo lường: lượng tử hoá <em>chỉ trọng số</em> giúp nhiều ở batch nhỏ nơi băng thông là nút thắt, nhưng ở batch rất lớn thì hệ thống chuyển sang bị chặn bởi tính toán và lợi ích giảm đi — vì lúc đó phải giải nén trọng số về dạng tính toán được.</p>
+</section>
+
+<section id="inference-s9">
+  <div class="sh"><b>09</b><h2>Speculative decoding</h2></div>
+<pre><code>Ý tưởng: dùng một model NHỎ đề xuất trước nhiều token,
+rồi model LỚN kiểm tra tất cả trong MỘT lượt forward.
+
+    1. model nháp (nhỏ, nhanh) sinh k = 4 token đề xuất
+    2. model chính chạy MỘT lượt forward trên cả 4 token đó
+    3. so sánh: chấp nhận các token khớp, loại từ chỗ lệch đầu tiên
+    4. lặp lại
+
+Nếu chấp nhận được 3 trong 4 token → sinh 3 token với chi phí gần bằng 1.</code></pre>
+  <div class="note key">
+    <h4>Vì sao việc này khả thi và không làm đổi kết quả</h4>
+    <p><strong>Khả thi</strong> vì decode bị chặn bởi bộ nhớ: kiểm tra 4 token trong một lượt forward tốn gần bằng sinh 1 token, do trọng số vẫn chỉ được đọc một lần. Phần năng lực tính toán vốn bỏ không giờ được dùng.</p>
+    <p><strong>Không đổi kết quả</strong> vì cơ chế chấp nhận được thiết kế để phân phối đầu ra <em>y hệt</em> khi giải mã bình thường. Đây không phải một phép xấp xỉ — nó là tăng tốc thuần, và điểm này rất hay bị hiểu sai.</p>
+  </div>
+  <p>Mức tăng tốc thực tế khoảng 1.5–3 lần, phụ thuộc <strong>tỉ lệ chấp nhận</strong> — tức model nháp giống model chính đến đâu. Với văn bản dễ đoán (code, văn bản có cấu trúc) tỉ lệ chấp nhận cao nên lãi nhiều; với văn bản sáng tạo thì ít hơn. Biến thể không cần model nháp riêng cũng tồn tại, dùng chính n-gram trong prompt để đề xuất.</p>
+</section>
+
+<section id="inference-s10">
+  <div class="sh"><b>10</b><h2>Cache prompt</h2></div>
+<pre><code>Nhiều request dùng chung phần đầu prompt:
+
+    [system prompt 2000 token]  ← GIỐNG NHAU ở mọi request
+    [tài liệu RAG 3000 token]   ← giống nhau trong một phiên
+    [câu hỏi 50 token]          ← khác nhau
+
+Không cache: prefill lại 5050 token mỗi lần
+Có cache:    tái dùng KV của 5000 token đầu, chỉ prefill 50 token mới</code></pre>
+  <table>
+    <tr><th>Lợi ích</th><th>Mức độ</th></tr>
+    <tr><td>Giảm TTFT</td><td>Rất đáng kể khi phần prefix chiếm phần lớn prompt</td></tr>
+    <tr><td>Giảm chi phí</td><td>Nhiều nhà cung cấp tính token đã cache với giá thấp hơn hẳn</td></tr>
+    <tr><td>Tăng thông lượng</td><td>GPU không phải làm lại việc cũ</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Hệ quả thiết kế prompt — dễ bị bỏ qua</h4>
+    Cache chỉ dùng được cho <strong>phần đầu giống nhau chính xác</strong>. Nên hãy đặt mọi thứ ổn định lên trước và mọi thứ thay đổi xuống sau: system prompt, sau đó ví dụ few-shot, sau đó tài liệu, cuối cùng là câu hỏi của người dùng. Chèn dấu thời gian hay id request vào <em>đầu</em> prompt sẽ phá sạch cache — một lỗi nhỏ về thứ tự làm mất toàn bộ lợi ích.
+  </div>
+</section>
+
+<section id="inference-s11">
+  <div class="sh"><b>11</b><h2>Bốn chỉ số phải đo</h2></div>
+  <table>
+    <tr><th>Chỉ số</th><th>Nghĩa</th><th>Quan trọng với</th></tr>
+    <tr><td><strong>TTFT</strong><br>time to first token</td><td>Từ lúc nhận request tới token đầu tiên. Chi phối bởi prefill</td><td>Cảm nhận về độ nhạy; quan trọng nhất với chatbot</td></tr>
+    <tr><td><strong>TPOT</strong><br>time per output token</td><td>Thời gian mỗi token sau đó. Chi phối bởi decode</td><td>Tốc độ chữ chạy ra; cần nhanh hơn tốc độ đọc của người</td></tr>
+    <tr><td><strong>Thông lượng</strong></td><td>Tổng token/giây trên cả hệ thống</td><td>Chi phí mỗi request; quan trọng nhất với xử lý hàng loạt</td></tr>
+    <tr><td><strong>Độ trễ p99</strong></td><td>Trường hợp chậm 1%</td><td>Trải nghiệm thật — trung bình che mất vấn đề</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Thông lượng và độ trễ đối nghịch nhau</h4>
+    Tăng batch làm thông lượng lên và TPOT xuống cấp. Không có cấu hình tối ưu cho cả hai, nên <strong>phải chốt yêu cầu trước</strong>: chatbot cần TPOT dưới khoảng 50ms để chữ chạy nhanh hơn người đọc, còn tác vụ hàng loạt thì chỉ quan tâm thông lượng và có thể đẩy batch lên tối đa. Trả lời "tối ưu cả hai" là câu trả lời sai.
+  </div>
+</section>
+
+<section id="inference-s12">
+  <div class="sh"><b>12</b><h2>Giảm chi phí ở tầng ứng dụng — xếp theo mức lãi</h2></div>
+  <table>
+    <tr><th>Kỹ thuật</th><th>Mức tiết kiệm</th><th>Ghi chú</th></tr>
+    <tr><td><strong>1. Cache câu trả lời</strong></td><td>Bằng đúng tỉ lệ trùng lặp — có thể 30–70%</td><td>Rẻ nhất và lãi nhất. Câu hỏi thật trùng lặp nhiều hơn bạn tưởng</td></tr>
+    <tr><td><strong>2. Chọn model theo độ khó</strong></td><td>Rất lớn — model nhỏ rẻ hơn hàng chục lần</td><td>Phân loại độ khó rồi định tuyến; chỉ chuyển lên model lớn khi cần</td></tr>
+    <tr><td><strong>3. Cache prompt</strong></td><td>Đáng kể khi prefix dài và dùng lại</td><td>Cần sắp lại thứ tự prompt cho đúng</td></tr>
+    <tr><td>4. Rút ngắn prompt</td><td>Tỉ lệ trực tiếp với số token bỏ được</td><td>Kiểm tra xem ví dụ few-shot có còn cần thiết không</td></tr>
+    <tr><td>5. Giới hạn token đầu ra</td><td>Token ra thường đắt hơn token vào vài lần</td><td>Đặt <code>max_tokens</code> và yêu cầu trả lời ngắn gọn trong prompt</td></tr>
+    <tr><td>6. Gom xử lý hàng loạt</td><td>Nhiều API có mức giá riêng thấp hơn cho chế độ batch</td><td>Chỉ dùng được khi không cần trả lời ngay</td></tr>
+    <tr><td>7. Tự vận hành model mở</td><td>Rẻ hơn ở quy mô lớn</td><td>Chỉ có lãi khi lưu lượng đủ để GPU không rảnh; cộng chi phí vận hành</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Hai hàng đầu là nơi có gần hết lợi ích</h4>
+    Cache câu trả lời và định tuyến theo độ khó thường tiết kiệm nhiều hơn mọi tối ưu kỹ thuật ở tầng model cộng lại — và cả hai đều làm ở tầng ứng dụng, không cần chạm vào GPU. Nêu chúng <em>trước</em> khi nói về lượng tử hoá và speculative decoding là thứ tự đúng, vì nó cho thấy bạn tối ưu theo chi phí thật chứ không theo độ thú vị kỹ thuật.
+  </div>
+</section>
+
+<section id="inference-s13">
+  <div class="sh"><b>13</b><h2>Bảng quyết định</h2></div>
+  <table>
+    <tr><th>Vấn đề</th><th>Nhắm vào</th><th>Làm gì</th></tr>
+    <tr><td>TTFT quá cao</td><td>Prefill</td><td>Cache prompt, rút ngắn prompt, chia nhỏ prefill theo khối</td></tr>
+    <tr><td>Chữ chạy ra quá chậm</td><td>Decode</td><td>Giảm batch, lượng tử hoá trọng số, speculative decoding</td></tr>
+    <tr><td>Thông lượng thấp, GPU rảnh</td><td>Lập lịch</td><td>Continuous batching, tăng batch tối đa</td></tr>
+    <tr><td>Hết VRAM khi có nhiều request</td><td>KV cache</td><td>GQA, lượng tử hoá cache, PagedAttention, giảm context tối đa</td></tr>
+    <tr><td>Chi phí API quá cao</td><td>Tầng ứng dụng</td><td>Cache câu trả lời, định tuyến model, giới hạn token ra</td></tr>
+    <tr><td>p99 tệ hơn trung bình rất nhiều</td><td>Xếp hàng</td><td>Giới hạn số request đồng thời, đặt hạn mức, tách hàng đợi theo loại request</td></tr>
+  </table>
+</section>
+
+<section id="inference-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Tính VRAM chỉ theo trọng số</h4><p>KV cache thường lớn hơn trọng số ở batch cao. Phải tính cả hai.</p></div>
+    <div class="card bad"><h4>Dùng static batching</h4><p>Cả batch bị giữ bởi request dài nhất. Continuous batching cho thông lượng cao hơn nhiều lần.</p></div>
+    <div class="card bad"><h4>Đặt dấu thời gian ở đầu prompt</h4><p>Phá sạch cache prefix. Thứ ổn định lên trước, thứ thay đổi xuống sau.</p></div>
+    <div class="card bad"><h4>Cố tối ưu cả thông lượng và độ trễ</h4><p>Chúng đối nghịch. Phải chốt yêu cầu sản phẩm trước.</p></div>
+    <div class="card bad"><h4>Chỉ báo độ trễ trung bình</h4><p>Trung bình che mất phần đuôi. Báo p95 và p99.</p></div>
+    <div class="card bad"><h4>Tối ưu model trước khi cache ở tầng ứng dụng</h4><p>Cache câu trả lời và định tuyến model thường lãi hơn mọi tối ưu GPU cộng lại.</p></div>
+  </div>
+</section>
+
+<section id="inference-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Prefill và decode khác nhau thế nào, vì sao điều đó quan trọng?</summary>
+  <p>Prefill xử lý toàn bộ prompt một lượt nên mỗi trọng số được đọc một lần và dùng cho hàng nghìn token — tỉ lệ phép tính trên byte cao, <b>bị chặn bởi sức tính</b>. Decode sinh từng token, mỗi lần đọc toàn bộ trọng số chỉ để tạo một token — <b>bị chặn bởi băng thông bộ nhớ</b>. Điều này quyết định mọi tối ưu: batching và lượng tử hoá trọng số giúp decode vì chúng cải thiện phía bộ nhớ; cache prompt giúp prefill. Nó cũng giải thích vì sao tăng batch làm thông lượng tăng gần tuyến tính mà độ trễ mỗi request gần như không đổi — GPU vẫn đọc cùng lượng trọng số.</p></details>
+
+  <details class="qa"><summary>Tính KV cache cho một model 8B với context 8k, batch 32.</summary>
+  <p>Công thức là <code>2 × L × n_kv_heads × head_dim × seq_len × batch × bytes</code>, hệ số 2 cho K và V. Với model kiểu Llama-3: 32 lớp, 8 head KV nhờ GQA, head_dim 128, fp16 — mỗi token tốn <code>2 × 32 × 8 × 128 × 2 = 131.072</code> byte, tức 128 KB. Context 8k là 1 GB mỗi request, batch 32 là khoảng 32 GB — lớn hơn cả 16 GB trọng số. Đây là lý do KV cache thường là thứ hết trước chứ không phải trọng số, và là ràng buộc quyết định số request đồng thời.</p></details>
+
+  <details class="qa"><summary>Continuous batching là gì và vì sao nó giúp nhiều?</summary>
+  <p>Static batching gom một nhóm request rồi chạy tới khi tất cả xong, nên cả batch bị giữ bởi request dài nhất và các khe của request đã xong chạy không tải. Trong thực tế độ dài phản hồi lệch rất mạnh — có request 10 token, có request 2000 — nên phần lãng phí rất lớn. Continuous batching lập lịch ở cấp <b>từng bước decode</b>: request nào xong thì rời batch ngay, request mới gia nhập vào chỗ trống, nên GPU luôn kín chỗ. Đánh đổi là batch lớn làm TPOT tăng, nên phải chọn mức batch theo yêu cầu sản phẩm.</p></details>
+
+  <details class="qa"><summary>Vì sao lượng tử hoá trọng số làm suy luận nhanh hơn?</summary>
+  <p>Vì decode bị chặn bởi băng thông bộ nhớ, không bởi tính toán. Trọng số int4 chỉ cần đọc một phần tư số byte so với fp16, nên thời gian mỗi bước decode giảm gần tương ứng dù số phép tính không đổi. Đây là trường hợp giảm bộ nhớ trực tiếp thành tăng tốc. Lưu ý ở batch rất lớn thì hệ thống chuyển sang bị chặn bởi tính toán và lợi ích giảm, vì phải giải nén trọng số về dạng tính được.</p></details>
+
+  <details class="qa"><summary>Speculative decoding có làm giảm chất lượng không?</summary>
+  <p>Không. Cơ chế chấp nhận được thiết kế để phân phối đầu ra <b>y hệt</b> khi giải mã bình thường — nó là tăng tốc thuần, không phải xấp xỉ. Nó khả thi vì decode bị chặn bởi bộ nhớ: model chính kiểm tra 4 token đề xuất trong một lượt forward tốn gần bằng sinh 1 token, do trọng số vẫn chỉ đọc một lần, nên phần năng lực tính toán vốn bỏ không được dùng. Mức tăng tốc thực tế 1.5–3 lần, phụ thuộc tỉ lệ chấp nhận — cao với code và văn bản có cấu trúc, thấp hơn với văn bản sáng tạo.</p></details>
+
+  <details class="qa"><summary>Chi phí API LLM của bạn quá cao — bạn làm gì?</summary>
+  <p>Tôi làm ở tầng ứng dụng trước vì đó là nơi có gần hết lợi ích. Một là cache câu trả lời — câu hỏi thật trùng lặp nhiều hơn người ta tưởng, thường tiết kiệm 30–70%. Hai là định tuyến theo độ khó: phân loại request rồi chỉ đưa lên model lớn khi cần, vì model nhỏ rẻ hơn hàng chục lần. Ba là cache prompt, kèm việc sắp lại thứ tự prompt để phần ổn định nằm trước — chèn dấu thời gian vào đầu prompt là phá sạch cache. Rồi mới tới rút ngắn prompt, giới hạn token đầu ra vì token ra đắt hơn token vào, và cân nhắc tự vận hành model mở nếu lưu lượng đủ lớn để GPU không rảnh.</p></details>
+</section>
+
+<footer>Deep dive · suy luận &amp; tối ưu chi phí · số liệu băng thông và bộ nhớ là mức điển hình, dùng để ước lượng bậc độ lớn chứ không phải benchmark.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../assets/catalog.js"></script>
+<script src="../../../assets/search-index.js"></script>
+<script src="../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

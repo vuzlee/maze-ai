@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTP, TCP &amp; caching — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../index.html">← Tất cả bài</a> <span id="crumbTitle">Mạng &amp; giao thức · HTTP, TCP &amp; caching</span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-net" data-title="HTTP, TCP &amp; caching" data-tag="Mạng" data-blurb="Đếm vòng khứ hồi, khi nào được thử lại, backoff có jitter, năm tầng cache, thundering herd, circuit breaker.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Hệ thống · mạng</p>
+  <h1>HTTP, TCP<br>&amp; <em>caching</em></h1>
+  <p class="lede">Phần nền tảng mà mọi vòng phỏng vấn hệ thống đều chạm tới. Bài này đếm <b>số vòng khứ hồi</b> để thấy một kết nối mới tốn bao nhiêu trước khi có byte dữ liệu đầu tiên, chốt khi nào <b>được phép thử lại</b>, năm tầng cache, và vì sao <b>thundering herd</b> làm sập hệ thống ngay khi cache hết hạn.</p>
+</header>
+
+
+<section id="net-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>client                                                      server
+  │  1. DNS: tên miền → địa chỉ IP                    (1 RTT nếu chưa cache)
+  │  2. TCP: bắt tay ba bước                          (1 RTT)
+  │  3. TLS: bắt tay, thoả thuận khoá                 (1–2 RTT)
+  │  4. HTTP: gửi request, nhận response              (1 RTT + thời gian xử lý)
+  ▼
+Với RTT = 100ms, một kết nối MỚI tốn 400–500ms
+TRƯỚC KHI server bắt đầu làm bất cứ việc gì.</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Trong hệ thống phân tán, <strong>số vòng khứ hồi quan trọng hơn băng thông</strong>. Băng thông mua được; RTT bị chặn bởi tốc độ ánh sáng và khoảng cách địa lý. Nên mọi tối ưu mạng đều là một dạng <em>giảm số vòng khứ hồi</em> — tái dùng kết nối, cache, đặt server gần người dùng.
+  </div>
+</section>
+
+<section id="net-s2">
+  <div class="sh"><b>02</b><h2>Đếm vòng khứ hồi</h2></div>
+  <table>
+    <tr><th>Tình huống</th><th>Số RTT trước byte dữ liệu đầu tiên</th></tr>
+    <tr><td>Kết nối mới, HTTP/1.1 + TLS 1.2</td><td>DNS 1 + TCP 1 + TLS 2 + request 1 = <strong>5</strong></td></tr>
+    <tr><td>Kết nối mới, TLS 1.3</td><td>1 + 1 + 1 + 1 = <strong>4</strong></td></tr>
+    <tr><td>Kết nối mới, HTTP/3 (QUIC)</td><td>DNS 1 + QUIC 1 + request 1 = <strong>3</strong> — QUIC gộp transport và TLS</td></tr>
+    <tr><td>DNS đã cache, kết nối mới, TLS 1.3</td><td><strong>3</strong></td></tr>
+    <tr><td><strong>Tái dùng kết nối đang mở</strong></td><td><strong>1</strong> — chỉ còn chính request</td></tr>
+    <tr><td>Có cache và còn hạn</td><td><strong>0</strong> — không ra mạng</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Hai dòng cuối là nơi có gần hết lợi ích</h4>
+    Từ 5 RTT xuống 1 RTT là nhờ <strong>tái dùng kết nối</strong> — keep-alive và connection pool, gần như miễn phí về công sức. Từ 1 xuống 0 là nhờ <strong>cache</strong>. Mọi thứ khác — nâng TLS, đổi HTTP/3 — chỉ tiết kiệm được một hai vòng. Nêu thứ tự ưu tiên này là dấu hiệu bạn tối ưu theo tác động, không theo độ mới của công nghệ.
+  </div>
+  <p><strong>Hệ quả cho code:</strong> mỗi lần tạo một HTTP client mới cho từng request là tự bắt mình trả lại toàn bộ chi phí bắt tay. Dùng một client dùng chung với connection pool là một trong những tối ưu đơn giản nhất mà hiệu quả rõ nhất — và là lỗi rất thường gặp trong code viết vội.</p>
+</section>
+
+<section id="net-s3">
+  <div class="sh"><b>03</b><h2>Lab: ngân sách RTT</h2></div>
+  <div class="lab">
+    <div class="bar">
+      <div><label>RTT (ms)</label><input type="number" id="nrtt" value="80" min="1" max="500"></div>
+      <div><label>phiên bản</label>
+        <select id="nver">
+          <option value="h11_12">HTTP/1.1 + TLS 1.2</option>
+          <option value="h11_13" selected>HTTP/1.1 + TLS 1.3</option>
+          <option value="h2">HTTP/2 + TLS 1.3</option>
+          <option value="h3">HTTP/3 (QUIC)</option>
+        </select>
+      </div>
+      <label class="chk"><input type="checkbox" id="ndns"> DNS đã cache</label>
+      <label class="chk"><input type="checkbox" id="nreuse"> tái dùng kết nối</label>
+      <div><label>server xử lý (ms)</label><input type="number" id="nproc" value="50" min="0"></div>
+      <div><label>số request nối tiếp</label><input type="number" id="nseq" value="1" min="1" max="20"></div>
+    </div>
+    <div id="nview4"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Đặt <strong>số request nối tiếp</strong> lên 10 rồi bật tắt <strong>tái dùng kết nối</strong>: chênh lệch rất lớn, vì không tái dùng thì mỗi request phải bắt tay lại từ đầu. Đó là toàn bộ giá trị của connection pool. Rồi tăng RTT lên 250ms để thấy tình huống người dùng ở xa server.
+    </p>
+  </div>
+</section>
+
+<section id="net-s4">
+  <div class="sh"><b>04</b><h2>TCP — những gì cần biết</h2></div>
+<pre><code>BẮT TAY BA BƯỚC
+    client → SYN
+    server → SYN-ACK
+    client → ACK  (và có thể gửi dữ liệu kèm)
+    → 1 RTT trước khi truyền được dữ liệu
+
+KHỞI ĐỘNG CHẬM
+    TCP không gửi hết tốc độ ngay; nó tăng dần cửa sổ để dò băng thông.
+    → kết nối mới CHẬM ở những KB đầu tiên, kể cả khi đường truyền rộng
+    → lý do nữa để tái dùng kết nối: kết nối đã "nóng" thì cửa sổ đã lớn</code></pre>
+  <table>
+    <tr><th>Khái niệm</th><th>Ý nghĩa vận hành</th></tr>
+    <tr><td>Keep-alive</td><td>Giữ kết nối mở để tái dùng. Bật theo mặc định ở HTTP/1.1, nhưng client phải dùng đúng</td></tr>
+    <tr><td>Head-of-line blocking ở tầng TCP</td><td>Một gói mất làm <em>mọi</em> dữ liệu phía sau phải chờ, vì TCP đảm bảo thứ tự. HTTP/2 không giải quyết được điều này</td></tr>
+    <tr><td>Nagle và delayed ACK</td><td>Có thể gây thêm độ trễ với gói nhỏ; đây là lý do một số hệ thống bật <code>TCP_NODELAY</code></td></tr>
+  </table>
+  <div class="note">
+    <h4>TLS 1.3 nhanh hơn ở đâu</h4>
+    TLS 1.2 cần <strong>2 RTT</strong> để bắt tay; TLS 1.3 gộp lại còn <strong>1 RTT</strong>, và với tính năng nối lại phiên thì có thể gửi dữ liệu ngay ở <strong>0 RTT</strong>. Trên kết nối di động RTT cao, chênh lệch này cảm nhận được rõ. Đây là câu trả lời gọn cho "vì sao nên nâng TLS".
+  </div>
+</section>
+
+<section id="net-s5">
+  <div class="sh"><b>05</b><h2>HTTP/1.1, HTTP/2 và HTTP/3</h2></div>
+  <table>
+    <tr><th></th><th>HTTP/1.1</th><th>HTTP/2</th><th>HTTP/3</th></tr>
+    <tr><td>Tầng vận chuyển</td><td>TCP</td><td>TCP</td><td><strong>QUIC trên UDP</strong></td></tr>
+    <tr><td>Nhiều request song song</td><td>Một request mỗi kết nối tại một thời điểm</td><td><strong>Ghép nhiều luồng trên một kết nối</strong></td><td>Ghép luồng, độc lập thật</td></tr>
+    <tr><td>Head-of-line ở tầng HTTP</td><td>Có</td><td>Giải quyết</td><td>Giải quyết</td></tr>
+    <tr><td>Head-of-line ở tầng TCP</td><td>Có</td><td><strong>Vẫn có</strong></td><td>Giải quyết</td></tr>
+    <tr><td>Nén header</td><td>Không</td><td>HPACK</td><td>QPACK</td></tr>
+    <tr><td>Bắt tay</td><td>TCP + TLS riêng</td><td>TCP + TLS riêng</td><td><strong>Gộp một lần</strong></td></tr>
+  </table>
+  <div class="note key">
+    <h4>Chi tiết hay được hỏi vặn: HTTP/2 chưa giải quyết hết head-of-line</h4>
+    HTTP/2 cho phép nhiều request chạy song song trên một kết nối TCP, nên hết nghẽn ở <em>tầng HTTP</em>. Nhưng TCP vẫn đảm bảo thứ tự byte, nên <strong>một gói bị mất làm mọi luồng phải chờ</strong> — nghẽn chỉ chuyển xuống tầng dưới. HTTP/3 chạy trên QUIC, nơi mỗi luồng có thứ tự riêng, nên gói mất chỉ ảnh hưởng đúng luồng của nó. Nói được điểm này là dấu hiệu hiểu chứ không chỉ nhớ.
+  </div>
+  <p>Với API nội bộ giữa các service, <strong>gRPC trên HTTP/2</strong> là mặc định phổ biến: nhị phân nên nhỏ hơn JSON, ghép luồng nên tái dùng một kết nối cho nhiều lời gọi, và có sẵn định nghĩa giao diện chặt chẽ.</p>
+</section>
+
+<section id="net-s6">
+  <div class="sh"><b>06</b><h2>Idempotency và khi nào được thử lại</h2></div>
+<pre><code>Idempotent = gọi nhiều lần cho kết quả GIỐNG gọi một lần.
+
+GET     idempotent, an toàn      → thử lại tự do
+PUT     idempotent               → thử lại được (đặt lại cùng giá trị)
+DELETE  idempotent               → thử lại được (lần hai trả 404, vẫn đúng ý)
+POST    KHÔNG idempotent         → thử lại có thể tạo BẢN GHI TRÙNG
+PATCH   tuỳ nội dung             → "tăng số dư lên 10" thì không idempotent</code></pre>
+  <div class="note warn">
+    <h4>Vì sao đây là chỗ nguy hiểm nhất</h4>
+    Timeout <strong>không</strong> có nghĩa là request thất bại — nó chỉ có nghĩa là bạn <em>không biết</em>. Server có thể đã xử lý xong và trả về, nhưng phản hồi bị mất trên đường. Thử lại một <code>POST</code> trong tình huống đó tạo ra đơn hàng thứ hai, lần trừ tiền thứ hai. Đây là lỗi gây thiệt hại thật nhiều nhất trong nhóm này.
+  </div>
+<pre><code>GIẢI PHÁP: khoá idempotency
+
+    POST /orders
+    Idempotency-Key: 7f3a-c21e-...        ← client sinh ra, GIỮ NGUYÊN khi thử lại
+
+Server: nếu đã thấy khoá này rồi → trả về kết quả CŨ, không xử lý lại.
+
+→ POST trở thành idempotent trên thực tế, và thử lại an toàn.</code></pre>
+  <p>Đây là cách mọi API thanh toán làm, và nêu ra được nó khi bàn về retry là một điểm cộng rõ — vì nó cho thấy bạn đã nghĩ tới trường hợp phản hồi mất chứ chỉ nghĩ tới trường hợp server lỗi.</p>
+</section>
+
+<section id="net-s7">
+  <div class="sh"><b>07</b><h2>Backoff và jitter</h2></div>
+<pre><code>SAI — thử lại ngay lập tức
+    server đang quá tải, bạn đổ thêm tải vào → làm nó sập hẳn
+
+TỐT HƠN — backoff theo hàm mũ
+    chờ 1s, 2s, 4s, 8s...
+    nhưng: mọi client cùng thất bại lúc t=0 sẽ cùng thử lại lúc t=1, t=3, t=7
+    → tải đến theo TỪNG ĐỢT ĐỒNG BỘ
+
+ĐÚNG — backoff theo hàm mũ CỘNG JITTER
+    chờ = random(0, base × 2^lần_thử)
+    → các client rải đều ra, không dồn cục</code></pre>
+  <table>
+    <tr><th>Nguyên tắc</th><th>Chi tiết</th></tr>
+    <tr><td>Giới hạn số lần thử</td><td>3 lần là thường đủ. Thử mãi chỉ kéo dài sự cố</td></tr>
+    <tr><td><strong>Ngân sách retry</strong></td><td>Chặn tổng số retry ở mức ví dụ 10% tổng request. Ngăn hiệu ứng nhân tải</td></tr>
+    <tr><td>Không thử lại lỗi 4xx</td><td>Request sai thì thử lại vẫn sai. Chỉ 429 là ngoại lệ</td></tr>
+    <tr><td>Tôn trọng <code>Retry-After</code></td><td>Server đã nói khi nào nên quay lại; đừng đoán</td></tr>
+    <tr><td>Không retry lồng nhau</td><td>Ba tầng service mỗi tầng retry 3 lần thành 27 request cho một lời gọi</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Hiệu ứng nhân tải khi có sự cố</h4>
+    Khi một service bắt đầu chậm, mọi client đều timeout và đều thử lại. Tải đến service đó <strong>tăng gấp nhiều lần</strong> đúng lúc nó yếu nhất — đây là cơ chế biến một sự cố nhỏ thành sập toàn hệ thống. Ngân sách retry và circuit breaker tồn tại để chặn đúng vòng xoáy này, và nói được cơ chế này là câu trả lời ở mức hệ thống.
+  </div>
+</section>
+
+<section id="net-s8">
+  <div class="sh"><b>08</b><h2>Mã trạng thái — theo góc nhìn vận hành</h2></div>
+  <table>
+    <tr><th>Mã</th><th>Nghĩa</th><th>Có thử lại?</th></tr>
+    <tr><td>200 / 201</td><td>Thành công</td><td>—</td></tr>
+    <tr><td>304 Not Modified</td><td>Cache còn dùng được — trả lời rỗng, rất rẻ</td><td>—</td></tr>
+    <tr><td>400 / 422</td><td>Request sai định dạng hoặc sai dữ liệu</td><td><strong>Không</strong> — sửa client</td></tr>
+    <tr><td>401 / 403</td><td>Chưa xác thực / không có quyền</td><td>Không, trừ khi làm mới token</td></tr>
+    <tr><td>404</td><td>Không tìm thấy</td><td>Không</td></tr>
+    <tr><td>409 Conflict</td><td>Xung đột trạng thái — thường là khoá lạc quan thất bại</td><td>Có, sau khi đọc lại trạng thái mới</td></tr>
+    <tr><td><strong>429</strong> Too Many Requests</td><td>Vượt hạn mức</td><td><strong>Có</strong> — theo <code>Retry-After</code></td></tr>
+    <tr><td>500</td><td>Lỗi server</td><td>Cẩn thận — chỉ nếu idempotent</td></tr>
+    <tr><td><strong>502 / 503 / 504</strong></td><td>Gateway lỗi / quá tải / hết hạn chờ</td><td><strong>Có</strong> — kèm backoff</td></tr>
+  </table>
+  <div class="note">
+    <h4>Phân biệt 502, 503 và 504 khi debug</h4>
+    <strong>502</strong>: proxy nhận được phản hồi không hợp lệ từ upstream — thường là service phía sau vừa chết hoặc trả về rác. <strong>503</strong>: service còn sống nhưng đang từ chối vì quá tải hoặc đang bảo trì. <strong>504</strong>: proxy chờ upstream quá lâu — service còn sống nhưng chậm. Ba mã dẫn tới ba nơi khác nhau để tìm nguyên nhân, và biết phân biệt chúng tiết kiệm rất nhiều thời gian khi có sự cố.
+  </div>
+</section>
+
+<section id="net-s9">
+  <div class="sh"><b>09</b><h2>Cache HTTP</h2></div>
+<pre><code>Cache-Control: max-age=3600            client cache 1 giờ, không hỏi lại
+Cache-Control: s-maxage=86400          dành riêng cho cache dùng chung (CDN)
+Cache-Control: no-cache                được cache nhưng PHẢI xác nhận lại mỗi lần
+Cache-Control: no-store                KHÔNG được lưu ở đâu cả
+Cache-Control: private                 chỉ browser được cache, CDN thì không
+Cache-Control: stale-while-revalidate=60   trả bản cũ ngay, làm mới ở nền</code></pre>
+  <div class="note warn">
+    <h4><code>no-cache</code> không có nghĩa là không cache</h4>
+    Nó có nghĩa là "được lưu, nhưng phải <strong>xác nhận lại</strong> với server trước khi dùng". Thứ có nghĩa là không lưu gì cả là <code>no-store</code>. Đây là cặp tên gây nhầm lẫn nhiều nhất trong HTTP, và dùng sai <code>no-cache</code> cho dữ liệu nhạy cảm là một lỗi bảo mật thật.
+  </div>
+<pre><code>XÁC NHẬN LẠI BẰNG ETAG — tiết kiệm băng thông
+
+    lần đầu:   GET /data
+               200 OK, ETag: "abc123", body 500 KB
+
+    lần sau:   GET /data
+               If-None-Match: "abc123"
+               → 304 Not Modified, body RỖNG
+
+    → vẫn tốn 1 RTT, nhưng không tốn 500 KB.</code></pre>
+  <p><code>stale-while-revalidate</code> đáng biết vì nó phá được đánh đổi giữa độ mới và độ trễ: khi cache vừa hết hạn, trả ngay bản cũ cho người dùng <em>rồi</em> làm mới ở nền. Người dùng không bao giờ phải chờ, và dữ liệu vẫn được cập nhật. Nó cũng là một phần lời giải cho thundering herd ở mục 12.</p>
+</section>
+
+<section id="net-s10">
+  <div class="sh"><b>10</b><h2>Năm tầng cache</h2></div>
+<pre><code>1. BROWSER          nhanh nhất, nhưng không kiểm soát được sau khi đã gửi header
+2. CDN              gần người dùng về địa lý → cắt RTT rất nhiều
+3. REVERSE PROXY    nginx, Varnish — trước ứng dụng, chặn tải trước khi vào app
+4. ỨNG DỤNG         Redis hoặc cache trong tiến trình — kết quả đã tính
+5. CƠ SỞ DỮ LIỆU    buffer pool, query cache — tự động, ít kiểm soát
+
+Nguyên tắc: cache CÀNG GẦN người dùng CÀNG RẺ,
+nhưng CÀNG KHÓ vô hiệu hoá khi dữ liệu đổi.</code></pre>
+  <table>
+    <tr><th>Tầng</th><th>Cache gì</th><th>Vô hiệu hoá</th></tr>
+    <tr><td>CDN</td><td>Tài nguyên tĩnh, ảnh, API công khai</td><td>Purge chủ động, hoặc đặt phiên bản vào URL</td></tr>
+    <tr><td>Reverse proxy</td><td>Trang và phản hồi API</td><td>TTL ngắn, hoặc purge theo khoá</td></tr>
+    <tr><td>Ứng dụng</td><td>Kết quả tính toán, dữ liệu tra cứu, phiên</td><td>Xoá khoá khi ghi — kiểm soát tốt nhất</td></tr>
+    <tr><td>Trong tiến trình</td><td>Dữ liệu cấu hình rất nóng</td><td>Khó nhất — mỗi máy một bản, phải phát tín hiệu cho tất cả</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Kỹ thuật đặt phiên bản vào URL</h4>
+    Với tài nguyên tĩnh, đặt <code>max-age</code> rất dài — một năm — và nhúng mã băm nội dung vào tên file: <code>app.7f3a2c.js</code>. Khi nội dung đổi thì <em>tên file đổi</em>, nên đó là một URL mới và cache cũ không còn liên quan. Không cần vô hiệu hoá gì cả. Đây là cách giải bài toán cache invalidation bằng cách <strong>tránh nó hoàn toàn</strong>, và là mẫu đáng nêu.
+  </div>
+</section>
+
+<section id="net-s11">
+  <div class="sh"><b>11</b><h2>Vô hiệu hoá cache — ba chiến lược</h2></div>
+  <table>
+    <tr><th>Chiến lược</th><th>Cách làm</th><th>Đánh đổi</th></tr>
+    <tr><td><strong>TTL</strong></td><td>Đặt thời hạn, hết hạn thì lấy lại</td><td>Đơn giản nhất; dữ liệu cũ trong tối đa một TTL</td></tr>
+    <tr><td><strong>Xoá khi ghi</strong></td><td>Khi cập nhật dữ liệu thì xoá khoá cache tương ứng</td><td>Dữ liệu luôn mới; nhưng phải nhớ mọi chỗ ghi, và dễ bỏ sót</td></tr>
+    <tr><td><strong>Khoá có phiên bản</strong></td><td>Đưa số phiên bản hoặc mã băm vào khoá cache</td><td>Không cần xoá gì; bản cũ tự bị bỏ rơi và hết hạn dần</td></tr>
+  </table>
+<pre><code>Ba mẫu ghi, cần phân biệt:
+
+CACHE-ASIDE (phổ biến nhất)
+    đọc:  thử cache → miss thì đọc DB → ghi vào cache
+    ghi:  ghi DB → XOÁ khoá cache
+
+WRITE-THROUGH
+    ghi:  ghi cache VÀ ghi DB cùng lúc
+    → cache luôn mới, nhưng mọi lần ghi đều chậm hơn
+
+WRITE-BEHIND
+    ghi:  ghi cache ngay, đẩy xuống DB sau
+    → ghi rất nhanh, nhưng CÓ THỂ MẤT dữ liệu nếu cache chết</code></pre>
+  <div class="note warn">
+    <h4>Trong cache-aside, phải XOÁ chứ không phải CẬP NHẬT</h4>
+    Nếu khi ghi bạn cập nhật cache bằng giá trị mới, hai request ghi đồng thời có thể ghi vào cache theo thứ tự ngược với thứ tự ghi vào cơ sở dữ liệu — và cache giữ giá trị cũ mãi mãi. Xoá khoá thì lần đọc sau buộc phải lấy lại từ nguồn, nên luôn đúng. Đây là chi tiết tinh vi và là câu hỏi vặn hay gặp.
+  </div>
+</section>
+
+<section id="net-s12">
+  <div class="sh"><b>12</b><h2>Thundering herd</h2></div>
+<pre><code>Một khoá cache rất nóng hết hạn tại t = 0.
+
+    1.000 request đang chờ đều thấy cache miss
+    → cả 1.000 cùng đi xuống cơ sở dữ liệu
+    → cùng một truy vấn, chạy 1.000 lần đồng thời
+    → cơ sở dữ liệu quá tải, càng chậm, càng nhiều request dồn vào
+    → sập</code></pre>
+  <table>
+    <tr><th>Cách chữa</th><th>Cơ chế</th></tr>
+    <tr><td><strong>Single-flight</strong></td><td>Chỉ cho <em>một</em> request đi lấy dữ liệu; những request khác chờ và dùng chung kết quả đó</td></tr>
+    <tr><td><strong>stale-while-revalidate</strong></td><td>Trả bản cũ ngay cho mọi người, một tiến trình nền làm mới</td></tr>
+    <tr><td>TTL có jitter</td><td>Thêm ngẫu nhiên vào TTL để các khoá không hết hạn cùng lúc</td></tr>
+    <tr><td>Làm mới sớm chủ động</td><td>Làm mới khi còn 10% thời hạn, trước khi thật sự hết</td></tr>
+    <tr><td>Khoá phân tán</td><td>Một khoá trong Redis quyết định ai được đi lấy dữ liệu</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao đây là câu hỏi phỏng vấn hay gặp</h4>
+    Vì nó là một sự cố <strong>do chính cache gây ra</strong> — hệ thống chạy hoàn hảo trong 99.9% thời gian rồi sập đúng lúc cache hết hạn. Nó kiểm tra bạn có nghĩ tới hành vi của hệ thống ở <em>ranh giới</em> hay chỉ ở trạng thái bình thường. Câu trả lời tốt nhất là single-flight kết hợp stale-while-revalidate: một request đi lấy, mọi người khác được trả bản cũ ngay chứ không phải chờ.
+  </div>
+</section>
+
+<section id="net-s13">
+  <div class="sh"><b>13</b><h2>Timeout và circuit breaker</h2></div>
+<pre><code>TIMEOUT — mọi lời gọi ra ngoài PHẢI có
+    không có timeout = một upstream chậm sẽ giữ hết luồng/kết nối của bạn
+    → service của bạn chết theo dù bản thân nó hoàn toàn ổn
+
+Ngân sách timeout phải GIẢM DẦN theo chiều gọi:
+    gateway 3s  →  service A 2s  →  service B 1s  →  DB 500ms
+
+Nếu ngược lại — service B chờ 5s trong khi gateway chỉ chờ 1s —
+thì công việc của B là vô nghĩa: client đã bỏ đi từ lâu.</code></pre>
+<pre><code>CIRCUIT BREAKER — ba trạng thái
+
+    CLOSED     mọi thứ bình thường, request đi qua
+       ↓  tỉ lệ lỗi vượt ngưỡng
+    OPEN       TỪ CHỐI NGAY, không gọi upstream nữa
+       ↓  sau một khoảng chờ
+    HALF-OPEN  cho vài request thử
+       ├─ thành công → CLOSED
+       └─ vẫn lỗi   → OPEN</code></pre>
+  <div class="note key">
+    <h4>Vì sao thất bại nhanh lại tốt hơn</h4>
+    Khi upstream đã chết, mọi lời gọi tới nó chỉ để chờ timeout — <strong>chiếm luồng, chiếm kết nối, và làm chậm cả những request không liên quan</strong>. Circuit breaker cắt vòng đó: từ chối ngay, giải phóng tài nguyên, và cho upstream thời gian hồi phục thay vì tiếp tục dội tải vào nó. Cộng với ngân sách retry ở mục 07, đây là hai cơ chế chính chống sự cố lan truyền.
+  </div>
+  <p><strong>Bảng chẩn đoán "API chậm"</strong>, theo thứ tự nên kiểm: có phải chỉ p99 chậm (nghẽn xếp hàng) hay tất cả đều chậm (upstream hoặc truy vấn); có tái dùng kết nối chưa; RTT tới người dùng bao nhiêu; cache hit bao nhiêu phần trăm; có N+1 query không; có lời gọi nào không có timeout; và có retry lồng nhau nhân tải không.</p>
+</section>
+
+<section id="net-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Tạo HTTP client mới cho từng request</h4><p>Trả lại toàn bộ chi phí bắt tay mỗi lần. Dùng client dùng chung có connection pool.</p></div>
+    <div class="card bad"><h4>Thử lại POST không có khoá idempotency</h4><p>Timeout không có nghĩa là thất bại. Tạo đơn hàng trùng, trừ tiền hai lần.</p></div>
+    <div class="card bad"><h4>Backoff không có jitter</h4><p>Mọi client thử lại đồng loạt, tải đến theo từng đợt đồng bộ.</p></div>
+    <div class="card bad"><h4>Lời gọi ra ngoài không có timeout</h4><p>Một upstream chậm giữ hết luồng của bạn; service chết theo dù bản thân nó ổn.</p></div>
+    <div class="card bad"><h4>Cập nhật cache thay vì xoá khoá</h4><p>Hai lần ghi đồng thời có thể để lại giá trị cũ trong cache mãi mãi.</p></div>
+    <div class="card bad"><h4>Dùng <code>no-cache</code> khi ý là không lưu</h4><p><code>no-cache</code> vẫn cho lưu, chỉ buộc xác nhận lại. Cần <code>no-store</code>.</p></div>
+  </div>
+</section>
+
+<section id="net-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Từ lúc gõ URL tới lúc thấy trang, có những gì xảy ra?</summary>
+  <p>DNS phân giải tên miền thành IP — một RTT nếu chưa cache. TCP bắt tay ba bước — một RTT. TLS bắt tay — hai RTT với TLS 1.2, một với TLS 1.3. Rồi HTTP request và response — một RTT cộng thời gian server xử lý. Tổng với RTT 100ms là 400–500ms <b>trước khi</b> server bắt đầu làm việc gì. Điều quan trọng rút ra: trong hệ thống phân tán thì số vòng khứ hồi quan trọng hơn băng thông, nên hai tối ưu lớn nhất là tái dùng kết nối để về một RTT và cache để về không RTT.</p></details>
+
+  <details class="qa"><summary>Khi nào được thử lại một request?</summary>
+  <p>Chỉ khi thao tác đó idempotent, và chỉ với các mã lỗi tạm thời — 429, 502, 503, 504. GET, PUT, DELETE thì idempotent nên thử lại tự do; POST thì không, và điểm nguy hiểm nhất là <b>timeout không có nghĩa là request thất bại</b> — server có thể đã xử lý xong mà phản hồi bị mất, nên thử lại tạo đơn trùng. Giải pháp là khoá idempotency do client sinh và giữ nguyên khi thử lại, để server nhận ra và trả kết quả cũ. Kèm backoff theo hàm mũ có jitter, giới hạn ba lần, và một ngân sách retry để chặn hiệu ứng nhân tải khi có sự cố.</p></details>
+
+  <details class="qa"><summary>Vì sao backoff cần jitter?</summary>
+  <p>Vì nếu tất cả client thất bại cùng lúc và đều dùng backoff cố định, chúng sẽ thử lại đồng loạt tại cùng những thời điểm — tải đến theo từng đợt đồng bộ, đúng lúc service đang yếu. Jitter rải các lần thử ra: thời gian chờ là một số ngẫu nhiên trong khoảng từ 0 tới <code>base × 2^lần_thử</code>. Đây là một phần của bài toán lớn hơn: khi service chậm, mọi client timeout và retry nên tải tăng gấp nhiều lần đúng lúc nó yếu nhất — cơ chế biến sự cố nhỏ thành sập toàn hệ thống. Ngân sách retry và circuit breaker tồn tại để chặn vòng xoáy đó.</p></details>
+
+  <details class="qa"><summary>Thundering herd là gì và chữa thế nào?</summary>
+  <p>Khi một khoá cache rất nóng hết hạn, hàng nghìn request đồng thời đều thấy miss và cùng đi xuống cơ sở dữ liệu với cùng một truy vấn — nó quá tải, càng chậm thì càng nhiều request dồn vào, rồi sập. Cách chữa tốt nhất là <b>single-flight</b> kết hợp <b>stale-while-revalidate</b>: chỉ một request được đi lấy dữ liệu, còn mọi request khác được trả bản cũ ngay chứ không phải chờ. Bổ trợ: thêm jitter vào TTL để các khoá không hết hạn cùng lúc, và làm mới chủ động khi còn khoảng 10% thời hạn.</p></details>
+
+  <details class="qa"><summary>HTTP/2 giải quyết head-of-line blocking chưa?</summary>
+  <p>Chỉ ở tầng HTTP. HTTP/1.1 chỉ chạy một request tại một thời điểm trên mỗi kết nối; HTTP/2 ghép nhiều luồng trên một kết nối nên hết nghẽn ở tầng đó. Nhưng nó vẫn chạy trên TCP, mà TCP đảm bảo thứ tự byte — nên <b>một gói bị mất làm mọi luồng phải chờ</b>, nghẽn chỉ chuyển xuống tầng dưới. HTTP/3 chạy trên QUIC, nơi mỗi luồng có thứ tự riêng nên gói mất chỉ ảnh hưởng luồng của nó; QUIC còn gộp bắt tay transport và TLS nên tiết kiệm thêm một RTT.</p></details>
+
+  <details class="qa"><summary>API của bạn chậm — bạn kiểm tra theo thứ tự nào?</summary>
+  <p>Trước tiên phân biệt chỉ p99 chậm hay tất cả đều chậm — p99 riêng lẻ thường là nghẽn xếp hàng hoặc gom rác, còn tất cả chậm thì là upstream hoặc truy vấn. Rồi kiểm có tái dùng kết nối chưa, vì tạo client mới mỗi request là trả lại toàn bộ chi phí bắt tay. Rồi RTT tới người dùng — nếu xa thì cần CDN hoặc điểm hiện diện gần hơn. Rồi tỉ lệ cache hit. Rồi tìm N+1 query, vì đếm số truy vấn thường quan trọng hơn tối ưu từng truy vấn. Cuối cùng kiểm mọi lời gọi ra ngoài có timeout không, và có retry lồng nhau nhân tải không.</p></details>
+</section>
+
+<footer>Deep dive · HTTP, TCP &amp; caching · số RTT là mức lý thuyết cho trường hợp phổ biến; thực tế còn phụ thuộc cấu hình server và đường truyền.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../assets/catalog.js"></script>
+<script src="../../../assets/search-index.js"></script>
+<script src="../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Union-Find (DSU) — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../index.html">← Tất cả bài</a> <span id="crumbTitle">Giải thuật &amp; cấu trúc dữ liệu · Union-Find (DSU)</span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-dsu" data-title="Union-Find (DSU)" data-tag="Cấu trúc" data-blurb="Vì sao cần cả hai tối ưu, khi nào thắng DFS, DSU trên 2n đỉnh cho quan hệ đối kháng, và Kruskal.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · cấu trúc gộp nhóm</p>
+  <h1>Union-Find —<br><em>gộp nhóm gần như tức thì</em></h1>
+  <p class="lede">Ba mươi dòng code trả lời câu "hai phần tử này cùng nhóm không" nhanh gần như <b>O(1)</b>. Bài này giải thích vì sao cần <b>cả hai</b> tối ưu chứ không phải một, khi nào Union-Find thắng DFS, kỹ thuật <b>DSU trên 2n đỉnh</b> cho quan hệ đối kháng, và Kruskal.</p>
+</header>
+
+
+<section id="dsu-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>find(x)      x thuộc nhóm nào?          → gần như O(1)
+union(x,y)   gộp hai nhóm lại           → gần như O(1)
+
+Không hỗ trợ: TÁCH nhóm ra. Union-Find chỉ đi một chiều — gộp vào, không tách ra.</code></pre>
+  <p>Mỗi nhóm được biểu diễn bằng một <strong>cây</strong>, và tên nhóm là gốc của cây đó. Hai phần tử cùng nhóm khi và chỉ khi chúng có cùng gốc.</p>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Cấu trúc này không quan tâm <em>hình dạng</em> của nhóm, chỉ quan tâm <em>ai cùng nhóm với ai</em>. Vì bỏ hết thông tin về cạnh và đường đi, nó nhanh hơn hẳn mọi cách duyệt đồ thị cho đúng câu hỏi đó.
+  </div>
+</section>
+
+<section id="dsu-s2">
+  <div class="sh"><b>02</b><h2>Bài toán nó giải, và vì sao DFS không đủ</h2></div>
+  <p>Cho một dãy thao tác đan xen nhau: lúc thì nối hai phần tử, lúc thì hỏi hai phần tử có cùng nhóm không.</p>
+<pre><code>union(1,2)      nối
+union(3,4)      nối
+connected(1,4)? → False
+union(2,3)      nối
+connected(1,4)? → True</code></pre>
+  <table>
+    <tr><th>Cách</th><th>Mỗi truy vấn</th><th>q truy vấn trên n đỉnh</th></tr>
+    <tr><td>DFS/BFS lại từ đầu mỗi lần hỏi</td><td>O(V + E)</td><td>O(q · (V+E)) — quá chậm</td></tr>
+    <tr><td>Union-Find</td><td>gần như O(1)</td><td><strong>O((V + q) · α(n))</strong></td></tr>
+  </table>
+  <p><strong>Điểm mấu chốt là tính động.</strong> Nếu đồ thị cố định và chỉ cần đếm thành phần liên thông một lần, DFS hoàn toàn đủ và dễ hơn. Union-Find thắng khi các cạnh <em>đến dần</em> và ta phải trả lời trong lúc đó — hoặc khi thuật toán cần liên tục hỏi "gộp cái này có tạo chu trình không", như Kruskal.</p>
+</section>
+
+<section id="dsu-s3">
+  <div class="sh"><b>03</b><h2>Bản cơ bản — và vì sao nó chậm</h2></div>
+<pre><code><span class="kw">class</span> DSU:
+    <span class="kw">def</span> __init__(self, n):
+        self.p = <span class="kw">list</span>(<span class="kw">range</span>(n))        <span class="cm"># ban đầu mỗi phần tử là gốc của chính nó</span>
+
+    <span class="kw">def</span> find(self, x):
+        <span class="kw">while</span> self.p[x] != x:        <span class="cm"># leo lên tới gốc</span>
+            x = self.p[x]
+        <span class="kw">return</span> x
+
+    <span class="kw">def</span> union(self, a, b):
+        self.p[self.find(a)] = self.find(b)   <span class="cm"># treo gốc này dưới gốc kia</span></code></pre>
+<pre><code>Trường hợp tệ nhất: union(0,1), union(1,2), union(2,3), ...
+
+0 → 1 → 2 → 3 → 4 → ... → n     ← cây suy biến thành danh sách
+find(0) phải leo n bước         ← O(n) mỗi thao tác</code></pre>
+  <p>Bản này đúng nhưng vô dụng ở quy mô lớn. Hai tối ưu dưới đây chữa đúng hai nguyên nhân khác nhau của vấn đề.</p>
+</section>
+
+<section id="dsu-s4">
+  <div class="sh"><b>04</b><h2>Nén đường</h2></div>
+  <p>Ý tưởng: đã bỏ công leo lên gốc rồi thì <strong>nối thẳng mọi nút trên đường lên gốc</strong>, để lần sau chỉ mất một bước.</p>
+<pre><code><span class="kw">def</span> find(self, x):
+    root = x
+    <span class="kw">while</span> self.p[root] != root:
+        root = self.p[root]
+    <span class="kw">while</span> self.p[x] != root:        <span class="cm"># lượt hai: dẹt cả đường vừa đi</span>
+        self.p[x], x = root, self.p[x]
+    <span class="kw">return</span> root
+
+<span class="cm"># bản đệ quy, ngắn gọn hơn — dùng khi n không quá lớn</span>
+<span class="kw">def</span> find(self, x):
+    <span class="kw">if</span> self.p[x] != x:
+        self.p[x] = self.find(self.p[x])   <span class="cm"># gán lại trên đường quay về</span>
+    <span class="kw">return</span> self.p[x]</code></pre>
+<pre><code>Trước find(4):        Sau find(4):
+
+0                     0
+ \                  / | | \
+  1                4  3 2  1     ← mọi nút giờ trỏ trực tiếp vào gốc
+   \
+    2
+     \
+      3
+       \
+        4</code></pre>
+  <p>Đây là một dạng <em>amortization</em>: thao tác đắt tự làm cho mọi thao tác sau rẻ đi. Cùng tinh thần với việc mảng động nhân đôi kích thước — trả trước một lần, hưởng lợi lâu dài.</p>
+</section>
+
+<section id="dsu-s5">
+  <div class="sh"><b>05</b><h2>Gộp theo kích thước</h2></div>
+  <p>Nén đường chỉ chữa hậu quả sau khi cây đã cao. Tối ưu thứ hai chặn từ gốc: <strong>đừng bao giờ treo cây lớn dưới cây nhỏ</strong>.</p>
+<pre><code><span class="kw">def</span> __init__(self, n):
+    self.p = <span class="kw">list</span>(<span class="kw">range</span>(n))
+    self.sz = [<span class="st">1</span>] * n              <span class="cm"># số phần tử của nhóm, chỉ đúng tại gốc</span>
+
+<span class="kw">def</span> union(self, a, b):
+    ra, rb = self.find(a), self.find(b)
+    <span class="kw">if</span> ra == rb: <span class="kw">return</span> <span class="kw">False</span>      <span class="cm"># đã cùng nhóm → không gộp gì</span>
+    <span class="kw">if</span> self.sz[ra] &lt; self.sz[rb]:
+        ra, rb = rb, ra              <span class="cm"># đảm bảo ra là cây LỚN hơn</span>
+    self.p[rb] = ra                  <span class="cm"># cây nhỏ treo dưới cây lớn</span>
+    self.sz[ra] += self.sz[rb]
+    <span class="kw">return</span> <span class="kw">True</span>                     <span class="cm">← trả về True nghĩa là VỪA gộp thật</span></code></pre>
+  <p>Chiều cao chỉ tăng khi hai cây <em>cùng cỡ</em> gộp với nhau, và mỗi lần như vậy kích thước nhóm phải nhân đôi. Nên chiều cao bị chặn ở <code>log n</code> — ngay cả khi không có nén đường.</p>
+  <div class="note key">
+    <h4>Giá trị trả về của union là thứ hay bị bỏ quên</h4>
+    <code>True</code> nghĩa là hai nhóm khác nhau vừa được nối. <code>False</code> nghĩa là chúng đã cùng nhóm — <strong>tức cạnh này tạo chu trình</strong>. Chỉ một giá trị boolean này thôi đã giải trực tiếp bài đếm nhóm, bài phát hiện chu trình, và bước lọc cạnh của Kruskal.
+  </div>
+  <p><em>Biến thể:</em> gộp theo <strong>hạng</strong> (chiều cao xấp xỉ) thay vì kích thước. Hai cách tương đương về độ phức tạp; gộp theo kích thước tiện hơn vì <code>sz[root]</code> còn dùng được để trả lời "nhóm này có bao nhiêu phần tử".</p>
+</section>
+
+<section id="dsu-s6">
+  <div class="sh"><b>06</b><h2>Vì sao cần cả hai tối ưu</h2></div>
+  <table>
+    <tr><th>Cấu hình</th><th>Tệ nhất mỗi thao tác</th><th>Ghi chú</th></tr>
+    <tr><td>Không tối ưu gì</td><td>O(n)</td><td>Cây suy biến thành danh sách</td></tr>
+    <tr><td>Chỉ nén đường</td><td>O(log n) amortized</td><td>Đã dùng được, nhưng cây vẫn cao trước lần find đầu</td></tr>
+    <tr><td>Chỉ gộp theo kích thước</td><td>O(log n)</td><td>Chiều cao bị chặn, nhưng không bao giờ dẹt xuống</td></tr>
+    <tr><td><strong>Cả hai</strong></td><td><strong>O(α(n))</strong></td><td>α là hàm Ackermann nghịch đảo</td></tr>
+  </table>
+  <p><strong>α(n) là gì:</strong> một hàm tăng cực kỳ chậm. Với mọi <code>n</code> nhỏ hơn số nguyên tử trong vũ trụ quan sát được, <code>α(n) &lt; 5</code>. Nên trên thực tế đây là hằng số, và người ta nói "gần như O(1)".</p>
+  <div class="note">
+    <h4>Cách trả lời gọn trong phỏng vấn</h4>
+    "Với cả nén đường và gộp theo kích thước thì mỗi thao tác là O(α(n)) amortized, trong đó α là Ackermann nghịch đảo — thực tế nhỏ hơn 5 với mọi n, nên coi như hằng số. Thiếu một trong hai tối ưu thì thành O(log n)." Nói được vế cuối quan trọng hơn việc phát âm đúng tên hàm.
+  </div>
+</section>
+
+<section id="dsu-s7">
+  <div class="sh"><b>07</b><h2>Lab: gộp từng bước</h2></div>
+  <p>Bật tắt hai tối ưu rồi chạy cùng một dãy cạnh. Cột <code>parent</code> là mảng cha; <code>tổng bước leo</code> là số lần đi lên một bậc trong tất cả các <code>find</code> — chính là chi phí thật của cấu trúc.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>dãy cạnh</label><input type="text" id="uedges" value="0-1 1-2 2-3 3-4 5-6 6-7 4-5 0-7" style="width:250px"></div>
+      <label class="chk"><input type="checkbox" id="ucomp" checked> nén đường</label>
+      <label class="chk"><input type="checkbox" id="usize" checked> gộp theo kích thước</label>
+      <button id="ustep">Bước tiếp</button>
+      <button class="ghost" id="uauto">Tự chạy</button>
+      <button class="ghost" id="urst">Đặt lại</button>
+    </div>
+    <div id="uview"></div>
+    <div class="stat">
+      <u>số nhóm <b id="ugroups">–</b></u>
+      <u>tổng bước leo <b id="uhops">0</b></u>
+      <u>cạnh tạo chu trình <b id="ucycles">0</b></u>
+    </div>
+    <div class="steps" id="ulog"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Tắt cả hai tối ưu rồi chạy hết dãy, ghi lại <strong>tổng bước leo</strong>. Bật cả hai và chạy lại — con số tụt hẳn. Dãy cạnh mặc định được chọn để tạo chuỗi dài, tức trường hợp xấu của bản không tối ưu.
+    </p>
+  </div>
+</section>
+
+<section id="dsu-s8">
+  <div class="sh"><b>08</b><h2>Bản dùng trong phỏng vấn</h2></div>
+  <p>Viết bản này thuộc lòng. Nó ngắn, có cả hai tối ưu, và đếm luôn số nhóm.</p>
+<pre><code><span class="kw">class</span> DSU:
+    <span class="kw">def</span> __init__(self, n):
+        self.p = <span class="kw">list</span>(<span class="kw">range</span>(n))
+        self.sz = [<span class="st">1</span>] * n
+        self.count = n                      <span class="cm"># số nhóm hiện tại</span>
+
+    <span class="kw">def</span> find(self, x):
+        <span class="kw">while</span> self.p[x] != x:
+            self.p[x] = self.p[self.p[x]]   <span class="cm"># nén một nửa — một dòng, hiệu quả gần bằng</span>
+            x = self.p[x]
+        <span class="kw">return</span> x
+
+    <span class="kw">def</span> union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        <span class="kw">if</span> ra == rb: <span class="kw">return</span> <span class="kw">False</span>
+        <span class="kw">if</span> self.sz[ra] &lt; self.sz[rb]: ra, rb = rb, ra
+        self.p[rb] = ra
+        self.sz[ra] += self.sz[rb]
+        self.count -= <span class="st">1</span>
+        <span class="kw">return</span> <span class="kw">True</span></code></pre>
+  <div class="note">
+    <h4>Về mẹo "nén một nửa"</h4>
+    Dòng <code>self.p[x] = self.p[self.p[x]]</code> nối mỗi nút với ông của nó ngay trong lúc leo. Nó không dẹt hoàn toàn như nén đường đầy đủ, nhưng viết trong một dòng, không cần lượt thứ hai, không cần đệ quy — và độ phức tạp tiệm cận vẫn giữ nguyên. Đây là bản tôi dùng khi viết trên bảng.
+  </div>
+</section>
+
+<section id="dsu-s9">
+  <div class="sh"><b>09</b><h2>Đếm nhóm và bắt chu trình</h2></div>
+<pre><code><span class="cm"># đếm số thành phần liên thông</span>
+<span class="kw">def</span> count_components(n, edges):
+    d = DSU(n)
+    <span class="kw">for</span> u, v <span class="kw">in</span> edges: d.union(u, v)
+    <span class="kw">return</span> d.count                       <span class="cm"># O(E · α(n))</span>
+
+<span class="cm"># kiểm tra một đồ thị vô hướng có phải cây</span>
+<span class="kw">def</span> is_tree(n, edges):
+    <span class="kw">if</span> <span class="kw">len</span>(edges) != n - <span class="st">1</span>: <span class="kw">return</span> <span class="kw">False</span>   <span class="cm"># cây có đúng n-1 cạnh</span>
+    d = DSU(n)
+    <span class="kw">for</span> u, v <span class="kw">in</span> edges:
+        <span class="kw">if</span> <span class="kw">not</span> d.union(u, v): <span class="kw">return</span> <span class="kw">False</span>    <span class="cm"># union trả False → có chu trình</span>
+    <span class="kw">return</span> <span class="kw">True</span>                             <span class="cm"># đủ cạnh và không chu trình → liên thông</span></code></pre>
+  <p>Hàm <code>is_tree</code> minh hoạ đúng sức mạnh của cấu trúc: hai tính chất "không chu trình" và "liên thông" đều được kiểm bằng chính giá trị trả về của <code>union</code>, không cần duyệt gì.</p>
+  <div class="note warn">
+    <h4>Chỉ dùng cho đồ thị vô hướng</h4>
+    Union-Find không phân biệt chiều của cạnh. Với đồ thị <strong>có hướng</strong>, phải dùng ba màu như trong bài đồ thị — cấu trúc này sẽ báo chu trình sai vì nó coi <code>u → v</code> và <code>v → u</code> như nhau.
+  </div>
+</section>
+
+<section id="dsu-s10">
+  <div class="sh"><b>10</b><h2>Kruskal — cây khung nhỏ nhất</h2></div>
+<pre><code><span class="kw">def</span> kruskal(n, edges):                   <span class="cm"># edges: (trọng số, u, v)</span>
+    edges.sort()                          <span class="cm"># O(E log E) — phần đắt nhất</span>
+    d = DSU(n)
+    total, used = <span class="st">0</span>, []
+    <span class="kw">for</span> w, u, v <span class="kw">in</span> edges:
+        <span class="kw">if</span> d.union(u, v):                 <span class="cm">← chỉ nhận cạnh KHÔNG tạo chu trình</span>
+            total += w; used.append((u, v))
+            <span class="kw">if</span> <span class="kw">len</span>(used) == n - <span class="st">1</span>: <span class="kw">break</span>    <span class="cm"># đủ cạnh cho cây khung</span>
+    <span class="kw">return</span> total <span class="kw">if</span> <span class="kw">len</span>(used) == n - <span class="st">1</span> <span class="kw">else</span> -<span class="st">1</span>   <span class="cm"># -1: đồ thị không liên thông</span></code></pre>
+  <p>Toàn bộ thuật toán là: sắp cạnh theo trọng số tăng, lấy lần lượt, bỏ cạnh nào tạo chu trình. Union-Find lo đúng phần "có tạo chu trình không" — mỗi lần chỉ mất gần như O(1). Tổng chi phí là <code>O(E log E)</code>, chi phối bởi bước sắp xếp.</p>
+  <table>
+    <tr><th></th><th>Kruskal</th><th>Prim</th></tr>
+    <tr><td>Cấu trúc chính</td><td>Union-Find</td><td>Heap</td></tr>
+    <tr><td>Cách nghĩ</td><td>Xét cạnh theo trọng số toàn cục</td><td>Mở rộng dần từ một đỉnh</td></tr>
+    <tr><td>Chi phí</td><td>O(E log E)</td><td>O(E log V)</td></tr>
+    <tr><td>Tốt cho</td><td>Đồ thị thưa; cạnh đã sắp sẵn</td><td>Đồ thị dày</td></tr>
+  </table>
+</section>
+
+<section id="dsu-s11">
+  <div class="sh"><b>11</b><h2>DSU trên 2n đỉnh — quan hệ đối kháng</h2></div>
+  <p>Union-Find gộp những thứ <em>giống nhau</em>. Vậy làm sao xử lý quan hệ <em>đối lập</em> — kiểu "A và B chắc chắn khác nhóm"? Mẹo: tạo <strong>hai bản cho mỗi phần tử</strong>.</p>
+<pre><code><span class="cm"># bài: có n người, mỗi cặp (a, b) là hai người phải ở HAI nhóm khác nhau.</span>
+<span class="cm"># Hỏi có chia được thành hai nhóm không?</span>
+
+<span class="cm"># i     đại diện "i thuộc nhóm X"</span>
+<span class="cm"># i + n đại diện "i thuộc nhóm Y" — bản đối của i</span>
+
+<span class="kw">def</span> can_split(n, pairs):
+    d = DSU(<span class="st">2</span> * n)
+    <span class="kw">for</span> a, b <span class="kw">in</span> pairs:
+        <span class="kw">if</span> d.find(a) == d.find(b):
+            <span class="kw">return</span> <span class="kw">False</span>              <span class="cm"># a và b đã buộc phải cùng nhóm → mâu thuẫn</span>
+        d.union(a, b + n)              <span class="cm"># a cùng nhóm với "đối của b"</span>
+        d.union(b, a + n)              <span class="cm"># b cùng nhóm với "đối của a"</span>
+    <span class="kw">return</span> <span class="kw">True</span></code></pre>
+  <p>Kỹ thuật này giải bài đồ thị hai phía mà không cần BFS tô màu, và mở rộng được cho <em>k</em> loại quan hệ bằng <code>k·n</code> đỉnh — ví dụ bài chuỗi thức ăn ba loài ăn nhau theo vòng.</p>
+  <h3>Weighted DSU — mang theo quan hệ định lượng</h3>
+<pre><code><span class="cm"># bài: cho biết a/b = 3, b/c = 2. Hỏi a/c = ?</span>
+<span class="cm"># Lưu thêm tỉ lệ từ mỗi nút tới cha của nó; find() nhân dồn trên đường lên gốc.</span>
+<span class="cm"># Cùng gốc → tính được tỉ lệ. Khác gốc → không xác định.</span></code></pre>
+  <p>Đây là biến thể hay xuất hiện ở vòng khó: cấu trúc không chỉ trả lời "cùng nhóm không" mà còn "quan hệ định lượng giữa hai phần tử là gì". Nêu ra được là điểm cộng đáng kể.</p>
+</section>
+
+<section id="dsu-s12">
+  <div class="sh"><b>12</b><h2>So với DFS/BFS — chọn cái nào</h2></div>
+  <table>
+    <tr><th>Tình huống</th><th>Chọn</th><th>Vì sao</th></tr>
+    <tr><td>Cạnh đến dần, hỏi liên thông xen kẽ</td><td><strong>Union-Find</strong></td><td>DFS phải chạy lại từ đầu mỗi lần hỏi</td></tr>
+    <tr><td>Đồ thị cố định, đếm nhóm một lần</td><td>DFS/BFS</td><td>Đơn giản hơn, không cần cấu trúc phụ</td></tr>
+    <tr><td>Cây khung nhỏ nhất</td><td><strong>Union-Find</strong> (Kruskal)</td><td>Cần kiểm tra chu trình liên tục</td></tr>
+    <tr><td>Cần <em>đường đi</em> cụ thể giữa hai đỉnh</td><td>BFS</td><td>Union-Find không lưu đường đi</td></tr>
+    <tr><td>Cần khoảng cách ngắn nhất</td><td>BFS</td><td>Union-Find không có khái niệm khoảng cách</td></tr>
+    <tr><td>Chu trình trong đồ thị có hướng</td><td>DFS ba màu</td><td>Union-Find bỏ qua chiều cạnh</td></tr>
+    <tr><td>Đảo trên lưới, một lần</td><td>Cả hai đều được</td><td>DFS thường ngắn hơn; DSU thắng nếu ô được thêm dần</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Một câu để chọn</h4>
+    Câu hỏi là <strong>"cùng nhóm không"</strong> và dữ liệu <strong>đến dần</strong> → Union-Find. Câu hỏi là <strong>"đường nào"</strong> hay <strong>"xa bao nhiêu"</strong> → BFS/DFS.
+  </div>
+</section>
+
+<section id="dsu-s13">
+  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
+    <tr><td>"có bao nhiêu nhóm", "bao nhiêu tỉnh, bao nhiêu bạn bè"</td><td><code>d.count</code> sau khi union hết</td></tr>
+    <tr><td>"cạnh nào là cạnh dư", "xoá cạnh nào để thành cây"</td><td>Cạnh đầu tiên làm <code>union</code> trả về False</td></tr>
+    <tr><td>"có phải cây không"</td><td>Đúng n−1 cạnh và không union nào trả False</td></tr>
+    <tr><td>"nối tất cả với chi phí nhỏ nhất"</td><td>Kruskal</td></tr>
+    <tr><td>"hai người này không được cùng nhóm"</td><td>DSU trên 2n đỉnh</td></tr>
+    <tr><td>"a/b = x, tính c/d"</td><td>Weighted DSU</td></tr>
+    <tr><td>Cạnh được thêm dần và hỏi xen kẽ</td><td>Union-Find — DFS sẽ timeout</td></tr>
+    <tr><td>"gộp các tài khoản / email trùng nhau"</td><td>Union-Find với ánh xạ chuỗi sang chỉ số</td></tr>
+  </table>
+</section>
+
+<section id="dsu-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>So sánh trực tiếp p[a] với p[b]</h4><p>Phải so <code>find(a)</code> với <code>find(b)</code>. Mảng cha chỉ cho biết cha trực tiếp, không phải gốc.</p></div>
+    <div class="card bad"><h4>Quên union theo kích thước</h4><p>Chỉ có nén đường thì vẫn chạy được, nhưng tệ nhất là O(log n). Trong phỏng vấn nên có cả hai và nói rõ.</p></div>
+    <div class="card bad"><h4>Đọc sz của nút không phải gốc</h4><p><code>sz</code> chỉ đúng tại gốc. Luôn viết <code>sz[find(x)]</code>.</p></div>
+    <div class="card bad"><h4>Dùng cho đồ thị có hướng</h4><p>Báo chu trình sai vì cấu trúc bỏ qua chiều cạnh. Dùng DFS ba màu.</p></div>
+    <div class="card bad"><h4>Kỳ vọng tách nhóm được</h4><p>Union-Find chỉ gộp, không tách. Bài có xoá cạnh thì phải xử lý ngược thời gian hoặc dùng cấu trúc khác.</p></div>
+    <div class="card bad"><h4>Bỏ qua giá trị trả về của union</h4><p>Mất luôn thông tin phát hiện chu trình và mất cách đếm nhóm gọn nhất.</p></div>
+  </div>
+</section>
+
+<section id="dsu-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Union-Find giải bài gì mà DFS không giải tốt?</summary>
+  <p>Bài liên thông <b>động</b>: các cạnh đến dần và ta phải trả lời "hai đỉnh này cùng nhóm chưa" xen kẽ giữa các lần thêm cạnh. DFS phải chạy lại từ đầu mỗi lần hỏi, thành O(q·(V+E)). Union-Find trả lời mỗi truy vấn gần như O(1). Nếu đồ thị cố định và chỉ cần đếm nhóm một lần thì DFS đủ và đơn giản hơn — tôi sẽ chọn DFS trong trường hợp đó.</p></details>
+
+  <details class="qa"><summary>Vì sao cần cả nén đường và gộp theo kích thước?</summary>
+  <p>Chúng chữa hai nguyên nhân khác nhau. Gộp theo kích thước <em>ngăn</em> cây cao lên, vì cây nhỏ luôn treo dưới cây lớn nên chiều cao chỉ tăng khi hai cây cùng cỡ — chặn ở log n. Nén đường <em>dẹt</em> cây sau mỗi lần find, để lần sau chỉ mất một bước. Có cả hai thì mỗi thao tác là O(α(n)) amortized, thực tế coi như hằng số. Thiếu một trong hai thì thành O(log n).</p></details>
+
+  <details class="qa"><summary>α(n) là gì và vì sao coi nó là hằng số?</summary>
+  <p>Là hàm Ackermann nghịch đảo, tăng cực kỳ chậm: với mọi n nhỏ hơn số nguyên tử trong vũ trụ quan sát được thì α(n) vẫn nhỏ hơn 5. Nên trong mọi bài toán thực tế nó là hằng số, và người ta nói Union-Find "gần như O(1)". Điểm cần nhấn là chữ <em>amortized</em>: một thao tác lẻ vẫn có thể tốn hơn, nhưng tổng trên cả dãy thao tác thì bị chặn.</p></details>
+
+  <details class="qa"><summary>Giải thích Kruskal và vai trò của Union-Find trong đó.</summary>
+  <p>Sắp toàn bộ cạnh theo trọng số tăng dần rồi lấy lần lượt, bỏ những cạnh mà hai đầu đã cùng nhóm — vì cạnh đó tạo chu trình và không đóng góp gì cho cây khung. Union-Find lo đúng phần kiểm tra đó với chi phí gần như O(1) mỗi cạnh. Tổng là O(E log E), chi phối bởi bước sắp xếp. Dừng được sớm khi đã nhận đủ n−1 cạnh; nếu hết cạnh mà chưa đủ thì đồ thị không liên thông.</p></details>
+
+  <details class="qa"><summary>Đề nói "hai người này phải ở hai nhóm khác nhau" — Union-Find xử lý được không?</summary>
+  <p>Được, bằng cách tạo hai bản cho mỗi phần tử: <code>i</code> nghĩa là "i ở nhóm X" và <code>i+n</code> nghĩa là "i ở nhóm Y". Với mỗi cặp đối kháng <code>(a,b)</code>, ta gộp <code>a</code> với <code>b+n</code> và <code>b</code> với <code>a+n</code>. Nếu tại lúc nào đó <code>find(a) == find(b)</code> thì có mâu thuẫn, tức không chia được. Kỹ thuật này thay được BFS tô hai màu, và mở rộng cho k loại quan hệ bằng k·n đỉnh.</p></details>
+
+  <details class="qa"><summary>Union-Find có xoá cạnh được không?</summary>
+  <p>Không. Cấu trúc chỉ đi một chiều: gộp vào chứ không tách ra, vì nó không lưu cạnh nào đã tạo ra liên kết nào. Nếu bài có thao tác xoá thì cách thường dùng là <b>xử lý ngược thời gian</b> — đọc hết truy vấn, bắt đầu từ trạng thái cuối rồi thêm dần cạnh theo thứ tự ngược, biến xoá thành thêm. Cách khác là dùng cấu trúc khác như link-cut tree, nhưng gần như không bao giờ cần trong phỏng vấn.</p></details>
+</section>
+
+<footer>Deep dive · Union-Find (DSU) · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../assets/catalog.js"></script>
+<script src="../../../assets/search-index.js"></script>
+<script src="../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

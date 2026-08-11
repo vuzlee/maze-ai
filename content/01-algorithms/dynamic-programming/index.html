@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic programming — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../index.html">← Tất cả bài</a> <span id="crumbTitle">Giải thuật &amp; cấu trúc dữ liệu · Dynamic programming</span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-dp" data-title="Dynamic programming" data-tag="Kỹ thuật" data-blurb="Bốn câu hỏi để dựng lời giải, đường từ backtracking sang bảng, vì sao thứ tự vòng lặp knapsack khác nhau, và cách chọn trạng thái.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · quy hoạch động</p>
+  <h1>Dynamic<br><em>programming</em></h1>
+  <p class="lede">Không phải một thuật toán mà là một <b>cách nhìn</b>: bài toán chia thành bài con lặp lại, mỗi bài con tính đúng một lần. Bài này chốt <b>bốn câu hỏi</b> để dựng lời giải, con đường từ backtracking sang bảng, vì sao <b>thứ tự vòng lặp</b> của knapsack 0/1 và không giới hạn lại khác nhau, và phần khó thật: <b>chọn đúng trạng thái</b>.</p>
+</header>
+
+
+<section id="dp-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>Đệ quy ngây thơ         tính lại cùng một bài con nhiều lần        → mũ
+   ↓ thêm bộ nhớ ghi kết quả
+Top-down + memo         mỗi bài con tính đúng một lần              → đa thức
+   ↓ đảo thứ tự, bỏ đệ quy
+Bottom-up (bảng)        điền bảng theo thứ tự phụ thuộc            → đa thức, không vỡ stack
+   ↓ chỉ giữ những dòng còn cần
+Rolling array           bộ nhớ từ O(n²) xuống O(n)</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    DP = <strong>đệ quy + ghi nhớ</strong>. Nếu viết được lời giải đệ quy đúng, bạn đã có DP — phần còn lại là kỹ thuật. Vì vậy khi bí, <em>đừng nghĩ về bảng trước</em>; hãy viết hàm đệ quy đúng rồi mới thêm memo.
+  </div>
+</section>
+
+<section id="dp-s2">
+  <div class="sh"><b>02</b><h2>Khi nào là DP</h2></div>
+  <p>Cần đủ <strong>hai</strong> tính chất. Thiếu một là không phải DP.</p>
+  <div class="grid2">
+    <div class="card ok"><h4>1. Bài con lặp lại</h4><p>Cùng một bài con xuất hiện ở nhiều nhánh khác nhau của cây đệ quy. Đây là lý do ghi nhớ có ích — nếu mỗi bài con chỉ gặp một lần thì memo vô dụng, và đó là chia để trị chứ không phải DP.</p></div>
+    <div class="card ok"><h4>2. Cấu trúc con tối ưu</h4><p>Lời giải tối ưu của bài lớn ghép từ lời giải tối ưu của bài con. Nếu phải biết cả lịch sử mới quyết định được thì trạng thái chưa đủ — hoặc bài này không có cấu trúc đó.</p></div>
+  </div>
+<pre><code><span class="cm"># fib ngây thơ: fib(3) bị tính 3 lần khi n = 6, và số lần nhân đôi theo n</span>
+              fib(5)
+            /        \
+       fib(4)        fib(3)     ← trùng
+      /     \       /     \
+  fib(3)  fib(2)  fib(2) fib(1) ← trùng nữa
+  → O(2ⁿ), trong khi chỉ có n giá trị khác nhau cần tính</code></pre>
+  <p>Ngược lại, sắp xếp trộn cũng chia bài toán ra nhưng hai nửa <em>không bao giờ trùng nhau</em> — nên memo không giúp gì, và mergesort là chia để trị chứ không phải DP.</p>
+</section>
+
+<section id="dp-s3">
+  <div class="sh"><b>03</b><h2>Ba tầng của cùng một bài</h2></div>
+  <p>Bài leo cầu thang: mỗi bước leo 1 hoặc 2 bậc, có bao nhiêu cách leo hết <code>n</code> bậc?</p>
+<pre><code><span class="cm"># TẦNG 1 — đệ quy thuần: O(2ⁿ)</span>
+<span class="kw">def</span> climb(n):
+    <span class="kw">if</span> n &lt;= <span class="st">2</span>: <span class="kw">return</span> n
+    <span class="kw">return</span> climb(n-<span class="st">1</span>) + climb(n-<span class="st">2</span>)
+
+<span class="cm"># TẦNG 2 — thêm memo: O(n), chỉ khác hai dòng</span>
+<span class="kw">from</span> functools <span class="kw">import</span> lru_cache
+
+@lru_cache(maxsize=<span class="kw">None</span>)
+<span class="kw">def</span> climb2(n):
+    <span class="kw">if</span> n &lt;= <span class="st">2</span>: <span class="kw">return</span> n
+    <span class="kw">return</span> climb2(n-<span class="st">1</span>) + climb2(n-<span class="st">2</span>)
+
+<span class="cm"># TẦNG 3 — bottom-up: O(n) thời gian, O(1) bộ nhớ</span>
+<span class="kw">def</span> climb3(n):
+    <span class="kw">if</span> n &lt;= <span class="st">2</span>: <span class="kw">return</span> n
+    a, b = <span class="st">1</span>, <span class="st">2</span>                      <span class="cm"># chỉ cần hai giá trị gần nhất</span>
+    <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>, n + <span class="st">1</span>):
+        a, b = b, a + b
+    <span class="kw">return</span> b</code></pre>
+  <div class="note">
+    <h4>Chiến thuật trong phỏng vấn</h4>
+    Trình bày theo đúng ba tầng này. Nói lời giải đệ quy trước — nó chứng minh bạn hiểu bài. Rồi chỉ ra bài con trùng lặp và thêm memo. Rồi đề xuất bản bottom-up nếu cần tránh vỡ ngăn xếp hoặc tiết kiệm bộ nhớ. Cách trình bày này gần như luôn được đánh giá cao hơn việc viết ngay một bảng DP mà không giải thích.
+  </div>
+</section>
+
+<section id="dp-s4">
+  <div class="sh"><b>04</b><h2>Bốn câu hỏi để dựng một lời giải DP</h2></div>
+  <table>
+    <tr><th>Câu hỏi</th><th>Trong bài coin change</th><th>Trong bài edit distance</th></tr>
+    <tr><td><strong>1. Trạng thái</strong> — <code>dp[...]</code> nghĩa là gì?</td><td><code>dp[x]</code> = số đồng ít nhất để đủ <code>x</code></td><td><code>dp[i][j]</code> = số phép ít nhất để biến <code>a[:i]</code> thành <code>b[:j]</code></td></tr>
+    <tr><td><strong>2. Chuyển</strong> — tính từ đâu?</td><td><code>dp[x] = 1 + min(dp[x - c])</code> với mọi đồng <code>c</code></td><td>Ba ô kề: trên, trái, chéo trên trái</td></tr>
+    <tr><td><strong>3. Cơ sở</strong> — biết trước gì?</td><td><code>dp[0] = 0</code></td><td><code>dp[i][0] = i</code>, <code>dp[0][j] = j</code></td></tr>
+    <tr><td><strong>4. Thứ tự</strong> — điền theo chiều nào?</td><td><code>x</code> tăng dần</td><td>Theo dòng, mỗi dòng từ trái sang</td></tr>
+  </table>
+  <p>Viết bốn câu này ra giấy — hoặc nói to lên trong phỏng vấn — trước khi code. Câu 1 là câu khó nhất và cũng quyết định mọi thứ; ba câu còn lại thường tự suy ra được.</p>
+  <div class="note key">
+    <h4>Quy tắc về thứ tự điền</h4>
+    Điền theo thứ tự sao cho <strong>mọi ô mà công thức cần đã có giá trị</strong>. Với bản top-down thì đệ quy tự lo việc này — đó là lợi thế lớn nhất của memo. Với bottom-up thì phải tự đảm bảo, và chọn sai thứ tự là nguồn của nhiều bug âm thầm.
+  </div>
+</section>
+
+<section id="dp-s5">
+  <div class="sh"><b>05</b><h2>Lab: điền bảng DP</h2></div>
+  <p>Bài edit distance — số phép chèn, xoá, thay ít nhất để biến chuỗi này thành chuỗi kia. Mỗi bước điền một ô và tô sáng các ô mà nó lấy giá trị từ đó.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>chuỗi A</label><input type="text" id="sa" value="kitten" style="width:110px"></div>
+      <div><label>chuỗi B</label><input type="text" id="sb" value="sitting" style="width:110px"></div>
+      <button id="dstep">Bước tiếp</button>
+      <button class="ghost" id="dauto">Tự chạy</button>
+      <button class="ghost" id="drst">Đặt lại</button>
+    </div>
+    <div id="dview"></div>
+    <div class="stat">
+      <u>ô đang tính <b id="dcell">–</b></u>
+      <u>quyết định <b id="dop">–</b></u>
+      <u>kết quả <b id="dres">đang chạy</b></u>
+    </div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Ba ô sáng là ba lựa chọn: <strong>trên</strong> là xoá một ký tự của A, <strong>trái</strong> là chèn một ký tự của B, <strong>chéo</strong> là thay hoặc giữ nguyên. Khi hai ký tự trùng nhau, ô chéo được lấy nguyên mà không cộng 1 — đó là toàn bộ công thức.
+    </p>
+  </div>
+</section>
+
+<section id="dp-s6">
+  <div class="sh"><b>06</b><h2>Top-down hay bottom-up</h2></div>
+  <table>
+    <tr><th></th><th>Top-down (memo)</th><th>Bottom-up (bảng)</th></tr>
+    <tr><td>Cách viết</td><td>Đệ quy + <code>@lru_cache</code></td><td>Vòng lặp điền bảng</td></tr>
+    <tr><td>Thứ tự tính</td><td>Tự động — đệ quy lo</td><td>Phải tự chọn đúng</td></tr>
+    <tr><td>Chỉ tính ô cần thiết</td><td>Có — thường nhanh hơn khi bảng thưa</td><td>Không — điền hết bảng</td></tr>
+    <tr><td>Nguy cơ vỡ ngăn xếp</td><td>Có, khi độ sâu &gt; ~1000</td><td>Không</td></tr>
+    <tr><td>Tối ưu bộ nhớ về O(n)</td><td>Khó</td><td>Dễ — rolling array</td></tr>
+    <tr><td>Dễ viết đúng lần đầu</td><td><strong>Dễ hơn</strong></td><td>Khó hơn</td></tr>
+  </table>
+  <p><strong>Lời khuyên thực dụng:</strong> trong phỏng vấn hãy viết top-down trước. Nó gần với cách suy nghĩ, ít bug hơn, và <code>@lru_cache</code> là một dòng. Chỉ chuyển sang bottom-up khi độ sâu đệ quy là vấn đề, khi cần tối ưu bộ nhớ, hoặc khi interviewer yêu cầu.</p>
+<pre><code><span class="cm"># cùng bài edit distance, bản top-down — ngắn hơn hẳn</span>
+<span class="kw">from</span> functools <span class="kw">import</span> lru_cache
+
+<span class="kw">def</span> edit(a, b):
+    @lru_cache(maxsize=<span class="kw">None</span>)
+    <span class="kw">def</span> go(i, j):
+        <span class="kw">if</span> i == <span class="st">0</span>: <span class="kw">return</span> j          <span class="cm"># chèn hết phần còn lại của b</span>
+        <span class="kw">if</span> j == <span class="st">0</span>: <span class="kw">return</span> i          <span class="cm"># xoá hết phần còn lại của a</span>
+        <span class="kw">if</span> a[i-<span class="st">1</span>] == b[j-<span class="st">1</span>]: <span class="kw">return</span> go(i-<span class="st">1</span>, j-<span class="st">1</span>)
+        <span class="kw">return</span> <span class="st">1</span> + <span class="kw">min</span>(go(i-<span class="st">1</span>, j), go(i, j-<span class="st">1</span>), go(i-<span class="st">1</span>, j-<span class="st">1</span>))
+    <span class="kw">return</span> go(<span class="kw">len</span>(a), <span class="kw">len</span>(b))    <span class="cm"># O(n·m) thời gian và bộ nhớ</span></code></pre>
+</section>
+
+<section id="dp-s7">
+  <div class="sh"><b>07</b><h2>DP một chiều</h2></div>
+  <p>Trạng thái chỉ có một tham số. Nhóm này chiếm phần lớn đề DP mức trung bình.</p>
+<pre><code><span class="cm"># house robber: không được lấy hai nhà liền nhau</span>
+<span class="kw">def</span> rob(a):
+    take, skip = <span class="st">0</span>, <span class="st">0</span>
+    <span class="kw">for</span> x <span class="kw">in</span> a:
+        take, skip = skip + x, <span class="kw">max</span>(take, skip)   <span class="cm"># lấy nhà này thì phải bỏ nhà trước</span>
+    <span class="kw">return</span> <span class="kw">max</span>(take, skip)                       <span class="cm"># O(n) thời gian, O(1) bộ nhớ</span>
+
+<span class="cm"># coin change: số đồng ít nhất để đủ amount</span>
+<span class="kw">def</span> coin_change(coins, amount):
+    INF = <span class="kw">float</span>(<span class="st">"inf"</span>)
+    dp = [<span class="st">0</span>] + [INF] * amount
+    <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, amount + <span class="st">1</span>):
+        <span class="kw">for</span> c <span class="kw">in</span> coins:
+            <span class="kw">if</span> c &lt;= x:
+                dp[x] = <span class="kw">min</span>(dp[x], dp[x - c] + <span class="st">1</span>)
+    <span class="kw">return</span> -<span class="st">1</span> <span class="kw">if</span> dp[amount] == INF <span class="kw">else</span> dp[amount]   <span class="cm"># O(amount · len(coins))</span></code></pre>
+  <h3>LIS — dãy con tăng dài nhất, hai lời giải</h3>
+<pre><code><span class="cm"># O(n²) — dễ nghĩ, nêu trước</span>
+<span class="kw">def</span> lis(a):
+    dp = [<span class="st">1</span>] * <span class="kw">len</span>(a)
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="kw">len</span>(a)):
+        <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(i):
+            <span class="kw">if</span> a[j] &lt; a[i]: dp[i] = <span class="kw">max</span>(dp[i], dp[j] + <span class="st">1</span>)
+    <span class="kw">return</span> <span class="kw">max</span>(dp, default=<span class="st">0</span>)
+
+<span class="cm"># O(n log n) — duy trì "đuôi nhỏ nhất của dãy tăng độ dài k"</span>
+<span class="kw">from</span> bisect <span class="kw">import</span> bisect_left
+<span class="kw">def</span> lis_fast(a):
+    tails = []
+    <span class="kw">for</span> x <span class="kw">in</span> a:
+        i = bisect_left(tails, x)
+        <span class="kw">if</span> i == <span class="kw">len</span>(tails): tails.append(x)
+        <span class="kw">else</span>:                tails[i] = x     <span class="cm"># thay bằng đuôi nhỏ hơn</span>
+    <span class="kw">return</span> <span class="kw">len</span>(tails)</code></pre>
+  <p><code>tails</code> <em>không</em> phải một dãy tăng thực sự trong mảng gốc — nó chỉ là bảng ghi đuôi nhỏ nhất cho từng độ dài. Độ dài của nó mới là đáp án. Nói rõ điều này khi trình bày, vì đây là chỗ hay bị hỏi vặn.</p>
+</section>
+
+<section id="dp-s8">
+  <div class="sh"><b>08</b><h2>DP trên hai chuỗi</h2></div>
+  <p>Nhận diện: đề cho <strong>hai</strong> chuỗi hoặc hai mảng. Trạng thái gần như luôn là <code>dp[i][j]</code> — đã xử lý <code>i</code> ký tự đầu của chuỗi một và <code>j</code> ký tự đầu của chuỗi hai.</p>
+<pre><code><span class="cm"># LCS — dãy con chung dài nhất</span>
+<span class="kw">def</span> lcs(a, b):
+    n, m = <span class="kw">len</span>(a), <span class="kw">len</span>(b)
+    dp = [[<span class="st">0</span>] * (m+<span class="st">1</span>) <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(n+<span class="st">1</span>)]
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, n+<span class="st">1</span>):
+        <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, m+<span class="st">1</span>):
+            <span class="kw">if</span> a[i-<span class="st">1</span>] == b[j-<span class="st">1</span>]:
+                dp[i][j] = dp[i-<span class="st">1</span>][j-<span class="st">1</span>] + <span class="st">1</span>          <span class="cm"># khớp → lấy chéo + 1</span>
+            <span class="kw">else</span>:
+                dp[i][j] = <span class="kw">max</span>(dp[i-<span class="st">1</span>][j], dp[i][j-<span class="st">1</span>])  <span class="cm"># bỏ một ký tự bên nào</span>
+    <span class="kw">return</span> dp[n][m]                                   <span class="cm"># O(n·m)</span></code></pre>
+  <p>Bảng <code>(n+1) × (m+1)</code> chứ không phải <code>n × m</code>: dòng 0 và cột 0 đại diện cho chuỗi rỗng, và chúng chính là điều kiện cơ sở. Thêm một dòng và một cột đệm giúp bỏ hết ca biên <code>i == 0</code> trong vòng lặp — kỹ thuật đáng dùng cho mọi bài DP hai chiều.</p>
+  <h3>Khôi phục lời giải, không chỉ giá trị</h3>
+<pre><code><span class="cm"># đi ngược từ dp[n][m] về dp[0][0]</span>
+i, j, out = n, m, []
+<span class="kw">while</span> i &gt; <span class="st">0</span> <span class="kw">and</span> j &gt; <span class="st">0</span>:
+    <span class="kw">if</span> a[i-<span class="st">1</span>] == b[j-<span class="st">1</span>]:
+        out.append(a[i-<span class="st">1</span>]); i -= <span class="st">1</span>; j -= <span class="st">1</span>
+    <span class="kw">elif</span> dp[i-<span class="st">1</span>][j] &gt;= dp[i][j-<span class="st">1</span>]: i -= <span class="st">1</span>
+    <span class="kw">else</span>: j -= <span class="st">1</span>
+out.reverse()</code></pre>
+  <p>Bài hỏi "dài bao nhiêu" thì chỉ cần giá trị; hỏi "là chuỗi nào" thì phải giữ cả bảng để đi ngược — nên <strong>không tối ưu được về O(n) bộ nhớ</strong>. Nêu đánh đổi này khi interviewer hỏi tối ưu bộ nhớ.</p>
+</section>
+
+<section id="dp-s9">
+  <div class="sh"><b>09</b><h2>Knapsack và thứ tự vòng lặp</h2></div>
+  <p>Đây là chỗ tinh tế nhất của DP một chiều, và là câu hỏi phân biệt rất hiệu quả.</p>
+<pre><code><span class="cm"># 0/1 knapsack — mỗi vật dùng TỐI ĐA MỘT lần</span>
+<span class="kw">def</span> knap01(weights, values, cap):
+    dp = [<span class="st">0</span>] * (cap + <span class="st">1</span>)
+    <span class="kw">for</span> w, v <span class="kw">in</span> <span class="kw">zip</span>(weights, values):
+        <span class="kw">for</span> c <span class="kw">in</span> <span class="kw">range</span>(cap, w - <span class="st">1</span>, -<span class="st">1</span>):        <span class="cm">← chạy NGƯỢC</span>
+            dp[c] = <span class="kw">max</span>(dp[c], dp[c - w] + v)
+    <span class="kw">return</span> dp[cap]
+
+<span class="cm"># unbounded knapsack — mỗi vật dùng BAO NHIÊU LẦN CŨNG ĐƯỢC</span>
+<span class="kw">def</span> knap_unbounded(weights, values, cap):
+    dp = [<span class="st">0</span>] * (cap + <span class="st">1</span>)
+    <span class="kw">for</span> w, v <span class="kw">in</span> <span class="kw">zip</span>(weights, values):
+        <span class="kw">for</span> c <span class="kw">in</span> <span class="kw">range</span>(w, cap + <span class="st">1</span>):            <span class="cm">← chạy XUÔI</span>
+            dp[c] = <span class="kw">max</span>(dp[c], dp[c - w] + v)
+    <span class="kw">return</span> dp[cap]</code></pre>
+  <div class="note key">
+    <h4>Vì sao đổi chiều lại đổi ý nghĩa bài toán</h4>
+    <p>Chạy <strong>xuôi</strong>: khi tính <code>dp[c]</code>, ô <code>dp[c-w]</code> <em>đã được cập nhật</em> trong cùng lượt của vật này. Nghĩa là nó có thể đã chứa vật đó rồi — nên vật được dùng lại nhiều lần.</p>
+    <p>Chạy <strong>ngược</strong>: khi tính <code>dp[c]</code>, ô <code>dp[c-w]</code> vẫn là giá trị của lượt trước, tức <em>chưa có</em> vật này. Nên mỗi vật chỉ vào đúng một lần.</p>
+    <p>Một dấu trừ trong <code>range</code> đổi hẳn bài toán. Giải thích được cơ chế này là dấu hiệu rõ ràng của người hiểu DP.</p>
+  </div>
+  <h3>Cùng cơ chế: đếm tổ hợp hay đếm hoán vị</h3>
+<pre><code><span class="cm"># đếm số CÁCH KẾT HỢP đồng xu — thứ tự không quan trọng</span>
+dp = [<span class="st">1</span>] + [<span class="st">0</span>] * amount
+<span class="kw">for</span> c <span class="kw">in</span> coins:                      <span class="cm">← đồng xu ở vòng NGOÀI</span>
+    <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(c, amount + <span class="st">1</span>):
+        dp[x] += dp[x - c]
+
+<span class="cm"># đếm số DÃY — thứ tự có quan trọng (1+2 khác 2+1)</span>
+dp = [<span class="st">1</span>] + [<span class="st">0</span>] * amount
+<span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, amount + <span class="st">1</span>):        <span class="cm">← số tiền ở vòng NGOÀI</span>
+    <span class="kw">for</span> c <span class="kw">in</span> coins:
+        <span class="kw">if</span> c &lt;= x: dp[x] += dp[x - c]</code></pre>
+  <p>Cùng hai vòng lặp, chỉ đổi thứ tự lồng nhau, ra hai đáp án khác nhau hoàn toàn. Khi gặp bài đếm, luôn tự hỏi trước: <em>thứ tự có tính là khác nhau không?</em></p>
+</section>
+
+<section id="dp-s10">
+  <div class="sh"><b>10</b><h2>Các họ DP khác</h2></div>
+  <table>
+    <tr><th>Họ</th><th>Trạng thái</th><th>Bài điển hình</th></tr>
+    <tr><td>DP trên khoảng</td><td><code>dp[i][j]</code> = kết quả trên đoạn từ i tới j; điền theo <em>độ dài đoạn tăng dần</em></td><td>Chuỗi con đối xứng dài nhất, nhân ma trận, bài trò chơi lấy đồ hai đầu</td></tr>
+    <tr><td>DP trên cây</td><td><code>dp[node][trạng thái]</code>; tính bằng postorder</td><td>Tập độc lập lớn nhất trên cây, đường kính, chọn nhà trên cây</td></tr>
+    <tr><td>DP trên bitmask</td><td><code>dp[mask]</code> = tập đã dùng; chỉ khả thi khi <code>n ≤ 20</code></td><td>Người bán hàng, ghép cặp, phủ tập hợp</td></tr>
+    <tr><td>DP có trạng thái phụ</td><td>Thêm chiều cho điều kiện: đang giữ hàng hay không, còn mấy lần đổi</td><td>Mua bán chứng khoán với k giao dịch, có thời gian chờ</td></tr>
+    <tr><td>DP trên chữ số</td><td><code>dp[vị trí][đã nhỏ hơn chưa][tổng]</code></td><td>Đếm số trong khoảng thoả tính chất</td></tr>
+  </table>
+<pre><code><span class="cm"># DP trên khoảng: chuỗi con đối xứng dài nhất — điền theo độ dài</span>
+<span class="kw">def</span> longest_palin(s):
+    n = <span class="kw">len</span>(s)
+    dp = [[<span class="kw">False</span>] * n <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(n)]
+    best = (<span class="st">0</span>, <span class="st">0</span>)
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n): dp[i][i] = <span class="kw">True</span>
+    <span class="kw">for</span> L <span class="kw">in</span> <span class="kw">range</span>(<span class="st">2</span>, n + <span class="st">1</span>):              <span class="cm">← độ dài ở vòng ngoài</span>
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n - L + <span class="st">1</span>):
+            j = i + L - <span class="st">1</span>
+            <span class="kw">if</span> s[i] == s[j] <span class="kw">and</span> (L == <span class="st">2</span> <span class="kw">or</span> dp[i+<span class="st">1</span>][j-<span class="st">1</span>]):
+                dp[i][j] = <span class="kw">True</span>
+                <span class="kw">if</span> L &gt; best[<span class="st">1</span>] - best[<span class="st">0</span>] + <span class="st">1</span>: best = (i, j)
+    <span class="kw">return</span> s[best[<span class="st">0</span>]:best[<span class="st">1</span>]+<span class="st">1</span>]</code></pre>
+  <p>Vòng ngoài là <strong>độ dài</strong> chứ không phải chỉ số, vì ô <code>dp[i][j]</code> cần <code>dp[i+1][j-1]</code> — một đoạn ngắn hơn. Đây là ví dụ rõ nhất cho câu hỏi thứ tư ở mục 04.</p>
+</section>
+
+<section id="dp-s11">
+  <div class="sh"><b>11</b><h2>Tối ưu bộ nhớ</h2></div>
+  <p>Nếu công thức chỉ dùng dòng <code>i-1</code>, thì giữ cả bảng là thừa.</p>
+<pre><code><span class="cm"># LCS bản O(min(n,m)) bộ nhớ</span>
+<span class="kw">def</span> lcs_mem(a, b):
+    <span class="kw">if</span> <span class="kw">len</span>(b) &gt; <span class="kw">len</span>(a): a, b = b, a       <span class="cm"># cho chuỗi ngắn thành chiều bảng</span>
+    prev = [<span class="st">0</span>] * (<span class="kw">len</span>(b) + <span class="st">1</span>)
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, <span class="kw">len</span>(a) + <span class="st">1</span>):
+        cur = [<span class="st">0</span>] * (<span class="kw">len</span>(b) + <span class="st">1</span>)
+        <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, <span class="kw">len</span>(b) + <span class="st">1</span>):
+            cur[j] = prev[j-<span class="st">1</span>] + <span class="st">1</span> <span class="kw">if</span> a[i-<span class="st">1</span>] == b[j-<span class="st">1</span>] <span class="kw">else</span> <span class="kw">max</span>(prev[j], cur[j-<span class="st">1</span>])
+        prev = cur
+    <span class="kw">return</span> prev[<span class="kw">len</span>(b)]</code></pre>
+  <div class="note warn">
+    <h4>Cái mất khi tối ưu bộ nhớ</h4>
+    Bỏ bảng đi thì <strong>không khôi phục được lời giải</strong>, chỉ còn giá trị. Nên hỏi lại đề: cần "độ dài" hay cần "chuỗi cụ thể"? Cần chuỗi thì giữ nguyên bảng O(n·m), và nói rõ lý do — đó là một câu trả lời tốt hơn là tối ưu bừa.
+  </div>
+  <p>Với knapsack 0/1 thì bản một chiều chạy ngược đã là bản tối ưu bộ nhớ — cùng một kỹ thuật, viết gọn hơn.</p>
+</section>
+
+<section id="dp-s12">
+  <div class="sh"><b>12</b><h2>Chọn đúng trạng thái — phần khó thật</h2></div>
+  <p>Phần lớn thất bại ở bài DP không phải vì viết sai vòng lặp mà vì <strong>trạng thái thiếu thông tin</strong>. Ví dụ cụ thể: mua bán chứng khoán, được giữ tối đa một cổ phiếu.</p>
+<pre><code><span class="cm"># TRẠNG THÁI SAI: dp[i] = lợi nhuận lớn nhất tính tới ngày i</span>
+<span class="cm"># → không đủ, vì còn phụ thuộc việc ngày i ta ĐANG GIỮ hàng hay không.</span>
+
+<span class="cm"># TRẠNG THÁI ĐÚNG: thêm một chiều cho tình trạng nắm giữ</span>
+<span class="kw">def</span> max_profit(prices):
+    hold, free = <span class="kw">float</span>(<span class="st">"-inf"</span>), <span class="st">0</span>       <span class="cm"># hold: đang giữ; free: không giữ</span>
+    <span class="kw">for</span> p <span class="kw">in</span> prices:
+        hold = <span class="kw">max</span>(hold, free - p)         <span class="cm"># giữ tiếp, hoặc mua hôm nay</span>
+        free = <span class="kw">max</span>(free, hold + p)         <span class="cm"># nghỉ tiếp, hoặc bán hôm nay</span>
+    <span class="kw">return</span> free</code></pre>
+  <h3>Ba dấu hiệu trạng thái của bạn còn thiếu</h3>
+  <ul>
+    <li><strong>Không viết được công thức chuyển</strong> mà không nhắc tới thông tin ngoài trạng thái. Thiếu gì thì thêm chiều đó.</li>
+    <li><strong>Cùng một trạng thái cho hai kết quả khác nhau</strong> tuỳ đường đi tới nó. Nghĩa là hai tình huống khác nhau đang bị gộp thành một ô.</li>
+    <li><strong>Phải quay lại sửa ô đã tính.</strong> DP điền một lần rồi cố định; nếu phải sửa thì thứ tự sai hoặc trạng thái sai.</li>
+  </ul>
+  <div class="note key">
+    <h4>Mẹo dựng trạng thái</h4>
+    Viết lời giải backtracking trước, rồi xem <strong>hàm đệ quy nhận những tham số nào</strong>. Chính bộ tham số đó là trạng thái, và mỗi tham số là một chiều của bảng. Cách này biến việc "nghĩ ra DP" thành việc máy móc — và nó là lý do mục 03 khuyên viết đệ quy trước.
+  </div>
+</section>
+
+<section id="dp-s13">
+  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
+    <tr><td>"đếm số cách", "có bao nhiêu cách"</td><td>DP đếm — chú ý thứ tự có quan trọng hay không</td></tr>
+    <tr><td>"lớn nhất / nhỏ nhất" trên một dãy lựa chọn</td><td>DP tối ưu hoá</td></tr>
+    <tr><td>"có thể đạt được không", "chia được không"</td><td>DP boolean, thường là biến thể subset sum</td></tr>
+    <tr><td>Hai chuỗi cho trước</td><td><code>dp[i][j]</code> — LCS, edit distance, khớp mẫu</td></tr>
+    <tr><td>"mỗi vật dùng một lần" so với "dùng bao nhiêu cũng được"</td><td>Knapsack 0/1 chạy ngược so với unbounded chạy xuôi</td></tr>
+    <tr><td>Đoạn con liên tiếp + có số âm</td><td>Kadane — DP một chiều đơn giản nhất</td></tr>
+    <tr><td><code>n ≤ 20</code> và có tập hợp</td><td>DP trên bitmask</td></tr>
+    <tr><td>"đối xứng", "đoạn từ i tới j"</td><td>DP trên khoảng, điền theo độ dài</td></tr>
+    <tr><td>Backtracking bị timeout và có trạng thái trùng</td><td>Thêm memo — đó chính là bước sang DP</td></tr>
+  </table>
+</section>
+
+<section id="dp-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Trạng thái thiếu chiều</h4><p>Không viết nổi công thức chuyển, hoặc cùng ô cho hai kết quả. Thêm chiều cho thông tin còn thiếu.</p></div>
+    <div class="card bad"><h4>Sai chiều vòng lặp ở knapsack</h4><p>Chạy xuôi cho bài 0/1 làm mỗi vật bị dùng nhiều lần. Ngược lại thì mất lời giải.</p></div>
+    <div class="card bad"><h4>Sai thứ tự ở DP trên khoảng</h4><p>Vòng ngoài phải là độ dài đoạn, không phải chỉ số đầu. Nếu không, ô cần đọc còn chưa được tính.</p></div>
+    <div class="card bad"><h4>Điều kiện cơ sở sai</h4><p><code>dp[0]</code> của bài đếm là 1 (một cách: không chọn gì), của bài tối thiểu là 0. Lẫn hai cái là kết quả lệch toàn bộ.</p></div>
+    <div class="card bad"><h4>Dùng list nhân bản để tạo bảng 2D</h4><p><code>[[0]*m]*n</code> tạo n tham chiếu tới cùng một dòng. Phải dùng comprehension.</p></div>
+    <div class="card bad"><h4>Tối ưu bộ nhớ rồi mới nhớ cần khôi phục lời giải</h4><p>Hỏi đề trước: cần giá trị hay cần cả lời giải.</p></div>
+  </div>
+</section>
+
+<section id="dp-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>DP khác chia để trị ở đâu?</summary>
+  <p>Cả hai đều chia bài toán thành bài con, nhưng DP đòi thêm điều kiện <b>bài con lặp lại</b>. Mergesort chia mảng thành hai nửa không bao giờ trùng nhau, nên ghi nhớ vô ích — đó là chia để trị. Fibonacci hay edit distance thì cùng một bài con xuất hiện ở nhiều nhánh, nên ghi nhớ cắt được chi phí từ mũ xuống đa thức. Điều kiện thứ hai là cấu trúc con tối ưu: lời giải tốt nhất của bài lớn ghép từ lời giải tốt nhất của bài con.</p></details>
+
+  <details class="qa"><summary>Bạn thường viết top-down hay bottom-up?</summary>
+  <p>Top-down trước, vì nó gần với cách suy nghĩ và chỉ cần thêm một decorator vào lời giải đệ quy đã đúng. Đệ quy tự lo thứ tự tính, và nó chỉ tính những trạng thái thật sự cần — có lợi khi bảng thưa. Tôi chuyển sang bottom-up khi độ sâu đệ quy vượt giới hạn của Python, hoặc khi cần tối ưu bộ nhớ xuống O(n) bằng rolling array, thứ khó làm với memo.</p></details>
+
+  <details class="qa"><summary>Vì sao knapsack 0/1 chạy vòng lặp ngược còn unbounded chạy xuôi?</summary>
+  <p>Vì nó quyết định ô <code>dp[c-w]</code> mà ta đọc là của lượt <em>trước</em> hay của lượt <em>hiện tại</em>. Chạy ngược thì ô đó chưa được cập nhật trong lượt của vật này, nên vật chỉ vào một lần — đúng bài 0/1. Chạy xuôi thì nó có thể đã chứa vật này rồi, nên vật được dùng lại nhiều lần — đúng bài unbounded. Một dấu trừ trong <code>range</code> đổi hẳn bài toán.</p></details>
+
+  <details class="qa"><summary>Làm sao bạn tìm ra trạng thái đúng?</summary>
+  <p>Tôi viết lời giải backtracking trước, rồi xem hàm đệ quy nhận những tham số nào — chính bộ tham số đó là trạng thái. Nếu không viết được công thức chuyển mà không phải nhắc tới thông tin ngoài trạng thái thì trạng thái còn thiếu chiều. Ví dụ bài mua bán chứng khoán: chỉ dùng <code>dp[ngày]</code> là không đủ, phải thêm chiều "đang giữ hàng hay không" — vì kết quả phụ thuộc điều đó.</p></details>
+
+  <details class="qa"><summary>Đếm số cách đổi tiền — thứ tự vòng lặp ảnh hưởng gì?</summary>
+  <p>Rất nhiều. Đặt đồng xu ở vòng ngoài thì mỗi tổ hợp được đếm một lần, tức thứ tự không quan trọng: 1+2 và 2+1 là cùng một cách. Đặt số tiền ở vòng ngoài thì mọi dãy được đếm riêng, tức 1+2 khác 2+1. Hai bài toán khác nhau với cùng hai dòng code, nên khi gặp bài đếm tôi luôn hỏi rõ trước: thứ tự có tính là khác nhau không.</p></details>
+
+  <details class="qa"><summary>Bài LIS — bản O(n log n) hoạt động thế nào?</summary>
+  <p>Duy trì một mảng <code>tails</code>, trong đó <code>tails[k]</code> là <em>đuôi nhỏ nhất</em> của mọi dãy tăng có độ dài <code>k+1</code>. Với mỗi phần tử, tìm nhị phân vị trí đầu tiên trong <code>tails</code> không nhỏ hơn nó rồi thay vào, hoặc nối vào cuối nếu nó lớn hơn tất cả. Độ dài của <code>tails</code> là đáp án. Lưu ý <code>tails</code> không phải một dãy con thật của mảng gốc — nó chỉ là bảng ghi đuôi tốt nhất cho từng độ dài, nên không dùng nó để khôi phục dãy mà phải lưu thêm con trỏ ngược.</p></details>
+</section>
+
+<footer>Deep dive · dynamic programming · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../assets/catalog.js"></script>
+<script src="../../../assets/search-index.js"></script>
+<script src="../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>
