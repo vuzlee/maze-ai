@@ -67,6 +67,19 @@ Sinh lại `assets/catalog.js` và `assets/search-index.js`, đồng thời báo
 chưa được liệt kê, khai báo trỏ tới thư mục không tồn tại, thiếu `index.html`. Không chạy lại thì
 bài mới không hiện ở trang chủ và không tìm được.
 
+## Đọc & học
+
+Trang bài được bố trí để học chứ không chỉ để đọc:
+
+- **dòng ngắn ~72 ký tự** cho phần chữ, còn code / bảng / sơ đồ / lab vẫn để rộng;
+- **mỗi mục là một khối** có số thứ tự dạng huy hiệu và đường kẻ ngăn, lướt là thấy ranh giới;
+- **thanh tiến độ đọc** ở đỉnh trang, mục lục đếm `06 / 15` và tô xanh những mục đã đi qua;
+- **đánh dấu đã học** ở cuối mỗi bài — lưu trong `localStorage`, trang chủ hiện tổng tiến độ
+  và có nút lọc *chỉ bài chưa học*;
+- **mở/đóng toàn bộ phần hỏi đáp** bằng một nút trên tiêu đề mục, để tự kiểm tra trước khi xem đáp án.
+
+Phím tắt: `j` mục sau · `k` mục trước · `m` đánh dấu đã học · `/` tìm toàn kho · `Esc` thoát tìm.
+
 ## Chỗ trống theo syllabus
 
 Khung thư mục đã dựng sẵn cho các mảng còn thiếu bài:

@@ -151,3 +151,162 @@
     show("page");
   }
 })();
+
+/* ============================================================
+   CÔNG CỤ HỌC
+   Chạy sau khối trên, khi trang chủ và mục lục đã dựng xong.
+   - thanh tiến độ đọc
+   - mục lục đánh dấu phần đã đi qua + đếm 06/15
+   - đánh dấu "đã học" từng bài, nhớ trong localStorage
+   - mở/đóng toàn bộ phần hỏi đáp để tự kiểm tra
+   - phím tắt j / k / m
+   ============================================================ */
+(function () {
+  var BASE = document.documentElement.getAttribute("data-base") || "";
+  var CAT = window.CATALOG || [];
+  var doc = document.querySelector(".doc");
+  var KEY = "mazeai.done";
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function readDone() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; }
+  }
+  function writeDone(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  /* ---------------- trang chủ: tiến độ + lọc bài chưa học ---------------- */
+  var lib = document.getElementById("library");
+  if (lib) {
+    var all = [];
+    CAT.forEach(function (c) { c.groups.forEach(function (g) { g.books.forEach(function (b) { all.push(b); }); }); });
+
+    var bar = document.createElement("div");
+    bar.className = "libbar";
+    lib.parentNode.insertBefore(bar, lib);
+
+    var onlyTodo = false;
+    function paint() {
+      var done = readDone();
+      var n = 0;
+      [].slice.call(lib.querySelectorAll(".bk")).forEach(function (a) {
+        var slug = a.getAttribute("data-slug");
+        var is = done.indexOf(slug) >= 0;
+        a.classList.toggle("done", is);
+        a.hidden = onlyTodo && is;
+        if (is) n++;
+      });
+      /* kệ nào trống sau khi lọc thì ẩn luôn cho gọn */
+      [].slice.call(lib.querySelectorAll(".shelf")).forEach(function (s) {
+        var vis = [].slice.call(s.querySelectorAll(".bk")).filter(function (a) { return !a.hidden; });
+        s.classList.toggle("empty", vis.length === 0);
+      });
+      var pct = all.length ? Math.round(100 * n / all.length) : 0;
+      bar.innerHTML =
+        "<span>đã học <b>" + n + "/" + all.length + "</b> bài</span>" +
+        '<span class="track"><i style="width:' + pct + '%"></i></span>' +
+        "<span>" + pct + "%</span>" +
+        '<button id="fTodo"' + (onlyTodo ? ' class="on"' : "") + ">chỉ bài chưa học</button>" +
+        (n ? '<button id="fReset">xoá đánh dấu</button>' : "");
+      document.getElementById("fTodo").onclick = function () { onlyTodo = !onlyTodo; paint(); };
+      var r = document.getElementById("fReset");
+      if (r) r.onclick = function () { if (confirm("Xoá toàn bộ đánh dấu đã học?")) { writeDone([]); paint(); } };
+    }
+    /* gắn slug lên từng card để biết card nào ứng với bài nào */
+    var ix = 0;
+    [].slice.call(lib.querySelectorAll(".bk")).forEach(function (a) { a.setAttribute("data-slug", all[ix++].slug); });
+    paint();
+  }
+
+  if (!doc) return;
+
+  /* ---------------- thanh tiến độ đọc ---------------- */
+  var prog = document.createElement("div");
+  prog.id = "prog";
+  document.body.appendChild(prog);
+
+  var tocLinks = [].slice.call(document.querySelectorAll("#toc a"));
+  var secs = tocLinks.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+
+  /* đầu mục lục: số mục đã đi qua / tổng số */
+  var tocBox = document.getElementById("toc");
+  var head = document.createElement("p");
+  head.className = "head";
+  if (tocBox) tocBox.parentNode.insertBefore(head, tocBox);
+  var label = document.querySelector("nav.toc > p:not(.head)");
+  if (label) label.remove();
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    prog.style.width = (max > 0 ? Math.min(100, 100 * h.scrollTop / max) : 0) + "%";
+
+    var passed = 0;
+    secs.forEach(function (s, i) {
+      if (!s) return;
+      var seen = s.getBoundingClientRect().top < h.clientHeight * 0.4;
+      tocLinks[i].classList.toggle("seen", seen);
+      if (seen) passed = i + 1;
+    });
+    head.innerHTML = "Mục lục<b>" + String(passed).padStart(2, "0") + " / " + secs.length + "</b>";
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  /* ---------------- mở / đóng toàn bộ hỏi đáp ---------------- */
+  [].slice.call(doc.querySelectorAll("section")).forEach(function (sec) {
+    var qa = [].slice.call(sec.querySelectorAll("details.qa"));
+    if (qa.length < 2) return;
+    var sh = sec.querySelector(".sh");
+    if (!sh) return;
+    var b = document.createElement("button");
+    b.className = "tool";
+    b.textContent = "mở tất cả";
+    b.onclick = function () {
+      var open = qa.some(function (d) { return !d.open });
+      qa.forEach(function (d) { d.open = open; });
+      b.textContent = open ? "đóng tất cả" : "mở tất cả";
+    };
+    sh.appendChild(b);
+  });
+
+  /* ---------------- đánh dấu đã học ---------------- */
+  var slug = doc.id.replace("art-", "");
+  var np = document.getElementById("np");
+  var barD = document.createElement("div");
+  barD.className = "donebar";
+  if (np) np.parentNode.insertBefore(barD, np);
+
+  function paintDone() {
+    var is = readDone().indexOf(slug) >= 0;
+    barD.innerHTML = '<button id="mk"' + (is ? ' class="on"' : "") + ">" +
+      (is ? "✓ đã học" : "đánh dấu đã học") + "</button>" +
+      "<span>" + (is ? "bài này đã xong — hiện dấu ✓ ở trang chủ" : "phím tắt: m") + "</span>";
+    document.getElementById("mk").onclick = toggleDone;
+  }
+  function toggleDone() {
+    var list = readDone(), i = list.indexOf(slug);
+    if (i >= 0) list.splice(i, 1); else list.push(slug);
+    writeDone(list);
+    paintDone();
+  }
+  paintDone();
+
+  /* ---------------- phím tắt ---------------- */
+  var hint = document.createElement("p");
+  hint.className = "hint";
+  hint.innerHTML = "<kbd>j</kbd>mục sau &nbsp; <kbd>k</kbd>mục trước<br><kbd>m</kbd>đánh dấu đã học &nbsp; <kbd>/</kbd>tìm";
+  var nav = document.querySelector("nav.toc");
+  if (nav) nav.appendChild(hint);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.metaKey || e.ctrlKey) return;
+    if (e.key === "m") { e.preventDefault(); toggleDone(); return; }
+    if (e.key !== "j" && e.key !== "k") return;
+    e.preventDefault();
+    var cur = 0;
+    secs.forEach(function (s, i) { if (s && s.getBoundingClientRect().top < 90) cur = i; });
+    var to = secs[Math.max(0, Math.min(secs.length - 1, cur + (e.key === "j" ? 1 : -1)))];
+    if (to) to.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+})();
