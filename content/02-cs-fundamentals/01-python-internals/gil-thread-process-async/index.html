@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIL, thread, process, async — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-gil" data-title="GIL, thread, process, async" data-tag="Đồng thời" data-blurb="GIL khoá cái gì, chờ hay tính, ba lỗi async làm treo server, và vì sao GIL không cứu bạn khỏi race condition.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Python internals · đồng thời</p>
+  <h1>GIL, thread,<br>process, <em>async</em></h1>
+  <p class="lede">Bốn mô hình, và câu hỏi duy nhất quyết định chọn cái nào: <b>tác vụ của bạn chờ hay tính?</b> Bài này giải thích GIL thực sự khoá cái gì, vì sao thread không tăng tốc việc nặng CPU, ba lỗi async làm treo cả server, và vì sao <b>GIL không cứu bạn khỏi race condition</b>.</p>
+</header>
+
+
+<section id="gil-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>                     nhiều luồng thật?   tận dụng nhiều CPU?   chi phí
+tuần tự                    không                không            0
+threading                  có                   KHÔNG (GIL)      ~8 MB/luồng
+multiprocessing            có                   CÓ               ~30 MB/tiến trình
+asyncio                    không (1 luồng)      KHÔNG            ~vài KB/task</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    <strong>Chờ</strong> thì dùng async hoặc thread. <strong>Tính</strong> thì dùng process, hoặc đẩy phép tính xuống thư viện C. Trả lời được câu "tác vụ này chờ hay tính" là đã chọn xong mô hình.
+  </div>
+</section>
+
+<section id="gil-s2">
+  <div class="sh"><b>02</b><h2>GIL là gì, và nó khoá cái gì</h2></div>
+  <p>Global Interpreter Lock: một khoá duy nhất trong CPython, và <strong>chỉ luồng nào giữ nó mới được thực thi bytecode Python</strong>.</p>
+<pre><code>Bốn luồng chạy vòng lặp tính toán trên máy 4 lõi:
+
+luồng 1  ███░░░░░░░░░███░░░░░░░  ← chỉ chạy khi giữ GIL
+luồng 2  ░░░███░░░░░░░░░███░░░░
+luồng 3  ░░░░░░███░░░░░░░░░███░
+luồng 4  ░░░░░░░░░███░░░░░░░░░░
+CPU      1 lõi làm việc, 3 lõi rảnh
+tổng thời gian: bằng chạy tuần tự, cộng thêm chi phí chuyển luồng</code></pre>
+  <h3>Vì sao CPython lại có GIL</h3>
+  <ul>
+    <li><strong>Đếm tham chiếu không an toàn.</strong> Mỗi object có một biến đếm số tham chiếu tới nó. Hai luồng tăng giảm biến đó cùng lúc thì số sai — object bị giải phóng khi vẫn còn dùng, hoặc không bao giờ được giải phóng.</li>
+    <li><strong>Một khoá to thì đơn giản và nhanh cho chương trình một luồng.</strong> Khoá từng object sẽ tốn chi phí ở mọi phép toán, làm chậm phần lớn chương trình Python vốn chỉ chạy một luồng.</li>
+    <li><strong>Thư viện C mở rộng dựa vào nó.</strong> Rất nhiều extension viết ra với giả định có GIL bảo vệ.</li>
+  </ul>
+  <div class="note">
+    <h4>GIL được nhả ra khi nào</h4>
+    Khi luồng <strong>chờ I/O</strong> — đọc file, gọi mạng, truy vấn cơ sở dữ liệu. Và khi luồng đi vào một thư viện C có chủ động nhả GIL: NumPy, phép nhân ma trận của PyTorch, nén ảnh, băm mật khẩu. Đây là lý do <code>numpy</code> tính toán song song được thật dù chạy trong nhiều thread Python.
+  </div>
+</section>
+
+<section id="gil-s3">
+  <div class="sh"><b>03</b><h2>Chờ hay tính — cách phân loại</h2></div>
+  <table>
+    <tr><th></th><th>I/O-bound — chờ</th><th>CPU-bound — tính</th></tr>
+    <tr><td>Ví dụ</td><td>Gọi API, truy vấn DB, đọc file, chờ phản hồi LLM</td><td>Vòng lặp tính toán, xử lý ảnh bằng Python thuần, phân tích chuỗi lớn</td></tr>
+    <tr><td>Thời gian trôi ở đâu</td><td>Chờ bên ngoài trả lời</td><td>Trong CPU, thực thi bytecode</td></tr>
+    <tr><td>Nhả GIL không</td><td>Có — trong lúc chờ</td><td>Không</td></tr>
+    <tr><td>Nên dùng</td><td><strong>asyncio</strong>, hoặc thread</td><td><strong>multiprocessing</strong>, hoặc thư viện C</td></tr>
+  </table>
+<pre><code><span class="cm"># cách đo nhanh xem tác vụ thuộc loại nào</span>
+<span class="kw">import</span> time
+t0, c0 = time.time(), time.process_time()
+do_work()
+wall = time.time() - t0        <span class="cm"># thời gian thực tế trôi qua</span>
+cpu  = time.process_time() - t0 <span class="cm"># thời gian CPU thật sự làm việc</span>
+
+<span class="cm"># cpu / wall ≈ 1  → CPU-bound</span>
+<span class="cm"># cpu / wall ≈ 0  → I/O-bound, chủ yếu đứng chờ</span></code></pre>
+  <p>Hai dòng đo này đáng nhắc trong phỏng vấn: nó cho thấy bạn quyết định dựa trên số đo chứ không dựa trên cảm giác.</p>
+</section>
+
+<section id="gil-s4">
+  <div class="sh"><b>04</b><h2>Thread — khi nào có lợi</h2></div>
+<pre><code><span class="kw">from</span> concurrent.futures <span class="kw">import</span> ThreadPoolExecutor
+
+<span class="cm"># TỐT: 100 request mạng, mỗi cái chờ 200ms</span>
+<span class="kw">with</span> ThreadPoolExecutor(max_workers=<span class="st">20</span>) <span class="kw">as</span> ex:
+    results = <span class="kw">list</span>(ex.map(fetch_url, urls))
+<span class="cm"># tuần tự: 20 giây. 20 luồng: khoảng 1 giây.</span>
+
+<span class="cm"># VÔ ÍCH: tính toán thuần Python</span>
+<span class="kw">with</span> ThreadPoolExecutor(max_workers=<span class="st">4</span>) <span class="kw">as</span> ex:
+    results = <span class="kw">list</span>(ex.map(heavy_math, data))
+<span class="cm"># không nhanh hơn tuần tự, thường CHẬM HƠN vì chi phí chuyển luồng</span></code></pre>
+  <p>Thread vẫn có chỗ dùng dù có GIL, vì ba lý do:</p>
+  <ul>
+    <li><strong>I/O nhả GIL</strong>, nên phần chờ hoàn toàn chồng lấn được.</li>
+    <li><strong>Chạy được thư viện chặn.</strong> Nhiều driver cơ sở dữ liệu và SDK chỉ có bản đồng bộ, không dùng được trong async. Bọc chúng trong thread là cách duy nhất.</li>
+    <li><strong>Không cần viết lại code.</strong> Chuyển sang async đòi hỏi <code>async</code>/<code>await</code> lan khắp hàm gọi; thread thì không.</li>
+  </ul>
+  <p>Số luồng nên đặt bao nhiêu: với tác vụ I/O thì nhiều hơn số lõi rất nhiều — vài chục tới vài trăm — vì luồng chủ yếu đứng chờ. Với tác vụ CPU thì thread không giúp gì nên câu hỏi này không có nghĩa.</p>
+</section>
+
+<section id="gil-s5">
+  <div class="sh"><b>05</b><h2>Process — cách duy nhất dùng nhiều lõi bằng Python thuần</h2></div>
+<pre><code><span class="kw">from</span> concurrent.futures <span class="kw">import</span> ProcessPoolExecutor
+
+<span class="kw">with</span> ProcessPoolExecutor(max_workers=<span class="st">8</span>) <span class="kw">as</span> ex:
+    results = <span class="kw">list</span>(ex.map(heavy_math, data))
+<span class="cm"># mỗi tiến trình có interpreter riêng, GIL riêng → 8 lõi làm việc thật</span></code></pre>
+  <p>Cái giá phải trả, và đây là phần candidate thường bỏ qua:</p>
+  <table>
+    <tr><th>Chi phí</th><th>Chi tiết</th></tr>
+    <tr><td>Khởi tạo</td><td>Mỗi tiến trình là một interpreter mới; tốn hàng chục tới hàng trăm ms và vài chục MB RAM</td></tr>
+    <tr><td>Truyền dữ liệu</td><td>Đối số và kết quả phải <strong>tuần tự hoá</strong> qua pickle rồi gửi qua ống. Truyền một DataFrame lớn có thể đắt hơn cả phép tính</td></tr>
+    <tr><td>Không chia sẻ bộ nhớ</td><td>Biến toàn cục không dùng chung. Muốn chia sẻ phải dùng <code>multiprocessing.shared_memory</code> hoặc file</td></tr>
+    <tr><td>Không pickle được</td><td>Lambda, hàm lồng, kết nối mở, khoá — đều lỗi khi truyền</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Quy tắc thực dụng</h4>
+    Process chỉ có lãi khi <strong>mỗi tác vụ đủ lớn để bù chi phí gửi dữ liệu</strong>. Chia 10 triệu phép tính nhỏ thành 10 triệu tác vụ thì chi phí pickle nuốt hết lợi ích. Chia thành 8 khối lớn thì lãi. Đây là câu trả lời tốt khi bị hỏi "vì sao dùng process rồi mà không nhanh hơn".
+  </div>
+  <p>Với ML, thường không cần multiprocessing cho phép tính: NumPy và PyTorch đã nhả GIL và tự song song hoá trong C. Process hữu ích cho <em>tiền xử lý dữ liệu bằng Python thuần</em> — đúng những gì <code>DataLoader(num_workers=k)</code> làm.</p>
+</section>
+
+<section id="gil-s6">
+  <div class="sh"><b>06</b><h2>Lab: bốn mô hình trên cùng một tải</h2></div>
+  <p>Nhập số tác vụ, thời gian tính và thời gian chờ của mỗi tác vụ. Lab tính thời gian tổng theo bốn mô hình, kèm công thức để bạn kiểm lại.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>số tác vụ</label><input type="number" id="ntask" value="8" min="1" max="200"></div>
+      <div><label>tính — ms mỗi tác vụ</label><input type="number" id="cpums" value="100" min="0"></div>
+      <div><label>chờ — ms mỗi tác vụ</label><input type="number" id="iows" value="400" min="0"></div>
+      <div><label>số lõi CPU</label><input type="number" id="cores" value="4" min="1" max="64"></div>
+      <div><label>kịch bản</label>
+        <select id="scen">
+          <option value="">—</option>
+          <option value="io">gọi 20 API — chờ nhiều</option>
+          <option value="cpu">tính toán nặng — không chờ</option>
+          <option value="mix">trộn — vừa tính vừa chờ</option>
+        </select>
+      </div>
+    </div>
+    <div id="cview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Đây là <strong>mô hình ước lượng</strong>, không phải đo thật — nhưng nó đúng về mặt định tính và cho thấy quy luật: chờ nhiều thì async thắng đậm; tính nhiều thì chỉ process giúp được; trộn lẫn thì phải chia hai tầng.
+    </p>
+  </div>
+</section>
+
+<section id="gil-s7">
+  <div class="sh"><b>07</b><h2>async/await</h2></div>
+  <p>Đồng thời <em>hợp tác</em> trên một luồng duy nhất: mỗi tác vụ tự nguyện nhường quyền tại điểm <code>await</code>.</p>
+<pre><code><span class="kw">import</span> asyncio
+
+<span class="kw">async def</span> fetch(session, url):
+    <span class="kw">async with</span> session.get(url) <span class="kw">as</span> r:
+        <span class="kw">return</span> <span class="kw">await</span> r.text()          <span class="cm">← nhường quyền tại đây</span>
+
+<span class="kw">async def</span> main(urls):
+    <span class="kw">async with</span> aiohttp.ClientSession() <span class="kw">as</span> s:
+        <span class="kw">return</span> <span class="kw">await</span> asyncio.gather(*[fetch(s, u) <span class="kw">for</span> u <span class="kw">in</span> urls])
+
+asyncio.run(main(urls))                <span class="cm"># 1000 request đồng thời trên MỘT luồng</span></code></pre>
+  <table>
+    <tr><th>Khái niệm</th><th>Là gì</th></tr>
+    <tr><td><code>coroutine</code></td><td>Hàm khai báo <code>async def</code>. Gọi nó <strong>không chạy gì cả</strong> — chỉ tạo một object chờ được await</td></tr>
+    <tr><td><code>await</code></td><td>Điểm nhường quyền: "tôi chờ ở đây, event loop cứ chạy việc khác"</td></tr>
+    <tr><td><code>event loop</code></td><td>Bộ điều phối: giữ danh sách tác vụ, chạy cái nào đã sẵn sàng</td></tr>
+    <tr><td><code>Task</code></td><td>Coroutine đã được giao cho event loop, chạy nền độc lập</td></tr>
+    <tr><td><code>gather</code></td><td>Chạy nhiều thứ đồng thời và chờ tất cả xong</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao async nhẹ hơn thread nhiều lần</h4>
+    Một luồng hệ điều hành tốn khoảng vài MB ngăn xếp và mỗi lần chuyển luồng phải đi qua kernel. Một task async chỉ là một object Python vài KB, và chuyển đổi chỉ là một lần gọi hàm trong không gian người dùng. Đó là lý do 10.000 kết nối đồng thời khả thi với async nhưng vô vọng với thread.
+  </div>
+</section>
+
+<section id="gil-s8">
+  <div class="sh"><b>08</b><h2>Ba lỗi async kinh điển</h2></div>
+  <h3>1. Gọi hàm chặn trong event loop</h3>
+<pre><code><span class="kw">async def</span> handler():
+    time.sleep(<span class="st">2</span>)              <span class="cm">← ĐÓNG BĂNG TOÀN BỘ event loop 2 giây</span>
+    data = requests.get(url)   <span class="cm">← cũng vậy: thư viện đồng bộ</span>
+    row = cursor.execute(sql)  <span class="cm">← driver DB đồng bộ cũng vậy</span>
+
+<span class="cm"># đúng:</span>
+<span class="kw">async def</span> handler():
+    <span class="kw">await</span> asyncio.sleep(<span class="st">2</span>)
+    data = <span class="kw">await</span> client.get(url)                     <span class="cm"># thư viện async</span>
+    row = <span class="kw">await</span> asyncio.to_thread(cursor.execute, sql) <span class="cm"># đẩy hàm chặn sang thread</span></code></pre>
+  <p>Đây là lỗi nghiêm trọng nhất vì hậu quả không nằm ở một request — nó làm <em>mọi</em> request đang chờ bị treo theo. Triệu chứng: server chậm bất thường dưới tải mà CPU vẫn thấp.</p>
+  <h3>2. Quên await</h3>
+<pre><code>result = fetch(url)          <span class="cm">← không chạy gì, result là một coroutine object</span>
+result = <span class="kw">await</span> fetch(url)    <span class="cm"># đúng</span></code></pre>
+  <p>Python cảnh báo <code>coroutine was never awaited</code> — nhưng chỉ khi bộ thu gom rác dọn tới nó, nên cảnh báo hiện muộn và ở chỗ khác hẳn nơi gây lỗi.</p>
+  <h3>3. Tuần tự hoá vô tình</h3>
+<pre><code><span class="cm"># SAI: chờ xong từng cái → không nhanh hơn tuần tự</span>
+<span class="kw">for</span> url <span class="kw">in</span> urls:
+    results.append(<span class="kw">await</span> fetch(url))
+
+<span class="cm"># ĐÚNG: phát hết ra rồi chờ chung</span>
+results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="kw">for</span> u <span class="kw">in</span> urls])</code></pre>
+  <div class="note warn">
+    <h4>Chi tiết ít người biết</h4>
+    Nếu một tác vụ trong <code>gather</code> ném lỗi, các tác vụ khác <strong>vẫn tiếp tục chạy</strong> và lỗi được ném lên ngay. Dùng <code>return_exceptions=True</code> để nhận lỗi như một giá trị kết quả thay vì làm sập cả nhóm. Đây là điều bắt buộc phải xử lý trong code thật.
+  </div>
+</section>
+
+<section id="gil-s9">
+  <div class="sh"><b>09</b><h2>Race condition — GIL không cứu bạn</h2></div>
+  <p>Ngộ nhận phổ biến: "có GIL nên code đa luồng Python an toàn". Sai.</p>
+<pre><code>counter = <span class="st">0</span>
+
+<span class="kw">def</span> inc():
+    <span class="kw">global</span> counter
+    <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1000000</span>):
+        counter += <span class="st">1</span>          <span class="cm">← KHÔNG nguyên tử</span>
+
+<span class="cm"># 4 luồng chạy đồng thời → kết quả thường KHÔNG phải 4.000.000</span></code></pre>
+<pre><code>counter += 1 thực chất là ba bước bytecode:
+    1. đọc counter
+    2. cộng 1
+    3. ghi lại
+
+Luồng có thể bị ngắt GIỮA các bước:
+    luồng A đọc 100 → bị ngắt
+    luồng B đọc 100, cộng, ghi 101
+    luồng A cộng, ghi 101        ← mất một lần tăng</code></pre>
+  <p>GIL đảm bảo <em>một bytecode</em> không bị xé đôi. Nó không đảm bảo <em>một dòng code</em> chạy trọn vẹn. Cách chữa:</p>
+<pre><code>lock = threading.Lock()
+
+<span class="kw">def</span> inc():
+    <span class="kw">global</span> counter
+    <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1000000</span>):
+        <span class="kw">with</span> lock:            <span class="cm"># đoạn tới hạn</span>
+            counter += <span class="st">1</span>
+
+<span class="cm"># hoặc tránh chia sẻ hẳn: mỗi luồng đếm riêng rồi cộng lại ở cuối</span></code></pre>
+  <div class="note key">
+    <h4>Vì sao async ít bị race hơn</h4>
+    Trong async, việc chuyển đổi chỉ xảy ra tại điểm <code>await</code> — nghĩa là bạn <em>biết chính xác</em> chỗ nào có thể bị ngắt. Với thread, việc ngắt xảy ra ở bất kỳ đâu. Đó là lý do code async dễ suy luận về tính đúng đắn hơn, dù vẫn cần cẩn thận khi có <code>await</code> ở giữa một chuỗi thao tác trên dữ liệu chung.
+  </div>
+</section>
+
+<section id="gil-s10">
+  <div class="sh"><b>10</b><h2>Chi phí thật của từng mô hình</h2></div>
+  <table>
+    <tr><th></th><th>Bộ nhớ mỗi đơn vị</th><th>Chi phí tạo</th><th>Chi phí chuyển đổi</th><th>Số lượng khả thi</th></tr>
+    <tr><td>Process</td><td>~30 MB trở lên</td><td>Hàng chục–trăm ms</td><td>Qua kernel, đắt</td><td>Bằng số lõi</td></tr>
+    <tr><td>Thread</td><td>~8 MB ngăn xếp</td><td>Dưới ms</td><td>Qua kernel</td><td>Hàng trăm</td></tr>
+    <tr><td>Async task</td><td>Vài KB</td><td>Micro giây</td><td>Gọi hàm, rất rẻ</td><td><strong>Hàng chục nghìn</strong></td></tr>
+  </table>
+  <p>Bảng này giải thích tại sao câu hỏi "tại sao async chứ không thread" có câu trả lời định lượng: cùng phục vụ 10.000 kết nối đồng thời, thread cần khoảng 80 GB RAM, async cần vài chục MB.</p>
+</section>
+
+<section id="gil-s11">
+  <div class="sh"><b>11</b><h2>Bảng chọn mô hình</h2></div>
+  <table>
+    <tr><th>Tình huống</th><th>Chọn</th><th>Vì sao</th></tr>
+    <tr><td>Gọi nhiều API, có thư viện async</td><td><strong>asyncio</strong></td><td>Nhẹ nhất, chồng lấn tối đa</td></tr>
+    <tr><td>Gọi nhiều API nhưng chỉ có SDK đồng bộ</td><td>ThreadPoolExecutor</td><td>Không phải viết lại; thư viện chặn vẫn nhả GIL khi chờ mạng</td></tr>
+    <tr><td>Tính toán nặng bằng Python thuần</td><td><strong>multiprocessing</strong></td><td>Cách duy nhất thoát GIL</td></tr>
+    <tr><td>Tính toán nặng bằng NumPy/PyTorch</td><td>Một luồng là đủ</td><td>Thư viện đã nhả GIL và tự song song trong C</td></tr>
+    <tr><td>Web server nhiều kết nối chờ</td><td>asyncio, hoặc nhiều tiến trình mỗi cái một event loop</td><td>Mô hình chuẩn của uvicorn với nhiều worker</td></tr>
+    <tr><td>Tiền xử lý dữ liệu cho huấn luyện</td><td>multiprocessing</td><td>Chính là <code>num_workers</code> của DataLoader</td></tr>
+    <tr><td>Vừa chờ nhiều vừa tính nhiều</td><td>asyncio + <code>to_thread</code> hoặc process pool</td><td>Tầng async lo chờ, tầng process lo tính</td></tr>
+  </table>
+</section>
+
+<section id="gil-s12">
+  <div class="sh"><b>12</b><h2>Trong hệ thống thật</h2></div>
+<pre><code>Một API phục vụ model LLM:
+
+  uvicorn --workers 4          ← 4 TIẾN TRÌNH, thoát GIL, dùng 4 lõi
+    └── mỗi tiến trình: 1 event loop
+          ├── async: nhận request, gọi vector DB, gọi LLM API, stream về client
+          └── to_thread: gọi driver DB đồng bộ, đọc file, xử lý ảnh</code></pre>
+  <p>Đây là kiến trúc gặp ở gần như mọi service Python hiện đại, và nó dùng <em>cả ba</em> mô hình đúng chỗ: process để dùng nhiều lõi, async để chồng lấn hàng nghìn lần chờ, thread để chứa những thư viện chưa có bản async.</p>
+  <div class="note">
+    <h4>Câu hỏi hay gặp ở vòng system design</h4>
+    <em>Service của em xử lý được bao nhiêu request đồng thời?</em> Câu trả lời tốt bắt đầu bằng việc phân loại: nếu chủ yếu là chờ, giới hạn nằm ở kết nối và bộ nhớ nên async cho phép hàng nghìn; nếu chủ yếu là tính, giới hạn nằm ở số lõi và không mô hình nào vượt qua được — phải scale ngang.
+  </div>
+</section>
+
+<section id="gil-s13">
+  <div class="sh"><b>13</b><h2>GIL sắp biến mất?</h2></div>
+  <p>Python 3.13 giới thiệu bản <strong>free-threaded</strong> — biên dịch riêng, không có GIL, theo lộ trình chính thức của PEP 703. Trạng thái hiện tại:</p>
+  <ul>
+    <li>Là <strong>bản dựng tuỳ chọn</strong>, không phải mặc định. Phải cài riêng.</li>
+    <li>Chương trình một luồng <strong>chậm hơn</strong> một chút, vì phải thay đếm tham chiếu bằng cơ chế an toàn hơn.</li>
+    <li>Thư viện C mở rộng phải được cập nhật để hoạt động đúng khi không có GIL.</li>
+    <li>Việc gỡ bỏ hoàn toàn dự kiến còn nhiều năm.</li>
+  </ul>
+  <div class="note key">
+    <h4>Cách trả lời nếu được hỏi</h4>
+    "PEP 703 đã được chấp thuận và Python 3.13 có bản dựng không GIL để thử nghiệm, nhưng nó chưa phải mặc định và hệ sinh thái extension còn phải theo. Nên hiện tại tôi vẫn thiết kế với giả định có GIL." Câu này cho thấy bạn theo dõi tình hình mà không phóng đại.
+  </div>
+</section>
+
+<section id="gil-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Dùng thread cho việc nặng CPU</h4><p>Không nhanh hơn, thường chậm hơn vì chi phí chuyển luồng. Cần process.</p></div>
+    <div class="card bad"><h4>Gọi hàm chặn trong coroutine</h4><p>Treo cả event loop, ảnh hưởng mọi request khác. Bọc bằng <code>asyncio.to_thread</code>.</p></div>
+    <div class="card bad"><h4>await trong vòng lặp</h4><p>Thành tuần tự. Dùng <code>gather</code> để phát hết rồi chờ chung.</p></div>
+    <div class="card bad"><h4>Tin rằng GIL làm code an toàn</h4><p><code>x += 1</code> là ba bytecode, có thể bị ngắt giữa. Cần lock hoặc tránh chia sẻ.</p></div>
+    <div class="card bad"><h4>Chia quá nhỏ khi dùng process</h4><p>Chi phí pickle nuốt hết lợi ích. Chia thành khối lớn theo số lõi.</p></div>
+    <div class="card bad"><h4>Tạo task rồi không giữ tham chiếu</h4><p><code>asyncio.create_task</code> mà không lưu lại thì task có thể bị thu gom giữa đường. Giữ trong một set, hoặc dùng TaskGroup.</p></div>
+  </div>
+</section>
+
+<section id="gil-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>GIL là gì và nó ảnh hưởng thế nào tới code của bạn?</summary>
+  <p>Là một khoá toàn cục trong CPython cho phép chỉ một luồng thực thi bytecode Python tại một thời điểm. Hệ quả trực tiếp: đa luồng <b>không</b> tăng tốc tác vụ nặng CPU, vì các luồng chỉ chia nhau một lõi. Nhưng GIL được nhả khi luồng chờ I/O và khi vào thư viện C như NumPy, nên đa luồng vẫn rất có lợi cho tác vụ chờ. Lý do tồn tại của nó là để bảo vệ bộ đếm tham chiếu và giữ interpreter đơn giản, nhanh cho chương trình một luồng.</p></details>
+
+  <details class="qa"><summary>Thread, process, async — bạn chọn thế nào?</summary>
+  <p>Tôi phân loại tác vụ trước bằng cách so thời gian CPU với thời gian thực tế. Nếu chờ nhiều thì async, vì mỗi task chỉ vài KB nên chồng lấn được hàng nghìn kết nối; nếu thư viện chỉ có bản đồng bộ thì thread, vì không phải viết lại code. Nếu tính nhiều thì process, đó là cách duy nhất dùng nhiều lõi — nhưng phải chia thành khối lớn để bù chi phí pickle. Trong service thật thì thường dùng cả ba: nhiều tiến trình, mỗi tiến trình một event loop, và thread pool cho các thư viện chặn.</p></details>
+
+  <details class="qa"><summary>Vì sao 1000 kết nối đồng thời thì async chứ không thread?</summary>
+  <p>Vì chi phí mỗi đơn vị. Một luồng hệ điều hành tốn khoảng 8MB ngăn xếp và mỗi lần chuyển luồng phải đi qua kernel; 1000 luồng là gần 8GB RAM và rất nhiều context switch. Một task async chỉ là object Python vài KB, chuyển đổi là một lần gọi hàm trong không gian người dùng. Cùng mức đồng thời, async tốn ít hơn hai bậc độ lớn. Đánh đổi là toàn bộ chuỗi hàm phải viết theo kiểu async và không được có lệnh chặn nào.</p></details>
+
+  <details class="qa"><summary>Có GIL thì code đa luồng có tự động an toàn không?</summary>
+  <p>Không. GIL chỉ đảm bảo một <em>bytecode</em> không bị xé đôi, không đảm bảo một <em>dòng code</em> chạy trọn vẹn. <code>counter += 1</code> gồm ba bytecode — đọc, cộng, ghi — và luồng có thể bị ngắt giữa chúng, làm mất lần tăng. Cần lock cho đoạn tới hạn, hoặc tốt hơn là tránh chia sẻ trạng thái: mỗi luồng tính riêng rồi gộp kết quả ở cuối.</p></details>
+
+  <details class="qa"><summary>Dùng multiprocessing rồi mà không nhanh hơn — vì sao?</summary>
+  <p>Thường vì chi phí truyền dữ liệu lớn hơn phần tính toán. Mỗi đối số và kết quả phải pickle rồi gửi qua ống, nên truyền một DataFrame lớn có thể đắt hơn cả phép tính. Cộng thêm chi phí khởi tạo interpreter cho mỗi tiến trình. Cách chữa: chia thành ít khối lớn theo số lõi thay vì nhiều tác vụ nhỏ, dùng <code>shared_memory</code> cho mảng lớn, hoặc kiểm tra lại xem phép tính đã nằm trong NumPy chưa — nếu rồi thì nó đã song song và không cần process.</p></details>
+
+  <details class="qa"><summary>Trong FastAPI, khi nào bạn dùng def và khi nào async def?</summary>
+  <p>Dùng <code>async def</code> khi mọi lệnh I/O bên trong đều có bản async — client HTTP async, driver DB async. Dùng <code>def</code> thường khi hàm có lệnh chặn: framework sẽ tự chạy nó trong một thread pool nên không treo event loop. Lỗi tệ nhất là khai báo <code>async def</code> rồi gọi thư viện đồng bộ bên trong — lúc đó event loop bị đóng băng và mọi request khác chờ theo. Nếu buộc phải gọi lệnh chặn trong coroutine thì bọc bằng <code>asyncio.to_thread</code>.</p></details>
+</section>
+
+<footer>Deep dive · GIL, thread, process, async · số liệu bộ nhớ là mức điển hình trên Linux 64-bit, thay đổi theo hệ thống.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

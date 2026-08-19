@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary search — mọi biến thể — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-binsearch" data-title="Binary search — mọi biến thể" data-tag="Kỹ thuật" data-blurb="Hai mẫu code phủ mọi đề, tìm nhị phân trên đáp án, mảng xoay, và vì sao lo &lt; hi phải đi cùng hi = mid.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · chia đôi không gian tìm kiếm</p>
+  <h1>Binary search —<br><em>mọi biến thể</em></h1>
+  <p class="lede">Ai cũng biết ý tưởng, rất ít người viết đúng ngay lần đầu. Bài này chốt <b>hai mẫu code</b> phủ mọi đề, giải thích vì sao <b>lo &lt; hi</b> và <b>hi = mid</b> đi với nhau, kỹ thuật <b>tìm nhị phân trên đáp án</b>, và mảng xoay — thứ mà một nửa candidate code sai ở vòng onsite.</p>
+</header>
+
+
+<section id="binsearch-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+  <p>Binary search không phải là "thuật toán tìm phần tử trong mảng đã sắp xếp". Đó chỉ là ứng dụng đơn giản nhất. Bản chất của nó rộng hơn nhiều:</p>
+<pre><code>Có một dãy trả lời FALSE ... FALSE TRUE ... TRUE
+                            ↑ tìm ranh giới này trong O(log n)
+
+Điều kiện duy nhất: hàm kiểm tra phải ĐƠN ĐIỆU
+  — một khi đã TRUE thì mãi TRUE, không quay lại FALSE.</code></pre>
+  <p>Mảng đã sắp xếp chỉ là một trường hợp: câu hỏi <code>a[i] &gt;= target</code> có dạng FALSE…FALSE TRUE…TRUE. Nhưng dãy đó có thể do <em>bất kỳ hàm nào</em> sinh ra — kể cả hàm phải chạy một vòng lặp O(n) mới trả lời được. Đó là kỹ thuật ở mục 07, và là dạng hay xuất hiện nhất ở phỏng vấn Big Tech.</p>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Đừng nghĩ "tìm phần tử". Hãy nghĩ <strong>"tìm ranh giới giữa không thoả và thoả"</strong>. Mọi biến thể trong bài này đều là câu đó viết lại.
+  </div>
+</section>
+
+<section id="binsearch-s2">
+  <div class="sh"><b>02</b><h2>Vì sao dễ viết sai</h2></div>
+  <p>Ba nguồn lỗi, và cả ba đều đến từ việc trộn lẫn các quy ước với nhau.</p>
+  <h3>1. Khoảng đóng hay nửa mở</h3>
+<pre><code>[lo, hi]   khoảng đóng   → điều kiện dừng: while lo &lt;= hi   → hi = mid - 1
+[lo, hi)   nửa mở        → điều kiện dừng: while lo &lt;  hi   → hi = mid</code></pre>
+  <p>Hai bộ này <strong>không trộn được</strong>. Dùng <code>while lo &lt; hi</code> nhưng lại viết <code>hi = mid - 1</code> thì bỏ sót đáp án; dùng <code>while lo &lt;= hi</code> mà viết <code>hi = mid</code> thì lặp vô hạn. Cách chữa duy nhất là chọn một quy ước và luôn dùng nó.</p>
+  <h3>2. Vòng lặp vô hạn khi khoảng còn hai phần tử</h3>
+<pre><code>lo = 3, hi = 4  →  mid = (3+4)//2 = 3   ← phép chia làm tròn xuống, mid luôn bằng lo
+nếu nhánh nào đó viết  lo = mid  →  lo vẫn là 3 mãi mãi → treo</code></pre>
+  <p>Quy tắc thoát: <strong>nếu có nhánh <code>lo = mid</code> thì phải làm tròn lên</strong> bằng <code>mid = (lo + hi + 1) // 2</code>. Còn nếu mọi nhánh đều là <code>lo = mid + 1</code> hoặc <code>hi = mid</code> thì làm tròn xuống là an toàn.</p>
+  <h3>3. Tràn số</h3>
+<pre><code>mid = (lo + hi) // 2          <span class="cm"># Java/C++: tràn int khi lo, hi rất lớn</span>
+mid = lo + (hi - lo) // 2     <span class="cm"># cách viết an toàn, nên dùng thành thói quen</span></code></pre>
+  <p>Python có số nguyên lớn vô hạn nên không tràn. Nhưng nhắc tới chi tiết này trong phỏng vấn là một điểm cộng nhỏ mà rẻ — nó cho thấy bạn biết code chạy ở ngôn ngữ khác thì khác.</p>
+</section>
+
+<section id="binsearch-s3">
+  <div class="sh"><b>03</b><h2>Mẫu 1 — tìm một giá trị chính xác</h2></div>
+<pre><code><span class="kw">def</span> find(a, t):
+    lo, hi = <span class="st">0</span>, <span class="kw">len</span>(a) - <span class="st">1</span>          <span class="cm"># khoảng ĐÓNG [lo, hi]</span>
+    <span class="kw">while</span> lo &lt;= hi:                    <span class="cm"># còn phần tử chưa xét</span>
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span>   a[mid] == t: <span class="kw">return</span> mid
+        <span class="kw">elif</span> a[mid] &lt;  t: lo = mid + <span class="st">1</span>   <span class="cm"># đáp án nằm bên phải</span>
+        <span class="kw">else</span>:            hi = mid - <span class="st">1</span>   <span class="cm"># đáp án nằm bên trái</span>
+    <span class="kw">return</span> -<span class="st">1</span></code></pre>
+  <p>Bất biến: <em>nếu <code>t</code> có trong mảng thì nó nằm trong <code>[lo, hi]</code></em>. Mỗi vòng lặp thu hẹp khoảng ít nhất một phần tử, nên vòng lặp chắc chắn dừng.</p>
+  <div class="note warn">
+    <h4>Giới hạn của mẫu này</h4>
+    Nó chỉ trả lời "có hay không, ở đâu đó". Với mảng có phần tử trùng nhau, nó trả về <em>một</em> vị trí bất kỳ trong nhóm trùng — không phải vị trí đầu hay cuối. Đề hỏi "vị trí đầu tiên" hay "đếm số lần xuất hiện" thì phải dùng mẫu 2.
+  </div>
+</section>
+
+<section id="binsearch-s4">
+  <div class="sh"><b>04</b><h2>Mẫu 2 — tìm biên, mẫu quan trọng nhất</h2></div>
+  <p>Đây là mẫu nên thuộc nằm lòng. Nó giải được cả mẫu 1, và giải được mọi bài về ranh giới.</p>
+<pre><code><span class="kw">def</span> lower_bound(a, t):
+    <span class="st">"""Chỉ số ĐẦU TIÊN có a[i] &gt;= t. Không có thì trả về len(a)."""</span>
+    lo, hi = <span class="st">0</span>, <span class="kw">len</span>(a)               <span class="cm"># khoảng NỬA MỞ [lo, hi)</span>
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> a[mid] &lt; t: lo = mid + <span class="st">1</span>     <span class="cm"># mid chắc chắn KHÔNG phải đáp án</span>
+        <span class="kw">else</span>:          hi = mid         <span class="cm"># mid CÓ THỂ là đáp án → giữ lại</span>
+    <span class="kw">return</span> lo
+
+<span class="kw">def</span> upper_bound(a, t):
+    <span class="st">"""Chỉ số đầu tiên có a[i] &gt; t."""</span>
+    lo, hi = <span class="st">0</span>, <span class="kw">len</span>(a)
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> a[mid] &lt;= t: lo = mid + <span class="st">1</span>    <span class="cm"># chỉ khác đúng một dấu =</span>
+        <span class="kw">else</span>:           hi = mid
+    <span class="kw">return</span> lo</code></pre>
+  <p>Hai hàm chỉ khác nhau ở dấu <code>=</code>. Từ chúng suy ra mọi thứ:</p>
+  <table>
+    <tr><th>Cần gì</th><th>Viết thế nào</th></tr>
+    <tr><td>Có tồn tại <code>t</code> không</td><td><code>i = lower_bound(a,t); i &lt; len(a) and a[i] == t</code></td></tr>
+    <tr><td>Vị trí xuất hiện đầu tiên</td><td><code>lower_bound(a, t)</code></td></tr>
+    <tr><td>Vị trí xuất hiện cuối cùng</td><td><code>upper_bound(a, t) - 1</code></td></tr>
+    <tr><td>Đếm số lần xuất hiện</td><td><code>upper_bound(a,t) - lower_bound(a,t)</code></td></tr>
+    <tr><td>Số phần tử nhỏ hơn <code>t</code></td><td><code>lower_bound(a, t)</code></td></tr>
+    <tr><td>Phần tử lớn nhất mà <code>&lt;= t</code></td><td><code>upper_bound(a,t) - 1</code></td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao nhánh này là mid + 1 còn nhánh kia là mid</h4>
+    Đọc theo nghĩa, đừng học thuộc. <code>a[mid] &lt; t</code> nghĩa là mid <strong>chắc chắn</strong> không thoả điều kiện <code>&gt;= t</code>, nên loại luôn: <code>lo = mid + 1</code>. Ngược lại mid <strong>có thể</strong> chính là đáp án, nên giữ nó trong khoảng: <code>hi = mid</code>. Toàn bộ tính đúng đắn của mẫu này nằm trong hai câu đó.
+  </div>
+  <p>Khi vòng lặp kết thúc, <code>lo == hi</code> và khoảng rỗng — đó là ranh giới cần tìm. Không cần kiểm tra thêm gì sau vòng lặp, đây là ưu điểm lớn so với mẫu 1.</p>
+</section>
+
+<section id="binsearch-s5">
+  <div class="sh"><b>05</b><h2>Lab: chạy từng bước</h2></div>
+  <p>Xem <code>lo</code>, <code>mid</code>, <code>hi</code> di chuyển. Đổi chế độ để thấy cùng một mảng và cùng target cho ra ba kết quả khác nhau.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>mảng (đã sắp xếp)</label><input type="text" id="arr" value="1 3 4 4 4 7 9 11 15 20" style="width:230px"></div>
+      <div><label>target</label><input type="number" id="tgt" value="4"></div>
+      <div><label>chế độ</label>
+        <select id="mode">
+          <option value="exact">tìm giá trị — mẫu 1</option>
+          <option value="lower" selected>lower_bound — a[i] ≥ t</option>
+          <option value="upper">upper_bound — a[i] &gt; t</option>
+        </select>
+      </div>
+      <button id="bstep">Bước tiếp</button>
+      <button class="ghost" id="brst">Đặt lại</button>
+    </div>
+    <div id="bview"></div>
+    <div class="stat">
+      <u>khoảng còn lại <b id="brange">–</b></u>
+      <u>số bước <b id="bsteps">0</b></u>
+      <u>kết quả <b id="bres">đang chạy</b></u>
+    </div>
+    <div class="steps" id="blog"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Mảng 10 phần tử cần tối đa 4 bước. Mảng 1 triệu phần tử cần 20 bước. Mảng 1 tỉ cần 30. <strong>Đó là lý do log n gần như miễn phí</strong> — tăng dữ liệu gấp nghìn lần chỉ thêm 10 bước.
+    </p>
+  </div>
+</section>
+
+<section id="binsearch-s6">
+  <div class="sh"><b>06</b><h2>bisect — dùng thư viện khi được phép</h2></div>
+<pre><code><span class="kw">from</span> bisect <span class="kw">import</span> bisect_left, bisect_right, insort
+
+a = [<span class="st">1</span>, <span class="st">3</span>, <span class="st">4</span>, <span class="st">4</span>, <span class="st">4</span>, <span class="st">7</span>, <span class="st">9</span>]
+bisect_left(a, <span class="st">4</span>)      <span class="cm"># 2  ← chính là lower_bound</span>
+bisect_right(a, <span class="st">4</span>)     <span class="cm"># 5  ← chính là upper_bound</span>
+bisect_right(a,<span class="st">4</span>) - bisect_left(a,<span class="st">4</span>)   <span class="cm"># 3 lần xuất hiện</span>
+
+insort(a, <span class="st">5</span>)           <span class="cm"># chèn giữ thứ tự — nhưng O(n) vì phải dời phần tử!</span>
+
+<span class="cm"># tìm theo khoá của object</span>
+bisect_left(items, x, key=<span class="kw">lambda</span> it: it.score)   <span class="cm"># Python 3.10+</span></code></pre>
+  <div class="note">
+    <h4>Trong phỏng vấn nên dùng cái nào</h4>
+    Nếu binary search <em>là</em> nội dung bài kiểm tra, hãy tự viết — dùng thư viện là né mất phần họ muốn xem. Nếu nó chỉ là một bước phụ trong bài lớn hơn, dùng <code>bisect</code> và nói rõ "đây là lower_bound, em có thể viết tay nếu anh muốn". Câu đó vừa nhanh vừa cho thấy bạn hiểu bên trong.
+  </div>
+</section>
+
+<section id="binsearch-s7">
+  <div class="sh"><b>07</b><h2>Tìm nhị phân trên đáp án</h2></div>
+  <p>Dạng xuất hiện nhiều nhất ở vòng phỏng vấn thật, và cũng là dạng ít người nhận ra nhất. Dấu hiệu: đề hỏi <strong>giá trị nhỏ nhất / lớn nhất sao cho một điều kiện thoả mãn</strong>, và mảng thì chẳng có gì để tìm cả.</p>
+  <h3>Ba bước dựng lời giải</h3>
+  <ol>
+    <li><strong>Xác định miền đáp án.</strong> Đáp án là một con số nằm giữa <code>lo</code> và <code>hi</code> nào đó — thường là giá trị nhỏ nhất và lớn nhất hợp lý của bài.</li>
+    <li><strong>Viết hàm <code>feasible(x)</code>.</strong> Với một đáp án ứng viên <code>x</code>, kiểm tra xem nó có khả thi không. Hàm này thường tốn O(n) — và đó là chuyện bình thường.</li>
+    <li><strong>Kiểm tra tính đơn điệu.</strong> Nếu <code>x</code> khả thi thì mọi <code>x' &gt; x</code> cũng phải khả thi. Không có tính chất này thì kỹ thuật sai.</li>
+  </ol>
+<pre><code><span class="cm"># khung tìm GIÁ TRỊ NHỎ NHẤT thoả mãn</span>
+lo, hi = min_possible, max_possible
+<span class="kw">while</span> lo &lt; hi:
+    mid = lo + (hi - lo) // <span class="st">2</span>
+    <span class="kw">if</span> feasible(mid): hi = mid          <span class="cm"># có thể còn nhỏ hơn nữa</span>
+    <span class="kw">else</span>:             lo = mid + <span class="st">1</span>      <span class="cm"># chắc chắn phải lớn hơn</span>
+<span class="kw">return</span> lo
+
+<span class="cm"># khung tìm GIÁ TRỊ LỚN NHẤT thoả mãn — chú ý dấu +1</span>
+<span class="kw">while</span> lo &lt; hi:
+    mid = lo + (hi - lo + <span class="st">1</span>) // <span class="st">2</span>      <span class="cm">← làm tròn LÊN, nếu không sẽ treo</span>
+    <span class="kw">if</span> feasible(mid): lo = mid
+    <span class="kw">else</span>:             hi = mid - <span class="st">1</span>
+<span class="kw">return</span> lo</code></pre>
+  <p><strong>Độ phức tạp:</strong> <code>O(n · log(miền đáp án))</code>. Vòng binary search chạy log lần trên <em>miền giá trị</em>, không phải trên số phần tử — chi tiết này hay bị nói nhầm.</p>
+</section>
+
+<section id="binsearch-s8">
+  <div class="sh"><b>08</b><h2>Ba đề kinh điển cùng một khung</h2></div>
+  <h3>Koko ăn chuối trong H giờ</h3>
+<pre><code><span class="cm"># tốc độ ăn nhỏ nhất để ăn hết piles trong h giờ</span>
+<span class="kw">def</span> min_speed(piles, h):
+    <span class="kw">def</span> feasible(k):
+        <span class="kw">return</span> <span class="kw">sum</span>((p + k - <span class="st">1</span>) // k <span class="kw">for</span> p <span class="kw">in</span> piles) &lt;= h   <span class="cm"># chia làm tròn lên</span>
+    lo, hi = <span class="st">1</span>, <span class="kw">max</span>(piles)                  <span class="cm"># tốc độ 1 tới ăn cả đống một giờ</span>
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> feasible(mid): hi = mid
+        <span class="kw">else</span>:             lo = mid + <span class="st">1</span>
+    <span class="kw">return</span> lo                              <span class="cm"># O(n log max) </span></code></pre>
+  <p>Đơn điệu vì: ăn nhanh hơn thì không bao giờ tốn nhiều giờ hơn. Câu này phải nói ra khi trình bày — đó là phần chứng minh.</p>
+  <h3>Chia mảng thành k đoạn, tối thiểu hoá tổng lớn nhất</h3>
+<pre><code><span class="kw">def</span> split_array(a, k):
+    <span class="kw">def</span> feasible(cap):                     <span class="cm"># chia được thành ≤ k đoạn, mỗi đoạn ≤ cap?</span>
+        cnt, cur = <span class="st">1</span>, <span class="st">0</span>
+        <span class="kw">for</span> x <span class="kw">in</span> a:
+            <span class="kw">if</span> cur + x &gt; cap: cnt += <span class="st">1</span>; cur = x
+            <span class="kw">else</span>:             cur += x
+        <span class="kw">return</span> cnt &lt;= k
+    lo, hi = <span class="kw">max</span>(a), <span class="kw">sum</span>(a)                <span class="cm"># chặn dưới/trên hiển nhiên</span>
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> feasible(mid): hi = mid
+        <span class="kw">else</span>:             lo = mid + <span class="st">1</span>
+    <span class="kw">return</span> lo</code></pre>
+  <p>Chú ý <code>lo = max(a)</code>: không đoạn nào nhỏ hơn phần tử lớn nhất được. Chọn đúng miền đáp án làm code ngắn và tránh vô số ca biên.</p>
+  <h3>Căn bậc hai nguyên</h3>
+<pre><code><span class="kw">def</span> isqrt(n):
+    lo, hi = <span class="st">0</span>, n
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo + <span class="st">1</span>) // <span class="st">2</span>       <span class="cm"># tìm LỚN NHẤT nên làm tròn lên</span>
+        <span class="kw">if</span> mid * mid &lt;= n: lo = mid
+        <span class="kw">else</span>:              hi = mid - <span class="st">1</span>
+    <span class="kw">return</span> lo</code></pre>
+  <div class="note key">
+    <h4>Nhận ra dạng này thế nào</h4>
+    Đề có chữ <strong>"nhỏ nhất sao cho"</strong>, <strong>"lớn nhất sao cho"</strong>, <strong>"tối thiểu hoá giá trị lớn nhất"</strong>, hoặc cho một ngưỡng thời gian/dung lượng. Kèm theo là ràng buộc lớn khiến duyệt hết mọi đáp án là không khả thi. Gần như chắc chắn là binary search trên đáp án.
+  </div>
+</section>
+
+<section id="binsearch-s9">
+  <div class="sh"><b>09</b><h2>Mảng xoay</h2></div>
+  <p>Mảng đã sắp xếp rồi bị xoay tại một điểm: <code>[4,5,6,7,0,1,2]</code>. Vẫn tìm được trong O(log n) vì <strong>một nửa luôn còn sắp xếp</strong>.</p>
+<pre><code><span class="kw">def</span> search_rotated(a, t):
+    lo, hi = <span class="st">0</span>, <span class="kw">len</span>(a) - <span class="st">1</span>
+    <span class="kw">while</span> lo &lt;= hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> a[mid] == t: <span class="kw">return</span> mid
+        <span class="kw">if</span> a[lo] &lt;= a[mid]:                 <span class="cm"># nửa TRÁI đang sắp xếp</span>
+            <span class="kw">if</span> a[lo] &lt;= t &lt; a[mid]: hi = mid - <span class="st">1</span>
+            <span class="kw">else</span>:                   lo = mid + <span class="st">1</span>
+        <span class="kw">else</span>:                               <span class="cm"># nửa PHẢI đang sắp xếp</span>
+            <span class="kw">if</span> a[mid] &lt; t &lt;= a[hi]: lo = mid + <span class="st">1</span>
+            <span class="kw">else</span>:                   hi = mid - <span class="st">1</span>
+    <span class="kw">return</span> -<span class="st">1</span></code></pre>
+  <p>Ý tưởng: xác định nửa nào còn sắp xếp, rồi kiểm tra target có nằm trong <em>khoảng giá trị</em> của nửa đó không. Nếu có thì đi vào đó, nếu không thì đi nửa còn lại.</p>
+  <h3>Tìm phần tử nhỏ nhất của mảng xoay</h3>
+<pre><code><span class="kw">def</span> find_min(a):
+    lo, hi = <span class="st">0</span>, <span class="kw">len</span>(a) - <span class="st">1</span>
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> a[mid] &gt; a[hi]: lo = mid + <span class="st">1</span>    <span class="cm"># điểm xoay nằm bên phải mid</span>
+        <span class="kw">else</span>:              hi = mid        <span class="cm"># mid có thể là min</span>
+    <span class="kw">return</span> a[lo]</code></pre>
+  <div class="note warn">
+    <h4>Vì sao so với a[hi] chứ không phải a[lo]</h4>
+    So với <code>a[lo]</code> hỏng khi mảng không hề bị xoay: <code>[1,2,3,4,5]</code> có <code>a[mid] &gt; a[lo]</code> nên thuật toán đi sang phải và bỏ mất phần tử nhỏ nhất. So với <code>a[hi]</code> thì đúng cho cả hai trường hợp. Đây là chi tiết mà interviewer hay chọn đúng để hỏi vặn.
+  </div>
+  <p>Có phần tử trùng nhau thì trường hợp tệ nhất tụt về O(n): với <code>[2,2,2,0,2]</code> ta không biết nửa nào sắp xếp, buộc phải lùi <code>hi</code> từng bước. Nêu ra điều này là điểm cộng.</p>
+</section>
+
+<section id="binsearch-s10">
+  <div class="sh"><b>10</b><h2>Tìm đỉnh — binary search trên mảng không sắp xếp</h2></div>
+  <p>Ví dụ tốt nhất cho luận điểm ở mục 01: binary search <strong>không cần mảng sắp xếp</strong>, chỉ cần một hướng đi luôn đúng.</p>
+<pre><code><span class="cm"># tìm một phần tử lớn hơn cả hai hàng xóm</span>
+<span class="kw">def</span> find_peak(a):
+    lo, hi = <span class="st">0</span>, <span class="kw">len</span>(a) - <span class="st">1</span>
+    <span class="kw">while</span> lo &lt; hi:
+        mid = lo + (hi - lo) // <span class="st">2</span>
+        <span class="kw">if</span> a[mid] &lt; a[mid + <span class="st">1</span>]: lo = mid + <span class="st">1</span>   <span class="cm"># đang đi lên → đỉnh ở bên phải</span>
+        <span class="kw">else</span>:                    hi = mid       <span class="cm"># đang đi xuống → đỉnh ở đây hoặc trái</span>
+    <span class="kw">return</span> lo</code></pre>
+  <p>Vì sao luôn tìm được: nếu đang đi lên thì bên phải chắc chắn có đỉnh (cùng lắm là phần tử cuối); nếu đang đi xuống thì bên trái chắc chắn có. Không cần biết gì về phần còn lại của mảng. Cùng ý tưởng này giải được bài "tìm phần tử xuất hiện một lần trong mảng mà mọi phần tử khác xuất hiện hai lần".</p>
+</section>
+
+<section id="binsearch-s11">
+  <div class="sh"><b>11</b><h2>Binary search trên số thực</h2></div>
+<pre><code><span class="kw">def</span> sqrt_real(n, eps=<span class="st">1e-9</span>):
+    lo, hi = <span class="st">0.0</span>, <span class="kw">max</span>(<span class="st">1.0</span>, <span class="kw">float</span>(n))
+    <span class="kw">while</span> hi - lo &gt; eps:              <span class="cm"># dừng theo sai số, không theo chỉ số</span>
+        mid = (lo + hi) / <span class="st">2</span>
+        <span class="kw">if</span> mid * mid &lt; n: lo = mid
+        <span class="kw">else</span>:             hi = mid
+    <span class="kw">return</span> lo
+
+<span class="cm"># hoặc chắc ăn hơn: lặp số vòng cố định</span>
+<span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(<span class="st">100</span>):                  <span class="cm"># mỗi vòng giảm nửa sai số → thừa sức</span>
+    mid = (lo + hi) / <span class="st">2</span>
+    ...</code></pre>
+  <p>Với số thực thì không có <code>mid + 1</code>, nên cả hai nhánh đều gán <code>mid</code> và điều kiện dừng phải dựa vào sai số. Cách lặp số vòng cố định an toàn hơn vì tránh được vòng lặp vô hạn do sai số dấu phẩy động khi <code>lo</code> và <code>hi</code> quá gần nhau.</p>
+</section>
+
+<section id="binsearch-s12">
+  <div class="sh"><b>12</b><h2>Khi nào không nên dùng</h2></div>
+  <ul>
+    <li><strong>Tìm một lần trên mảng chưa sắp xếp.</strong> Sắp xếp tốn O(n log n) rồi tìm O(log n) — trong khi quét thẳng chỉ O(n). Chỉ đáng sắp khi sẽ tìm nhiều lần.</li>
+    <li><strong>Điều kiện không đơn điệu.</strong> Nếu dãy đúng/sai lộn xộn thì binary search cho ra một đáp án nào đó, nhưng sai. Đây là loại bug nguy hiểm vì code vẫn chạy và vẫn trả về số.</li>
+    <li><strong>Dữ liệu không truy cập ngẫu nhiên được.</strong> Trên danh sách liên kết, nhảy tới giữa đã tốn O(n), nên O(log n) lần nhảy thành O(n log n) — tệ hơn quét thẳng.</li>
+    <li><strong>n rất nhỏ.</strong> Với vài chục phần tử, quét tuyến tính đơn giản và ít bug hơn nhiều.</li>
+  </ul>
+  <div class="note">
+    <h4>Chi phí thật của log n</h4>
+    Binary search nhảy loạn xạ trong bộ nhớ nên gần như mọi lần đọc đều trượt cache. Quét tuyến tính đọc tuần tự và được phần cứng tải trước. Đó là lý do trên mảng vài trăm phần tử, quét thẳng đôi khi nhanh hơn — một ví dụ nữa cho mục "khi O(n²) thắng O(n log n)" ở bài Big-O.
+  </div>
+</section>
+
+<section id="binsearch-s13">
+  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
+    <tr><td>"mảng đã sắp xếp" + tìm phần tử</td><td>Mẫu 2, kiểm tra <code>a[i] == t</code> sau đó</td></tr>
+    <tr><td>"vị trí đầu tiên / cuối cùng", "đếm số lần xuất hiện"</td><td><code>lower_bound</code> và <code>upper_bound</code></td></tr>
+    <tr><td>"nhỏ nhất sao cho…", "lớn nhất sao cho…"</td><td>Binary search trên đáp án</td></tr>
+    <tr><td>"tối thiểu hoá giá trị lớn nhất", "chia thành k phần"</td><td>Binary search trên đáp án + hàm feasible tham lam</td></tr>
+    <tr><td>"mảng sắp xếp bị xoay"</td><td>Xác định nửa nào còn sắp xếp</td></tr>
+    <tr><td>"phần tử lớn hơn hai hàng xóm"</td><td>Tìm đỉnh — không cần sắp xếp</td></tr>
+    <tr><td>Ràng buộc <code>n ≤ 10⁵</code> nhưng miền giá trị tới <code>10⁹</code></td><td>Gần như chắc chắn là binary search trên đáp án</td></tr>
+  </table>
+</section>
+
+<section id="binsearch-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Trộn hai quy ước khoảng</h4><p><code>while lo &lt; hi</code> đi với <code>hi = mid - 1</code> làm bỏ sót đáp án. Chọn một mẫu và dùng nó cho mọi bài.</p></div>
+    <div class="card bad"><h4>Quên +1 khi tìm giá trị lớn nhất</h4><p><code>lo = mid</code> mà làm tròn xuống thì treo vô hạn khi còn hai phần tử. Đây là lỗi làm timeout mà không ai hiểu vì sao.</p></div>
+    <div class="card bad"><h4>Không kiểm tra kết quả của lower_bound</h4><p>Hàm luôn trả về một chỉ số, kể cả khi <code>t</code> không tồn tại. Phải kiểm <code>i &lt; len(a) and a[i] == t</code>.</p></div>
+    <div class="card bad"><h4>So với a[lo] khi tìm min của mảng xoay</h4><p>Sai với mảng chưa bị xoay. Luôn so với <code>a[hi]</code>.</p></div>
+    <div class="card bad"><h4>Cho rằng feasible phải là O(1)</h4><p>Nó thường là O(n) và điều đó hoàn toàn bình thường. Tổng vẫn là <code>O(n log(miền))</code>.</p></div>
+    <div class="card bad"><h4>Không chứng minh tính đơn điệu</h4><p>Code chạy, trả về số, nhưng sai. Luôn nói ra một câu: "vì x khả thi thì mọi giá trị lớn hơn cũng khả thi".</p></div>
+  </div>
+</section>
+
+<section id="binsearch-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao dùng lo &lt; hi thay vì lo &lt;= hi?</summary>
+  <p>Vì hai cái đi với hai quy ước khoảng khác nhau. <code>lo &lt;= hi</code> dùng cho khoảng đóng <code>[lo, hi]</code>, nên nhánh thu hẹp phải là <code>hi = mid - 1</code>. <code>lo &lt; hi</code> dùng cho khoảng nửa mở <code>[lo, hi)</code>, nên viết <code>hi = mid</code>. Tôi mặc định dùng bản nửa mở vì nó trả về ranh giới trực tiếp, không cần xử lý gì sau vòng lặp, và dùng lại được cho mọi bài về biên.</p></details>
+
+  <details class="qa"><summary>Khi nào binary search đúng mà mảng không hề được sắp xếp?</summary>
+  <p>Khi tồn tại một hàm kiểm tra đơn điệu. Ví dụ bài tìm đỉnh: chỉ cần so <code>a[mid]</code> với <code>a[mid+1]</code> là biết đi hướng nào, vì đang đi lên thì bên phải chắc chắn có đỉnh. Tổng quát hơn, mọi bài "nhỏ nhất sao cho điều kiện đúng" đều dùng được, kể cả khi đầu vào chẳng phải mảng. <b>Điều kiện thật sự là tính đơn điệu, không phải sự sắp xếp.</b></p></details>
+
+  <details class="qa"><summary>Giải thích binary search trên đáp án.</summary>
+  <p>Thay vì tìm trong mảng, ta tìm trong <em>miền giá trị của đáp án</em>. Ba bước: chặn miền bằng cận dưới và cận trên hiển nhiên; viết hàm kiểm tra một đáp án ứng viên có khả thi không, thường tốn O(n) và thường là tham lam; chứng minh tính đơn điệu. Độ phức tạp là <code>O(n log(miền))</code>. Dấu hiệu nhận biết là đề hỏi giá trị nhỏ nhất hoặc lớn nhất thoả mãn một điều kiện, kèm miền giá trị lớn tới mức không duyệt hết được.</p></details>
+
+  <details class="qa"><summary>Tìm phần tử nhỏ nhất trong mảng xoay — vì sao so với a[hi]?</summary>
+  <p>Vì so với <code>a[lo]</code> sai khi mảng không bị xoay. Với <code>[1,2,3,4,5]</code>, ta có <code>a[mid] &gt; a[lo]</code> nên thuật toán kết luận điểm xoay nằm bên phải và bỏ mất phần tử nhỏ nhất ở đầu. So với <code>a[hi]</code> đúng cho cả hai trường hợp: <code>a[mid] &gt; a[hi]</code> thì điểm xoay chắc chắn nằm sau mid. Nếu mảng có phần tử trùng thì trường hợp tệ nhất tụt xuống O(n).</p></details>
+
+  <details class="qa"><summary>Mảng chưa sắp xếp, tìm một giá trị — bạn có sắp xếp trước rồi binary search không?</summary>
+  <p>Không, nếu chỉ tìm một lần: sắp xếp là O(n log n) trong khi quét thẳng chỉ O(n). Có, nếu sẽ tìm nhiều lần: chi phí sắp xếp được chia đều cho các lần tìm, và với q truy vấn thì <code>O(n log n + q log n)</code> thắng <code>O(q·n)</code> ngay khi q lớn. Nếu không cần giữ thứ tự thì hash set còn tốt hơn — O(n) dựng và O(1) mỗi lần tra.</p></details>
+
+  <details class="qa"><summary>Làm sao bạn chắc code binary search của mình không lặp vô hạn?</summary>
+  <p>Kiểm tra rằng mỗi vòng lặp khoảng luôn thu hẹp ít nhất một đơn vị. Điểm chết duy nhất là khi khoảng còn hai phần tử: <code>mid</code> làm tròn xuống nên bằng <code>lo</code>, và nếu có nhánh <code>lo = mid</code> thì không tiến được. Cách chữa là làm tròn lên bằng <code>(lo + hi + 1) // 2</code>. Tôi luôn thử tay với mảng hai phần tử trước khi nộp bài.</p></details>
+</section>
+
+<footer>Deep dive · binary search · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

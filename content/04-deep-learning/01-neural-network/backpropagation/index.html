@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backpropagation từng bước — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-backprop" data-title="Backpropagation từng bước" data-tag="Gradient" data-blurb="Mạng 2-2-1 với số thật, vì sao softmax + CE cho gradient p − y, gradient teo và nổ, và checklist debug.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · gradient</p>
+  <h1>Backpropagation<br><em>từng bước</em></h1>
+  <p class="lede">Không phải phép màu — chỉ là <b>quy tắc chuỗi</b> áp dụng theo thứ tự khôn ngoan. Bài này đi qua một mạng 2–2–1 với <b>số thật</b>, giải thích vì sao gradient của softmax cộng cross-entropy gọn thành <code>p − y</code>, vì sao gradient teo dần qua nhiều lớp, và vì sao công thức khởi tạo lại có <code>√(1/n)</code>.</p>
+</header>
+
+
+<section id="backprop-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>FORWARD:   x → z₁ → a₁ → z₂ → a₂ → L
+           tính và LƯU LẠI mọi giá trị trung gian
+
+BACKWARD:  L → ∂L/∂a₂ → ∂L/∂z₂ → ∂L/∂W₂, ∂L/∂a₁ → ∂L/∂z₁ → ∂L/∂W₁
+           đi ngược, mỗi bước nhân thêm một đạo hàm cục bộ
+
+UPDATE:    W ← W - η · ∂L/∂W</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Mỗi nút trong mạng chỉ cần biết hai thứ: <strong>đạo hàm cục bộ của chính nó</strong>, và <strong>gradient nhận từ phía sau</strong>. Nhân hai thứ đó lại rồi chuyển tiếp về trước. Không nút nào cần biết gì về toàn bộ mạng — đó là lý do backprop hoạt động được ở mọi kiến trúc.
+  </div>
+</section>
+
+<section id="backprop-s2">
+  <div class="sh"><b>02</b><h2>Vì sao không tính gradient bằng số</h2></div>
+<pre><code>Cách ngây thơ — sai phân hữu hạn:
+
+    ∂L/∂wᵢ ≈ [ L(w + ε·eᵢ) - L(w) ] / ε
+
+Với mỗi tham số cần MỘT lượt forward riêng.
+Model có 100 triệu tham số → 100 triệu lượt forward cho MỘT bước cập nhật.
+
+Backprop: MỘT lượt forward + MỘT lượt backward → gradient của TẤT CẢ tham số.
+Chi phí lượt backward khoảng 2 lần lượt forward.</code></pre>
+  <p>Đó là toàn bộ giá trị của backprop: nó tính gradient cho mọi tham số với chi phí <strong>không đổi theo số tham số</strong>, bằng cách tái sử dụng các kết quả trung gian thay vì tính lại.</p>
+  <div class="note">
+    <h4>Gradient bằng số vẫn có ích ở một chỗ</h4>
+    Để <strong>kiểm tra</strong> code backprop tự viết. Tính gradient bằng cả hai cách trên vài tham số ngẫu nhiên rồi so — chênh lệch tương đối phải nhỏ hơn khoảng <code>1e-7</code>. Đây là kỹ thuật gradient checking, và nêu ra được nó là câu trả lời tốt cho "làm sao anh biết code backprop của mình đúng".
+  </div>
+</section>
+
+<section id="backprop-s3">
+  <div class="sh"><b>03</b><h2>Quy tắc chuỗi</h2></div>
+<pre><code>Một đường:
+    L = f(g(h(x)))
+    ∂L/∂x = ∂L/∂f · ∂f/∂g · ∂g/∂h · ∂h/∂x        ← nhân dồn
+
+Nhiều đường (biến dùng ở nhiều chỗ):
+    ∂L/∂x = Σ (gradient theo từng đường)          ← CỘNG dồn</code></pre>
+  <p>Quy tắc cộng khi một biến được dùng nhiều lần là điểm quan trọng và hay bị bỏ sót:</p>
+<pre><code>a₁ được dùng bởi CẢ HAI nơ-ron của lớp sau
+→ ∂L/∂a₁ = (đóng góp qua nơ-ron 1) + (đóng góp qua nơ-ron 2)
+
+Trong dạng ma trận, phép cộng này được gói gọn thành một phép nhân ma trận:
+    ∂L/∂a₁ = W₂ᵀ · ∂L/∂z₂</code></pre>
+  <div class="note warn">
+    <h4>Đây là nguồn bug số một khi tự cài backprop</h4>
+    Quên cộng gradient khi một tensor được dùng nhiều lần — ví dụ có residual connection, hoặc trọng số được chia sẻ giữa các lớp. Kết quả là gradient thiếu một phần, model vẫn học nhưng chậm và không bao giờ tốt. Trong PyTorch, đây chính là lý do <code>loss.backward()</code> <em>cộng dồn</em> vào <code>.grad</code>, và vì sao phải gọi <code>optimizer.zero_grad()</code> ở mỗi bước.
+  </div>
+</section>
+
+<section id="backprop-s4">
+  <div class="sh"><b>04</b><h2>Đồ thị tính toán</h2></div>
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Đồ thị tính toán forward và backward">
+      <rect class="sv-b" x="20" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="50" y="93" text-anchor="middle">x</text>
+      <rect class="sv-b" x="120" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="150" y="93" text-anchor="middle">z₁</text>
+      <rect class="sv-b" x="220" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="250" y="93" text-anchor="middle">a₁</text>
+      <rect class="sv-b" x="320" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="350" y="93" text-anchor="middle">z₂</text>
+      <rect class="sv-b" x="420" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="450" y="93" text-anchor="middle">a₂</text>
+      <rect class="sv-b" x="520" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="550" y="93" text-anchor="middle">L</text>
+
+      <path d="M80 82 L120 82" stroke="#6C8CFF" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M180 82 L220 82" stroke="#6C8CFF" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M280 82 L320 82" stroke="#6C8CFF" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M380 82 L420 82" stroke="#6C8CFF" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M480 82 L520 82" stroke="#6C8CFF" stroke-width="2" marker-end="url(#f)"/>
+
+      <path d="M520 96 L480 96" stroke="#F0B44A" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M420 96 L380 96" stroke="#F0B44A" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M320 96 L280 96" stroke="#F0B44A" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M220 96 L180 96" stroke="#F0B44A" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M120 96 L80 96" stroke="#F0B44A" stroke-width="2" marker-end="url(#b)"/>
+
+      <text class="sv-l" x="20" y="45" fill="#6C8CFF">forward — tính giá trị, lưu lại để dùng ở lượt ngược</text>
+      <text class="sv-l" x="20" y="140" fill="#F0B44A">backward — nhân dồn đạo hàm cục bộ</text>
+      <text class="sv-l" x="120" y="160">W₁, b₁</text>
+      <text class="sv-l" x="320" y="160">W₂, b₂</text>
+      <defs>
+        <marker id="f" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 z" fill="#6C8CFF"/></marker>
+        <marker id="b" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 z" fill="#F0B44A"/></marker>
+      </defs>
+    </svg>
+    <figcaption>Lượt forward phải <strong>lưu lại</strong> các giá trị trung gian, vì lượt backward cần chúng. Đó là lý do huấn luyện tốn bộ nhớ nhiều hơn suy luận rất nhiều.</figcaption>
+  </figure>
+  <div class="note key">
+    <h4>Hệ quả thực tế về bộ nhớ</h4>
+    Suy luận chỉ cần trọng số. Huấn luyện cần trọng số, activation của <em>mọi</em> lớp, gradient, và trạng thái của optimizer — với Adam là thêm hai bản sao kích thước bằng trọng số. Đó là lý do batch size lớn gây hết VRAM, và là lý do có kỹ thuật <em>gradient checkpointing</em>: bỏ bớt activation đã lưu rồi tính lại khi cần, đổi thời gian lấy bộ nhớ.
+  </div>
+</section>
+
+<section id="backprop-s5">
+  <div class="sh"><b>05</b><h2>Lab: mạng 2–2–1 với số thật</h2></div>
+  <p>Hai đầu vào, hai nơ-ron ẩn dùng sigmoid, một đầu ra sigmoid, mất mát log loss. Bấm từng bước để đi hết lượt forward rồi lượt backward.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>learning rate</label><input type="number" id="blr" value="0.5" step="0.1" min="0.01" max="5"></div>
+      <div><label>nhãn đúng y</label>
+        <select id="by"><option value="1" selected>1</option><option value="0">0</option></select>
+      </div>
+      <button id="bstep3">Bước tiếp</button>
+      <button class="ghost" id="bauto3">Tự chạy</button>
+      <button class="ghost" id="bupd">Cập nhật trọng số</button>
+      <button class="ghost" id="brst3">Đặt lại</button>
+    </div>
+    <div id="bview3"></div>
+    <div class="stat">
+      <u>mất mát <b id="bloss">–</b></u>
+      <u>số lần cập nhật <b id="bupdn">0</b></u>
+    </div>
+    <div class="steps" id="blog3"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Chạy hết một lượt rồi bấm <strong>Cập nhật trọng số</strong> nhiều lần: mất mát giảm dần. Đổi nhãn <code>y</code> sang 0 để thấy dấu của mọi gradient đảo ngược. Chú ý dòng <code>∂L/∂z₂ = a₂ − y</code> — công thức gọn đến bất ngờ, và mục 07 giải thích tại sao.
+    </p>
+  </div>
+</section>
+
+<section id="backprop-s6">
+  <div class="sh"><b>06</b><h2>Đạo hàm các phép cơ bản</h2></div>
+  <table>
+    <tr><th>Phép</th><th>Forward</th><th>Backward — nhận <code>g</code> từ phía sau</th></tr>
+    <tr><td>Cộng</td><td><code>c = a + b</code></td><td><code>∂a = g</code>, <code>∂b = g</code> — chỉ chuyển tiếp</td></tr>
+    <tr><td>Nhân</td><td><code>c = a · b</code></td><td><code>∂a = g·b</code>, <code>∂b = g·a</code> — đổi chỗ nhau</td></tr>
+    <tr><td>Nhân ma trận</td><td><code>Z = X W</code></td><td><code>∂X = g Wᵀ</code>, <code>∂W = Xᵀ g</code></td></tr>
+    <tr><td>ReLU</td><td><code>a = max(0, z)</code></td><td><code>∂z = g</code> nếu <code>z &gt; 0</code>, ngược lại <code>0</code> — như một cái van</td></tr>
+    <tr><td>Sigmoid</td><td><code>a = σ(z)</code></td><td><code>∂z = g · a(1 − a)</code> — dùng lại <code>a</code> đã tính ở forward</td></tr>
+    <tr><td>Tanh</td><td><code>a = tanh(z)</code></td><td><code>∂z = g · (1 − a²)</code></td></tr>
+    <tr><td>Softmax + CE</td><td><code>p = softmax(z)</code></td><td><code>∂z = p − y</code> — xem mục 07</td></tr>
+  </table>
+  <div class="note">
+    <h4>Hai điều đáng để ý trong bảng</h4>
+    <p><strong>Sigmoid và tanh dùng lại đầu ra của chính chúng</strong> để tính gradient, không cần <code>z</code>. Đó là lý do framework lưu <code>a</code> chứ không lưu <code>z</code> cho các lớp này — tiết kiệm bộ nhớ.</p>
+    <p><strong>ReLU là một cái van đóng mở.</strong> Nó không làm co gradient như sigmoid, chỉ cho qua hoặc chặn hẳn. Đây là lý do chính ReLU giải quyết được vấn đề gradient teo dần.</p>
+  </div>
+</section>
+
+<section id="backprop-s7">
+  <div class="sh"><b>07</b><h2>Softmax + cross-entropy: vì sao gradient là <code>p − y</code></h2></div>
+<pre><code>softmax:        pᵢ = e^zᵢ / Σⱼ e^zⱼ
+cross-entropy:  L = -Σᵢ yᵢ log pᵢ
+
+Tính riêng lẻ thì đạo hàm của softmax là một MA TRẬN Jacobian rắc rối:
+    ∂pᵢ/∂zⱼ = pᵢ(δᵢⱼ - pⱼ)
+
+Nhưng khi ghép với cross-entropy và nhân ra, mọi thứ triệt tiêu:
+    ∂L/∂zᵢ = pᵢ - yᵢ</code></pre>
+  <p>Cùng một kết quả với cặp sigmoid + log loss ở bài phân loại nhị phân, và với cặp identity + MSE ở bài hồi quy. Đây không phải trùng hợp — nó là tính chất của các <strong>hàm liên kết chuẩn</strong> trong họ phân phối hàm mũ.</p>
+  <table>
+    <tr><th>Bài toán</th><th>Hàm bọc</th><th>Hàm mất mát</th><th>Gradient theo z</th></tr>
+    <tr><td>Hồi quy</td><td>không có</td><td>MSE</td><td><code>ŷ − y</code></td></tr>
+    <tr><td>Phân loại nhị phân</td><td>sigmoid</td><td>log loss</td><td><code>p − y</code></td></tr>
+    <tr><td>Phân loại nhiều lớp</td><td>softmax</td><td>cross-entropy</td><td><code>p − y</code></td></tr>
+  </table>
+  <div class="note key">
+    <h4>Hai hệ quả thực tế</h4>
+    <p><strong>1. Framework luôn gộp hai bước lại.</strong> <code>CrossEntropyLoss</code> của PyTorch nhận <em>logits</em> chứ không nhận xác suất, và tự làm softmax bên trong. Vì gộp lại thì không cần dựng Jacobian, và tránh được tràn số khi tính <code>e^z</code> với <code>z</code> lớn.</p>
+    <p><strong>2. Tự làm softmax rồi đưa vào CrossEntropyLoss là bug.</strong> Softmax bị áp hai lần, gradient sai và model học rất kém — một lỗi im lặng cực kỳ phổ biến.</p>
+  </div>
+</section>
+
+<section id="backprop-s8">
+  <div class="sh"><b>08</b><h2>Dạng ma trận và shape</h2></div>
+<pre><code>Một lớp, batch N mẫu, vào D chiều, ra H chiều:
+
+FORWARD
+    X : (N, D)
+    W : (D, H)
+    Z = X @ W + b        →  (N, H)
+
+BACKWARD — nhận dZ : (N, H)
+    dW = X.T @ dZ        →  (D, H)   ✓ khớp shape của W
+    dX = dZ @ W.T        →  (N, D)   ✓ khớp shape của X
+    db = dZ.sum(axis=0)  →  (H,)     ← CỘNG theo chiều batch</code></pre>
+  <div class="note key">
+    <h4>Mẹo dùng được ở mọi bài</h4>
+    Không cần nhớ công thức. <strong>Gradient của một tensor luôn có shape giống chính tensor đó.</strong> Từ ràng buộc đó, chỉ có đúng một cách ghép phép nhân ma trận cho ra shape đúng — nên bạn suy ra được công thức tại chỗ. Nói mẹo này trong phỏng vấn khi bị yêu cầu viết backward của một lớp là cách an toàn nhất.
+  </div>
+  <p><strong>Vì sao <code>db</code> phải cộng theo chiều batch:</strong> cùng một <code>b</code> được dùng cho cả N mẫu, tức nó tham gia vào N đường tính toán khác nhau. Theo quy tắc cộng ở mục 03, gradient là tổng đóng góp của mọi đường. Cùng lý do đó, gradient của trọng số được chia sẻ giữa các bước thời gian trong RNN cũng phải cộng dồn qua mọi bước.</p>
+</section>
+
+<section id="backprop-s9">
+  <div class="sh"><b>09</b><h2>Gradient teo và nổ</h2></div>
+<pre><code>Gradient qua L lớp là một TÍCH của L số hạng:
+
+    ∂L/∂W₁ = (đạo hàm lớp L) · (đạo hàm lớp L-1) · ... · (đạo hàm lớp 1)
+
+Mỗi số hạng trung bình khoảng 0.9  →  qua 50 lớp: 0.9⁵⁰ ≈ 0.005     TEO
+Mỗi số hạng trung bình khoảng 1.1  →  qua 50 lớp: 1.1⁵⁰ ≈ 117       NỔ</code></pre>
+  <p>Vấn đề nằm ở bản chất <strong>tích số</strong>: chỉ cần lệch khỏi 1 một chút, qua nhiều lớp thì lệch theo hàm mũ.</p>
+  <table>
+    <tr><th>Nguyên nhân</th><th>Cách chữa</th></tr>
+    <tr><td>Sigmoid và tanh bão hoà — đạo hàm tối đa chỉ 0.25 với sigmoid</td><td>Dùng <strong>ReLU</strong>: đạo hàm là 0 hoặc 1, không làm co</td></tr>
+    <tr><td>Trọng số khởi tạo quá nhỏ hoặc quá lớn</td><td><strong>Xavier</strong> hoặc <strong>He</strong> — xem mục 10</td></tr>
+    <tr><td>Mạng quá sâu, đường gradient quá dài</td><td><strong>Residual connection</strong>: <code>x + f(x)</code> cho gradient một đường có đạo hàm bằng 1</td></tr>
+    <tr><td>Độ lớn activation trôi dạt qua các lớp</td><td><strong>BatchNorm / LayerNorm</strong></td></tr>
+    <tr><td>Gradient nổ đột ngột</td><td><strong>Gradient clipping</strong>: cắt norm về ngưỡng — gần như bắt buộc với RNN và Transformer</td></tr>
+  </table>
+  <div class="note">
+    <h4>Vì sao residual connection hiệu quả đến vậy</h4>
+    Với <code>y = x + f(x)</code> thì <code>∂y/∂x = 1 + ∂f/∂x</code>. Số hạng <strong>1</strong> đó tạo một đường cho gradient chảy về mà không bị nhân với bất cứ thứ gì. Nên dù <code>∂f/∂x</code> có teo về 0, gradient vẫn đi qua nguyên vẹn. Đây là lý do một ý tưởng đơn giản như vậy lại cho phép huấn luyện mạng sâu hàng trăm lớp.
+  </div>
+</section>
+
+<section id="backprop-s10">
+  <div class="sh"><b>10</b><h2>Khởi tạo trọng số — vì sao có <code>√(1/n)</code></h2></div>
+<pre><code>Một nơ-ron nhận n đầu vào:  z = Σᵢ wᵢxᵢ
+
+Giả sử wᵢ và xᵢ độc lập, trung bình 0:
+    Var(z) = n · Var(w) · Var(x)
+
+Muốn Var(z) ≈ Var(x) — tức độ lớn tín hiệu KHÔNG đổi khi qua lớp:
+    n · Var(w) = 1
+    → Var(w) = 1/n
+    → std(w) = √(1/n)</code></pre>
+  <table>
+    <tr><th>Cách</th><th>Phương sai</th><th>Dùng với</th></tr>
+    <tr><td>Xavier / Glorot</td><td><code>2 / (n_in + n_out)</code></td><td>tanh, sigmoid — cân cả lượt forward và backward</td></tr>
+    <tr><td>He / Kaiming</td><td><code>2 / n_in</code></td><td><strong>ReLU</strong> — hệ số 2 để bù phần bị ReLU cắt bỏ</td></tr>
+    <tr><td>Toàn số 0</td><td>—</td><td><strong>Không bao giờ</strong> — mọi nơ-ron trong một lớp sẽ giống hệt nhau mãi mãi</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Vì sao khởi tạo bằng 0 làm mạng vô dụng</h4>
+    Nếu mọi trọng số của một lớp bằng nhau, thì mọi nơ-ron trong lớp đó tính ra <em>cùng một giá trị</em>, nhận <em>cùng một gradient</em>, và được cập nhật <em>giống hệt nhau</em>. Chúng sẽ mãi mãi giống nhau — cả lớp hoạt động như một nơ-ron duy nhất. Tính ngẫu nhiên của khởi tạo tồn tại để <strong>phá vỡ tính đối xứng</strong> đó. Riêng bias thì khởi tạo 0 hoàn toàn ổn, vì tính đối xứng đã bị phá bởi trọng số.</p>
+  </div>
+  <p><strong>Vì sao He có hệ số 2:</strong> ReLU đặt một nửa đầu vào về 0, nên phương sai đầu ra chỉ còn khoảng một nửa. Nhân 2 vào phương sai khởi tạo là để bù đúng phần mất đó, giữ cho độ lớn tín hiệu không teo dần qua các lớp.</p>
+</section>
+
+<section id="backprop-s11">
+  <div class="sh"><b>11</b><h2>Chuẩn hoá giúp gì cho gradient</h2></div>
+<pre><code>y = γ · (x - μ) / √(σ² + ε) + β
+
+BatchNorm:  μ, σ tính theo chiều BATCH, cho từng đặc trưng
+LayerNorm:  μ, σ tính theo chiều ĐẶC TRƯNG, cho từng mẫu</code></pre>
+  <table>
+    <tr><th>Tác dụng</th><th>Cơ chế</th></tr>
+    <tr><td>Giữ độ lớn activation ổn định</td><td>Ngăn chúng trôi dạt dần qua các lớp, nên gradient không teo cũng không nổ</td></tr>
+    <tr><td>Cho phép learning rate lớn hơn</td><td>Mặt mất mát trở nên trơn hơn nên bước lớn vẫn an toàn</td></tr>
+    <tr><td>Giảm phụ thuộc vào khởi tạo</td><td>Sai thang đo lúc khởi tạo được chuẩn hoá lại ngay ở lớp đầu</td></tr>
+    <tr><td>Có tác dụng regularize nhẹ</td><td>Riêng BatchNorm — nhiễu từ việc thống kê theo batch đóng vai trò như nhiễu ngẫu nhiên</td></tr>
+  </table>
+  <div class="note">
+    <h4>Vì sao Transformer dùng LayerNorm</h4>
+    Ba lý do, xếp theo mức quan trọng khi triển khai: LayerNorm <strong>không phụ thuộc kích thước batch</strong> nên phục vụ từng request lẻ vẫn đúng; nó không bị ảnh hưởng bởi các token đệm khi chuỗi trong batch dài ngắn khác nhau; và nó hoạt động <em>giống hệt nhau</em> lúc huấn luyện và lúc suy luận, còn BatchNorm phải giữ thống kê trung bình động nên có hai chế độ khác nhau.
+  </div>
+</section>
+
+<section id="backprop-s12">
+  <div class="sh"><b>12</b><h2>Model không học — checklist theo thứ tự</h2></div>
+  <ol>
+    <li><strong>Cho model học thuộc một batch nhỏ.</strong> Lấy 8 mẫu, tắt regularization, huấn luyện tới khi mất mát gần 0. Không xuống được nghĩa là <em>bug kiến trúc hoặc bug code</em>, không phải vấn đề dữ liệu hay learning rate. Đây luôn là bước đầu tiên.</li>
+    <li><strong>Kiểm tra mất mát ban đầu.</strong> Với phân loại C lớp, mất mát lúc chưa học phải xấp xỉ <code>ln(C)</code> — với 10 lớp là khoảng 2.30. Lệch xa nghĩa là nhãn sai định dạng, hoặc đã áp softmax hai lần.</li>
+    <li><strong>Dò learning rate.</strong> Thử theo thang logarithm từ <code>1e-5</code> tới <code>1e-1</code>. Mất mát thành <code>NaN</code> là quá lớn; đứng im là quá nhỏ.</li>
+    <li><strong>Kiểm tra norm của gradient.</strong> Gần 0 là teo; rất lớn là nổ; đúng bằng 0 nghĩa là có chỗ ngắt đồ thị tính toán.</li>
+    <li><strong>Kiểm tra <code>zero_grad()</code>.</strong> Thiếu nó thì gradient cộng dồn qua các bước và bước cập nhật ngày càng sai.</li>
+    <li><strong>Kiểm tra chuẩn hoá dữ liệu.</strong> Đầu vào chưa chuẩn hoá là nguyên nhân rất thường gặp làm mạng không hội tụ.</li>
+    <li><strong>Kiểm tra nhãn.</strong> Nhãn lệch một đơn vị, nhãn bị xáo trộn so với đầu vào, hoặc một lớp không hề xuất hiện trong dữ liệu.</li>
+    <li><strong>Kiểm tra chế độ train / eval.</strong> Quên <code>model.eval()</code> làm dropout và BatchNorm hoạt động sai lúc đánh giá.</li>
+  </ol>
+  <div class="note key">
+    <h4>Bước 1 quan trọng hơn bảy bước còn lại</h4>
+    Nếu model không học thuộc nổi 8 mẫu, thì mọi việc tinh chỉnh learning rate, đổi optimizer, hay thêm dữ liệu đều vô nghĩa — có bug ở đâu đó trong code. Bài kiểm tra này mất hai phút và loại bỏ được cả một lớp nguyên nhân. Nêu nó ra khi được hỏi "model của em không hội tụ, làm sao debug" là câu trả lời của người đã làm việc thật.
+  </div>
+</section>
+
+<section id="backprop-s13">
+  <div class="sh"><b>13</b><h2>Bảng công thức tóm tắt</h2></div>
+<pre><code>Mạng hai lớp, phân loại nhị phân:
+
+FORWARD
+    z₁ = W₁x + b₁
+    a₁ = σ(z₁)          hoặc  relu(z₁)
+    z₂ = W₂a₁ + b₂
+    a₂ = σ(z₂)
+    L  = -[y log a₂ + (1-y) log(1-a₂)]
+
+BACKWARD
+    dz₂ = a₂ - y                        ← gọn nhờ cặp sigmoid + log loss
+    dW₂ = dz₂ · a₁ᵀ
+    db₂ = dz₂
+    da₁ = W₂ᵀ · dz₂
+    dz₁ = da₁ ⊙ a₁(1-a₁)                ← ⊙ là nhân từng phần tử
+                                          hoặc da₁ ⊙ (z₁ &gt; 0) nếu dùng ReLU
+    dW₁ = dz₁ · xᵀ
+    db₁ = dz₁
+
+UPDATE
+    W ← W - η · dW</code></pre>
+  <p>Viết lại được bảng này từ đầu, không cần tra, là mức chuẩn bị đủ cho câu hỏi whiteboard về backprop.</p>
+</section>
+
+<section id="backprop-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Quên <code>zero_grad()</code></h4><p>Gradient cộng dồn qua các bước. Mất mát dao động thất thường và không hội tụ.</p></div>
+    <div class="card bad"><h4>Áp softmax rồi đưa vào CrossEntropyLoss</h4><p>Softmax hai lần. Model vẫn chạy, học rất kém, không có lỗi nào báo.</p></div>
+    <div class="card bad"><h4>Khởi tạo trọng số bằng 0</h4><p>Mọi nơ-ron trong lớp giống hệt nhau mãi mãi. Cả lớp thành một nơ-ron.</p></div>
+    <div class="card bad"><h4>Quên cộng gradient khi tensor dùng nhiều lần</h4><p>Gradient thiếu một phần. Xảy ra khi tự cài residual hoặc chia sẻ trọng số.</p></div>
+    <div class="card bad"><h4>Không chuẩn hoá đầu vào</h4><p>Mặt mất mát thành thung lũng hẹp; learning rate nào cũng sai.</p></div>
+    <div class="card bad"><h4>Quên <code>model.eval()</code></h4><p>Dropout vẫn bật và BatchNorm dùng thống kê batch lúc đánh giá.</p></div>
+  </div>
+</section>
+
+<section id="backprop-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Giải thích backpropagation trong một phút.</summary>
+  <p>Lượt forward tính đầu ra và <b>lưu lại mọi giá trị trung gian</b>. Lượt backward đi ngược từ hàm mất mát, ở mỗi nút nhân gradient nhận được từ phía sau với đạo hàm cục bộ của chính nút đó, rồi chuyển tiếp về trước — đó là quy tắc chuỗi. Nếu một tensor được dùng ở nhiều nơi thì gradient của nó là <b>tổng</b> đóng góp từ mọi đường. Giá trị của cách làm này là tính được gradient cho <em>tất cả</em> tham số với chi phí chỉ khoảng hai lần một lượt forward, thay vì một lượt riêng cho từng tham số như sai phân hữu hạn.</p></details>
+
+  <details class="qa"><summary>Vì sao gradient của softmax cộng cross-entropy lại gọn thành <code>p − y</code>?</summary>
+  <p>Vì các số hạng triệt tiêu khi ghép hai bước. Đạo hàm riêng của softmax là một Jacobian rắc rối <code>pᵢ(δᵢⱼ − pⱼ)</code>, nhưng nhân với đạo hàm của cross-entropy thì phần lớn triệt tiêu và còn lại đúng <code>p − y</code>. Đây là tính chất chung của hàm liên kết chuẩn trong họ phân phối hàm mũ — cùng lý do đó, sigmoid với log loss và identity với MSE cũng cho gradient dạng <code>dự đoán − nhãn</code>. Về thực hành, framework luôn gộp hai bước vào một hàm mất mát nhận logits, vừa tránh dựng Jacobian vừa tránh tràn số.</p></details>
+
+  <details class="qa"><summary>Vì sao gradient teo dần, và cách chữa?</summary>
+  <p>Vì gradient qua L lớp là một <b>tích</b> của L đạo hàm cục bộ. Chỉ cần mỗi số hạng trung bình dưới 1 một chút thì qua nhiều lớp nó nhỏ đi theo hàm mũ — sigmoid có đạo hàm tối đa chỉ 0.25 nên rất dễ gặp. Cách chữa theo mức hiệu quả: ReLU vì đạo hàm là 0 hoặc 1 nên không làm co; residual connection vì <code>∂(x+f(x))/∂x = 1 + ∂f/∂x</code>, số hạng 1 cho gradient một đường đi thẳng về không bị nhân với gì; chuẩn hoá lớp; khởi tạo He hoặc Xavier; và gradient clipping cho trường hợp nổ.</p></details>
+
+  <details class="qa"><summary>Vì sao khởi tạo trọng số có <code>√(1/n)</code>?</summary>
+  <p>Vì với <code>z = Σwᵢxᵢ</code> trên n đầu vào độc lập trung bình 0, ta có <code>Var(z) = n·Var(w)·Var(x)</code>. Muốn độ lớn tín hiệu không đổi khi qua lớp thì cần <code>n·Var(w) = 1</code>, tức <code>std(w) = √(1/n)</code>. Nếu không, tín hiệu teo dần hoặc nổ dần qua các lớp và gradient cũng vậy. He dùng <code>2/n_in</code> vì ReLU đặt một nửa đầu vào về 0 nên phương sai đầu ra còn một nửa, nhân 2 để bù. Xavier dùng <code>2/(n_in + n_out)</code> để cân cả lượt forward và lượt backward, phù hợp với tanh.</p></details>
+
+  <details class="qa"><summary>Model của bạn không hội tụ — bạn làm gì?</summary>
+  <p>Việc đầu tiên là cho nó <b>học thuộc một batch 8 mẫu</b>, tắt hết regularization. Nếu mất mát không xuống gần 0 thì có bug trong code hoặc kiến trúc, và mọi việc tinh chỉnh learning rate hay thêm dữ liệu đều vô nghĩa. Nếu học thuộc được thì tôi kiểm mất mát ban đầu có xấp xỉ <code>ln(C)</code> không, dò learning rate theo thang logarithm, xem norm gradient có teo hay nổ, kiểm <code>zero_grad()</code>, kiểm chuẩn hoá đầu vào, kiểm nhãn có bị lệch hay xáo trộn, và kiểm chế độ train/eval.</p></details>
+
+  <details class="qa"><summary>Vì sao huấn luyện tốn nhiều bộ nhớ hơn suy luận?</summary>
+  <p>Vì lượt backward cần các giá trị trung gian của lượt forward, nên activation của mọi lớp phải được giữ lại thay vì giải phóng ngay. Cộng thêm gradient có kích thước bằng trọng số, và trạng thái optimizer — với Adam là hai bản sao nữa. Nên tổng bộ nhớ có thể gấp nhiều lần suy luận, và nó tăng theo batch size vì activation tỉ lệ với batch. Cách đổi lại là gradient checkpointing: không lưu hết activation mà tính lại một phần khi cần, đánh đổi thời gian lấy bộ nhớ.</p></details>
+</section>
+
+<footer>Deep dive · backpropagation · công thức viết cho một mẫu; dạng batch chỉ thêm phép cộng theo chiều batch cho gradient của bias và trọng số.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

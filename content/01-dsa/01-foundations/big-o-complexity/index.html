@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Big-O &amp; phân tích độ phức tạp — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-bigo" data-title="Big-O &amp; phân tích độ phức tạp" data-tag="Nền tảng" data-blurb="Cách đếm ra O(n log n), amortized thật sự là gì, chi phí ẩn của Python, và ngưỡng n nào thì thuật toán gãy.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · phân tích độ phức tạp</p>
+  <h1>Big-O —<br>đọc <em>giá tiền</em> của code</h1>
+  <p class="lede">Cách đếm cho ra <b>O(n log n)</b> chứ không phải đoán, khi nào <b>được phép bỏ hằng số</b> và khi nào bỏ là sai, <b>amortized</b> thật sự nghĩa là gì, chi phí ẩn của các thao tác Python, và cách phát biểu complexity trong phỏng vấn sao cho không bị hỏi vặn.</p>
+</header>
+
+
+<section id="bigo-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+  <p>Big-O trả lời đúng một câu hỏi: <strong>khi dữ liệu lớn dần, chi phí tăng theo hình dạng nào?</strong> Không phải nhanh bao nhiêu giây, mà nhanh chậm <em>theo tỉ lệ nào</em>.</p>
+<pre><code>code
+ │  đếm số thao tác cơ bản theo n
+ ▼
+T(n) = 3n² + 12n + 7
+ │  giữ số hạng lớn nhất, bỏ hệ số
+ ▼
+O(n²)
+ │  đối chiếu với ràng buộc của đề
+ ▼
+n ≤ 10⁴ → chạy được    n ≤ 10⁶ → chắc chắn timeout</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Big-O không nói code của bạn nhanh hay chậm. Nó nói code của bạn <strong>chịu được dữ liệu lớn tới đâu</strong>. Hai chương trình cùng O(n) có thể chênh nhau 50 lần về thời gian thật.
+  </div>
+</section>
+
+<section id="bigo-s2">
+  <div class="sh"><b>02</b><h2>Big-O đo cái gì, và không đo cái gì</h2></div>
+  <div class="grid2">
+    <div class="card ok"><h4>Có đo</h4><p>Tốc độ <em>tăng</em> của chi phí khi n tiến ra vô cùng. Dùng để so sánh thuật toán và để dự đoán điểm gãy.</p></div>
+    <div class="card bad"><h4>Không đo</h4><p>Thời gian thực tế, hằng số, chi phí truy cập bộ nhớ, cache miss, ngôn ngữ nhanh hay chậm, và hành vi ở n nhỏ.</p></div>
+  </div>
+  <p>Ví dụ cụ thể cho thấy khoảng cách giữa hai cột:</p>
+<pre><code><span class="cm"># cả hai đều O(n)</span>
+<span class="kw">def</span> a(xs): <span class="kw">return</span> <span class="kw">sum</span>(xs)                 <span class="cm"># vòng lặp chạy trong C</span>
+<span class="kw">def</span> b(xs):
+    t = <span class="st">0</span>
+    <span class="kw">for</span> x <span class="kw">in</span> xs: t += x                     <span class="cm"># vòng lặp chạy trong Python</span>
+    <span class="kw">return</span> t
+
+<span class="cm"># n = 10 triệu: a nhanh hơn b khoảng 8–10 lần.</span>
+<span class="cm"># Big-O của hai hàm giống hệt nhau.</span></code></pre>
+  <p><strong>Vì sao vẫn dùng Big-O dù nó bỏ qua nhiều thứ:</strong> hằng số phụ thuộc máy, ngôn ngữ, trình biên dịch — chúng thay đổi theo thời gian. Hình dạng tăng trưởng thì không. Một thuật toán O(n²) hôm nay chậm, mười năm sau máy nhanh gấp trăm lần thì nó vẫn chỉ xử lý được dữ liệu lớn gấp mười.</p>
+</section>
+
+<section id="bigo-s3">
+  <div class="sh"><b>03</b><h2>Cách đếm — bốn quy tắc</h2></div>
+  <h3>1. Tuần tự thì cộng, lồng nhau thì nhân</h3>
+<pre><code><span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n): ...        <span class="cm"># n</span>
+<span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(m): ...        <span class="cm"># m        → O(n + m)</span>
+
+<span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n):
+    <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(m): ...    <span class="cm">#          → O(n · m)</span></code></pre>
+  <p>Chú ý: <code>O(n + m)</code> <strong>không</strong> rút gọn thành <code>O(n)</code> khi n và m là hai đại lượng độc lập. Rút gọn ở đây là sai, và interviewer để ý chi tiết này.</p>
+
+  <h3>2. Vòng lặp không phải lúc nào cũng chạy n lần</h3>
+<pre><code><span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n):
+    <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(i, n):    <span class="cm"># n + (n-1) + ... + 1 = n(n+1)/2</span>
+        ...                     <span class="cm"># → O(n²), không phải O(n·n) tình cờ đúng</span>
+
+i = <span class="st">1</span>
+<span class="kw">while</span> i &lt; n:
+    i *= <span class="st">2</span>                  <span class="cm"># i nhân đôi → O(log n)</span></code></pre>
+  <p>Dấu hiệu của <code>log n</code>: mỗi bước <strong>chia hoặc nhân kích thước bài toán với một hằng số</strong>. Chia đôi liên tục thì số bước là số lần chia được, tức <code>log₂ n</code>.</p>
+
+  <h3>3. Đếm theo tổng công việc, không theo số vòng lặp</h3>
+<pre><code><span class="kw">for</span> word <span class="kw">in</span> words:          <span class="cm"># n từ</span>
+    <span class="kw">for</span> ch <span class="kw">in</span> word:          <span class="cm"># mỗi từ dài L</span>
+        ...
+<span class="cm"># O(n · L)  — hoặc gọn hơn: O(tổng số ký tự)</span></code></pre>
+  <p>Cách nói "tổng số ký tự" thường chính xác hơn <code>n · L</code>, vì các từ không dài bằng nhau. Trong phỏng vấn, nêu được biến thứ hai là điểm cộng.</p>
+
+  <h3>4. Cẩn thận với thao tác trông như O(1)</h3>
+<pre><code><span class="kw">for</span> x <span class="kw">in</span> xs:
+    <span class="kw">if</span> x <span class="kw">in</span> other_list:      <span class="cm"># ← O(m), không phải O(1)!</span>
+        ...
+<span class="cm"># tổng: O(n · m), không phải O(n)</span>
+
+<span class="cm"># sửa:</span>
+other = <span class="kw">set</span>(other_list)     <span class="cm"># O(m) một lần</span>
+<span class="kw">for</span> x <span class="kw">in</span> xs:
+    <span class="kw">if</span> x <span class="kw">in</span> other: ...       <span class="cm"># O(1) → tổng O(n + m)</span></code></pre>
+  <div class="note warn">
+    <h4>Đây là lỗi phân tích phổ biến nhất</h4>
+    <code>in</code> trên <code>list</code> là quét tuyến tính; trên <code>set</code> và <code>dict</code> mới là O(1). Cùng một cú pháp, hai độ phức tạp khác nhau hoàn toàn.
+  </div>
+</section>
+
+<section id="bigo-s4">
+  <div class="sh"><b>04</b><h2>Lab: n lớn cỡ nào thì thuật toán gãy</h2></div>
+  <p>Đây là phản xạ quan trọng nhất khi đọc ràng buộc của đề: nhìn n là biết được phép dùng thuật toán nào. Nhập n và tốc độ máy, lab tính số phép tính và thời gian ước lượng.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>n</label><input type="number" id="n" value="100000"></div>
+      <div><label>phép tính / giây</label>
+        <select id="ops">
+          <option value="1e7">10⁷ — Python thuần</option>
+          <option value="1e8" selected>10⁸ — Python tối ưu / C chậm</option>
+          <option value="1e9">10⁹ — C/C++</option>
+        </select>
+      </div>
+      <div><label>chọn nhanh</label>
+        <select id="quick">
+          <option value="">—</option>
+          <option value="1000">n = 10³</option>
+          <option value="100000">n = 10⁵</option>
+          <option value="1000000">n = 10⁶</option>
+          <option value="100000000">n = 10⁸</option>
+        </select>
+      </div>
+    </div>
+    <div id="bigout"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Quy tắc rút ra: <code>n ≤ 20</code> thì <code>2ⁿ</code> còn sống. <code>n ≤ 5000</code> mới dám <code>O(n²)</code>. <code>n = 10⁶</code> thì chỉ còn <code>O(n)</code> và <code>O(n log n)</code>. Đề cho <code>n ≤ 10⁵</code> gần như luôn ngụ ý lời giải <code>O(n log n)</code> trở xuống.
+    </p>
+  </div>
+</section>
+
+<section id="bigo-s5">
+  <div class="sh"><b>05</b><h2>Bỏ hằng số — và khi nào bỏ là sai</h2></div>
+  <p>Quy tắc chuẩn: giữ số hạng lớn nhất, bỏ hệ số.</p>
+<pre><code>T(n) = 3n² + 100n + 5000   →  O(n²)
+T(n) = 5n + 2n log n       →  O(n log n)
+T(n) = 2ⁿ + n¹⁰⁰           →  O(2ⁿ)      <span class="cm"># mũ luôn thắng đa thức</span></code></pre>
+  <p>Lý do được phép bỏ: khi n đủ lớn, số hạng lớn nhất áp đảo mọi thứ còn lại. Với <code>n = 10⁶</code> thì <code>3n²</code> lớn hơn <code>100n</code> gấp ba mươi nghìn lần — phần còn lại thành nhiễu.</p>
+  <div class="note warn">
+    <h4>Ba tình huống hằng số vẫn quan trọng</h4>
+    <p><strong>n luôn nhỏ.</strong> Sắp xếp 10 phần tử thì insertion sort thắng quicksort, vì hằng số nhỏ và không có đệ quy. Thư viện thật đều làm vậy: Timsort chuyển sang insertion sort cho đoạn ngắn.</p>
+    <p><strong>Hằng số quá lớn.</strong> Một thuật toán O(n) với hằng số 10⁶ thua O(n log n) hằng số 2 cho tới khi n vượt ngưỡng khổng lồ. Nhiều thuật toán "tối ưu về lý thuyết" không ai dùng vì lý do này.</p>
+    <p><strong>Cache.</strong> Duyệt mảng liên tiếp nhanh hơn duyệt linked list nhiều lần, dù cùng O(n), vì bộ nhớ đọc theo khối. Đây là câu trả lời hay khi bị hỏi vì sao thực tế không khớp lý thuyết.</p>
+  </div>
+</section>
+
+<section id="bigo-s6">
+  <div class="sh"><b>06</b><h2>O, Ω, Θ và ba trường hợp</h2></div>
+  <table>
+    <tr><th>Ký hiệu</th><th>Nghĩa</th><th>Ví von</th></tr>
+    <tr><td><code>O(f)</code></td><td>Chặn trên — không tệ hơn f</td><td>"nhiều nhất là"</td></tr>
+    <tr><td><code>Ω(f)</code></td><td>Chặn dưới — ít nhất là f</td><td>"ít nhất là"</td></tr>
+    <tr><td><code>Θ(f)</code></td><td>Chặn hai phía — đúng bằng f</td><td>"chính xác cỡ"</td></tr>
+  </table>
+  <p>Về mặt kỹ thuật, nói "quicksort là O(n²)" là <em>đúng</em> nhưng vô ích, vì O chỉ là chặn trên — nói nó là O(n¹⁰⁰) cũng đúng nốt. Trong thực tế mọi người dùng O với nghĩa Θ, và điều đó chấp nhận được. Chỉ cần biết sự khác biệt nếu bị hỏi.</p>
+  <p><strong>Đừng nhầm ba trường hợp với ba ký hiệu.</strong> Đây là hai trục hoàn toàn độc lập:</p>
+  <table>
+    <tr><th>Thuật toán</th><th>Tốt nhất</th><th>Trung bình</th><th>Tệ nhất</th></tr>
+    <tr><td>Quicksort</td><td>n log n</td><td>n log n</td><td>n² <span class="cm">— pivot luôn tệ</span></td></tr>
+    <tr><td>Mergesort</td><td>n log n</td><td>n log n</td><td>n log n</td></tr>
+    <tr><td>Tìm trong hash table</td><td>1</td><td>1</td><td>n <span class="cm">— mọi key đụng nhau</span></td></tr>
+    <tr><td>Tìm tuyến tính</td><td>1</td><td>n</td><td>n</td></tr>
+  </table>
+  <p>Câu hỏi hay gặp: <em>quicksort tệ nhất là O(n²), vậy sao vẫn dùng?</em> Vì trung bình là n log n với hằng số nhỏ, sắp tại chỗ nên tiết kiệm bộ nhớ, và chọn pivot ngẫu nhiên làm xác suất rơi vào trường hợp tệ nhỏ tới mức bỏ qua được.</p>
+</section>
+
+<section id="bigo-s7">
+  <div class="sh"><b>07</b><h2>Amortized — chi phí trung bình có đảm bảo</h2></div>
+  <p><code>list.append</code> là O(1) amortized. Hiểu đúng câu này cần nhìn cách mảng động lớn lên.</p>
+<pre><code>Mảng đầy → cấp phát mảng mới gấp đôi → chép toàn bộ sang.
+
+n = 1 → 2 → 4 → 8 → 16 → ... → n
+chi phí chép:  1 + 2 + 4 + ... + n/2 + n  &lt;  2n
+
+Tổng chi phí cho n lần append &lt; 3n  →  trung bình mỗi lần &lt; 3 thao tác = O(1)</code></pre>
+  <p>Mấu chốt là <strong>chuỗi hình học hội tụ</strong>: các lần chép trước cộng lại vẫn nhỏ hơn lần chép cuối. Nếu tăng thêm hằng số thay vì gấp đôi, phân tích sụp ngay:</p>
+<pre><code>Mỗi lần đầy thì tăng thêm đúng 10 ô:
+chi phí chép = 10 + 20 + 30 + ... + n = O(n²)
+→ mỗi append trung bình O(n). Đây là lý do phải nhân đôi chứ không cộng thêm.</code></pre>
+  <div class="note key">
+    <h4>Amortized khác average ở chỗ nào</h4>
+    <strong>Average</strong> là kỳ vọng theo phân phối đầu vào — mang tính xác suất, có thể xui. <strong>Amortized</strong> là đảm bảo chắc chắn trên toàn chuỗi thao tác: n lần append <em>luôn</em> tốn tổng O(n), không có yếu tố may rủi. Amortized mạnh hơn average.
+  </div>
+  <div class="note warn">
+    <h4>Amortized không phải worst-case của một thao tác lẻ</h4>
+    Một lần <code>append</code> cụ thể vẫn có thể tốn O(n) khi rơi đúng lúc phải cấp phát lại. Với hệ thống thời gian thực có ràng buộc độ trễ theo từng thao tác, đây là vấn đề thật — phải cấp phát trước bằng kích thước cố định.
+  </div>
+</section>
+
+<section id="bigo-s8">
+  <div class="sh"><b>08</b><h2>Space complexity</h2></div>
+  <p>Luôn nói cả bộ nhớ. Rất nhiều candidate chỉ nói thời gian rồi bị hỏi vặn.</p>
+<pre><code><span class="cm"># O(1) bộ nhớ phụ — chỉ vài biến</span>
+<span class="kw">def</span> reverse(a):
+    i, j = <span class="st">0</span>, <span class="kw">len</span>(a)-<span class="st">1</span>
+    <span class="kw">while</span> i &lt; j:
+        a[i], a[j] = a[j], a[i]; i += <span class="st">1</span>; j -= <span class="st">1</span>
+
+<span class="cm"># O(n) bộ nhớ — tạo list mới</span>
+<span class="kw">def</span> reverse2(a): <span class="kw">return</span> a[::-<span class="st">1</span>]</code></pre>
+  <h3>Ngăn xếp đệ quy cũng là bộ nhớ</h3>
+<pre><code><span class="kw">def</span> dfs(node):
+    <span class="kw">if</span> <span class="kw">not</span> node: <span class="kw">return</span>
+    dfs(node.left); dfs(node.right)
+
+<span class="cm"># cây cân bằng  → độ sâu log n → O(log n) bộ nhớ</span>
+<span class="cm"># cây suy biến  → độ sâu n     → O(n) bộ nhớ → RecursionError ở n ≈ 1000</span></code></pre>
+  <p>Python giới hạn độ sâu đệ quy mặc định khoảng 1000. Danh sách liên kết 10⁵ nút mà duyệt đệ quy là vỡ ngay — đây là lý do thật để chuyển sang vòng lặp, không phải vì tốc độ.</p>
+  <p><strong>Phân biệt bộ nhớ đầu vào và bộ nhớ phụ.</strong> Khi nói "thuật toán dùng O(1) bộ nhớ", ta nói về phần cấp phát thêm, không tính mảng đầu vào. Nói rõ điều này khi trình bày.</p>
+</section>
+
+<section id="bigo-s9">
+  <div class="sh"><b>09</b><h2>Chi phí ẩn trong Python</h2></div>
+  <p>Những dòng nhìn vô hại nhưng đắt. Mỗi dòng dưới đây từng làm hỏng một lời giải đúng thuật toán.</p>
+  <table>
+    <tr><th>Viết thế này</th><th>Thực chất</th><th>Nên viết</th></tr>
+    <tr><td><code>lst.pop(0)</code></td><td>O(n) — dời toàn bộ phần tử</td><td><code>deque.popleft()</code> — O(1)</td></tr>
+    <tr><td><code>lst.insert(0, x)</code></td><td>O(n)</td><td><code>deque.appendleft(x)</code></td></tr>
+    <tr><td><code>x in lst</code></td><td>O(n)</td><td><code>x in set_</code> — O(1)</td></tr>
+    <tr><td><code>s += ch</code> trong vòng lặp</td><td>O(n²) — chuỗi bất biến, chép lại mỗi lần</td><td><code>"".join(parts)</code> — O(n)</td></tr>
+    <tr><td><code>lst[1:]</code> trong đệ quy</td><td>O(n) mỗi lần cắt → tổng O(n²)</td><td>truyền chỉ số <code>lo, hi</code></td></tr>
+    <tr><td><code>max(lst)</code> trong vòng lặp</td><td>O(n) mỗi lần → O(n²)</td><td>duy trì max khi duyệt</td></tr>
+    <tr><td><code>list(dict.keys())</code> để tra</td><td>O(n) mỗi lần tra</td><td>tra thẳng trên dict</td></tr>
+    <tr><td><code>sorted()</code> trong vòng lặp</td><td>O(n log n) mỗi lần</td><td>sắp một lần, hoặc dùng heap</td></tr>
+  </table>
+<pre><code><span class="cm"># bài toán thật: gộp k danh sách đã sắp xếp</span>
+<span class="kw">while</span> lists:
+    smallest = <span class="kw">min</span>(lists, key=<span class="kw">lambda</span> l: l[<span class="st">0</span>])   <span class="cm"># O(k) mỗi lần</span>
+    out.append(smallest.pop(<span class="st">0</span>))                <span class="cm"># O(n) mỗi lần ← đắt gấp bội</span>
+<span class="cm"># tổng: O(N·k + N·n) — trong khi heap cho O(N log k)</span></code></pre>
+  <div class="note">
+    <h4>Cách kiểm chứng nhanh</h4>
+    Chạy thử với n rồi 2n. Nếu thời gian tăng khoảng 2 lần thì tuyến tính; tăng khoảng 4 lần thì bậc hai. Đo được nhanh hơn tranh luận, và trong phỏng vấn thì nói "em sẽ đo bằng cách nhân đôi n" là một câu trả lời tốt.
+  </div>
+</section>
+
+<section id="bigo-s10">
+  <div class="sh"><b>10</b><h2>Đệ quy và cây đệ quy</h2></div>
+  <p>Với hàm đệ quy, vẽ cây gọi rồi cộng công việc theo từng tầng.</p>
+<pre><code>Mergesort: T(n) = 2T(n/2) + O(n)
+
+tầng 0:        n              công việc: n
+tầng 1:    n/2   n/2          công việc: n
+tầng 2:  n/4 n/4 n/4 n/4      công việc: n
+...
+số tầng: log n  →  tổng = n · log n  →  O(n log n)</code></pre>
+<pre><code>Fibonacci ngây thơ: T(n) = T(n-1) + T(n-2) + O(1)
+
+           fib(5)
+         /        \
+     fib(4)      fib(3)        ← fib(3) bị tính hai lần
+     /    \      /    \
+  fib(3) fib(2) ...            ← và tiếp tục nhân đôi
+
+cây phân nhánh 2, sâu n  →  O(2ⁿ)
+memo hoá  →  mỗi giá trị tính đúng một lần  →  O(n)</code></pre>
+  <h3>Master theorem — bản dùng được ngay</h3>
+  <p>Cho <code>T(n) = a·T(n/b) + O(n^d)</code>, so sánh <code>d</code> với <code>log_b(a)</code>:</p>
+  <table>
+    <tr><th>Điều kiện</th><th>Kết quả</th><th>Ví dụ</th></tr>
+    <tr><td><code>d &gt; log_b a</code></td><td><code>O(n^d)</code> — gốc cây tốn nhất</td><td>T(n)=2T(n/2)+n² → O(n²)</td></tr>
+    <tr><td><code>d = log_b a</code></td><td><code>O(n^d log n)</code> — mọi tầng đều nhau</td><td>Mergesort → O(n log n)</td></tr>
+    <tr><td><code>d &lt; log_b a</code></td><td><code>O(n^(log_b a))</code> — lá tốn nhất</td><td>T(n)=8T(n/2)+n → O(n³)</td></tr>
+  </table>
+  <p>Không cần thuộc công thức. Cần biết vẽ cây và trả lời: <em>tầng nào tốn nhiều công nhất</em> — gốc, lá, hay đều nhau.</p>
+</section>
+
+<section id="bigo-s11">
+  <div class="sh"><b>11</b><h2>Bảng tra thao tác Python</h2></div>
+  <table>
+    <tr><th>Thao tác</th><th>list</th><th>deque</th><th>dict / set</th><th>heapq</th></tr>
+    <tr><td>Truy cập theo chỉ số</td><td>O(1)</td><td>O(n)</td><td>—</td><td>—</td></tr>
+    <tr><td>Thêm cuối</td><td>O(1)*</td><td>O(1)</td><td>O(1)*</td><td>O(log n)</td></tr>
+    <tr><td>Thêm đầu</td><td>O(n)</td><td>O(1)</td><td>—</td><td>—</td></tr>
+    <tr><td>Xoá cuối</td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td>—</td></tr>
+    <tr><td>Xoá đầu</td><td>O(n)</td><td>O(1)</td><td>—</td><td>O(log n) lấy min</td></tr>
+    <tr><td>Kiểm tra tồn tại</td><td>O(n)</td><td>O(n)</td><td>O(1)*</td><td>O(n)</td></tr>
+    <tr><td>Lấy min</td><td>O(n)</td><td>O(n)</td><td>O(n)</td><td>O(1)</td></tr>
+    <tr><td>Sắp xếp</td><td>O(n log n)</td><td>—</td><td>—</td><td>O(n) để dựng heap</td></tr>
+  </table>
+  <p class="cm" style="font-size:13.4px;color:var(--muted)">* amortized hoặc trung bình; tệ nhất của dict/set là O(n) khi mọi khoá đụng nhau.</p>
+  <div class="note key">
+    <h4>Ba dòng đáng thuộc</h4>
+    Cần thêm/xoá ở đầu → <strong>deque</strong>. Cần kiểm tra tồn tại → <strong>set</strong>. Cần liên tục lấy phần tử nhỏ nhất → <strong>heap</strong>. Ba lựa chọn này chuyển rất nhiều bài từ O(n²) xuống O(n log n).
+  </div>
+</section>
+
+<section id="bigo-s12">
+  <div class="sh"><b>12</b><h2>Khi O(n²) thắng O(n log n)</h2></div>
+  <p>Nghe ngược đời nhưng xảy ra thường xuyên, và trả lời được câu này cho thấy bạn hiểu Big-O chứ không thờ nó.</p>
+  <ul>
+    <li><strong>n nhỏ và cố định.</strong> Với n dưới khoảng 30, insertion sort thường nhanh hơn mọi thuật toán chia để trị vì không có chi phí đệ quy và truy cập bộ nhớ liên tiếp.</li>
+    <li><strong>Dữ liệu gần như đã sắp xếp.</strong> Insertion sort chạy O(n) trên dữ liệu gần sắp. Timsort khai thác đúng tính chất này, đó là lý do <code>sorted()</code> của Python nhanh bất thường trên dữ liệu thật.</li>
+    <li><strong>Bộ nhớ chật.</strong> Thuật toán sắp tại chỗ thắng thuật toán cần mảng phụ khi dữ liệu sát giới hạn RAM — lúc đó tráo đổi ra ổ đĩa mới là chi phí thật.</li>
+    <li><strong>Cache.</strong> Duyệt tuần tự trên mảng có thể nhanh hơn nhảy con trỏ trên cây, dù độ phức tạp tệ hơn, vì mỗi lần đọc bộ nhớ kéo về cả một dòng cache.</li>
+  </ul>
+  <div class="note">
+    <h4>Cách nói trong phỏng vấn</h4>
+    "Về tiệm cận thì heap tốt hơn, nhưng nếu k luôn nhỏ hơn 20 thì quét tuyến tính đơn giản hơn, ít bug hơn và thực tế nhanh hơn. Em sẽ chọn theo ràng buộc thật của bài toán." — câu này cho thấy tư duy kỹ sư, không phải tư duy học thuộc.
+  </div>
+</section>
+
+<section id="bigo-s13">
+  <div class="sh"><b>13</b><h2>Nói complexity thế nào cho đúng</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Yếu</h4><p>"Cái này O(n)."</p></div>
+    <div class="card ok"><h4>Tốt</h4><p>"Thời gian O(n) vì mỗi phần tử được duyệt đúng một lần và mọi thao tác trên set đều O(1). Bộ nhớ O(k) với k là số phần tử khác nhau, tệ nhất bằng n."</p></div>
+  </div>
+  <h3>Bốn thói quen nên có</h3>
+  <ul>
+    <li><strong>Nêu biến là gì.</strong> "n là số node, m là số cạnh" — với đồ thị thì <code>O(n + m)</code> mới đúng, viết <code>O(n)</code> là sai.</li>
+    <li><strong>Luôn nói cả bộ nhớ.</strong> Kể cả khi là O(1), nói ra vẫn hơn để bị hỏi.</li>
+    <li><strong>Nói tại sao, đừng chỉ nói kết quả.</strong> "vì vòng ngoài chạy n lần và mỗi lần làm O(log n) việc do có heap".</li>
+    <li><strong>Chủ động nêu trường hợp tệ nhất.</strong> "Trung bình O(n log n), tệ nhất O(n²) khi pivot luôn rơi vào biên; em chọn pivot ngẫu nhiên để tránh."</li>
+  </ul>
+  <p>Cơ số của logarithm thì bỏ được, vì đổi cơ số chỉ khác nhau một hằng số. Nói <code>O(log n)</code> là đủ, không cần <code>log₂</code>.</p>
+</section>
+
+<section id="bigo-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Rút gọn O(n + m) thành O(n)</h4><p>Chỉ đúng khi m bị chặn bởi n. Với hai đầu vào độc lập thì giữ nguyên cả hai biến.</p></div>
+    <div class="card bad"><h4>Quên chi phí của sort</h4><p>"Em sắp xếp trước rồi duyệt một lượt, nên O(n)." Sai — bước sắp đã là O(n log n) và nó chi phối.</p></div>
+    <div class="card bad"><h4>Coi thao tác trên chuỗi là O(1)</h4><p>So sánh hai chuỗi là O(độ dài), không phải O(1). Với chuỗi dài thì đây là số hạng chính.</p></div>
+    <div class="card bad"><h4>Bỏ quên ngăn xếp đệ quy khi tính bộ nhớ</h4><p>Đệ quy sâu n thì bộ nhớ là O(n), dù không cấp phát mảng nào.</p></div>
+    <div class="card bad"><h4>Nhầm O(2ⁿ) với O(n!)</h4><p>Sinh tập con là 2ⁿ; sinh hoán vị là n!. Với n = 12 thì hai con số chênh nhau hơn trăm lần.</p></div>
+    <div class="card bad"><h4>Nói O mà ý là Θ, rồi bị hỏi vặn</h4><p>Không sai trong thực tế, nhưng phải biết phân biệt nếu interviewer đào.</p></div>
+  </div>
+</section>
+
+<section id="bigo-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao dùng Big-O mà không đo thời gian thật?</summary>
+  <p>Thời gian thật phụ thuộc máy, ngôn ngữ, dữ liệu cụ thể, nên không so sánh được giữa các môi trường và sẽ lỗi thời. Big-O nắm cái không đổi: <b>hình dạng tăng trưởng của chi phí</b>. Nó cho phép dự đoán thuật toán chịu được dữ liệu lớn tới đâu trước khi viết một dòng code. Đo thời gian thật vẫn cần, nhưng để tinh chỉnh hằng số chứ không để chọn thuật toán.</p></details>
+
+  <details class="qa"><summary>append vào list là O(1) amortized nghĩa là gì?</summary>
+  <p>Mảng đầy thì cấp phát mảng mới gấp đôi và chép sang, lần đó tốn O(n). Nhưng tổng chi phí chép cho n lần append nhỏ hơn 2n vì các lần trước tạo thành chuỗi hình học, nên trung bình mỗi lần là hằng số. Amortized mạnh hơn average: đây là đảm bảo chắc chắn trên toàn chuỗi, không phụ thuộc xác suất. Điều nó <b>không</b> đảm bảo là một lần append lẻ luôn nhanh.</p></details>
+
+  <details class="qa"><summary>Quicksort tệ nhất O(n²), sao vẫn là lựa chọn mặc định ở nhiều nơi?</summary>
+  <p>Trung bình là n log n với hằng số nhỏ nhất trong nhóm, sắp tại chỗ nên chỉ tốn O(log n) bộ nhớ ngăn xếp, và truy cập bộ nhớ tuần tự nên rất thân thiện với cache. Trường hợp tệ nhất tránh được bằng pivot ngẫu nhiên hoặc median-of-three. Khi cần đảm bảo cứng thì dùng mergesort hoặc heapsort — đổi lấy bộ nhớ phụ hoặc hằng số lớn hơn.</p></details>
+
+  <details class="qa"><summary>Đề cho n ≤ 10⁵, bạn suy ra được gì?</summary>
+  <p>Rằng lời giải mong đợi là O(n log n) hoặc tốt hơn. O(n²) sẽ là 10¹⁰ phép tính, quá xa ngưỡng vài giây. Ngược lại nếu đề cho n ≤ 20 thì gần như chắc chắn là bài duyệt tập con hoặc quy hoạch động trên bitmask, tức là chấp nhận 2ⁿ. <b>Ràng buộc của đề là gợi ý về thuật toán</b> — đọc nó trước khi nghĩ.</p></details>
+
+  <details class="qa"><summary>Khi nào một thuật toán tệ hơn về tiệm cận lại tốt hơn trong thực tế?</summary>
+  <p>Khi n nhỏ và hằng số chi phối; khi dữ liệu gần như đã sắp xếp; khi truy cập bộ nhớ tuần tự thắng nhảy con trỏ nhờ cache; hoặc khi thuật toán tối ưu cần bộ nhớ phụ mà hệ thống không có. Thư viện sort thực tế đều lai giữa nhiều thuật toán chính vì lý do này.</p></details>
+
+  <details class="qa"><summary>Phân tích complexity đoạn này: hai vòng lặp lồng nhau, vòng trong chạy từ i tới n.</summary>
+  <p>Tổng số lần lặp là n + (n−1) + … + 1 = n(n+1)/2, tức O(n²). Điểm cần nói thêm: dù vòng trong không chạy đủ n lần, kết quả vẫn là bậc hai — chỉ khác hằng số 1/2, mà hằng số thì bỏ. Nhiều người nhìn thấy <code>range(i, n)</code> rồi kết luận nhầm là O(n log n).</p></details>
+</section>
+
+<footer>Deep dive · Big-O &amp; phân tích độ phức tạp · số liệu thời gian ước lượng theo mức 10⁷–10⁹ phép tính mỗi giây.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

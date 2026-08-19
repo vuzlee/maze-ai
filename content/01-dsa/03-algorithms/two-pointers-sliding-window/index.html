@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two pointers &amp; sliding window — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-window" data-title="Two pointers &amp; sliding window" data-tag="Kỹ thuật" data-blurb="Điều kiện để hai kỹ thuật này đúng, hai mẫu code phủ hầu hết đề, kỹ thuật at-most-K, và lằn ranh phải đổi sang prefix sum.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · kỹ thuật cửa sổ</p>
+  <h1>Two pointers &amp;<br><em>sliding window</em></h1>
+  <p class="lede">Hai kỹ thuật biến <b>O(n²)</b> thành <b>O(n)</b> trên cùng một bài. Điều kiện để chúng đúng, hai mẫu code dùng cho hầu hết đề, kỹ thuật <b>đếm bằng at-most-K</b>, và lằn ranh mà quá nó thì cửa sổ vô dụng — phải chuyển sang prefix sum.</p>
+</header>
+
+
+<section id="window-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+  <p>Cả hai kỹ thuật cùng một họ: <strong>duy trì một đoạn liên tiếp bằng hai chỉ số, mỗi chỉ số chỉ đi tới, không quay lui</strong>. Khác nhau ở cách hai chỉ số di chuyển.</p>
+<pre><code>Two pointers — đối đầu          Sliding window — cùng chiều
+[ a b c d e f g ]               [ a b c d e f g ]
+  ↑           ↑                     ↑   ↑
+  i           j                     L   R
+  i tăng, j giảm                    R mở rộng, L co lại khi vi phạm
+  → gặp nhau ở giữa                 → cả hai quét hết mảng đúng một lượt</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Mỗi chỉ số đi tối đa n bước và không bao giờ lùi. Hai chỉ số thì tổng cộng tối đa 2n bước, nên <strong>O(n)</strong> — dù nhìn code có hai vòng lặp lồng nhau.
+  </div>
+</section>
+
+<section id="window-s2">
+  <div class="sh"><b>02</b><h2>Vì sao bỏ được một vòng lặp</h2></div>
+  <p>Xét bài kinh điển: mảng đã sắp xếp, tìm hai số có tổng bằng target.</p>
+<pre><code><span class="cm"># cách ngây thơ — O(n²)</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n):
+    <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(i+<span class="st">1</span>, n):
+        <span class="kw">if</span> a[i] + a[j] == target: <span class="kw">return</span> (i, j)</code></pre>
+  <p>Cách này thử mọi cặp vì nó <strong>không dùng thông tin mảng đã sắp xếp</strong>. Two pointers dùng thông tin đó để loại hàng loạt cặp trong một bước:</p>
+<pre><code>a = [1, 3, 5, 8, 11],  target = 12
+i=0, j=4 → 1 + 11 = 12  ✓
+
+a = [1, 3, 5, 8, 11],  target = 14
+i=0, j=4 → 1 + 11 = 12 &lt; 14  → tổng quá nhỏ
+   Muốn tăng tổng thì phải tăng số nhỏ. Số nhỏ nhất còn lại là a[i].
+   → i++ , và ta vừa loại bỏ TOÀN BỘ cặp (0, j) với mọi j — n phép thử trong một bước.</code></pre>
+  <p>Đó là toàn bộ phép màu: mỗi bước dịch chỉ số loại đi cả một hàng hoặc cả một cột của bảng n×n các cặp. Sau tối đa 2n bước thì bảng cạn.</p>
+  <div class="note">
+    <h4>Vì sao không bỏ sót đáp án</h4>
+    Khi <code>a[i] + a[j] &lt; target</code>, mọi cặp <code>(i, j')</code> với <code>j' &lt; j</code> đều có tổng còn nhỏ hơn, vì mảng tăng dần. Nên không có đáp án nào nằm trong nhóm bị loại. <strong>Chứng minh này chính là thứ interviewer muốn nghe</strong> — không có nó thì bạn chỉ đang nhớ mẫu code.
+  </div>
+</section>
+
+<section id="window-s3">
+  <div class="sh"><b>03</b><h2>Ba dạng two pointers</h2></div>
+  <table>
+    <tr><th>Dạng</th><th>Chuyển động</th><th>Dùng cho</th></tr>
+    <tr><td>Đối đầu</td><td>i từ trái, j từ phải, tiến vào giữa</td><td>Two Sum trên mảng sắp xếp, đảo chuỗi, kiểm tra palindrome, container with most water</td></tr>
+    <tr><td>Cùng chiều<br><span class="cm">nhanh &amp; chậm</span></td><td>Cả hai đi phải, tốc độ khác nhau</td><td>Xoá trùng tại chỗ, dồn phần tử, phát hiện chu trình danh sách liên kết</td></tr>
+    <tr><td>Hai mảng</td><td>Mỗi chỉ số trên một mảng</td><td>Trộn hai mảng đã sắp, giao và hợp của hai tập đã sắp</td></tr>
+  </table>
+<pre><code><span class="cm"># cùng chiều: xoá trùng tại chỗ trên mảng đã sắp</span>
+<span class="kw">def</span> dedupe(a):
+    <span class="kw">if</span> <span class="kw">not</span> a: <span class="kw">return</span> <span class="st">0</span>
+    slow = <span class="st">0</span>                          <span class="cm"># biên của vùng kết quả</span>
+    <span class="kw">for</span> fast <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, <span class="kw">len</span>(a)):     <span class="cm"># quét toàn mảng</span>
+        <span class="kw">if</span> a[fast] != a[slow]:
+            slow += <span class="st">1</span>
+            a[slow] = a[fast]
+    <span class="kw">return</span> slow + <span class="st">1</span>                   <span class="cm"># O(n) thời gian, O(1) bộ nhớ</span></code></pre>
+  <p>Cách nhớ dạng cùng chiều: <code>slow</code> là <em>biên của phần đã xử lý xong</em>, <code>fast</code> là <em>con trỏ đọc</em>. Rất nhiều bài "sửa mảng tại chỗ" chỉ là biến thể của khung này.</p>
+</section>
+
+<section id="window-s4">
+  <div class="sh"><b>04</b><h2>Điều kiện để kỹ thuật này đúng</h2></div>
+  <p>Không phải bài nào cũng dùng được. Điều kiện cốt lõi là <strong>tính đơn điệu</strong>: khi dịch một chỉ số, ta phải biết chắc hướng thay đổi của đại lượng đang xét.</p>
+  <div class="grid2">
+    <div class="card ok"><h4>Dùng được</h4><p>Mảng đã sắp xếp. Hoặc: mở rộng cửa sổ làm đại lượng chỉ tăng, thu hẹp làm nó chỉ giảm. Ví dụ tổng của các số dương, số ký tự khác nhau, số phần tử.</p></div>
+    <div class="card bad"><h4>Không dùng được</h4><p>Mảng chưa sắp mà bài không cho phép sắp (vì cần giữ thứ tự). Hoặc: mảng có số âm khi bài hỏi về tổng — thêm phần tử có thể làm tổng giảm, mất tính đơn điệu.</p></div>
+  </div>
+<pre><code><span class="cm"># vì sao số âm phá vỡ sliding window</span>
+a = [<span class="st">3</span>, -<span class="st">2</span>, <span class="st">5</span>],  tìm đoạn có tổng &gt; 4
+
+Cửa sổ [3] tổng 3 → chưa đủ → mở rộng
+Cửa sổ [3,-2] tổng 1 → mở rộng làm tổng GIẢM
+→ không còn suy luận được "chưa đủ thì mở rộng, quá thì co lại"
+→ phải chuyển sang prefix sum, xem mục 11</code></pre>
+  <div class="note warn">
+    <h4>Câu hỏi tự đặt trước khi code</h4>
+    <em>Nếu tôi mở rộng cửa sổ, đại lượng tôi đang theo dõi chắc chắn đi theo hướng nào?</em> Trả lời được thì dùng được cửa sổ. Không trả lời được thì kỹ thuật này sai, dù đề nhìn rất giống đề cửa sổ.
+  </div>
+</section>
+
+<section id="window-s5">
+  <div class="sh"><b>05</b><h2>Mẫu code two pointers</h2></div>
+<pre><code><span class="kw">def</span> two_sum_sorted(a, target):
+    i, j = <span class="st">0</span>, <span class="kw">len</span>(a) - <span class="st">1</span>
+    <span class="kw">while</span> i &lt; j:                       <span class="cm"># i &lt; j: không dùng lại một phần tử</span>
+        s = a[i] + a[j]
+        <span class="kw">if</span>   s == target: <span class="kw">return</span> (i, j)
+        <span class="kw">elif</span> s &lt;  target: i += <span class="st">1</span>       <span class="cm"># cần lớn hơn → bỏ số nhỏ nhất</span>
+        <span class="kw">else</span>:            j -= <span class="st">1</span>       <span class="cm"># cần nhỏ hơn → bỏ số lớn nhất</span>
+    <span class="kw">return</span> <span class="kw">None</span></code></pre>
+  <p>Ba chi tiết quyết định đúng sai:</p>
+  <ul>
+    <li><code>i &lt; j</code> hay <code>i &lt;= j</code> — dùng <code>&lt;</code> khi hai chỉ số phải trỏ vào hai phần tử khác nhau, dùng <code>&lt;=</code> khi cho phép trùng (ví dụ kiểm tra palindrome độ dài lẻ thì không cần).</li>
+    <li>Nhánh nào tăng, nhánh nào giảm — suy ra từ hướng đơn điệu, đừng học thuộc.</li>
+    <li>Có bỏ qua giá trị trùng không — với bài liệt kê mọi bộ ba không trùng lặp thì phải nhảy qua các giá trị giống nhau, nếu không kết quả bị lặp.</li>
+  </ul>
+<pre><code><span class="cm"># 3Sum: cố định một số rồi two pointers phần còn lại → O(n²)</span>
+<span class="kw">def</span> three_sum(a):
+    a.sort(); out = []
+    <span class="kw">for</span> k <span class="kw">in</span> <span class="kw">range</span>(<span class="kw">len</span>(a) - <span class="st">2</span>):
+        <span class="kw">if</span> k &gt; <span class="st">0</span> <span class="kw">and</span> a[k] == a[k-<span class="st">1</span>]: <span class="kw">continue</span>   <span class="cm"># bỏ trùng ở số cố định</span>
+        i, j = k + <span class="st">1</span>, <span class="kw">len</span>(a) - <span class="st">1</span>
+        <span class="kw">while</span> i &lt; j:
+            s = a[k] + a[i] + a[j]
+            <span class="kw">if</span> s &lt; <span class="st">0</span>: i += <span class="st">1</span>
+            <span class="kw">elif</span> s &gt; <span class="st">0</span>: j -= <span class="st">1</span>
+            <span class="kw">else</span>:
+                out.append((a[k], a[i], a[j]))
+                i += <span class="st">1</span>; j -= <span class="st">1</span>
+                <span class="kw">while</span> i &lt; j <span class="kw">and</span> a[i] == a[i-<span class="st">1</span>]: i += <span class="st">1</span>  <span class="cm"># bỏ trùng</span>
+    <span class="kw">return</span> out</code></pre>
+  <p>Chi phí: sắp xếp O(n log n) cộng hai vòng O(n²), tổng <strong>O(n²)</strong> — bước sắp không chi phối. Đây là ví dụ tốt cho mục "đừng quên chi phí của sort" ở bài Big-O: ở đây sort <em>không</em> phải số hạng chính, nhưng vẫn phải nêu ra.</p>
+</section>
+
+<section id="window-s6">
+  <div class="sh"><b>06</b><h2>Cửa sổ cố định</h2></div>
+  <p>Dạng dễ nhất: kích thước cửa sổ cho trước bằng k. Thay vì tính lại tổng mỗi lần, ta <strong>cập nhật theo sai phân</strong>.</p>
+<pre><code><span class="kw">def</span> max_sum_k(a, k):
+    s = <span class="kw">sum</span>(a[:k])          <span class="cm"># cửa sổ đầu tiên: O(k)</span>
+    best = s
+    <span class="kw">for</span> r <span class="kw">in</span> <span class="kw">range</span>(k, <span class="kw">len</span>(a)):
+        s += a[r] - a[r-k]     <span class="cm"># vào một, ra một: O(1)</span>
+        best = <span class="kw">max</span>(best, s)
+    <span class="kw">return</span> best               <span class="cm"># tổng O(n)</span></code></pre>
+  <p>Ý tưởng "vào một, ra một" áp dụng cho mọi đại lượng cộng được: tổng, số lượng nguyên âm, số phần tử chẵn. Với đại lượng không cộng được như <em>giá trị lớn nhất trong cửa sổ</em>, phải dùng monotonic deque — đó là bài riêng.</p>
+</section>
+
+<section id="window-s7">
+  <div class="sh"><b>07</b><h2>Cửa sổ co giãn — mẫu dùng cho hầu hết đề</h2></div>
+  <p>Kích thước không cho trước. Quy tắc: <strong>R luôn mở rộng, L chỉ co khi cửa sổ vi phạm điều kiện</strong>.</p>
+<pre><code><span class="kw">def</span> longest_unique(s):
+    last = {}                 <span class="cm"># ký tự → chỉ số xuất hiện gần nhất</span>
+    L = <span class="st">0</span>; best = <span class="st">0</span>
+    <span class="kw">for</span> R, ch <span class="kw">in</span> <span class="kw">enumerate</span>(s):
+        <span class="kw">if</span> ch <span class="kw">in</span> last <span class="kw">and</span> last[ch] &gt;= L:
+            L = last[ch] + <span class="st">1</span>          <span class="cm"># nhảy L qua lần xuất hiện trước</span>
+        last[ch] = R
+        best = <span class="kw">max</span>(best, R - L + <span class="st">1</span>)  <span class="cm"># cửa sổ hiện tại luôn hợp lệ</span>
+    <span class="kw">return</span> best</code></pre>
+  <p>Khung tổng quát, áp được cho phần lớn đề dạng "đoạn con dài nhất thoả điều kiện":</p>
+<pre><code>L = 0
+<span class="kw">for</span> R <span class="kw">in</span> <span class="kw">range</span>(n):
+    thêm a[R] vào trạng thái            <span class="cm"># mở rộng</span>
+    <span class="kw">while</span> trạng thái vi phạm:            <span class="cm"># co cho tới khi hợp lệ trở lại</span>
+        bỏ a[L] khỏi trạng thái
+        L += 1
+    cập nhật đáp án với đoạn [L, R]      <span class="cm"># tại đây cửa sổ LUÔN hợp lệ</span></code></pre>
+  <div class="note key">
+    <h4>Vì sao vòng while bên trong không làm nó thành O(n²)</h4>
+    Vì <code>L</code> chỉ tăng, không bao giờ lùi. Trên toàn bộ quá trình, <code>L</code> đi tối đa n bước — bất kể nó dồn vào một lần lặp hay rải đều. Đây gọi là phân tích amortized, và là câu trả lời chuẩn khi interviewer chỉ vào vòng lặp lồng nhau rồi hỏi "cái này O(n²) đúng không?".
+  </div>
+  <p><strong>Bài ngược lại — đoạn con ngắn nhất thoả điều kiện</strong> — chỉ đổi chỗ cập nhật đáp án: co lại chừng nào còn <em>thoả</em>, và ghi nhận đáp án trong lúc co.</p>
+<pre><code><span class="kw">def</span> min_len_sum_at_least(a, target):   <span class="cm"># a toàn số dương</span>
+    L = <span class="st">0</span>; s = <span class="st">0</span>; best = <span class="kw">float</span>(<span class="st">"inf"</span>)
+    <span class="kw">for</span> R, x <span class="kw">in</span> <span class="kw">enumerate</span>(a):
+        s += x
+        <span class="kw">while</span> s &gt;= target:              <span class="cm"># còn thoả thì cứ co để tìm ngắn hơn</span>
+            best = <span class="kw">min</span>(best, R - L + <span class="st">1</span>)
+            s -= a[L]; L += <span class="st">1</span>
+    <span class="kw">return</span> <span class="st">0</span> <span class="kw">if</span> best == <span class="kw">float</span>(<span class="st">"inf"</span>) <span class="kw">else</span> best</code></pre>
+</section>
+
+<section id="window-s8">
+  <div class="sh"><b>08</b><h2>Lab: chạy cửa sổ từng bước</h2></div>
+  <p>Bài "đoạn con dài nhất không có ký tự lặp". Bấm từng bước để xem L và R di chuyển, và chỗ nào L nhảy.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>chuỗi đầu vào</label><input type="text" id="str" value="abcabcbb" style="width:190px"></div>
+      <button id="step">Bước tiếp</button>
+      <button class="ghost" id="auto">Tự chạy</button>
+      <button class="ghost" id="rst">Đặt lại</button>
+    </div>
+    <div id="view"></div>
+    <div class="stat">
+      <u>cửa sổ hiện tại <b id="cur">–</b></u>
+      <u>dài nhất tìm được <b id="best">0</b></u>
+      <u>tổng số bước <b id="steps">0</b></u>
+    </div>
+    <div class="steps" id="log"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Để ý: <code>R</code> chạy đúng một lượt từ đầu tới cuối, và <code>L</code> cũng chỉ đi tới. Tổng số lần dịch của cả hai không vượt quá <code>2n</code> — đó là lý do thuật toán là O(n) dù mắt nhìn thấy hai chỉ số.
+    </p>
+  </div>
+</section>
+
+<section id="window-s9">
+  <div class="sh"><b>09</b><h2>Bất biến — cách viết không bị sai</h2></div>
+  <p>Mỗi vòng lặp cửa sổ nên có một câu phát biểu <strong>luôn đúng tại điểm cuối mỗi vòng lặp</strong>. Viết câu đó ra trước khi code thì gần như không sai được.</p>
+  <table>
+    <tr><th>Bài</th><th>Bất biến</th></tr>
+    <tr><td>Đoạn dài nhất không lặp ký tự</td><td>Đoạn <code>[L, R]</code> không chứa ký tự lặp</td></tr>
+    <tr><td>Đoạn ngắn nhất có tổng ≥ target</td><td>Đoạn <code>[L, R]</code> có tổng &lt; target sau khi đã co hết mức</td></tr>
+    <tr><td>Nhiều nhất K ký tự khác nhau</td><td>Đoạn <code>[L, R]</code> có không quá K ký tự khác nhau</td></tr>
+    <tr><td>Two Sum sắp xếp</td><td>Đáp án nếu tồn tại thì nằm trong <code>[i, j]</code></td></tr>
+  </table>
+  <p>Bất biến quyết định <strong>vị trí đặt dòng cập nhật đáp án</strong>. Đặt trước vòng co thì đọc trạng thái chưa hợp lệ, đặt sau thì đúng. Đây là nguồn gốc của gần như mọi lỗi lệch một đơn vị trong nhóm bài này.</p>
+  <div class="note">
+    <h4>Kiểm tra bằng ba ca</h4>
+    Chuỗi rỗng, chuỗi một ký tự, và chuỗi toàn ký tự giống nhau. Ba ca này bắt được phần lớn lỗi biên, và nêu chúng ra trong phỏng vấn cho thấy bạn có thói quen kiểm thử.
+  </div>
+</section>
+
+<section id="window-s10">
+  <div class="sh"><b>10</b><h2>Đếm số đoạn con bằng at-most-K</h2></div>
+  <p>Đề dạng "đếm số đoạn con có <strong>đúng</strong> K phần tử khác nhau" nhìn không giống bài cửa sổ, vì không có gì để tối đa hoá. Mẹo chuẩn:</p>
+<pre><code>đúng K = (nhiều nhất K) − (nhiều nhất K−1)</code></pre>
+  <p>Lý do: mọi đoạn có nhiều nhất K, trừ đi mọi đoạn có nhiều nhất K−1, còn lại đúng những đoạn có đúng K. Và bài "nhiều nhất K" thì cửa sổ giải được trực tiếp.</p>
+<pre><code><span class="kw">def</span> at_most(a, k):
+    cnt = {}; L = <span class="st">0</span>; total = <span class="st">0</span>
+    <span class="kw">for</span> R, x <span class="kw">in</span> <span class="kw">enumerate</span>(a):
+        cnt[x] = cnt.get(x, <span class="st">0</span>) + <span class="st">1</span>
+        <span class="kw">while</span> <span class="kw">len</span>(cnt) &gt; k:
+            cnt[a[L]] -= <span class="st">1</span>
+            <span class="kw">if</span> cnt[a[L]] == <span class="st">0</span>: <span class="kw">del</span> cnt[a[L]]
+            L += <span class="st">1</span>
+        total += R - L + <span class="st">1</span>          <span class="cm">← chìa khoá, xem giải thích dưới</span>
+    <span class="kw">return</span> total
+
+<span class="kw">def</span> exactly(a, k): <span class="kw">return</span> at_most(a, k) - at_most(a, k - <span class="st">1</span>)</code></pre>
+  <div class="note key">
+    <h4>Vì sao cộng R − L + 1</h4>
+    Khi cửa sổ <code>[L, R]</code> hợp lệ, thì mọi đoạn <em>kết thúc tại R</em> và bắt đầu từ bất kỳ đâu trong <code>[L, R]</code> cũng hợp lệ — vì đoạn ngắn hơn không thể có nhiều phần tử khác nhau hơn. Có đúng <code>R − L + 1</code> đoạn như vậy. Cộng qua mọi R là đếm được toàn bộ, mỗi đoạn đúng một lần vì phân loại theo điểm kết thúc.
+  </div>
+  <p>Khung này giải luôn một loạt đề: đếm đoạn có tối đa K số lẻ, đếm đoạn có tổng nhỏ hơn ngưỡng, đếm đoạn nhị phân có đúng K số 1.</p>
+</section>
+
+<section id="window-s11">
+  <div class="sh"><b>11</b><h2>Khi cửa sổ vô dụng — chuyển sang prefix sum</h2></div>
+  <p>Mảng có số âm thì mở rộng cửa sổ không còn làm tổng tăng đơn điệu, nên kỹ thuật gãy. Thay bằng tổng tiền tố kết hợp hash map.</p>
+<pre><code><span class="cm"># đếm số đoạn con có tổng đúng bằng k, mảng có thể chứa số âm</span>
+<span class="kw">def</span> count_sum_k(a, k):
+    seen = {<span class="st">0</span>: <span class="st">1</span>}        <span class="cm"># tổng tiền tố 0 xuất hiện một lần (đoạn rỗng)</span>
+    s = <span class="st">0</span>; out = <span class="st">0</span>
+    <span class="kw">for</span> x <span class="kw">in</span> a:
+        s += x
+        out += seen.get(s - k, <span class="st">0</span>)   <span class="cm"># có bao nhiêu tiền tố trước thoả</span>
+        seen[s] = seen.get(s, <span class="st">0</span>) + <span class="st">1</span>
+    <span class="kw">return</span> out                        <span class="cm"># O(n) thời gian, O(n) bộ nhớ</span></code></pre>
+  <p>Ý tưởng: tổng đoạn <code>(i, j]</code> bằng <code>prefix[j] − prefix[i]</code>. Muốn tổng bằng <code>k</code> thì cần <code>prefix[i] = prefix[j] − k</code>. Vậy chỉ cần đếm xem giá trị đó đã gặp bao nhiêu lần.</p>
+  <table>
+    <tr><th>Tình huống</th><th>Dùng</th><th>Bộ nhớ</th></tr>
+    <tr><td>Toàn số dương, tìm đoạn dài/ngắn nhất</td><td>Sliding window</td><td>O(1) hoặc O(k)</td></tr>
+    <tr><td>Có số âm, tìm tổng bằng đúng k</td><td>Prefix sum + hash map</td><td>O(n)</td></tr>
+    <tr><td>Truy vấn tổng đoạn nhiều lần</td><td>Mảng prefix dựng sẵn</td><td>O(n)</td></tr>
+    <tr><td>Có cập nhật giá trị giữa chừng</td><td>Fenwick / segment tree</td><td>O(n)</td></tr>
+  </table>
+  <p>Nhận ra được ranh giới này là điểm phân biệt rõ nhất giữa người hiểu và người nhớ mẫu code. Rất nhiều candidate áp cửa sổ vào bài có số âm rồi không giải thích được vì sao sai.</p>
+</section>
+
+<section id="window-s12">
+  <div class="sh"><b>12</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Nghĩ tới</th></tr>
+    <tr><td>"đoạn con liên tiếp" + "dài nhất / ngắn nhất"</td><td>Sliding window co giãn</td></tr>
+    <tr><td>"đoạn con độ dài đúng k"</td><td>Cửa sổ cố định, cập nhật vào-ra</td></tr>
+    <tr><td>"mảng đã sắp xếp" + "tìm cặp / bộ ba"</td><td>Two pointers đối đầu</td></tr>
+    <tr><td>"đếm số đoạn con thoả điều kiện"</td><td>At-most-K, hoặc prefix sum nếu có số âm</td></tr>
+    <tr><td>"sửa mảng tại chỗ, O(1) bộ nhớ"</td><td>Two pointers cùng chiều nhanh–chậm</td></tr>
+    <tr><td>"danh sách liên kết có chu trình không"</td><td>Nhanh–chậm, thỏ và rùa</td></tr>
+    <tr><td>"đoạn con" + có số âm + tổng đúng bằng k</td><td>Prefix sum + hash map, <em>không</em> phải cửa sổ</td></tr>
+    <tr><td>"giá trị lớn nhất trong mỗi cửa sổ"</td><td>Monotonic deque</td></tr>
+  </table>
+</section>
+
+<section id="window-s13">
+  <div class="sh"><b>13</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Cập nhật đáp án sai chỗ</h4><p>Ghi nhận đáp án trước khi co xong thì đọc trúng cửa sổ chưa hợp lệ. Viết bất biến ra trước rồi đặt dòng cập nhật ở nơi bất biến đúng.</p></div>
+    <div class="card bad"><h4>Quên xoá khoá khỏi dict khi đếm về 0</h4><p><code>len(cnt)</code> sẽ tính cả khoá có giá trị 0, làm điều kiện "nhiều nhất K" luôn sai. Đây là bug im lặng, không có exception.</p></div>
+    <div class="card bad"><h4>Áp cửa sổ vào mảng có số âm</h4><p>Chạy ra kết quả, thậm chí đúng với vài test nhỏ, nhưng sai về bản chất. Chuyển sang prefix sum.</p></div>
+    <div class="card bad"><h4>Dùng if thay vì while khi co</h4><p>Một lần co không đảm bảo cửa sổ hợp lệ trở lại. Phải co tới khi hết vi phạm.</p></div>
+    <div class="card bad"><h4>Quên bỏ giá trị trùng trong 3Sum</h4><p>Kết quả có bộ ba lặp lại. Cần bỏ trùng ở cả số cố định lẫn hai con trỏ.</p></div>
+    <div class="card bad"><h4>Kết luận nhầm O(n²) vì thấy vòng lồng</h4><p>Chính bạn cũng dễ mắc khi tự phân tích. Nhớ: L không lùi, nên tổng công việc là O(n).</p></div>
+  </div>
+</section>
+
+<section id="window-s14">
+  <div class="sh"><b>14</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao sliding window là O(n) khi trong vòng for có thêm vòng while?</summary>
+  <p>Vì <code>L</code> chỉ tăng và không bao giờ quay lui. Trên toàn bộ thuật toán, <code>L</code> dịch tối đa n lần, bất kể các lần dịch đó dồn vào một vòng lặp hay rải đều. Cộng với <code>R</code> cũng đi n bước, tổng công việc là O(n). Đây là phân tích amortized: <b>đếm tổng công việc trên toàn chuỗi, không nhân số vòng lặp với nhau</b>.</p></details>
+
+  <details class="qa"><summary>Two pointers cần điều kiện gì mới đúng?</summary>
+  <p>Cần tính đơn điệu: khi dịch một chỉ số, phải biết chắc đại lượng đang xét thay đổi theo hướng nào, và biết chắc phần bị loại không chứa đáp án. Với Two Sum, mảng đã sắp xếp cho ta điều đó — tổng nhỏ hơn target thì tăng số nhỏ, và mọi cặp vừa bị loại đều có tổng còn nhỏ hơn nữa. Mất tính đơn điệu, ví dụ vì có số âm, thì kỹ thuật không còn đúng.</p></details>
+
+  <details class="qa"><summary>Đếm số đoạn con có đúng K phần tử khác nhau — làm sao?</summary>
+  <p>Tính "nhiều nhất K" trừ "nhiều nhất K−1". Bài "nhiều nhất K" giải được bằng cửa sổ, và tại mỗi R ta cộng <code>R − L + 1</code> vì mọi đoạn kết thúc tại R và bắt đầu trong <code>[L, R]</code> đều hợp lệ. Hiệu của hai kết quả cho ra đúng những đoạn có đúng K. Tổng chi phí O(n) và chỉ cần chạy cùng một hàm hai lần.</p></details>
+
+  <details class="qa"><summary>Bài này mảng có số âm, cửa sổ còn dùng được không?</summary>
+  <p>Không, nếu điều kiện dựa trên tổng. Thêm một phần tử có thể làm tổng giảm nên không suy luận được nên mở rộng hay co lại. Chuyển sang tổng tiền tố kết hợp hash map: tổng đoạn bằng hiệu hai tiền tố, nên đếm xem giá trị <code>prefix − k</code> đã gặp bao nhiêu lần. Vẫn O(n) thời gian, nhưng tốn O(n) bộ nhớ thay vì O(1).</p></details>
+
+  <details class="qa"><summary>Vì sao dùng dict lưu chỉ số cuối thay vì set khi tìm đoạn không lặp ký tự?</summary>
+  <p>Với set, khi gặp ký tự lặp phải co L từng bước một cho tới khi loại được ký tự đó. Với dict lưu chỉ số xuất hiện gần nhất, ta nhảy thẳng <code>L</code> tới vị trí ngay sau lần xuất hiện trước. Cả hai đều O(n) về tiệm cận, nhưng bản dict ít thao tác hơn và code ngắn hơn. Điều kiện <code>last[ch] &gt;= L</code> là bắt buộc — nếu thiếu, L có thể bị kéo lùi về quá khứ.</p></details>
+
+  <details class="qa"><summary>Khi nào bạn chọn two pointers thay vì hash map cho Two Sum?</summary>
+  <p>Nếu mảng đã sắp xếp thì two pointers cho O(n) thời gian và O(1) bộ nhớ, tốt hơn hash map ở khoản bộ nhớ. Nếu mảng chưa sắp và bài cần trả về chỉ số gốc thì hash map thắng, vì sắp xếp sẽ phá thứ tự và tốn thêm O(n log n). Câu trả lời tốt là nêu cả hai và chọn theo ràng buộc của đề.</p></details>
+</section>
+
+<footer>Deep dive · two pointers &amp; sliding window · mọi đoạn code trong bài chạy được nguyên trạng trên Python 3.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đồ thị — BFS, DFS, topo sort — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-graph" data-title="Đồ thị — BFS, DFS, topo sort" data-tag="Kỹ thuật" data-blurb="Khi nào đánh dấu đã thăm, ba cách phát hiện chu trình, hai cách sắp topo, và BFS trên không gian trạng thái.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · đồ thị</p>
+  <h1>Đồ thị —<br><em>BFS, DFS, topo sort</em></h1>
+  <p class="lede">Hai thuật toán duyệt, và một tá bài toán chỉ là chúng đổi vỏ. Bài này chốt <b>khi nào đánh dấu đã thăm</b> — khác nhau giữa BFS và DFS và đó là bug hay gặp nhất, ba cách phát hiện chu trình, hai cách sắp thứ tự topo, và mẹo <b>BFS trên không gian trạng thái</b> khi đề không hề nhắc chữ đồ thị.</p>
+</header>
+
+
+<section id="graph-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>BFS  duyệt theo TẦNG        → đường đi ngắn nhất khi mọi cạnh có trọng số bằng nhau
+DFS  duyệt theo NHÁNH SÂU   → liên thông, chu trình, thứ tự topo, mọi bài về cấu trúc
+
+Cả hai đều O(V + E) với danh sách kề.
+Khác nhau duy nhất ở cấu trúc chứa đỉnh chờ: queue hay stack.</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Rất nhiều đề <strong>không nhắc chữ đồ thị</strong>. Hễ có "trạng thái" và "bước chuyển giữa các trạng thái" thì đó là đồ thị: lưới ô vuông, biến đổi chuỗi, mở khoá số, lịch học môn tiên quyết. Nhận ra được điều đó là xong phần khó nhất.
+  </div>
+</section>
+
+<section id="graph-s2">
+  <div class="sh"><b>02</b><h2>Biểu diễn đồ thị</h2></div>
+  <table>
+    <tr><th>Cách</th><th>Bộ nhớ</th><th>Kiểm tra có cạnh u–v</th><th>Duyệt hàng xóm của u</th><th>Dùng khi</th></tr>
+    <tr><td>Danh sách kề</td><td>O(V + E)</td><td>O(bậc của u)</td><td>O(bậc của u)</td><td><strong>Mặc định</strong> — hầu hết mọi bài</td></tr>
+    <tr><td>Ma trận kề</td><td>O(V²)</td><td>O(1)</td><td>O(V)</td><td>Đồ thị dày, hoặc cần tra cạnh liên tục</td></tr>
+    <tr><td>Danh sách cạnh</td><td>O(E)</td><td>O(E)</td><td>O(E)</td><td>Kruskal, hoặc khi phải sắp cạnh theo trọng số</td></tr>
+  </table>
+<pre><code><span class="kw">from</span> collections <span class="kw">import</span> defaultdict, deque
+
+<span class="cm"># từ danh sách cạnh sang danh sách kề — dòng code viết nhiều nhất khi làm đồ thị</span>
+g = defaultdict(list)
+<span class="kw">for</span> u, v <span class="kw">in</span> edges:
+    g[u].append(v)
+    g[v].append(u)          <span class="cm">← chỉ thêm dòng này nếu đồ thị VÔ HƯỚNG</span></code></pre>
+  <div class="note warn">
+    <h4>Ba câu phải hỏi trước khi code</h4>
+    <strong>Có hướng hay vô hướng?</strong> Quyết định có thêm cạnh ngược hay không. <strong>Có trọng số không?</strong> Có thì BFS không cho đường ngắn nhất, phải dùng Dijkstra. <strong>Có thể có đỉnh cô lập, đa cạnh, hay cạnh tự nối không?</strong> Ảnh hưởng tới cách đếm thành phần liên thông và cách phát hiện chu trình. Hỏi ba câu này trong phỏng vấn luôn được tính điểm.
+  </div>
+</section>
+
+<section id="graph-s3">
+  <div class="sh"><b>03</b><h2>BFS</h2></div>
+<pre><code><span class="kw">def</span> bfs(g, src):
+    seen = {src}                       <span class="cm"># đánh dấu NGAY khi đưa vào hàng đợi</span>
+    q = deque([src])
+    dist = {src: <span class="st">0</span>}
+    <span class="kw">while</span> q:
+        u = q.popleft()
+        <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+            <span class="kw">if</span> v <span class="kw">not in</span> seen:
+                seen.add(v)            <span class="cm"># đánh dấu ở đây, không phải lúc lấy ra</span>
+                dist[v] = dist[u] + <span class="st">1</span>
+                q.append(v)
+    <span class="kw">return</span> dist                        <span class="cm"># O(V + E)</span></code></pre>
+  <p><strong>Vì sao BFS cho đường đi ngắn nhất</strong> khi đồ thị không trọng số: nó mở rộng theo từng tầng đúng thứ tự khoảng cách. Lần đầu chạm tới một đỉnh, đó chắc chắn là đường ngắn nhất — không có đường nào ngắn hơn còn chưa được xét, vì các tầng gần hơn đã xử lý xong hết.</p>
+  <h3>Khôi phục đường đi</h3>
+<pre><code>parent = {src: <span class="kw">None</span>}
+<span class="cm"># ... trong vòng lặp, khi phát hiện v mới:</span>
+parent[v] = u
+
+<span class="cm"># dựng lại đường sau khi tìm thấy đích</span>
+path, cur = [], target
+<span class="kw">while</span> cur <span class="kw">is not</span> <span class="kw">None</span>:
+    path.append(cur); cur = parent[cur]
+path.reverse()</code></pre>
+  <p>Lưu <code>parent</code> thay vì lưu cả đường đi trong hàng đợi. Nhồi đường đi vào hàng đợi làm bộ nhớ thành O(V²) — lỗi hay gặp và thường bị hỏi tới.</p>
+</section>
+
+<section id="graph-s4">
+  <div class="sh"><b>04</b><h2>DFS</h2></div>
+<pre><code><span class="cm"># bản đệ quy — ngắn, dùng khi cây/đồ thị không quá sâu</span>
+<span class="kw">def</span> dfs(u, seen):
+    seen.add(u)
+    <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+        <span class="kw">if</span> v <span class="kw">not in</span> seen:
+            dfs(v, seen)
+
+<span class="cm"># bản lặp — bắt buộc khi V lớn (Python giới hạn đệ quy ~1000)</span>
+<span class="kw">def</span> dfs_iter(src):
+    seen = <span class="kw">set</span>()
+    st = [src]
+    <span class="kw">while</span> st:
+        u = st.pop()
+        <span class="kw">if</span> u <span class="kw">in</span> seen: <span class="kw">continue</span>       <span class="cm">← kiểm tra khi LẤY RA</span>
+        seen.add(u)
+        <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+            <span class="kw">if</span> v <span class="kw">not in</span> seen: st.append(v)
+    <span class="kw">return</span> seen</code></pre>
+  <p>DFS không cho đường đi ngắn nhất — nó lao xuống hết một nhánh rồi mới quay lại. Bù lại nó tự nhiên phù hợp với mọi bài về <em>cấu trúc</em>: có chu trình không, các thành phần liên thông, thứ tự phụ thuộc, cầu và khớp.</p>
+</section>
+
+<section id="graph-s5">
+  <div class="sh"><b>05</b><h2>Đánh dấu đã thăm ở đâu — chi tiết hay sai nhất</h2></div>
+  <div class="grid2">
+    <div class="card ok"><h4>BFS — đánh dấu khi ĐƯA VÀO hàng đợi</h4><p>Vì lần đầu chạm tới đỉnh đã là đường ngắn nhất, không cần cân nhắc lại. Nếu chờ tới lúc lấy ra mới đánh dấu, cùng một đỉnh bị đưa vào nhiều lần — hàng đợi phình lên, và với đồ thị dày thì thành O(V²).</p></div>
+    <div class="card bad"><h4>DFS lặp — đánh dấu khi LẤY RA khỏi stack</h4><p>Vì một đỉnh có thể được đẩy vào từ nhiều đỉnh khác trước khi được thăm. Nếu đánh dấu lúc đẩy vào thì vẫn chạy đúng cho bài duyệt đơn giản, nhưng sai thứ tự DFS và làm sai một số biến thể như phát hiện chu trình.</p></div>
+  </div>
+<pre><code>Đồ thị:  A → B, A → C, B → C
+
+BFS đánh dấu lúc lấy ra:
+  hàng đợi: [A] → [B, C] → [C, C]   ← C vào hai lần, thừa việc
+
+BFS đánh dấu lúc đưa vào:
+  hàng đợi: [A] → [B, C] → [C]      ← mỗi đỉnh vào đúng một lần</code></pre>
+  <div class="note key">
+    <h4>Cách nhớ</h4>
+    BFS quan tâm <strong>khoảng cách</strong> — chốt sớm là đúng. DFS quan tâm <strong>thứ tự khám phá</strong> — phải chốt lúc thật sự bước vào. Nói được sự khác biệt này là dấu hiệu rõ ràng của người đã tự viết cả hai chứ không chép mẫu.
+  </div>
+</section>
+
+<section id="graph-s6">
+  <div class="sh"><b>06</b><h2>Lab: BFS đối đầu DFS</h2></div>
+  <p>Cùng một lưới, cùng điểm bắt đầu và đích. Số trong ô là thứ tự thăm.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>thuật toán</label>
+        <select id="gmode">
+          <option value="bfs" selected>BFS — hàng đợi</option>
+          <option value="dfs">DFS — ngăn xếp</option>
+        </select>
+      </div>
+      <button id="gstep">Bước tiếp</button>
+      <button class="ghost" id="gauto">Tự chạy</button>
+      <button class="ghost" id="grst">Đặt lại</button>
+    </div>
+    <div id="gview"></div>
+    <div class="stat">
+      <u>số ô đã thăm <b id="gvis">0</b></u>
+      <u>kích thước hàng đợi / ngăn xếp <b id="gfront">0</b></u>
+      <u>tới đích sau <b id="gfound">–</b></u>
+    </div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Chạy hết BFS rồi DFS. BFS lan ra như gợn nước và chạm đích bằng <strong>đúng số bước ngắn nhất</strong>. DFS lao theo một hướng, tới đích bằng đường dài hơn nhiều — nhưng thường thăm ít ô hơn trước khi tới đó. Đó là toàn bộ đánh đổi giữa hai thuật toán.
+    </p>
+  </div>
+</section>
+
+<section id="graph-s7">
+  <div class="sh"><b>07</b><h2>Thành phần liên thông và flood fill</h2></div>
+<pre><code><span class="cm"># đếm số thành phần liên thông</span>
+<span class="kw">def</span> count_components(n, edges):
+    g = defaultdict(list)
+    <span class="kw">for</span> u, v <span class="kw">in</span> edges: g[u].append(v); g[v].append(u)
+    seen, cnt = <span class="kw">set</span>(), <span class="st">0</span>
+    <span class="kw">for</span> s <span class="kw">in</span> <span class="kw">range</span>(n):              <span class="cm">← phải thử MỌI đỉnh làm điểm bắt đầu</span>
+        <span class="kw">if</span> s <span class="kw">not in</span> seen:
+            cnt += <span class="st">1</span>
+            <span class="cm"># một lần duyệt phủ hết thành phần chứa s</span>
+            q = deque([s]); seen.add(s)
+            <span class="kw">while</span> q:
+                u = q.popleft()
+                <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+                    <span class="kw">if</span> v <span class="kw">not in</span> seen: seen.add(v); q.append(v)
+    <span class="kw">return</span> cnt</code></pre>
+  <p>Khung "vòng ngoài quét mọi đỉnh, vòng trong duyệt một thành phần" là mẫu chuẩn cho cả nhóm bài: đếm đảo, đếm tỉnh, đếm vùng, đếm bạn bè.</p>
+  <h3>Trên lưới — đồ thị ẩn</h3>
+<pre><code>DIRS = [(-<span class="st">1</span>,<span class="st">0</span>), (<span class="st">1</span>,<span class="st">0</span>), (<span class="st">0</span>,-<span class="st">1</span>), (<span class="st">0</span>,<span class="st">1</span>)]      <span class="cm"># 4 hướng; thêm 4 chéo nếu đề cho</span>
+
+<span class="kw">def</span> num_islands(grid):
+    R, C = <span class="kw">len</span>(grid), <span class="kw">len</span>(grid[<span class="st">0</span>])
+    cnt = <span class="st">0</span>
+    <span class="kw">for</span> r <span class="kw">in</span> <span class="kw">range</span>(R):
+        <span class="kw">for</span> c <span class="kw">in</span> <span class="kw">range</span>(C):
+            <span class="kw">if</span> grid[r][c] == <span class="st">"1"</span>:
+                cnt += <span class="st">1</span>
+                q = deque([(r,c)]); grid[r][c] = <span class="st">"0"</span>       <span class="cm"># dìm đảo ngay = đánh dấu</span>
+                <span class="kw">while</span> q:
+                    x, y = q.popleft()
+                    <span class="kw">for</span> dx, dy <span class="kw">in</span> DIRS:
+                        nx, ny = x+dx, y+dy
+                        <span class="kw">if</span> <span class="st">0</span> &lt;= nx &lt; R <span class="kw">and</span> <span class="st">0</span> &lt;= ny &lt; C <span class="kw">and</span> grid[nx][ny] == <span class="st">"1"</span>:
+                            grid[nx][ny] = <span class="st">"0"</span>
+                            q.append((nx, ny))
+    <span class="kw">return</span> cnt                                        <span class="cm"># O(R · C)</span></code></pre>
+  <p>Lưới <code>R × C</code> là đồ thị có <code>V = R·C</code> đỉnh và mỗi đỉnh tối đa 4 cạnh, nên <code>E ≈ 4RC</code> và tổng vẫn là <code>O(RC)</code>. Sửa lưới trực tiếp để đánh dấu tiết kiệm được O(RC) bộ nhớ — nhưng phải nói rõ với interviewer rằng bạn đang phá dữ liệu đầu vào, và hỏi xem có được phép không.</p>
+</section>
+
+<section id="graph-s8">
+  <div class="sh"><b>08</b><h2>Phát hiện chu trình — ba trường hợp khác nhau</h2></div>
+  <h3>Vô hướng — dùng đỉnh cha</h3>
+<pre><code><span class="kw">def</span> has_cycle_undirected(n, g):
+    seen = <span class="kw">set</span>()
+    <span class="kw">def</span> dfs(u, parent):
+        seen.add(u)
+        <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+            <span class="kw">if</span> v == parent: <span class="kw">continue</span>          <span class="cm">← bỏ qua cạnh vừa đi tới, không phải chu trình</span>
+            <span class="kw">if</span> v <span class="kw">in</span> seen: <span class="kw">return</span> <span class="kw">True</span>
+            <span class="kw">if</span> dfs(v, u): <span class="kw">return</span> <span class="kw">True</span>
+        <span class="kw">return</span> <span class="kw">False</span>
+    <span class="kw">return</span> <span class="kw">any</span>(dfs(s, -<span class="st">1</span>) <span class="kw">for</span> s <span class="kw">in</span> <span class="kw">range</span>(n) <span class="kw">if</span> s <span class="kw">not in</span> seen)</code></pre>
+  <p>Trong đồ thị vô hướng, mọi cạnh đều đi được hai chiều nên A–B luôn trông như chu trình độ dài 2. Phải loại trừ đỉnh cha. <em>Lưu ý:</em> nếu đồ thị có hai cạnh song song giữa A và B thì đó <strong>là</strong> chu trình thật — lúc đó phải theo dõi theo chỉ số cạnh chứ không theo đỉnh cha.</p>
+  <h3>Có hướng — ba màu</h3>
+<pre><code><span class="cm"># 0 = chưa thăm, 1 = đang trong ngăn xếp đệ quy, 2 = đã xong</span>
+<span class="kw">def</span> has_cycle_directed(n, g):
+    color = [<span class="st">0</span>] * n
+    <span class="kw">def</span> dfs(u):
+        color[u] = <span class="st">1</span>
+        <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+            <span class="kw">if</span> color[v] == <span class="st">1</span>: <span class="kw">return</span> <span class="kw">True</span>   <span class="cm">← cạnh quay lại đỉnh ĐANG mở = chu trình</span>
+            <span class="kw">if</span> color[v] == <span class="st">0</span> <span class="kw">and</span> dfs(v): <span class="kw">return</span> <span class="kw">True</span>
+        color[u] = <span class="st">2</span>                         <span class="cm"># đóng đỉnh này lại</span>
+        <span class="kw">return</span> <span class="kw">False</span>
+    <span class="kw">return</span> <span class="kw">any</span>(color[s] == <span class="st">0</span> <span class="kw">and</span> dfs(s) <span class="kw">for</span> s <span class="kw">in</span> <span class="kw">range</span>(n))</code></pre>
+  <div class="note warn">
+    <h4>Vì sao đồ thị có hướng cần ba màu, không phải hai</h4>
+    Gặp lại một đỉnh <em>đã xong</em> (màu 2) không phải chu trình — chỉ là hai đường khác nhau cùng dẫn tới đó. Chỉ khi gặp đỉnh <em>đang mở</em> (màu 1), tức đang nằm trong ngăn xếp đệ quy hiện tại, thì mới có chu trình. Dùng một tập <code>seen</code> duy nhất sẽ báo chu trình sai — đây là lỗi kinh điển.
+  </div>
+  <p>Cách thứ ba là Union-Find cho đồ thị vô hướng: gộp hai đỉnh của mỗi cạnh, nếu chúng đã cùng nhóm thì cạnh này tạo chu trình. Gần như O(E) và không cần đệ quy.</p>
+</section>
+
+<section id="graph-s9">
+  <div class="sh"><b>09</b><h2>Topological sort — hai cách</h2></div>
+  <p>Sắp thứ tự các đỉnh của đồ thị có hướng sao cho mọi cạnh đều đi từ trước ra sau. Chỉ tồn tại khi đồ thị <strong>không có chu trình</strong>.</p>
+  <h3>Kahn — BFS theo bậc vào</h3>
+<pre><code><span class="kw">def</span> topo_kahn(n, edges):
+    g = defaultdict(list); indeg = [<span class="st">0</span>] * n
+    <span class="kw">for</span> u, v <span class="kw">in</span> edges:
+        g[u].append(v); indeg[v] += <span class="st">1</span>          <span class="cm"># u phải làm trước v</span>
+    q = deque(u <span class="kw">for</span> u <span class="kw">in</span> <span class="kw">range</span>(n) <span class="kw">if</span> indeg[u] == <span class="st">0</span>)
+    out = []
+    <span class="kw">while</span> q:
+        u = q.popleft(); out.append(u)
+        <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+            indeg[v] -= <span class="st">1</span>                        <span class="cm"># bỏ một điều kiện tiên quyết</span>
+            <span class="kw">if</span> indeg[v] == <span class="st">0</span>: q.append(v)
+    <span class="kw">return</span> out <span class="kw">if</span> <span class="kw">len</span>(out) == n <span class="kw">else</span> []      <span class="cm">← thiếu đỉnh nghĩa là có chu trình</span></code></pre>
+  <div class="note key">
+    <h4>Hai lợi ích của Kahn</h4>
+    Nó <strong>phát hiện chu trình miễn phí</strong>: nếu kết quả có ít hơn n đỉnh thì phần còn lại nằm trong chu trình. Và nó lặp nên không sợ vỡ ngăn xếp. Đây là lý do tôi mặc định dùng Kahn thay vì bản DFS.
+  </div>
+  <h3>DFS — đảo ngược postorder</h3>
+<pre><code><span class="kw">def</span> topo_dfs(n, g):
+    color = [<span class="st">0</span>] * n; out = []
+    <span class="kw">def</span> dfs(u):
+        color[u] = <span class="st">1</span>
+        <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+            <span class="kw">if</span> color[v] == <span class="st">1</span>: <span class="kw">raise</span> ValueError(<span class="st">"có chu trình"</span>)
+            <span class="kw">if</span> color[v] == <span class="st">0</span>: dfs(v)
+        color[u] = <span class="st">2</span>
+        out.append(u)                     <span class="cm"># thêm vào SAU khi xong mọi hậu duệ</span>
+    <span class="kw">for</span> s <span class="kw">in</span> <span class="kw">range</span>(n):
+        <span class="kw">if</span> color[s] == <span class="st">0</span>: dfs(s)
+    <span class="kw">return</span> out[::-<span class="st">1</span>]                      <span class="cm">← đảo ngược mới ra thứ tự topo</span></code></pre>
+  <p>Vì sao phải đảo: một đỉnh chỉ được thêm vào sau khi mọi đỉnh nó trỏ tới đã xong, nên nó xuất hiện <em>sau</em> chúng trong danh sách. Đảo lại thì nó về trước — đúng yêu cầu.</p>
+  <p>Nhóm bài: lịch học môn tiên quyết, thứ tự biên dịch, phát hiện phụ thuộc vòng, giải mã thứ tự chữ cái của một bảng chữ cái ngoài hành tinh.</p>
+</section>
+
+<section id="graph-s10">
+  <div class="sh"><b>10</b><h2>Tô hai màu — kiểm tra đồ thị hai phía</h2></div>
+<pre><code><span class="kw">def</span> is_bipartite(n, g):
+    color = {}
+    <span class="kw">for</span> s <span class="kw">in</span> <span class="kw">range</span>(n):
+        <span class="kw">if</span> s <span class="kw">in</span> color: <span class="kw">continue</span>
+        color[s] = <span class="st">0</span>; q = deque([s])
+        <span class="kw">while</span> q:
+            u = q.popleft()
+            <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+                <span class="kw">if</span> v <span class="kw">not in</span> color:
+                    color[v] = <span class="st">1</span> - color[u]     <span class="cm"># hàng xóm phải khác màu</span>
+                    q.append(v)
+                <span class="kw">elif</span> color[v] == color[u]:
+                    <span class="kw">return</span> <span class="kw">False</span>              <span class="cm"># đụng nhau → có chu trình độ dài lẻ</span>
+    <span class="kw">return</span> <span class="kw">True</span></code></pre>
+  <p>Một đồ thị là hai phía khi và chỉ khi nó <strong>không có chu trình độ dài lẻ</strong>. Vòng lặp ngoài là bắt buộc vì đồ thị có thể không liên thông.</p>
+  <p>Nhóm bài: chia hai nhóm đối kháng, ghép cặp, "có thể chia người thành hai bàn sao cho ai ghét nhau không cùng bàn".</p>
+</section>
+
+<section id="graph-s11">
+  <div class="sh"><b>11</b><h2>BFS nhiều nguồn và 0-1 BFS</h2></div>
+  <h3>Nhiều nguồn — mẹo đơn giản mà mạnh</h3>
+<pre><code><span class="cm"># khoảng cách từ mỗi ô tới ô số 0 GẦN NHẤT</span>
+q = deque()
+<span class="kw">for</span> r <span class="kw">in</span> <span class="kw">range</span>(R):
+    <span class="kw">for</span> c <span class="kw">in</span> <span class="kw">range</span>(C):
+        <span class="kw">if</span> grid[r][c] == <span class="st">0</span>:
+            q.append((r, c)); dist[r][c] = <span class="st">0</span>    <span class="cm">← đẩy TẤT CẢ nguồn vào cùng lúc</span>
+<span class="cm"># rồi BFS bình thường — mỗi ô nhận khoảng cách tới nguồn gần nhất</span></code></pre>
+  <p>Thay vì chạy BFS riêng từ mỗi nguồn — <code>O(k · RC)</code> — ta đẩy hết nguồn vào hàng đợi ban đầu và chạy <em>một lần</em>, ra <code>O(RC)</code>. Bài "cam thối lan ra", "khoảng cách tới cửa gần nhất", "nhiệt lan trong lưới" đều là bài này.</p>
+  <h3>0-1 BFS — khi cạnh chỉ có trọng số 0 hoặc 1</h3>
+<pre><code>dq = deque([src])
+<span class="cm"># khi mở rộng:</span>
+<span class="kw">if</span> w == <span class="st">0</span>: dq.appendleft(v)      <span class="cm"># miễn phí → ưu tiên tuyệt đối</span>
+<span class="kw">else</span>:       dq.append(v)          <span class="cm"># tốn 1 → xếp cuối như BFS thường</span></code></pre>
+  <p>Cho đường đi ngắn nhất trong <code>O(V + E)</code> mà không cần heap, tức nhanh hơn Dijkstra. Dùng cho bài "số lần xoay tối thiểu", "số ô phải phá tối thiểu".</p>
+</section>
+
+<section id="graph-s12">
+  <div class="sh"><b>12</b><h2>BFS trên không gian trạng thái</h2></div>
+  <p>Dạng đề mà chữ "đồ thị" không hề xuất hiện, và cũng là dạng dễ bị bỏ lỡ nhất.</p>
+<pre><code><span class="cm"># mở khoá số 4 vòng, mỗi bước xoay một vòng lên hoặc xuống, tránh các mã tử</span>
+<span class="kw">def</span> open_lock(deadends, target):
+    dead = <span class="kw">set</span>(deadends)
+    <span class="kw">if</span> <span class="st">"0000"</span> <span class="kw">in</span> dead: <span class="kw">return</span> -<span class="st">1</span>
+    q = deque([(<span class="st">"0000"</span>, <span class="st">0</span>)]); seen = {<span class="st">"0000"</span>}
+    <span class="kw">while</span> q:
+        s, d = q.popleft()
+        <span class="kw">if</span> s == target: <span class="kw">return</span> d
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="st">4</span>):                       <span class="cm"># sinh hàng xóm của trạng thái</span>
+            <span class="kw">for</span> step <span class="kw">in</span> (<span class="st">1</span>, -<span class="st">1</span>):
+                nxt = s[:i] + <span class="kw">str</span>((<span class="kw">int</span>(s[i]) + step) % <span class="st">10</span>) + s[i+<span class="st">1</span>:]
+                <span class="kw">if</span> nxt <span class="kw">not in</span> seen <span class="kw">and</span> nxt <span class="kw">not in</span> dead:
+                    seen.add(nxt); q.append((nxt, d + <span class="st">1</span>))
+    <span class="kw">return</span> -<span class="st">1</span></code></pre>
+  <div class="note key">
+    <h4>Ba câu hỏi để chuyển bài lạ thành BFS</h4>
+    <p><strong>Trạng thái là gì?</strong> Ở đây là chuỗi bốn chữ số. Có thể là toạ độ, là tập đã ghé, là bộ (vị trí, nhiên liệu còn lại).</p>
+    <p><strong>Hàng xóm của một trạng thái là gì?</strong> Các trạng thái đi tới được bằng một bước hợp lệ.</p>
+    <p><strong>Mỗi bước có cùng chi phí không?</strong> Có thì BFS. Không thì Dijkstra.</p>
+  </div>
+  <p>Nhóm bài này gồm: biến đổi chuỗi từng chữ, trò chơi xếp ô, số bước nhảy tối thiểu của quân mã, "ít phép biến đổi nhất để từ x thành y". Điểm cần cẩn thận là <strong>tập <code>seen</code> phải lưu trạng thái, không chỉ lưu vị trí</strong> — nếu trạng thái gồm nhiều thành phần thì thiếu thành phần nào là sai ngay.</p>
+</section>
+
+<section id="graph-s13">
+  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
+    <tr><td>"số bước ít nhất", "đường ngắn nhất", cạnh không trọng số</td><td>BFS</td></tr>
+    <tr><td>"đếm đảo / vùng / nhóm", "có đường đi không"</td><td>DFS hoặc BFS, quét mọi đỉnh làm điểm bắt đầu</td></tr>
+    <tr><td>"môn tiên quyết", "thứ tự thực hiện", "phụ thuộc"</td><td>Topological sort — Kahn</td></tr>
+    <tr><td>"có phụ thuộc vòng không", "lịch có khả thi không"</td><td>Ba màu, hoặc Kahn rồi đếm</td></tr>
+    <tr><td>"chia hai nhóm", "ai ghét nhau không cùng bàn"</td><td>Tô hai màu</td></tr>
+    <tr><td>"lan từ nhiều điểm cùng lúc", "tới cái gần nhất"</td><td>BFS nhiều nguồn</td></tr>
+    <tr><td>Cạnh có trọng số dương</td><td>Dijkstra — không phải BFS</td></tr>
+    <tr><td>Cạnh trọng số chỉ 0 hoặc 1</td><td>0-1 BFS với deque</td></tr>
+    <tr><td>"ít phép biến đổi nhất từ A thành B"</td><td>BFS trên không gian trạng thái</td></tr>
+  </table>
+</section>
+
+<section id="graph-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>BFS đánh dấu lúc lấy ra</h4><p>Đỉnh vào hàng đợi nhiều lần, thừa việc và có thể thành O(V²). Đánh dấu ngay lúc đưa vào.</p></div>
+    <div class="card bad"><h4>Dùng một tập seen để bắt chu trình có hướng</h4><p>Báo chu trình sai khi hai đường cùng dẫn tới một đỉnh đã xong. Phải dùng ba màu.</p></div>
+    <div class="card bad"><h4>Quên loại đỉnh cha ở đồ thị vô hướng</h4><p>Mọi cạnh trông như chu trình độ dài 2.</p></div>
+    <div class="card bad"><h4>Chỉ duyệt từ một đỉnh</h4><p>Bỏ sót các thành phần liên thông khác. Vòng lặp ngoài quét mọi đỉnh là bắt buộc.</p></div>
+    <div class="card bad"><h4>Nhồi cả đường đi vào hàng đợi</h4><p>Bộ nhớ O(V²). Lưu <code>parent</code> rồi dựng lại đường sau.</p></div>
+    <div class="card bad"><h4>Dùng BFS cho đồ thị có trọng số</h4><p>Không cho đường ngắn nhất. Phải Dijkstra, hoặc 0-1 BFS nếu trọng số chỉ là 0 và 1.</p></div>
+  </div>
+</section>
+
+<section id="graph-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>BFS và DFS khác nhau ở đâu, chọn cái nào khi nào?</summary>
+  <p>Khác nhau duy nhất ở cấu trúc chứa đỉnh đang chờ: BFS dùng queue nên lan theo tầng, DFS dùng stack nên lao theo nhánh. Cả hai đều O(V+E). Chọn BFS khi cần <b>đường đi ngắn nhất trên đồ thị không trọng số</b>, hoặc khi đáp án ở gần điểm bắt đầu. Chọn DFS cho mọi bài về cấu trúc — liên thông, chu trình, thứ tự topo — và khi cần tiết kiệm bộ nhớ trên đồ thị rộng, vì DFS chỉ giữ một đường còn BFS giữ cả một tầng.</p></details>
+
+  <details class="qa"><summary>Vì sao BFS phải đánh dấu đã thăm lúc đưa vào hàng đợi?</summary>
+  <p>Vì lần đầu chạm tới một đỉnh đã là đường ngắn nhất tới nó, nên không có lý do gì xét lại. Nếu chờ tới lúc lấy ra mới đánh dấu, cùng một đỉnh có thể bị đưa vào từ nhiều đỉnh khác nhau trước đó — hàng đợi phình lên và với đồ thị dày thì chi phí thành O(V²). Với DFS lặp thì ngược lại: phải kiểm tra lúc lấy ra, vì một đỉnh có thể được đẩy vào nhiều lần trước khi thực sự được thăm.</p></details>
+
+  <details class="qa"><summary>Phát hiện chu trình trong đồ thị có hướng — vì sao cần ba màu?</summary>
+  <p>Vì gặp lại một đỉnh đã xử lý xong không phải chu trình, chỉ là hai đường khác nhau cùng dẫn tới đó. Chu trình chỉ xảy ra khi gặp đỉnh <em>đang nằm trong ngăn xếp đệ quy hiện tại</em>. Ba màu phân biệt được: chưa thăm, đang mở, đã xong. Dùng một tập <code>seen</code> duy nhất sẽ báo chu trình sai. Với đồ thị vô hướng thì đơn giản hơn: chỉ cần loại trừ đỉnh cha, hoặc dùng Union-Find.</p></details>
+
+  <details class="qa"><summary>Giải thích topological sort và cách phát hiện chu trình kèm theo.</summary>
+  <p>Đó là thứ tự các đỉnh sao cho mọi cạnh đi từ trước ra sau, chỉ tồn tại nếu đồ thị không có chu trình. Thuật toán Kahn: đếm bậc vào, đưa các đỉnh bậc vào 0 vào hàng đợi, lấy ra và giảm bậc vào của các đỉnh kề, đỉnh nào về 0 thì thêm vào hàng đợi. Nếu kết quả có ít hơn n đỉnh thì phần thiếu nằm trong chu trình — <b>phát hiện chu trình miễn phí</b>. Cách khác là DFS rồi đảo ngược postorder, nhưng bản Kahn lặp nên không sợ vỡ ngăn xếp.</p></details>
+
+  <details class="qa"><summary>Có 10 nguồn, cần khoảng cách từ mỗi ô tới nguồn gần nhất. Bạn chạy BFS 10 lần?</summary>
+  <p>Không. Đẩy toàn bộ 10 nguồn vào hàng đợi ngay từ đầu với khoảng cách 0, rồi chạy BFS một lần. Mỗi ô sẽ được chạm bởi nguồn gần nhất trước tiên, vì BFS mở rộng đồng thời theo tầng từ mọi nguồn. Chi phí O(RC) thay vì O(k·RC). Đây là kỹ thuật BFS nhiều nguồn, dùng cho bài cam thối, cửa gần nhất, hay lan nhiệt.</p></details>
+
+  <details class="qa"><summary>Đề không nhắc gì đến đồ thị nhưng bạn vẫn dùng BFS — khi nào?</summary>
+  <p>Khi bài có <em>trạng thái</em> và <em>bước chuyển</em> chi phí bằng nhau. Tôi tự hỏi ba câu: trạng thái là gì, hàng xóm của một trạng thái là gì, mỗi bước có cùng chi phí không. Ví dụ bài mở khoá bốn vòng số: trạng thái là chuỗi bốn chữ số, hàng xóm là tám chuỗi xoay được, mỗi bước tốn 1 — vậy là BFS trên đồ thị 10⁴ đỉnh. Điểm dễ sai là tập <code>seen</code> phải lưu toàn bộ trạng thái, không chỉ một phần như vị trí.</p></details>
+</section>
+
+<footer>Deep dive · đồ thị · mọi đoạn code chạy được nguyên trạng trên Python 3 với collections.deque và defaultdict.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

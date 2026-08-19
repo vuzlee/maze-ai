@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtracking — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-backtrack" data-title="Backtracking" data-tag="Kỹ thuật" data-blurb="Khung sáu dòng cho subsets, permutations, N-Queens. Vì sao phải hoàn tác, cách bỏ trùng, và cắt tỉa.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · duyệt có quay lui</p>
+  <h1>Backtracking —<br><em>thử, sai, hoàn tác</em></h1>
+  <p class="lede">Một khung sáu dòng giải subsets, permutations, N-Queens, sudoku, word search. Bài này chốt <b>ba câu hỏi</b> phải trả lời trước khi code, vì sao <b>bắt buộc hoàn tác</b>, cách xử lý phần tử trùng lặp, và <b>cắt tỉa</b> — thứ quyết định pass hay timeout.</p>
+</header>
+
+
+<section id="backtrack-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+  <p>Backtracking là <strong>DFS trên cây quyết định</strong>. Cây đó không tồn tại trong bộ nhớ — nó được sinh ra khi đi và biến mất khi quay lại.</p>
+<pre><code>Tập [1,2] — cây quyết định của bài subsets:
+
+                    []
+              /            \
+         chọn 1            bỏ 1
+           [1]               []
+        /      \          /      \
+   chọn 2    bỏ 2    chọn 2    bỏ 2
+    [1,2]     [1]      [2]       []
+
+4 lá = 4 tập con = 2²</code></pre>
+  <p>Mỗi nút là một <em>lời giải dở dang</em>. Mỗi cạnh là một <em>quyết định</em>. Lá là lời giải hoàn chỉnh, hoặc là ngõ cụt cần quay lại.</p>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Đi xuống thì <strong>chọn</strong>, đi lên thì <strong>bỏ chọn</strong>. Trạng thái phải được trả về đúng như trước khi bước vào nhánh — nếu không, nhánh kế bên sẽ làm việc trên dữ liệu bị bẩn.
+  </div>
+</section>
+
+<section id="backtrack-s2">
+  <div class="sh"><b>02</b><h2>Ba câu hỏi bắt buộc trước khi code</h2></div>
+  <p>Đừng viết dòng nào trước khi trả lời được ba câu này. Trả lời xong thì code gần như tự viết ra.</p>
+  <table>
+    <tr><th>Câu hỏi</th><th>Trong bài subsets</th><th>Trong bài N-Queens</th></tr>
+    <tr><td><strong>1. Lựa chọn</strong> — ở mỗi bước tôi có những khả năng nào?</td><td>Lấy hoặc không lấy phần tử thứ i</td><td>Đặt quân hậu vào một trong n cột của hàng hiện tại</td></tr>
+    <tr><td><strong>2. Ràng buộc</strong> — lựa chọn nào không hợp lệ?</td><td>Không có ràng buộc</td><td>Cột hoặc đường chéo đã bị chiếm</td></tr>
+    <tr><td><strong>3. Đích</strong> — khi nào một lời giải là hoàn chỉnh?</td><td>Đã quyết định xong mọi phần tử</td><td>Đã đặt đủ n quân</td></tr>
+  </table>
+  <p>Câu thứ tư nên hỏi thêm: <strong>trạng thái nào cần mang theo?</strong> Đó là những gì phải truyền qua tham số hoặc lưu ngoài — danh sách đang dựng, tập cột đã dùng, tổng hiện tại.</p>
+</section>
+
+<section id="backtrack-s3">
+  <div class="sh"><b>03</b><h2>Khung chuẩn</h2></div>
+<pre><code><span class="kw">def</span> backtrack(state, path, out):
+    <span class="kw">if</span> is_goal(state):
+        out.append(path[:])            <span class="cm">← COPY, xem mục 14</span>
+        <span class="kw">return</span>
+    <span class="kw">for</span> choice <span class="kw">in</span> candidates(state):
+        <span class="kw">if</span> <span class="kw">not</span> valid(choice, state): <span class="kw">continue</span>   <span class="cm"># cắt tỉa</span>
+        path.append(choice)            <span class="cm"># 1. chọn</span>
+        apply(choice, state)
+        backtrack(state, path, out)    <span class="cm"># 2. đi sâu</span>
+        undo(choice, state)            <span class="cm"># 3. hoàn tác</span>
+        path.pop()</code></pre>
+  <p>Sáu dòng đó là toàn bộ backtracking. Mọi bài chỉ khác nhau ở việc điền vào <code>is_goal</code>, <code>candidates</code>, và <code>valid</code>.</p>
+  <div class="note">
+    <h4>Hai kiểu vòng lặp lựa chọn</h4>
+    <p><strong>Nhị phân</strong> — với mỗi phần tử, lấy hoặc không lấy. Cây sâu <code>n</code>, mỗi nút hai nhánh. Dùng cho subsets, chia tập, bài tổng con.</p>
+    <p><strong>Theo vòng lặp</strong> — tại mỗi bước thử mọi ứng viên còn lại, thường kèm tham số <code>start</code> để không lặp lại. Dùng cho combinations, permutations, N-Queens.</p>
+  </div>
+</section>
+
+<section id="backtrack-s4">
+  <div class="sh"><b>04</b><h2>Vì sao bắt buộc hoàn tác</h2></div>
+<pre><code>Không hoàn tác:
+    path.append(choice)
+    backtrack(...)
+    <span class="cm"># thiếu path.pop()</span>
+
+Kết quả với [1,2]:
+    nhánh "chọn 1" xong, path = [1]
+    nhánh "bỏ 1" bắt đầu với path = [1]     ← BẨN, đáng lẽ phải là []
+    → mọi kết quả sau đó đều sai</code></pre>
+  <p>Cấu trúc <code>path</code> được <strong>chia sẻ giữa mọi nhánh</strong> để tiết kiệm bộ nhớ. Cái giá là ta phải tự tay trả nó về nguyên trạng. Đây là hợp đồng của backtracking.</p>
+  <h3>Cách khác: truyền bản sao, không cần hoàn tác</h3>
+<pre><code><span class="cm"># không cần undo, nhưng tốn O(n) bộ nhớ mỗi lần gọi</span>
+<span class="kw">def</span> subsets_copy(nums, i=<span class="st">0</span>, path=()):
+    <span class="kw">if</span> i == <span class="kw">len</span>(nums):
+        <span class="kw">return</span> [<span class="kw">list</span>(path)]
+    <span class="kw">return</span> subsets_copy(nums, i+<span class="st">1</span>, path + (nums[i],)) \
+         + subsets_copy(nums, i+<span class="st">1</span>, path)</code></pre>
+  <p>Bản này ngắn và không bao giờ có bug bẩn trạng thái, nhưng cấp phát một tuple mới ở mỗi nút. Với <code>n</code> nhỏ thì không sao; bài lớn thì dùng bản có hoàn tác. Nêu được cả hai và đánh đổi giữa chúng là câu trả lời tốt.</p>
+</section>
+
+<section id="backtrack-s5">
+  <div class="sh"><b>05</b><h2>Subsets — 2ⁿ</h2></div>
+<pre><code><span class="cm"># cách 1: chọn / không chọn — theo đúng cây ở mục 01</span>
+<span class="kw">def</span> subsets(nums):
+    out, path = [], []
+    <span class="kw">def</span> go(i):
+        <span class="kw">if</span> i == <span class="kw">len</span>(nums):
+            out.append(path[:]); <span class="kw">return</span>
+        path.append(nums[i]); go(i+<span class="st">1</span>); path.pop()   <span class="cm"># chọn rồi hoàn tác</span>
+        go(i+<span class="st">1</span>)                                  <span class="cm"># không chọn</span>
+    go(<span class="st">0</span>)
+    <span class="kw">return</span> out
+
+<span class="cm"># cách 2: vòng lặp với start — mọi nút đều là một tập con hợp lệ</span>
+<span class="kw">def</span> subsets2(nums):
+    out, path = [], []
+    <span class="kw">def</span> go(start):
+        out.append(path[:])                <span class="cm">← ghi ở MỌI nút, không chỉ ở lá</span>
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(start, <span class="kw">len</span>(nums)):
+            path.append(nums[i])
+            go(i + <span class="st">1</span>)                     <span class="cm"># i+1 để không dùng lại phần tử</span>
+            path.pop()
+    go(<span class="st">0</span>)
+    <span class="kw">return</span> out</code></pre>
+  <p>Hai cách cho cùng 2ⁿ tập con, chỉ khác thứ tự sinh. Cách 2 tự nhiên hơn khi đề yêu cầu <em>tập con có k phần tử</em> — chỉ cần thêm điều kiện <code>if len(path) == k</code>.</p>
+  <p><strong>Độ phức tạp:</strong> <code>O(n · 2ⁿ)</code>. Có 2ⁿ tập con và mỗi lần chép <code>path</code> tốn O(n). Nói "O(2ⁿ)" là chưa đủ chính xác — hệ số n đến từ việc chép, và interviewer để ý chi tiết này.</p>
+</section>
+
+<section id="backtrack-s6">
+  <div class="sh"><b>06</b><h2>Permutations — n!</h2></div>
+<pre><code><span class="cm"># cách 1: mảng used — rõ ràng nhất</span>
+<span class="kw">def</span> permute(nums):
+    n = <span class="kw">len</span>(nums)
+    out, path, used = [], [], [<span class="kw">False</span>] * n
+    <span class="kw">def</span> go():
+        <span class="kw">if</span> <span class="kw">len</span>(path) == n:
+            out.append(path[:]); <span class="kw">return</span>
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n):
+            <span class="kw">if</span> used[i]: <span class="kw">continue</span>          <span class="cm"># mỗi phần tử dùng đúng một lần</span>
+            used[i] = <span class="kw">True</span>;  path.append(nums[i])
+            go()
+            used[i] = <span class="kw">False</span>; path.pop()   <span class="cm"># hoàn tác CẢ HAI thứ</span>
+    go()
+    <span class="kw">return</span> out
+
+<span class="cm"># cách 2: đổi chỗ tại chỗ — O(1) bộ nhớ phụ ngoài kết quả</span>
+<span class="kw">def</span> permute_swap(nums):
+    out = []
+    <span class="kw">def</span> go(k):
+        <span class="kw">if</span> k == <span class="kw">len</span>(nums):
+            out.append(nums[:]); <span class="kw">return</span>
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(k, <span class="kw">len</span>(nums)):
+            nums[k], nums[i] = nums[i], nums[k]   <span class="cm"># đưa ứng viên lên vị trí k</span>
+            go(k + <span class="st">1</span>)
+            nums[k], nums[i] = nums[i], nums[k]   <span class="cm"># đổi lại — chính là hoàn tác</span>
+    go(<span class="st">0</span>)
+    <span class="kw">return</span> out</code></pre>
+  <p>Khác biệt giữa subsets và permutations nằm ở vòng lặp: subsets dùng <code>range(start, n)</code> nên không quay lại phần tử đã qua — <em>thứ tự không quan trọng</em>. Permutations dùng <code>range(0, n)</code> với mảng <code>used</code> nên mọi thứ tự đều được sinh.</p>
+  <p><strong>Độ phức tạp:</strong> <code>O(n · n!)</code>. Với <code>n = 10</code> đã là 36 triệu thao tác — nên đề dạng này luôn có <code>n</code> rất nhỏ. Nhìn ràng buộc <code>n ≤ 8</code> thì gần như chắc chắn là hoán vị hoặc quay lui.</p>
+</section>
+
+<section id="backtrack-s7">
+  <div class="sh"><b>07</b><h2>Lab: cây quyết định</h2></div>
+  <p>Từng bước một, kèm cả bước hoàn tác. Để ý số bước hoàn tác gần bằng số bước chọn — đó là nửa công việc của thuật toán.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>bài toán</label>
+        <select id="kmode">
+          <option value="subsets" selected>subsets — 2ⁿ</option>
+          <option value="perm">permutations — n!</option>
+          <option value="comb">tổ hợp k = 2</option>
+        </select>
+      </div>
+      <div><label>tập đầu vào</label><input type="text" id="karr" value="1 2 3" style="width:130px"></div>
+      <button id="kstep">Bước tiếp</button>
+      <button class="ghost" id="kauto">Tự chạy</button>
+      <button class="ghost" id="krst">Đặt lại</button>
+    </div>
+    <div id="kview"></div>
+    <div class="stat">
+      <u>đang dựng <b id="kpath">[]</b></u>
+      <u>độ sâu <b id="kdepth">0</b></u>
+      <u>đã chọn / đã hoàn tác <b id="kcnt">0 / 0</b></u>
+      <u>kết quả tìm được <b id="kres">0</b></u>
+    </div>
+    <div class="steps" id="klog"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      So <code>subsets</code> với <code>permutations</code> trên cùng tập ba phần tử: 8 kết quả so với 6, nhưng cây của permutations sâu hơn và rẽ nhiều hơn ở tầng đầu. Đổi sang tập bốn phần tử để thấy 2ⁿ và n! rời xa nhau.
+    </p>
+  </div>
+</section>
+
+<section id="backtrack-s8">
+  <div class="sh"><b>08</b><h2>Xử lý phần tử trùng</h2></div>
+  <p>Đầu vào <code>[1, 2, 2]</code> mà đề yêu cầu <strong>không có kết quả lặp lại</strong>. Cách sai là dùng set để lọc cuối — đúng kết quả nhưng tốn công vô ích và interviewer sẽ hỏi cách tốt hơn.</p>
+<pre><code><span class="kw">def</span> subsets_dup(nums):
+    nums.sort()                              <span class="cm">← BẮT BUỘC: dồn các giá trị bằng nhau lại</span>
+    out, path = [], []
+    <span class="kw">def</span> go(start):
+        out.append(path[:])
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(start, <span class="kw">len</span>(nums)):
+            <span class="kw">if</span> i &gt; start <span class="kw">and</span> nums[i] == nums[i-<span class="st">1</span>]:
+                <span class="kw">continue</span>                     <span class="cm"># bỏ qua bản trùng ở CÙNG một tầng</span>
+            path.append(nums[i])
+            go(i + <span class="st">1</span>)
+            path.pop()
+    go(<span class="st">0</span>)
+    <span class="kw">return</span> out</code></pre>
+  <div class="note key">
+    <h4>Vì sao là <code>i &gt; start</code> chứ không phải <code>i &gt; 0</code></h4>
+    Điều kiện <code>i &gt; start</code> nghĩa là: <em>trong cùng một tầng của cây</em>, chỉ nhánh đầu tiên trong nhóm giá trị bằng nhau được đi. Còn <code>i == start</code> luôn được phép, vì đó là lần dùng giá trị này ở tầng sâu hơn — hoàn toàn hợp lệ. Viết <code>i &gt; 0</code> sẽ chặn luôn cả <code>[2,2]</code>, làm mất kết quả đúng.
+  </div>
+<pre><code>[1,2,2] → cây với điều kiện bỏ trùng:
+
+tầng 0: chọn 1 ✓   chọn 2(vị trí 1) ✓   chọn 2(vị trí 2) ✗ bỏ — trùng cùng tầng
+tầng 1 (sau khi chọn 2 ở vị trí 1): chọn 2(vị trí 2) ✓ — i == start, hợp lệ
+
+kết quả: [] [1] [1,2] [1,2,2] [2] [2,2]   ← không có bản lặp</code></pre>
+  <p>Với permutations có phần tử trùng thì điều kiện tương tự nhưng dựa trên <code>used</code>: bỏ qua khi <code>nums[i] == nums[i-1] and not used[i-1]</code> — nghĩa là bản trùng phía trước chưa được dùng, tức ta đang ở cùng một tầng.</p>
+</section>
+
+<section id="backtrack-s9">
+  <div class="sh"><b>09</b><h2>Cắt tỉa — thứ quyết định pass hay timeout</h2></div>
+  <p>Backtracking không cắt tỉa là duyệt vét cạn. Cắt tỉa tốt có thể giảm không gian tìm kiếm hàng nghìn lần mà không đổi độ phức tạp trên giấy.</p>
+  <table>
+    <tr><th>Kỹ thuật</th><th>Cách làm</th><th>Ví dụ</th></tr>
+    <tr><td>Dừng sớm khi vượt ngưỡng</td><td>Kiểm tra ràng buộc <em>trước</em> khi đi sâu</td><td>Tổng đã vượt target → không cần thử thêm</td></tr>
+    <tr><td>Sắp xếp trước</td><td>Sắp tăng dần rồi <code>break</code> khi phần tử đã quá lớn</td><td>Bài combination sum</td></tr>
+    <tr><td>Đếm khả thi</td><td>Nếu số phần tử còn lại không đủ để hoàn thành thì thôi</td><td>Cần k phần tử mà còn ít hơn k</td></tr>
+    <tr><td>Ràng buộc tăng dần</td><td>Duy trì tập đã dùng để kiểm tra hợp lệ trong O(1)</td><td>Cột và đường chéo của N-Queens</td></tr>
+    <tr><td>Ghi nhớ trạng thái</td><td>Cùng trạng thái đã xét thì bỏ qua</td><td>Ranh giới với quy hoạch động</td></tr>
+  </table>
+<pre><code><span class="cm"># combination sum: sắp xếp + break, hai dòng đổi được thời gian chạy hàng chục lần</span>
+<span class="kw">def</span> comb_sum(nums, target):
+    nums.sort()
+    out, path = [], []
+    <span class="kw">def</span> go(start, remain):
+        <span class="kw">if</span> remain == <span class="st">0</span>:
+            out.append(path[:]); <span class="kw">return</span>
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(start, <span class="kw">len</span>(nums)):
+            <span class="kw">if</span> nums[i] &gt; remain: <span class="kw">break</span>       <span class="cm">← đã sắp nên phần tử sau càng lớn, dừng luôn</span>
+            path.append(nums[i])
+            go(i, remain - nums[i])         <span class="cm"># i chứ không i+1: cho phép dùng lại</span>
+            path.pop()
+    go(<span class="st">0</span>, target)
+    <span class="kw">return</span> out</code></pre>
+  <div class="note warn">
+    <h4>Cắt tỉa phải đặt đúng chỗ</h4>
+    Kiểm tra ràng buộc <em>trước khi</em> gọi đệ quy, không phải ở đầu hàm con. Kiểm tra sau khi đã bước vào nghĩa là bạn vẫn trả giá cho một lần gọi hàm và một lần append — với 2ⁿ nhánh thì khoản đó không nhỏ.
+  </div>
+</section>
+
+<section id="backtrack-s10">
+  <div class="sh"><b>10</b><h2>N-Queens</h2></div>
+  <p>Bài mẫu cho việc <em>duy trì ràng buộc tăng dần</em> thay vì kiểm tra lại từ đầu.</p>
+<pre><code><span class="kw">def</span> n_queens(n):
+    cols, diag, anti = <span class="kw">set</span>(), <span class="kw">set</span>(), <span class="kw">set</span>()
+    out, pos = [], []
+    <span class="kw">def</span> go(r):
+        <span class="kw">if</span> r == n:
+            out.append(pos[:]); <span class="kw">return</span>
+        <span class="kw">for</span> c <span class="kw">in</span> <span class="kw">range</span>(n):
+            <span class="kw">if</span> c <span class="kw">in</span> cols <span class="kw">or</span> (r-c) <span class="kw">in</span> diag <span class="kw">or</span> (r+c) <span class="kw">in</span> anti:
+                <span class="kw">continue</span>                          <span class="cm"># kiểm tra O(1)</span>
+            cols.add(c); diag.add(r-c); anti.add(r+c); pos.append(c)
+            go(r + <span class="st">1</span>)
+            cols.remove(c); diag.remove(r-c); anti.remove(r+c); pos.pop()
+    go(<span class="st">0</span>)
+    <span class="kw">return</span> out</code></pre>
+  <div class="note key">
+    <h4>Hai công thức đáng nhớ</h4>
+    Trên một đường chéo chính, <code>r - c</code> là hằng số. Trên một đường chéo phụ, <code>r + c</code> là hằng số. Nhờ hai công thức này, kiểm tra hợp lệ chỉ mất O(1) thay vì quét cả bàn O(n). Đây là ý tưởng đắt giá nhất của bài, và interviewer chờ nghe nó.
+  </div>
+  <p>Đặt mỗi hàng đúng một quân là một dạng cắt tỉa ngay trong thiết kế: nó loại bỏ toàn bộ nhánh có hai quân cùng hàng mà không cần kiểm tra gì. Nhờ vậy, thay vì <code>C(n², n)</code> cách đặt, ta chỉ xét <code>n!</code> — và cắt tỉa cột với chéo còn giảm nữa.</p>
+</section>
+
+<section id="backtrack-s11">
+  <div class="sh"><b>11</b><h2>Tìm chữ trên lưới</h2></div>
+  <p>Backtracking trên lưới, với một chi tiết đặc trưng: <strong>đánh dấu tạm rồi trả lại</strong>.</p>
+<pre><code><span class="kw">def</span> exist(board, word):
+    R, C = <span class="kw">len</span>(board), <span class="kw">len</span>(board[<span class="st">0</span>])
+    <span class="kw">def</span> go(r, c, k):
+        <span class="kw">if</span> k == <span class="kw">len</span>(word): <span class="kw">return</span> <span class="kw">True</span>
+        <span class="kw">if</span> <span class="kw">not</span> (<span class="st">0</span> &lt;= r &lt; R <span class="kw">and</span> <span class="st">0</span> &lt;= c &lt; C): <span class="kw">return</span> <span class="kw">False</span>
+        <span class="kw">if</span> board[r][c] != word[k]: <span class="kw">return</span> <span class="kw">False</span>       <span class="cm"># cắt tỉa mạnh nhất</span>
+
+        tmp = board[r][c]
+        board[r][c] = <span class="st">"#"</span>                              <span class="cm"># đánh dấu đang dùng</span>
+        found = (go(r+<span class="st">1</span>,c,k+<span class="st">1</span>) <span class="kw">or</span> go(r-<span class="st">1</span>,c,k+<span class="st">1</span>) <span class="kw">or</span>
+                 go(r,c+<span class="st">1</span>,k+<span class="st">1</span>) <span class="kw">or</span> go(r,c-<span class="st">1</span>,k+<span class="st">1</span>))
+        board[r][c] = tmp                             <span class="cm">← trả lại, đây là bước hoàn tác</span>
+        <span class="kw">return</span> found
+    <span class="kw">return</span> <span class="kw">any</span>(go(r, c, <span class="st">0</span>) <span class="kw">for</span> r <span class="kw">in</span> <span class="kw">range</span>(R) <span class="kw">for</span> c <span class="kw">in</span> <span class="kw">range</span>(C))</code></pre>
+  <p>Vì sao phải trả lại ô: một ô không dùng được <em>hai lần trong cùng một đường đi</em>, nhưng hoàn toàn dùng được ở một đường đi khác bắt đầu từ chỗ khác. Nếu đánh dấu vĩnh viễn như BFS thì các đường đi sau bị chặn oan.</p>
+  <div class="note">
+    <h4>Khác biệt cốt lõi so với BFS/DFS ở bài đồ thị</h4>
+    Ở bài đếm đảo, ta đánh dấu <strong>vĩnh viễn</strong> vì mỗi ô chỉ thuộc một thành phần. Ở backtracking, ta đánh dấu <strong>tạm thời</strong> vì đang tìm đường đi và mỗi đường có tập ô riêng. Nhầm hai chuyện này là lỗi khá phổ biến — và giải thích được sự khác biệt là một câu trả lời mạnh.
+  </div>
+</section>
+
+<section id="backtrack-s12">
+  <div class="sh"><b>12</b><h2>Tính độ phức tạp</h2></div>
+<pre><code>Tổng chi phí = (số nút của cây quyết định) × (công việc tại mỗi nút)</code></pre>
+  <table>
+    <tr><th>Bài</th><th>Số kết quả</th><th>Độ phức tạp</th><th>n tối đa thực tế</th></tr>
+    <tr><td>Subsets</td><td>2ⁿ</td><td>O(n · 2ⁿ)</td><td>~20</td></tr>
+    <tr><td>Permutations</td><td>n!</td><td>O(n · n!)</td><td>~10</td></tr>
+    <tr><td>Tổ hợp k phần tử</td><td>C(n,k)</td><td>O(k · C(n,k))</td><td>tuỳ k</td></tr>
+    <tr><td>N-Queens</td><td>ít hơn nhiều n!</td><td>O(n!) chặn trên</td><td>~12</td></tr>
+    <tr><td>Word search</td><td>—</td><td>O(R·C·4^L)</td><td>L ngắn</td></tr>
+  </table>
+  <p>Hệ số <code>n</code> hay <code>k</code> phía trước đến từ việc <strong>chép lời giải</strong> khi ghi vào kết quả. Bỏ qua nó là câu trả lời chưa đầy đủ.</p>
+  <div class="note key">
+    <h4>Đọc ràng buộc để nhận ra đề backtracking</h4>
+    <code>n ≤ 20</code> ngụ ý <code>2ⁿ</code>, tức duyệt tập con hoặc quy hoạch động trên bitmask. <code>n ≤ 10</code> ngụ ý <code>n!</code>, tức hoán vị. Ràng buộc nhỏ bất thường là tín hiệu rõ nhất — nối trực tiếp với bảng ngưỡng trong bài Big-O.
+  </div>
+  <p><strong>Bộ nhớ:</strong> O(độ sâu cây) cho ngăn xếp đệ quy và cho <code>path</code>, không tính dung lượng lưu kết quả. Nói rõ hai phần này riêng ra.</p>
+</section>
+
+<section id="backtrack-s13">
+  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
+    <tr><td>"liệt kê tất cả", "in ra mọi cách"</td><td>Backtracking — phải sinh hết nên không tránh được mũ</td></tr>
+    <tr><td>"tất cả tập con", "chia thành hai nhóm"</td><td>Cây nhị phân chọn / không chọn</td></tr>
+    <tr><td>"mọi thứ tự có thể", "sắp xếp lại"</td><td>Permutations với mảng used</td></tr>
+    <tr><td>"tổ hợp có tổng bằng k"</td><td>Vòng lặp với start + sắp xếp + break</td></tr>
+    <tr><td>Có phần tử trùng, không muốn kết quả lặp</td><td>Sắp xếp rồi bỏ qua khi <code>i &gt; start</code> và trùng</td></tr>
+    <tr><td>"đặt quân", "điền ô", sudoku, ghép hình</td><td>Backtracking với ràng buộc tăng dần</td></tr>
+    <tr><td>"có tồn tại một cách nào không" — chỉ cần đúng/sai</td><td>Backtracking trả về bool, dừng ngay khi tìm thấy</td></tr>
+    <tr><td>"đếm SỐ cách" mà không cần liệt kê</td><td>Thường là quy hoạch động, không phải backtracking</td></tr>
+  </table>
+  <p>Dòng cuối quan trọng: nếu đề chỉ hỏi <em>số lượng</em> hoặc <em>giá trị tối ưu</em> chứ không cần danh sách, khả năng cao có lời giải DP nhanh hơn nhiều. Backtracking là bắt buộc chỉ khi phải liệt kê từng lời giải.</p>
+</section>
+
+<section id="backtrack-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Quên chép khi ghi kết quả</h4><p><code>out.append(path)</code> lưu <em>tham chiếu</em>. Sau khi hoàn tác hết, mọi phần tử trong <code>out</code> đều thành list rỗng. Phải viết <code>path[:]</code>.</p></div>
+    <div class="card bad"><h4>Quên hoàn tác một phần trạng thái</h4><p>Nhớ <code>path.pop()</code> nhưng quên <code>used[i] = False</code>. Kết quả thiếu nhánh, rất khó tìm.</p></div>
+    <div class="card bad"><h4>Dùng <code>i &gt; 0</code> thay vì <code>i &gt; start</code> khi bỏ trùng</h4><p>Chặn luôn cả kết quả hợp lệ như <code>[2,2]</code>.</p></div>
+    <div class="card bad"><h4>Đánh dấu vĩnh viễn trong bài tìm đường</h4><p>Chặn oan các đường đi khác. Đánh dấu tạm rồi trả lại.</p></div>
+    <div class="card bad"><h4>Cắt tỉa sau khi đã gọi đệ quy</h4><p>Vẫn trả giá cho lần gọi hàm. Kiểm tra trước khi đi sâu.</p></div>
+    <div class="card bad"><h4>Dùng backtracking cho bài chỉ hỏi số lượng</h4><p>Timeout. Nếu không cần liệt kê thì tìm lời giải DP.</p></div>
+  </div>
+</section>
+
+<section id="backtrack-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Backtracking là gì, khác duyệt vét cạn ở đâu?</summary>
+  <p>Là DFS trên cây quyết định, trong đó ta chọn, đi sâu, rồi <b>hoàn tác</b> để thử nhánh khác. Khác vét cạn ở phần <em>cắt tỉa</em>: khi biết một nhánh không thể dẫn tới lời giải, ta bỏ nó ngay chứ không đi hết. Về tiệm cận thì thường vẫn là mũ, nhưng cắt tỉa tốt giảm không gian thực tế hàng nghìn lần — đó là phần quyết định pass hay timeout.</p></details>
+
+  <details class="qa"><summary>Vì sao phải hoàn tác, và vì sao phải chép khi ghi kết quả?</summary>
+  <p>Hai mặt của cùng một chuyện: <code>path</code> được chia sẻ giữa mọi nhánh để tiết kiệm bộ nhớ. Vì chia sẻ nên phải trả nó về nguyên trạng trước khi rời một nhánh, nếu không nhánh kế bên làm việc trên dữ liệu bẩn. Và cũng vì chia sẻ nên khi ghi kết quả phải chép <code>path[:]</code> — lưu tham chiếu thì sau khi hoàn tác hết, mọi phần tử trong danh sách kết quả đều rỗng.</p></details>
+
+  <details class="qa"><summary>Đầu vào có phần tử trùng, làm sao không sinh kết quả lặp?</summary>
+  <p>Sắp xếp trước để các giá trị bằng nhau nằm cạnh nhau, rồi trong vòng lặp bỏ qua khi <code>i &gt; start and nums[i] == nums[i-1]</code>. Điều kiện <code>i &gt; start</code> là mấu chốt: nó chỉ chặn bản trùng <em>trong cùng một tầng</em> của cây, còn <code>i == start</code> vẫn được phép vì đó là lần dùng ở tầng sâu hơn — hoàn toàn hợp lệ. Viết <code>i &gt; 0</code> sẽ mất luôn kết quả đúng như <code>[2,2]</code>. Cách này tốt hơn lọc bằng set ở cuối vì không tốn công sinh rồi bỏ.</p></details>
+
+  <details class="qa"><summary>Độ phức tạp của subsets và permutations?</summary>
+  <p>Subsets là <code>O(n · 2ⁿ)</code>: có 2ⁿ tập con, mỗi lần ghi kết quả tốn O(n) để chép. Permutations là <code>O(n · n!)</code> với cùng lý do. Hệ số n phía trước đến từ việc chép lời giải, nói riêng <code>O(2ⁿ)</code> là chưa đầy đủ. Bộ nhớ là O(n) cho ngăn xếp và path, không tính chỗ lưu kết quả — nên nói tách hai phần đó.</p></details>
+
+  <details class="qa"><summary>N-Queens — làm sao kiểm tra hợp lệ trong O(1)?</summary>
+  <p>Dùng ba tập: cột đã dùng, đường chéo chính, đường chéo phụ. Với ô <code>(r, c)</code> thì <code>r − c</code> là hằng số trên một đường chéo chính và <code>r + c</code> là hằng số trên một đường chéo phụ, nên chỉ cần kiểm tra ba lần tra tập. Ngoài ra việc đặt mỗi hàng đúng một quân đã tự loại toàn bộ nhánh trùng hàng — một dạng cắt tỉa nằm ngay trong cách mô hình hoá bài toán.</p></details>
+
+  <details class="qa"><summary>Khi nào bài trông giống backtracking nhưng nên dùng DP?</summary>
+  <p>Khi đề chỉ hỏi <em>số lượng cách</em> hoặc <em>giá trị tối ưu</em>, không đòi liệt kê từng lời giải. Backtracking phải sinh hết nên không tránh được chi phí mũ; DP thì gộp các trạng thái giống nhau lại nên thường xuống đa thức. Dấu hiệu là các nhánh khác nhau dẫn tới cùng một trạng thái — ví dụ cùng tổng còn lại và cùng vị trí. Lúc đó thêm memo hoá vào backtracking là bước chuyển tự nhiên sang DP.</p></details>
+</section>
+
+<footer>Deep dive · backtracking · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

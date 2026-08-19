@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack, monotonic stack &amp; queue — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-stack" data-title="Stack, monotonic stack &amp; queue" data-tag="Cấu trúc" data-blurb="Monotonic stack biến O(n²) thành O(n): phần tử lớn hơn kế tiếp, histogram, hứng nước mưa, và deque cho max cửa sổ.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · DSA · cấu trúc tuyến tính</p>
+  <h1>Stack, <em>monotonic stack</em><br>&amp; queue</h1>
+  <p class="lede">Stack thì ai cũng biết. Thứ đáng học là <b>monotonic stack</b>: một khung mười dòng biến hàng loạt bài <b>O(n²)</b> thành <b>O(n)</b> — phần tử lớn hơn kế tiếp, hình chữ nhật lớn nhất trong biểu đồ cột, hứng nước mưa. Kèm <b>monotonic deque</b> cho bài giá trị lớn nhất trong mỗi cửa sổ.</p>
+</header>
+
+
+<section id="stack-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>Stack           vào sau ra trước   → "cái gần nhất chưa xử lý xong"
+Queue           vào trước ra trước → "xử lý theo thứ tự đến"
+Monotonic stack stack luôn tăng hoặc luôn giảm
+                → trả lời "phần tử gần nhất lớn hơn / nhỏ hơn" trong O(n)
+Monotonic deque như trên nhưng bỏ được cả hai đầu
+                → trả lời "max của mỗi cửa sổ trượt" trong O(n)</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Stack là <strong>bộ nhớ tạm cho những thứ chưa được giải quyết</strong>. Khi phần tử mới tới trả lời được câu hỏi đang treo của phần tử cũ, ta lấy nó ra và chốt đáp án. Toàn bộ monotonic stack chỉ là câu này.
+  </div>
+</section>
+
+<section id="stack-s2">
+  <div class="sh"><b>02</b><h2>Stack — dùng gì trong Python</h2></div>
+<pre><code>st = []
+st.append(x)      <span class="cm"># push — O(1) amortized</span>
+top = st[-<span class="st">1</span>]      <span class="cm"># peek — O(1), nhớ kiểm tra rỗng trước</span>
+x = st.pop()      <span class="cm"># pop  — O(1)</span>
+<span class="kw">if</span> <span class="kw">not</span> st: ...     <span class="cm"># kiểm tra rỗng theo cách Pythonic</span></code></pre>
+  <p><code>list</code> là lựa chọn đúng cho stack: thêm và xoá ở cuối đều O(1). Không cần <code>deque</code> ở đây — chỉ cần nó khi phải thao tác ở <em>đầu</em> danh sách.</p>
+  <div class="note warn">
+    <h4>Bẫy phổ biến nhất</h4>
+    <code>st[-1]</code> trên stack rỗng ném <code>IndexError</code>. Trong vòng lặp monotonic stack, điều kiện <strong>luôn phải viết</strong> là <code>while st and ...</code> — kiểm tra rỗng trước, nhờ Python đánh giá ngắn mạch. Quên chữ <code>st and</code> là lỗi runtime hay gặp nhất ở nhóm bài này.
+  </div>
+</section>
+
+<section id="stack-s3">
+  <div class="sh"><b>03</b><h2>Dạng ghép cặp — ngoặc hợp lệ</h2></div>
+<pre><code><span class="kw">def</span> valid(s):
+    pair = {<span class="st">')'</span>: <span class="st">'('</span>, <span class="st">']'</span>: <span class="st">'['</span>, <span class="st">'}'</span>: <span class="st">'{'</span>}
+    st = []
+    <span class="kw">for</span> ch <span class="kw">in</span> s:
+        <span class="kw">if</span> ch <span class="kw">in</span> <span class="st">"([{"</span>:
+            st.append(ch)
+        <span class="kw">else</span>:
+            <span class="kw">if</span> <span class="kw">not</span> st <span class="kw">or</span> st.pop() != pair[ch]:   <span class="cm"># rỗng, hoặc sai loại</span>
+                <span class="kw">return</span> <span class="kw">False</span>
+    <span class="kw">return</span> <span class="kw">not</span> st                              <span class="cm"># còn thừa mở → sai</span></code></pre>
+  <p>Vì sao stack là cấu trúc đúng: ngoặc đóng luôn phải khớp với ngoặc mở <strong>gần nhất chưa được đóng</strong>. "Gần nhất chưa xử lý" chính là định nghĩa của đỉnh stack.</p>
+  <p>Cùng khuôn này giải: rút gọn đường dẫn file, giải mã chuỗi lồng nhau dạng <code>3[a2[c]]</code>, tính biểu thức có ngoặc, và kiểm tra cây/HTML có cân đối không.</p>
+</section>
+
+<section id="stack-s4">
+  <div class="sh"><b>04</b><h2>Monotonic stack là gì</h2></div>
+  <p>Bài mẫu: với mỗi phần tử, tìm <strong>phần tử lớn hơn nó gần nhất về phía bên phải</strong>.</p>
+<pre><code>a = [2, 1, 5, 6, 2, 3]
+→   [5, 5, 6, -1, 3, -1]</code></pre>
+  <p>Cách ngây thơ là hai vòng lặp, O(n²). Nhận xét để rút xuống O(n):</p>
+  <div class="note">
+    <h4>Nhận xét cốt lõi</h4>
+    Nếu <code>a[i] &lt;= a[j]</code> với <code>i &lt; j</code>, thì <strong><code>a[i]</code> vĩnh viễn vô dụng</strong> đối với mọi phần tử phía sau <code>j</code>. Bất cứ ai đi tìm "phần tử lớn hơn gần nhất" mà chấp nhận <code>a[i]</code> thì đã gặp <code>a[j]</code> trước rồi. Vậy thì vứt <code>a[i]</code> đi ngay khi gặp <code>a[j]</code>.
+  </div>
+  <p>Vứt đi liên tục như thế thì phần còn lại trong stack luôn giảm dần — đó là lý do có chữ "monotonic".</p>
+<pre><code><span class="kw">def</span> next_greater(a):
+    n = <span class="kw">len</span>(a)
+    res = [-<span class="st">1</span>] * n
+    st = []                                <span class="cm"># lưu CHỈ SỐ, không lưu giá trị</span>
+    <span class="kw">for</span> i, x <span class="kw">in</span> <span class="kw">enumerate</span>(a):
+        <span class="kw">while</span> st <span class="kw">and</span> a[st[-<span class="st">1</span>]] &lt; x:       <span class="cm"># x giải quyết được các phần tử đang treo</span>
+            res[st.pop()] = x
+        st.append(i)                       <span class="cm"># i thành câu hỏi treo mới</span>
+    <span class="kw">return</span> res                             <span class="cm"># phần còn lại trong st không có ai lớn hơn</span></code></pre>
+  <p><strong>Lưu chỉ số chứ đừng lưu giá trị.</strong> Có chỉ số thì lấy được giá trị bất cứ lúc nào, và tính được khoảng cách — thứ mà nhiều biến thể cần tới.</p>
+</section>
+
+<section id="stack-s5">
+  <div class="sh"><b>05</b><h2>Vì sao vẫn là O(n) dù có vòng while lồng trong</h2></div>
+  <p>Câu hỏi này chắc chắn được hỏi. Câu trả lời giống hệt cấu trúc lập luận ở bài sliding window:</p>
+<pre><code>Mỗi chỉ số được đẩy vào stack ĐÚNG MỘT LẦN.
+Mỗi chỉ số được lấy ra khỏi stack TỐI ĐA MỘT LẦN.
+→ tổng số thao tác trên stack ≤ 2n
+→ O(n), bất kể vòng while có lúc chạy nhiều lần</code></pre>
+  <p>Điểm mấu chốt là vòng <code>while</code> bên trong không chạy tới n lần <em>ở mọi vòng lặp ngoài</em>. Nó chỉ tiêu thụ những phần tử đã được đẩy vào trước đó, và ngân sách đẩy vào chỉ có n. Đây là phân tích amortized — cùng công cụ dùng cho <code>list.append</code> ở bài Big-O.</p>
+  <div class="note key">
+    <h4>Cách nói trong phỏng vấn</h4>
+    "Nhìn thì có vòng lồng nhau, nhưng mỗi phần tử vào stack một lần và ra tối đa một lần, nên tổng công việc là O(n). Bộ nhớ O(n) cho trường hợp mảng tăng dần, khi không phần tử nào bị lấy ra cho tới cuối."
+  </div>
+</section>
+
+<section id="stack-s6">
+  <div class="sh"><b>06</b><h2>Bốn biến thể — chỉ khác hai chỗ</h2></div>
+  <p>Mọi bài "phần tử gần nhất thoả điều kiện" đều là một trong bốn ô dưới đây. Hai thứ thay đổi: <strong>chiều duyệt</strong> và <strong>dấu so sánh</strong>.</p>
+  <table>
+    <tr><th>Cần tìm</th><th>Duyệt</th><th>Điều kiện while</th><th>Stack còn lại</th></tr>
+    <tr><td>Lớn hơn gần nhất bên <strong>phải</strong></td><td>trái → phải</td><td><code>a[st[-1]] &lt; x</code></td><td>giảm dần</td></tr>
+    <tr><td>Lớn hơn gần nhất bên <strong>trái</strong></td><td>phải → trái</td><td><code>a[st[-1]] &lt; x</code></td><td>giảm dần</td></tr>
+    <tr><td>Nhỏ hơn gần nhất bên <strong>phải</strong></td><td>trái → phải</td><td><code>a[st[-1]] &gt; x</code></td><td>tăng dần</td></tr>
+    <tr><td>Nhỏ hơn gần nhất bên <strong>trái</strong></td><td>phải → trái</td><td><code>a[st[-1]] &gt; x</code></td><td>tăng dần</td></tr>
+  </table>
+<pre><code><span class="cm"># biến thể "bên trái": duyệt ngược, phần còn lại y hệt</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n - <span class="st">1</span>, -<span class="st">1</span>, -<span class="st">1</span>):
+    <span class="kw">while</span> st <span class="kw">and</span> a[st[-<span class="st">1</span>]] &lt; a[i]:
+        res[st.pop()] = a[i]
+    st.append(i)</code></pre>
+  <p><strong>Về dấu <code>&lt;</code> hay <code>&lt;=</code>:</strong> dùng <code>&lt;</code> khi phần tử bằng nhau <em>không</em> tính là "lớn hơn"; dùng <code>&lt;=</code> khi muốn phần tử sau đè phần tử bằng nó. Với bài đếm khoảng, chọn sai dấu làm các đoạn bằng nhau bị tính hai lần — nêu rõ quy ước khi trình bày.</p>
+  <p>Bài "nhiệt độ ấm hơn sau bao nhiêu ngày" chỉ là biến thể một: thay <code>res[st.pop()] = x</code> bằng <code>res[j] = i - j</code>, vì đã lưu chỉ số nên tính được khoảng cách.</p>
+</section>
+
+<section id="stack-s7">
+  <div class="sh"><b>07</b><h2>Lab: chạy từng bước</h2></div>
+  <p>Bài phần tử lớn hơn gần nhất bên phải. Nhìn stack co giãn, và để ý mỗi chỉ số chỉ vào ra đúng một lần.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>mảng</label><input type="text" id="marr" value="2 1 5 6 2 3" style="width:200px"></div>
+      <button id="mstep">Bước tiếp</button>
+      <button class="ghost" id="mauto">Tự chạy</button>
+      <button class="ghost" id="mrst">Đặt lại</button>
+    </div>
+    <div id="mview"></div>
+    <div class="stat">
+      <u>stack (chỉ số) <b id="mstack">rỗng</b></u>
+      <u>tổng thao tác push+pop <b id="mops">0</b></u>
+    </div>
+    <div class="steps" id="mlog"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Thử mảng tăng dần <code>1 2 3 4 5</code>: stack luôn rỗng vì mỗi phần tử mới giải quyết ngay phần tử trước. Thử mảng giảm dần <code>5 4 3 2 1</code>: không ai bị lấy ra, stack phình tới n — đó là trường hợp tốn bộ nhớ nhất.
+    </p>
+  </div>
+</section>
+
+<section id="stack-s8">
+  <div class="sh"><b>08</b><h2>Hình chữ nhật lớn nhất trong biểu đồ cột</h2></div>
+  <p>Bài khó kinh điển, và là lý do thật sự để học monotonic stack. Ý tưởng: với mỗi cột, tính hình chữ nhật <strong>cao đúng bằng cột đó</strong> có thể nới rộng tới đâu.</p>
+<pre><code>Cột i nới được sang trái tới cột đầu tiên THẤP HƠN nó,
+và sang phải tới cột đầu tiên THẤP HƠN nó.
+→ đúng hai bài "nhỏ hơn gần nhất" ở mục 06.</code></pre>
+<pre><code><span class="kw">def</span> largest_rectangle(h):
+    st = []                       <span class="cm"># chỉ số, chiều cao TĂNG dần</span>
+    best = <span class="st">0</span>
+    hs = h + [<span class="st">0</span>]                  <span class="cm"># cột giả cao 0 để xả sạch stack ở cuối</span>
+    <span class="kw">for</span> i, x <span class="kw">in</span> <span class="kw">enumerate</span>(hs):
+        <span class="kw">while</span> st <span class="kw">and</span> hs[st[-<span class="st">1</span>]] &gt;= x:
+            height = hs[st.pop()]
+            <span class="cm"># biên trái là phần tử còn lại trong stack, biên phải là i</span>
+            width = i - st[-<span class="st">1</span>] - <span class="st">1</span> <span class="kw">if</span> st <span class="kw">else</span> i
+            best = <span class="kw">max</span>(best, height * width)
+        st.append(i)
+    <span class="kw">return</span> best                   <span class="cm"># O(n) thời gian, O(n) bộ nhớ</span></code></pre>
+  <div class="note key">
+    <h4>Hai chi tiết quyết định</h4>
+    <p><strong>Cột giả cao 0 ở cuối.</strong> Không có nó thì các cột còn lại trong stack không bao giờ được xử lý. Đây là kỹ thuật lính canh, dùng đi dùng lại ở nhiều bài.</p>
+    <p><strong>Công thức bề rộng.</strong> Sau khi lấy ra, phần tử ở đỉnh stack chính là cột thấp hơn gần nhất bên trái, nên bề rộng là <code>i - st[-1] - 1</code>. Nếu stack rỗng thì không có giới hạn trái, bề rộng là <code>i</code>. Viết nhầm chỗ này là lỗi hay gặp nhất của bài.</p>
+  </div>
+  <p>Bài "hình chữ nhật toàn số 1 lớn nhất trong ma trận nhị phân" là bài này chạy từng dòng: dựng mảng chiều cao cộng dồn theo cột rồi gọi hàm trên cho mỗi dòng — tổng O(số ô).</p>
+</section>
+
+<section id="stack-s9">
+  <div class="sh"><b>09</b><h2>Hứng nước mưa — ba cách, nên biết cả ba</h2></div>
+  <p>Đây là bài hiếm hoi mà interviewer hay hỏi "còn cách nào tốn ít bộ nhớ hơn không". Có ba lời giải, cùng O(n) thời gian nhưng khác nhau về bộ nhớ.</p>
+  <h3>Cách 1 — mảng phụ, dễ nghĩ nhất</h3>
+<pre><code><span class="kw">def</span> trap_dp(h):
+    n = <span class="kw">len</span>(h)
+    <span class="kw">if</span> <span class="kw">not</span> n: <span class="kw">return</span> <span class="st">0</span>
+    left = [<span class="st">0</span>]*n; right = [<span class="st">0</span>]*n
+    left[<span class="st">0</span>] = h[<span class="st">0</span>]
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="st">1</span>, n): left[i] = <span class="kw">max</span>(left[i-<span class="st">1</span>], h[i])
+    right[n-<span class="st">1</span>] = h[n-<span class="st">1</span>]
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n-<span class="st">2</span>, -<span class="st">1</span>, -<span class="st">1</span>): right[i] = <span class="kw">max</span>(right[i+<span class="st">1</span>], h[i])
+    <span class="kw">return</span> <span class="kw">sum</span>(<span class="kw">min</span>(left[i], right[i]) - h[i] <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n))</code></pre>
+  <p>Nguyên lý: nước trên cột <code>i</code> bằng <code>min(cao nhất bên trái, cao nhất bên phải) − h[i]</code>. Bộ nhớ O(n).</p>
+  <h3>Cách 2 — monotonic stack, tính theo từng lớp ngang</h3>
+<pre><code><span class="kw">def</span> trap_stack(h):
+    st = []; water = <span class="st">0</span>
+    <span class="kw">for</span> i, x <span class="kw">in</span> <span class="kw">enumerate</span>(h):
+        <span class="kw">while</span> st <span class="kw">and</span> h[st[-<span class="st">1</span>]] &lt; x:
+            bottom = h[st.pop()]
+            <span class="kw">if</span> <span class="kw">not</span> st: <span class="kw">break</span>            <span class="cm"># không có thành trái → nước chảy ra</span>
+            width = i - st[-<span class="st">1</span>] - <span class="st">1</span>
+            height = <span class="kw">min</span>(h[st[-<span class="st">1</span>]], x) - bottom
+            water += width * height
+        st.append(i)
+    <span class="kw">return</span> water</code></pre>
+  <h3>Cách 3 — two pointers, O(1) bộ nhớ</h3>
+<pre><code><span class="kw">def</span> trap_two(h):
+    l, r = <span class="st">0</span>, <span class="kw">len</span>(h) - <span class="st">1</span>
+    lmax = rmax = water = <span class="st">0</span>
+    <span class="kw">while</span> l &lt; r:
+        <span class="kw">if</span> h[l] &lt; h[r]:                  <span class="cm"># thành phải chắc chắn cao hơn lmax</span>
+            lmax = <span class="kw">max</span>(lmax, h[l])
+            water += lmax - h[l]; l += <span class="st">1</span>
+        <span class="kw">else</span>:
+            rmax = <span class="kw">max</span>(rmax, h[r])
+            water += rmax - h[r]; r -= <span class="st">1</span>
+    <span class="kw">return</span> water</code></pre>
+  <div class="note">
+    <h4>Vì sao cách 3 đúng</h4>
+    Khi <code>h[l] &lt; h[r]</code>, ta biết chắc bên phải tồn tại một cột cao ít nhất bằng <code>h[r]</code>, tức là cao hơn <code>h[l]</code>. Nên mức nước ở <code>l</code> chỉ còn phụ thuộc <code>lmax</code> — không cần biết cụ thể bên phải cao bao nhiêu. Đây là lập luận đơn điệu, cùng họ với two pointers ở bài trước.
+  </div>
+  <p>Trong phỏng vấn: trình bày cách 1 để cho thấy hiểu bản chất, rồi đề xuất cách 3 để tối ưu bộ nhớ. Nêu được cả hai và so sánh đánh đổi là câu trả lời đầy đủ.</p>
+</section>
+
+<section id="stack-s10">
+  <div class="sh"><b>10</b><h2>Monotonic deque — max của mỗi cửa sổ</h2></div>
+  <p>Cửa sổ trượt độ dài <code>k</code>, cần giá trị lớn nhất trong mỗi cửa sổ. Tổng và số lượng thì cập nhật vào-ra được, nhưng <em>max thì không</em> — bỏ phần tử ra có thể làm max thay đổi mà ta không biết giá trị lớn thứ hai.</p>
+<pre><code><span class="kw">from</span> collections <span class="kw">import</span> deque
+
+<span class="kw">def</span> max_window(a, k):
+    dq = deque()                       <span class="cm"># chỉ số, giá trị GIẢM dần</span>
+    out = []
+    <span class="kw">for</span> i, x <span class="kw">in</span> <span class="kw">enumerate</span>(a):
+        <span class="kw">while</span> dq <span class="kw">and</span> a[dq[-<span class="st">1</span>]] &lt;= x:    <span class="cm"># bỏ đuôi: ai nhỏ hơn x thì vô dụng</span>
+            dq.pop()
+        dq.append(i)
+        <span class="kw">if</span> dq[<span class="st">0</span>] &lt;= i - k:              <span class="cm"># bỏ đầu: đã trôi ra khỏi cửa sổ</span>
+            dq.popleft()
+        <span class="kw">if</span> i &gt;= k - <span class="st">1</span>:
+            out.append(a[dq[<span class="st">0</span>]])        <span class="cm"># đầu deque luôn là max</span>
+    <span class="kw">return</span> out                         <span class="cm"># O(n) thời gian, O(k) bộ nhớ</span></code></pre>
+  <p>Cần deque thay vì stack vì phải bỏ ở <strong>cả hai đầu</strong>: bỏ ở đuôi những phần tử nhỏ hơn phần tử mới, bỏ ở đầu những phần tử đã trôi ra ngoài cửa sổ.</p>
+  <div class="note key">
+    <h4>Vì sao bỏ được mà không sợ mất đáp án</h4>
+    Nếu <code>a[j] &lt;= x</code> với <code>j &lt; i</code>, thì <code>a[j]</code> không bao giờ là max của bất kỳ cửa sổ nào còn chứa <code>i</code> — vì mọi cửa sổ chứa <code>j</code> và nằm sau <code>i</code> đều chứa cả <code>i</code>, mà <code>x</code> lớn hơn. Lập luận y hệt nhận xét cốt lõi của monotonic stack.
+  </div>
+  <p>Cách khác dùng heap cho O(n log k) — chấp nhận được nhưng chậm hơn, và phải xử lý việc xoá phần tử đã hết hạn. Deque là lời giải tối ưu, và nêu ra được cả hai là điểm cộng.</p>
+</section>
+
+<section id="stack-s11">
+  <div class="sh"><b>11</b><h2>Stack để khử đệ quy</h2></div>
+  <p>Mọi đệ quy đều chuyển được thành vòng lặp với stack tường minh — vì bản thân đệ quy đã dùng stack lời gọi của hệ điều hành.</p>
+<pre><code><span class="cm"># DFS đệ quy</span>
+<span class="kw">def</span> dfs(u, seen):
+    seen.add(u)
+    <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+        <span class="kw">if</span> v <span class="kw">not in</span> seen: dfs(v, seen)
+
+<span class="cm"># DFS lặp — cùng thứ tự nếu duyệt hàng xóm theo chiều ngược</span>
+<span class="kw">def</span> dfs_iter(start):
+    seen = <span class="kw">set</span>()
+    st = [start]
+    <span class="kw">while</span> st:
+        u = st.pop()
+        <span class="kw">if</span> u <span class="kw">in</span> seen: <span class="kw">continue</span>       <span class="cm"># kiểm tra khi LẤY RA, không phải khi đẩy vào</span>
+        seen.add(u)
+        <span class="kw">for</span> v <span class="kw">in</span> <span class="kw">reversed</span>(g[u]):
+            <span class="kw">if</span> v <span class="kw">not in</span> seen: st.append(v)</code></pre>
+  <p><strong>Vì sao đáng làm:</strong> Python giới hạn độ sâu đệ quy khoảng 1000. Đồ thị hay danh sách liên kết 10⁵ nút là vỡ ngay với <code>RecursionError</code>. Bản lặp không có giới hạn đó.</p>
+  <div class="note warn">
+    <h4>Khác biệt tinh tế</h4>
+    Ở bản lặp, một đỉnh có thể được đẩy vào stack nhiều lần trước khi được thăm. Vì vậy phải kiểm tra <code>seen</code> lúc <em>lấy ra</em>. Chỉ kiểm lúc đẩy vào thì vẫn chạy đúng trên phần lớn test nhưng tốn bộ nhớ hơn, và sai trong vài biến thể bài toán.
+  </div>
+</section>
+
+<section id="stack-s12">
+  <div class="sh"><b>12</b><h2>Queue và BFS</h2></div>
+<pre><code><span class="kw">from</span> collections <span class="kw">import</span> deque
+
+q = deque([start])
+q.append(x)        <span class="cm"># vào cuối    — O(1)</span>
+u = q.popleft()    <span class="cm"># ra đầu      — O(1)</span>
+
+<span class="cm"># KHÔNG dùng list làm queue:</span>
+lst.pop(<span class="st">0</span>)         <span class="cm"># O(n) — biến BFS thành O(n²)</span></code></pre>
+  <p>BFS duyệt theo từng lớp, nên trên đồ thị <strong>không trọng số</strong> nó cho đường đi ngắn nhất. Mẫu duyệt theo lớp:</p>
+<pre><code><span class="kw">def</span> bfs_levels(start):
+    q = deque([start]); seen = {start}; depth = <span class="st">0</span>
+    <span class="kw">while</span> q:
+        <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(<span class="kw">len</span>(q)):        <span class="cm">← chốt kích thước lớp TRƯỚC khi thêm</span>
+            u = q.popleft()
+            <span class="kw">for</span> v <span class="kw">in</span> g[u]:
+                <span class="kw">if</span> v <span class="kw">not in</span> seen:
+                    seen.add(v)          <span class="cm"># đánh dấu khi ĐẨY VÀO, tránh trùng</span>
+                    q.append(v)
+        depth += <span class="st">1</span></code></pre>
+  <p>Hai chi tiết: chốt <code>len(q)</code> trước vòng lặp trong, nếu không sẽ nuốt luôn lớp kế tiếp; và với BFS thì đánh dấu <code>seen</code> lúc đẩy vào — ngược với DFS lặp ở mục trên, vì BFS lần đầu chạm tới một đỉnh đã là đường ngắn nhất rồi.</p>
+</section>
+
+<section id="stack-s13">
+  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
+  <table>
+    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
+    <tr><td>Ngoặc, lồng nhau, giải mã chuỗi, rút gọn đường dẫn</td><td>Stack ghép cặp</td></tr>
+    <tr><td>"phần tử lớn hơn / nhỏ hơn gần nhất", "bao nhiêu ngày nữa"</td><td>Monotonic stack</td></tr>
+    <tr><td>"hình chữ nhật lớn nhất", "diện tích lớn nhất dưới biểu đồ"</td><td>Monotonic stack tăng dần + lính canh</td></tr>
+    <tr><td>"hứng nước", "vùng trũng"</td><td>Two pointers, hoặc monotonic stack</td></tr>
+    <tr><td>"max / min của mỗi cửa sổ độ dài k"</td><td>Monotonic deque</td></tr>
+    <tr><td>"đường đi ngắn nhất, đồ thị không trọng số"</td><td>BFS với deque</td></tr>
+    <tr><td>Đệ quy sâu quá 1000 tầng</td><td>Chuyển sang stack tường minh</td></tr>
+  </table>
+</section>
+
+<section id="stack-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Quên kiểm tra stack rỗng</h4><p><code>while a[st[-1]] &lt; x</code> ném IndexError. Luôn viết <code>while st and …</code>.</p></div>
+    <div class="card bad"><h4>Lưu giá trị thay vì chỉ số</h4><p>Mất khả năng tính bề rộng và khoảng cách. Mặc định lưu chỉ số.</p></div>
+    <div class="card bad"><h4>Quên lính canh cuối mảng</h4><p>Bài histogram bỏ sót mọi cột còn lại trong stack. Thêm cột giả cao 0.</p></div>
+    <div class="card bad"><h4>Sai công thức bề rộng</h4><p><code>i - st[-1] - 1</code> sau khi pop, và <code>i</code> khi stack rỗng. Viết nhầm thành <code>i - st[-1]</code> là lỗi kinh điển.</p></div>
+    <div class="card bad"><h4>Dùng list.pop(0) cho BFS</h4><p>O(n) mỗi lần, biến BFS thành O(n²). Luôn dùng <code>deque.popleft()</code>.</p></div>
+    <div class="card bad"><h4>Không chốt len(q) khi BFS theo lớp</h4><p>Vòng lặp nuốt luôn các đỉnh vừa thêm, làm số lớp tính sai.</p></div>
+  </div>
+</section>
+
+<section id="stack-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Monotonic stack là gì và vì sao nó là O(n)?</summary>
+  <p>Là stack luôn giữ thứ tự tăng hoặc giảm, dùng để trả lời "phần tử gần nhất lớn hơn hoặc nhỏ hơn". Nhận xét cốt lõi: nếu <code>a[i] &lt;= a[j]</code> với <code>i &lt; j</code> thì <code>a[i]</code> vĩnh viễn vô dụng với mọi truy vấn phía sau <code>j</code>, nên bỏ được ngay. Về độ phức tạp: mỗi chỉ số vào stack một lần và ra tối đa một lần, nên tổng thao tác không quá 2n — O(n), dù nhìn code thấy vòng while lồng trong vòng for.</p></details>
+
+  <details class="qa"><summary>Giải thích cách tính hình chữ nhật lớn nhất trong biểu đồ cột.</summary>
+  <p>Với mỗi cột, hình chữ nhật cao đúng bằng nó nới được tới cột thấp hơn gần nhất ở hai bên — chính là hai bài monotonic stack. Duy trì stack chỉ số có chiều cao tăng dần; khi gặp cột thấp hơn thì lấy ra và chốt diện tích, với bề rộng bằng <code>i - st[-1] - 1</code> sau khi pop, hoặc <code>i</code> nếu stack rỗng. Thêm một cột giả cao 0 ở cuối để xả sạch stack. O(n) thời gian và O(n) bộ nhớ.</p></details>
+
+  <details class="qa"><summary>Bài hứng nước mưa — có cách nào O(1) bộ nhớ không?</summary>
+  <p>Có, dùng two pointers. Đi từ hai đầu, giữ <code>lmax</code> và <code>rmax</code>. Nếu <code>h[l] &lt; h[r]</code> thì bên phải chắc chắn có cột cao hơn <code>h[l]</code>, nên mức nước tại <code>l</code> chỉ phụ thuộc <code>lmax</code> — cộng <code>lmax - h[l]</code> rồi dịch <code>l</code>. Ngược lại thì xử lý phía phải. O(n) thời gian, O(1) bộ nhớ, so với bản mảng phụ tốn O(n).</p></details>
+
+  <details class="qa"><summary>Vì sao bài max của cửa sổ trượt cần deque chứ không phải stack?</summary>
+  <p>Vì phải bỏ phần tử ở cả hai đầu: bỏ ở đuôi những giá trị nhỏ hơn phần tử mới vì chúng không bao giờ còn là max, và bỏ ở đầu những chỉ số đã trôi ra khỏi cửa sổ. Stack chỉ thao tác được một đầu. Kết quả là O(n) thời gian và O(k) bộ nhớ, tốt hơn cách dùng heap là O(n log k).</p></details>
+
+  <details class="qa"><summary>Khi nào bạn chuyển đệ quy sang stack tường minh?</summary>
+  <p>Khi độ sâu có thể vượt giới hạn đệ quy của Python, khoảng 1000 — ví dụ DFS trên đồ thị 10⁵ đỉnh hoặc danh sách liên kết rất dài. Cũng dùng khi cần kiểm soát thứ tự duyệt hoặc muốn tạm dừng và lưu trạng thái. Lưu ý ở bản lặp: kiểm tra đã thăm lúc <em>lấy ra</em> khỏi stack, vì một đỉnh có thể bị đẩy vào nhiều lần.</p></details>
+
+  <details class="qa"><summary>Stack và queue nên dùng cấu trúc nào trong Python?</summary>
+  <p>Stack dùng <code>list</code> — <code>append</code> và <code>pop</code> ở cuối đều O(1). Queue phải dùng <code>collections.deque</code>, vì <code>list.pop(0)</code> là O(n) do phải dời toàn bộ phần tử, và điều đó biến BFS từ O(V+E) thành O(V²). Đây là lỗi hiệu năng phổ biến nhất trong code BFS viết vội.</p></details>
+</section>
+
+<footer>Deep dive · stack, monotonic stack &amp; queue · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

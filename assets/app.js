@@ -15,7 +15,9 @@
 
   var FLAT = [];
   CAT.forEach(function (c) {
-    c.books.forEach(function (b) { FLAT.push({ book: b, cat: c }); });
+    c.groups.forEach(function (g) {
+      g.books.forEach(function (b) { FLAT.push({ book: b, group: g, cat: c }); });
+    });
   });
 
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -28,19 +30,28 @@
   }
 
   /* ---------------- trang chủ: dựng kệ ---------------- */
+  function card(b) {
+    return '<a class="bk" href="' + BASE + b.path + '">' +
+      '<div class="tag">' + esc(b.tag) + "</div>" +
+      "<h3>" + esc(b.title) + "</h3>" +
+      "<p>" + esc(b.blurb) + "</p>" +
+      '<div class="meta"><span>' + b.n + " mục</span><b>đọc →</b></div></a>";
+  }
+
   if (lib) {
     lib.innerHTML = CAT.map(function (c) {
-      var cards = c.books.map(function (b) {
-        return '<a class="bk" href="' + BASE + b.path + '">' +
-          '<div class="tag">' + esc(b.tag) + "</div>" +
-          "<h3>" + esc(b.title) + "</h3>" +
-          "<p>" + esc(b.blurb) + "</p>" +
-          '<div class="meta"><span>' + b.n + " mục</span><b>đọc →</b></div></a>";
+      var total = 0;
+      c.groups.forEach(function (g) { total += g.books.length; });
+      /* kệ chỉ có một nhóm thì không cần tiêu đề nhóm */
+      var body = c.groups.map(function (g) {
+        var cards = '<div class="cards">' + g.books.map(card).join("\n") + "</div>";
+        if (c.groups.length < 2) return cards;
+        return '<h3 class="sub">' + esc(g.name) +
+          '<span class="gc">' + g.books.length + " bài</span></h3>" + cards;
       }).join("\n");
       return '<div class="shelf"><h2>' + esc(c.name) +
-        '<span class="gc">' + c.books.length + " bài</span></h2>" +
-        '<p class="gnote">' + esc(c.note) + "</p>" +
-        '<div class="cards">' + cards + "</div></div>";
+        '<span class="gc">' + total + " bài</span></h2>" +
+        '<p class="gnote">' + esc(c.note) + "</p>" + body + "</div>";
     }).join("\n");
   }
 
@@ -66,12 +77,21 @@
     targets.forEach(function (t) { if (t) io.observe(t); });
   }
 
-  /* ---------------- trang bài: bài trước / bài sau ---------------- */
+  /* ---------------- trang bài: breadcrumb + bài trước / bài sau ---------------- */
   var np = document.getElementById("np");
+  var crumb = document.getElementById("crumbTitle");
+  var slug = doc ? doc.id.replace("art-", "") : "";
+  var i = -1;
+  FLAT.forEach(function (x, k) { if (x.book.slug === slug) i = k; });
+
+  if (doc && crumb && i >= 0) {
+    var here = FLAT[i];
+    crumb.innerHTML = esc(here.cat.name) +
+      (here.cat.groups.length > 1 ? " · " + esc(here.group.name) : "") +
+      " · " + esc(here.book.title);
+  }
+
   if (doc && np) {
-    var slug = doc.id.replace("art-", "");
-    var i = -1;
-    FLAT.forEach(function (x, k) { if (x.book.slug === slug) i = k; });
     var p = i > 0 ? FLAT[i - 1] : null, n = i >= 0 ? FLAT[i + 1] : null;
     np.innerHTML =
       (p ? '<a href="' + BASE + p.book.path + '"><span>bài trước · ' + esc(p.cat.name) + "</span><b>" + esc(p.book.title) + "</b></a>" : "") +

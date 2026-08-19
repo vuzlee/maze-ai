@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linear &amp; logistic regression — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-linreg" data-title="Linear &amp; logistic regression" data-tag="Nền tảng" data-blurb="Vì sao không dùng MSE cho phân loại, vì sao L1 tạo hệ số 0, bốn giả định, và cách đọc odds ratio.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Machine learning · nền tảng</p>
+  <h1>Linear &amp;<br><em>logistic regression</em></h1>
+  <p class="lede">Hai model bị coi là "đơn giản" nhưng bị hỏi sâu nhất, vì chúng là nơi kiểm tra bạn có hiểu <b>hàm mất mát, gradient, giả định và diễn giải</b> hay không. Bài này giải thích vì sao <b>không dùng MSE cho phân loại</b>, vì sao L1 tạo hệ số bằng 0 mà L2 thì không, và cách đọc hệ số thành câu tiếng Việt.</p>
+</header>
+
+
+<section id="linreg-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+<pre><code>Linear regression      z = w·x + b                    → dự đoán SỐ
+                       mất mát: MSE
+
+Logistic regression    z = w·x + b                    → dự đoán XÁC SUẤT
+                       p = sigmoid(z)
+                       mất mát: log loss
+
+Cùng một phần tuyến tính. Khác nhau ở HÀM BỌC và HÀM MẤT MÁT.</code></pre>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    Cả hai model đều là <code>w·x + b</code>. Toàn bộ khác biệt nằm ở chỗ bạn muốn đầu ra là gì, và chọn hàm mất mát nào cho đúng với mục tiêu đó. Hiểu đúng cặp <strong>hàm bọc + hàm mất mát</strong> là hiểu cả hai model.
+  </div>
+</section>
+
+<section id="linreg-s2">
+  <div class="sh"><b>02</b><h2>Linear regression</h2></div>
+<pre><code>ŷ = w₁x₁ + w₂x₂ + ... + wₙxₙ + b
+
+Hàm mất mát — MSE:
+    L = (1/n) Σ (ŷᵢ - yᵢ)²
+
+Gradient theo một trọng số:
+    ∂L/∂wⱼ = (2/n) Σ (ŷᵢ - yᵢ) · xᵢⱼ</code></pre>
+  <p><strong>Vì sao bình phương sai số chứ không phải trị tuyệt đối:</strong></p>
+  <table>
+    <tr><th></th><th>MSE — bình phương</th><th>MAE — trị tuyệt đối</th></tr>
+    <tr><td>Đạo hàm</td><td>Liên tục, mượt ở mọi điểm</td><td>Không xác định tại 0</td></tr>
+    <tr><td>Phạt sai số lớn</td><td>Nặng — sai 10 tệ hơn 100 lần sai 1</td><td>Tuyến tính</td></tr>
+    <tr><td>Nhạy ngoại lai</td><td><strong>Rất nhạy</strong></td><td>Bền vững hơn</td></tr>
+    <tr><td>Nghiệm tối ưu ước lượng</td><td>Trung bình có điều kiện</td><td>Trung vị có điều kiện</td></tr>
+    <tr><td>Nghiệm đóng</td><td>Có</td><td>Không</td></tr>
+  </table>
+  <p>Dòng cuối cùng của bảng là câu trả lời sâu nhất: MSE ước lượng <em>trung bình</em>, MAE ước lượng <em>trung vị</em>. Nếu dữ liệu có đuôi dài và bạn quan tâm giá trị điển hình chứ không phải giá trị trung bình, thì MAE hoặc Huber loss là lựa chọn đúng hơn — không phải vì "bền với ngoại lai" một cách chung chung, mà vì nó ước lượng đúng đại lượng bạn cần.</p>
+</section>
+
+<section id="linreg-s3">
+  <div class="sh"><b>03</b><h2>Nghiệm đóng hay gradient descent</h2></div>
+<pre><code>Nghiệm đóng (normal equation):
+    w = (XᵀX)⁻¹ Xᵀy
+
+Chi phí: O(n·d² + d³)   ← d³ là nghịch đảo ma trận d×d</code></pre>
+  <table>
+    <tr><th>Cách</th><th>Dùng khi</th><th>Vấn đề</th></tr>
+    <tr><td>Nghiệm đóng</td><td>Ít đặc trưng (d nhỏ hơn vài nghìn), muốn kết quả chính xác</td><td>Nghịch đảo tốn O(d³); ma trận suy biến nếu có đa cộng tuyến hoàn hảo</td></tr>
+    <tr><td>Gradient descent</td><td>Nhiều đặc trưng, nhiều dữ liệu, hoặc dữ liệu dạng dòng chảy</td><td>Phải chọn learning rate; cần chuẩn hoá đặc trưng</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Vì sao gradient descent cần chuẩn hoá đặc trưng</h4>
+    Nếu <code>x₁</code> có thang đo 0–1 còn <code>x₂</code> là 0–100000, thì mặt mất mát trở thành một thung lũng rất dài và hẹp. Gradient descent sẽ <em>ngoằn ngoèo</em> qua lại giữa hai vách thay vì đi thẳng xuống, và learning rate phù hợp cho chiều này lại quá lớn cho chiều kia. Nghiệm đóng không gặp vấn đề này vì nó giải trực tiếp. Đây là lý do <code>StandardScaler</code> gần như luôn xuất hiện trước model tuyến tính.
+  </div>
+</section>
+
+<section id="linreg-s4">
+  <div class="sh"><b>04</b><h2>Lab: gradient descent</h2></div>
+  <p>Dữ liệu cố định. Kéo learning rate và chạy từng bước để xem đường thẳng tiến tới nghiệm tối ưu — hoặc phân kỳ.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>learning rate</label><input type="number" id="glr" value="0.03" step="0.01" min="0.001" max="1"></div>
+      <label class="chk"><input type="checkbox" id="gout"> thêm một điểm ngoại lai</label>
+      <button id="ggo">10 bước</button>
+      <button class="ghost" id="gauto3">Tự chạy</button>
+      <button class="ghost" id="grst3">Đặt lại</button>
+    </div>
+    <div id="gview3"></div>
+    <div class="stat">
+      <u>w hiện tại <b id="gw">0.00</b></u>
+      <u>b hiện tại <b id="gb">0.00</b></u>
+      <u>MSE <b id="gloss">–</b></u>
+      <u>số bước <b id="gsteps">0</b></u>
+      <u>nghiệm tối ưu <b id="gopt">–</b></u>
+    </div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Thử <code>lr = 0.3</code>: mất mát <strong>tăng vọt</strong> thay vì giảm — đó là phân kỳ do bước quá lớn. Thử <code>lr = 0.001</code>: đi đúng hướng nhưng chậm tới mức vô dụng. Bật điểm ngoại lai để thấy MSE kéo cả đường thẳng lệch đi bao nhiêu — chỉ vì <em>một</em> điểm.
+    </p>
+  </div>
+</section>
+
+<section id="linreg-s5">
+  <div class="sh"><b>05</b><h2>Bốn giả định và hệ quả khi vi phạm</h2></div>
+  <table>
+    <tr><th>Giả định</th><th>Nghĩa</th><th>Vi phạm thì sao</th><th>Phát hiện bằng</th></tr>
+    <tr><td>Tuyến tính</td><td>Quan hệ giữa x và y là tuyến tính theo tham số</td><td>Model thiếu khớp một cách hệ thống</td><td>Vẽ phần dư theo giá trị dự đoán — thấy hình cong</td></tr>
+    <tr><td>Độc lập</td><td>Các phần dư không tương quan với nhau</td><td>Sai số chuẩn bị đánh giá quá thấp → tin tưởng sai vào hệ số</td><td>Dữ liệu chuỗi thời gian, dữ liệu theo cụm</td></tr>
+    <tr><td>Phương sai đồng nhất</td><td>Độ phân tán của phần dư như nhau ở mọi mức dự đoán</td><td>Khoảng tin cậy sai; dự đoán ở vùng phân tán lớn quá tự tin</td><td>Đồ thị phần dư có hình phễu</td></tr>
+    <tr><td>Phần dư phân phối chuẩn</td><td>Cần cho kiểm định và khoảng tin cậy</td><td>P-value không đáng tin — nhưng <em>dự đoán</em> vẫn dùng được</td><td>Q-Q plot</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Điều quan trọng nhất về bốn giả định này</h4>
+    Chúng cần cho <strong>suy luận thống kê</strong> — p-value, khoảng tin cậy, kết luận "biến này có ảnh hưởng". Nếu bạn chỉ cần <strong>dự đoán</strong> và đánh giá bằng tập kiểm tra riêng thì việc vi phạm giả định ít nghiêm trọng hơn nhiều. Phân biệt được hai mục đích này là câu trả lời cho thấy bạn hiểu vấn đề, không chỉ nhớ danh sách.
+  </div>
+  <p>Đồ thị đáng vẽ nhất là <strong>phần dư theo giá trị dự đoán</strong>. Nó bắt được cả ba vi phạm đầu trong một hình: hình cong nghĩa là thiếu tuyến tính, hình phễu nghĩa là phương sai không đồng nhất, và các cụm nghĩa là thiếu một biến phân loại.</p>
+</section>
+
+<section id="linreg-s6">
+  <div class="sh"><b>06</b><h2>Diễn giải hệ số</h2></div>
+<pre><code>giá_nhà = <span class="st">50</span> · diện_tích + <span class="st">30</span> · số_phòng + <span class="st">100</span>
+
+"Mỗi mét vuông tăng thêm ứng với giá tăng 50 triệu,
+ KHI GIỮ NGUYÊN số phòng."</code></pre>
+  <p>Ba chi tiết luôn phải nói kèm khi diễn giải:</p>
+  <ul>
+    <li><strong>Đơn vị.</strong> Hệ số vô nghĩa nếu không nói đơn vị của x và y.</li>
+    <li><strong>Giữ nguyên các biến khác.</strong> Đây là điều kiện bắt buộc, và nó có thể vô nghĩa trong thực tế — không thể tăng diện tích mà giữ nguyên số phòng mãi được.</li>
+    <li><strong>Tương quan không phải nhân quả.</strong> Hệ số nói lên quan hệ trong dữ liệu này, không nói rằng can thiệp vào x sẽ làm y đổi.</li>
+  </ul>
+  <h3>Đa cộng tuyến</h3>
+<pre><code>Hai đặc trưng tương quan mạnh: diện_tích_m2 và diện_tích_ft2
+
+→ (XᵀX) gần suy biến, nghịch đảo bất ổn định
+→ hệ số dao động dữ dội, dấu có thể lật ngược
+→ NHƯNG chất lượng DỰ ĐOÁN gần như không đổi
+
+Phát hiện: VIF &gt; 5 hoặc 10 là dấu hiệu đáng lo</code></pre>
+  <div class="note">
+    <h4>Đa cộng tuyến ảnh hưởng tới cái gì</h4>
+    Nó phá <strong>khả năng diễn giải từng hệ số</strong>, không phá khả năng dự đoán. Nếu mục tiêu là dự đoán, bạn có thể để nguyên hoặc dùng L2 để ổn định hệ số. Nếu mục tiêu là giải thích ảnh hưởng của từng biến, phải xử lý: bỏ một biến, gộp lại, hoặc dùng PCA. Nói được sự phân biệt này thường tạo ấn tượng tốt vì nhiều candidate coi đa cộng tuyến là lỗi phải diệt trong mọi trường hợp.
+  </div>
+</section>
+
+<section id="linreg-s7">
+  <div class="sh"><b>07</b><h2>Vì sao không dùng linear regression để phân loại</h2></div>
+<pre><code>Gán nhãn 0 và 1 rồi fit đường thẳng:
+
+  ŷ = 1.7   ← xác suất 170%?
+  ŷ = -0.4  ← xác suất âm?
+
+Và tệ hơn: thêm MỘT điểm ở rất xa về phía phải sẽ kéo cả đường thẳng
+xuống, làm đổi luôn ranh giới quyết định cho những điểm ở giữa.</code></pre>
+  <p>Ba vấn đề, xếp theo mức nghiêm trọng:</p>
+  <ul>
+    <li><strong>Đầu ra không bị chặn trong [0, 1]</strong> nên không diễn giải được thành xác suất.</li>
+    <li><strong>MSE giả định phần dư phân phối chuẩn</strong>, nhưng nhãn nhị phân thì theo phân phối Bernoulli — sai giả định ngay từ gốc.</li>
+    <li><strong>Điểm ở xa ảnh hưởng quá mạnh</strong> tới ranh giới, dù chúng vốn dễ phân loại nhất.</li>
+  </ul>
+  <p>Logistic regression sửa cả ba: bọc <code>sigmoid</code> để chặn đầu ra trong (0, 1), và đổi hàm mất mát thành log loss để khớp với phân phối Bernoulli.</p>
+</section>
+
+<section id="linreg-s8">
+  <div class="sh"><b>08</b><h2>Logistic regression</h2></div>
+<pre><code>z = w·x + b                    <span class="cm"># phần tuyến tính, gọi là log-odds</span>
+p = sigmoid(z) = 1 / (1 + e⁻ᶻ)  <span class="cm"># nén về khoảng (0, 1)</span>
+
+z = 0   → p = 0.5      ← ranh giới quyết định
+z &gt; 0   → p &gt; 0.5
+z = 2   → p ≈ 0.88
+z = -2  → p ≈ 0.12</code></pre>
+  <p>Điều đáng nhớ nhất về cấu trúc này: <strong>ranh giới quyết định vẫn là một mặt phẳng tuyến tính</strong> trong không gian đặc trưng. Sigmoid chỉ biến điểm số thành xác suất; nó không làm model phi tuyến. Muốn ranh giới cong thì phải tự thêm đặc trưng bậc cao hoặc đặc trưng tương tác.</p>
+<pre><code>Hàm mất mát — log loss (còn gọi binary cross-entropy):
+    L = -(1/n) Σ [ yᵢ·log(pᵢ) + (1-yᵢ)·log(1-pᵢ) ]
+
+Gradient — kết quả rất gọn:
+    ∂L/∂wⱼ = (1/n) Σ (pᵢ - yᵢ) · xᵢⱼ</code></pre>
+  <div class="note key">
+    <h4>Điểm đẹp nhất của logistic regression</h4>
+    Gradient có dạng <code>(p − y)·x</code> — <strong>giống hệt</strong> gradient của linear regression với MSE, chỉ thay <code>ŷ</code> bằng <code>p</code>. Đây không phải trùng hợp: nó là tính chất chung của mọi model thuộc họ hàm mũ khi dùng hàm liên kết chuẩn. Nêu ra được điều này là dấu hiệu rõ ràng của người đã tự dẫn công thức chứ không chỉ dùng thư viện.
+  </div>
+</section>
+
+<section id="linreg-s9">
+  <div class="sh"><b>09</b><h2>Vì sao log loss chứ không phải MSE</h2></div>
+  <p>Câu hỏi phỏng vấn kinh điển, và có <strong>hai</strong> lý do — nói được cả hai mới là câu trả lời đầy đủ.</p>
+  <h3>Lý do 1: MSE + sigmoid không lồi</h3>
+<pre><code>Với sigmoid bọc ngoài, mặt mất mát MSE theo w có nhiều cực tiểu địa phương.
+Log loss thì LỒI theo w → gradient descent chắc chắn tới cực tiểu toàn cục.</code></pre>
+  <h3>Lý do 2: gradient triệt tiêu đúng lúc cần nhất</h3>
+<pre><code>Trường hợp tệ nhất: nhãn thật y = 1, model dự đoán p = 0.001 (sai hoàn toàn)
+
+Với MSE:      gradient ∝ (p - y) · σ'(z)
+              σ'(z) = p(1-p) ≈ 0.001 → gradient GẦN BẰNG 0
+              → model sai nặng nhưng gần như không học được gì
+
+Với log loss:  gradient ∝ (p - y) = -0.999
+              → tín hiệu học rất mạnh, đúng như mong đợi</code></pre>
+  <p>Đó là điểm cốt lõi: đạo hàm của sigmoid bão hoà ở hai đầu, nên nhân nó vào gradient sẽ <em>giết</em> tín hiệu học ở đúng những mẫu bị dự đoán sai nặng nhất. Log loss được thiết kế để triệt tiêu chính xác cái hệ số <code>σ'(z)</code> đó.</p>
+  <div class="note">
+    <h4>Nhìn từ góc thống kê</h4>
+    Log loss không phải phát minh tuỳ ý — nó chính là <strong>âm log-likelihood</strong> của phân phối Bernoulli. Tối thiểu hoá nó tương đương với ước lượng hợp lý cực đại (MLE). Cũng như MSE là âm log-likelihood của phân phối chuẩn. Chọn hàm mất mát thực chất là <em>khai báo bạn giả định dữ liệu sinh ra từ phân phối nào</em>.
+  </div>
+</section>
+
+<section id="linreg-s10">
+  <div class="sh"><b>10</b><h2>Odds ratio — cách diễn giải đúng</h2></div>
+<pre><code>odds = p / (1 - p)                 <span class="cm"># tỉ lệ cược</span>
+log(odds) = z = w·x + b            <span class="cm"># phần tuyến tính chính là LOG-ODDS</span>
+
+→ tăng x₁ thêm 1 đơn vị làm log-odds tăng thêm w₁
+→ tức odds được NHÂN với e^w₁</code></pre>
+<pre><code>Ví dụ: w = 0.7 cho biến "có tiền sử mua hàng"
+
+e^0.7 ≈ 2.0
+
+"Khách có tiền sử mua hàng có odds mua lại GẤP ĐÔI so với khách không có,
+ khi giữ nguyên các biến khác."
+
+SAI nếu nói: "xác suất mua gấp đôi" — odds khác xác suất.</code></pre>
+  <table>
+    <tr><th>p</th><th>odds</th><th>odds sau khi × 2</th><th>p mới</th></tr>
+    <tr><td>0.10</td><td>0.11</td><td>0.22</td><td>0.18 — gần gấp đôi</td></tr>
+    <tr><td>0.50</td><td>1.00</td><td>2.00</td><td>0.67 — không gấp đôi</td></tr>
+    <tr><td>0.90</td><td>9.00</td><td>18.00</td><td>0.95 — tăng rất ít</td></tr>
+  </table>
+  <p>Bảng này cho thấy vì sao phải cẩn thận: cùng một odds ratio nhưng ảnh hưởng lên xác suất khác nhau hoàn toàn tuỳ vào xác suất nền. Đây là lỗi diễn giải phổ biến nhất khi trình bày kết quả logistic regression cho người không chuyên.</p>
+</section>
+
+<section id="linreg-s11">
+  <div class="sh"><b>11</b><h2>Lab: ngưỡng quyết định</h2></div>
+  <p>Model cho ra xác suất; <strong>ngưỡng là quyết định nghiệp vụ</strong>, không phải tham số của model. Kéo ngưỡng để xem precision và recall đánh đổi nhau.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>ngưỡng</label><input type="number" id="thr" value="0.5" step="0.05" min="0" max="1"></div>
+      <div><label>tình huống</label>
+        <select id="tcase">
+          <option value="balanced" selected>cân bằng — 50/50</option>
+          <option value="rare">lớp dương hiếm — 10%</option>
+        </select>
+      </div>
+    </div>
+    <div id="thrview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Hạ ngưỡng xuống 0.2: bắt được gần hết ca dương (recall cao) nhưng báo sai nhiều (precision thấp) — hợp cho sàng lọc bệnh. Nâng lên 0.8: chỉ báo khi rất chắc — hợp khi báo sai gây tốn kém. Chuyển sang tình huống <strong>lớp dương hiếm</strong> để thấy accuracy trở nên vô nghĩa.
+    </p>
+  </div>
+</section>
+
+<section id="linreg-s12">
+  <div class="sh"><b>12</b><h2>Regularization</h2></div>
+<pre><code>L2 (Ridge):     L + λ Σ wⱼ²      → hệ số nhỏ đều, KHÔNG về 0
+L1 (Lasso):     L + λ Σ |wⱼ|     → một số hệ số về ĐÚNG 0 → tự chọn đặc trưng
+Elastic Net:    kết hợp cả hai</code></pre>
+  <h3>Vì sao L1 tạo ra hệ số bằng 0 mà L2 thì không</h3>
+<pre><code>Nhìn theo hình dạng vùng ràng buộc trong không gian hai trọng số:
+
+L2: |w|² ≤ t  →  hình TRÒN, không có góc
+L1: |w|  ≤ t  →  hình THOI, có GÓC nằm đúng trên các trục
+
+Đường đồng mức của hàm mất mát chạm vùng ràng buộc ở đâu?
+  Với hình tròn: gần như luôn ở một điểm có cả hai toạ độ khác 0.
+  Với hình thoi: rất dễ chạm đúng vào GÓC — mà góc nằm trên trục,
+                 nghĩa là một trọng số bằng đúng 0.</code></pre>
+  <p>Cách nói khác, theo gradient: đạo hàm của <code>|w|</code> là hằng số <code>±λ</code> không phụ thuộc độ lớn của <code>w</code>, nên nó tiếp tục đẩy <code>w</code> về 0 cho tới khi tới đúng 0. Còn đạo hàm của <code>w²</code> là <code>2λw</code>, càng gần 0 thì lực đẩy càng yếu — nên chỉ tiến tới 0 mà không bao giờ tới.</p>
+  <table>
+    <tr><th>Chọn</th><th>Khi nào</th></tr>
+    <tr><td>L2</td><td>Mặc định. Nhiều đặc trưng đều có ích một chút; muốn ổn định hệ số khi có đa cộng tuyến</td></tr>
+    <tr><td>L1</td><td>Nghi ngờ phần lớn đặc trưng vô dụng; muốn model thưa để dễ triển khai và diễn giải</td></tr>
+    <tr><td>Elastic Net</td><td>Nhiều đặc trưng tương quan theo nhóm — L1 thuần sẽ chọn tuỳ ý một biến trong nhóm rồi bỏ hết</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Hai chi tiết bắt buộc</h4>
+    <p><strong>Chuẩn hoá đặc trưng trước khi regularize.</strong> Hình phạt tính trên độ lớn hệ số, mà hệ số phụ thuộc thang đo. Không chuẩn hoá thì biến có đơn vị nhỏ bị phạt nặng một cách vô lý.</p>
+    <p><strong>Không phạt hệ số chặn <code>b</code>.</strong> Nó chỉ dịch chuyển đường, không liên quan tới độ phức tạp của model. Các thư viện đều đã xử lý đúng việc này.</p>
+  </div>
+</section>
+
+<section id="linreg-s13">
+  <div class="sh"><b>13</b><h2>Vì sao vẫn là baseline sau mấy chục năm</h2></div>
+  <table>
+    <tr><th>Lý do</th><th>Chi tiết</th></tr>
+    <tr><td>Diễn giải được</td><td>Mỗi hệ số là một câu tiếng Việt. Bắt buộc trong tài chính, y tế, bảo hiểm vì có yêu cầu pháp lý phải giải thích quyết định</td></tr>
+    <tr><td>Nhanh và nhẹ</td><td>Huấn luyện trong vài giây trên hàng triệu dòng; suy luận là một phép nhân vector — rất hợp với ràng buộc độ trễ thấp</td></tr>
+    <tr><td>Xác suất được hiệu chỉnh tốt</td><td>Nói 70% thì thực tế gần 70%. Nhiều model mạnh hơn lại cho xác suất lệch, phải hiệu chỉnh thêm</td></tr>
+    <tr><td>Là mốc so sánh</td><td>Nếu model phức tạp không thắng nổi logistic regression thì vấn đề nằm ở dữ liệu hoặc đặc trưng, không ở model</td></tr>
+    <tr><td>Ít siêu tham số</td><td>Chỉ có <code>λ</code>. Không có gì để tinh chỉnh hỏng</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Cách nói trong phỏng vấn</h4>
+    "Em luôn bắt đầu bằng logistic regression làm baseline. Nó cho em một con số để so, cho em biết đặc trưng nào có tín hiệu qua hệ số, và huấn luyện đủ nhanh để lặp lại nhiều lần trong ngày. Nếu boosting chỉ hơn baseline 1% thì em sẽ giữ baseline vì nó dễ triển khai, dễ giải thích và dễ vận hành hơn nhiều."
+  </div>
+</section>
+
+<section id="linreg-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Không chuẩn hoá đặc trưng khi dùng regularization</h4><p>Hình phạt phụ thuộc thang đo nên biến đơn vị nhỏ bị phạt oan.</p></div>
+    <div class="card bad"><h4>Diễn giải odds ratio thành xác suất</h4><p>"Odds gấp đôi" không phải "xác suất gấp đôi" — chênh lệch rất lớn khi p đã cao.</p></div>
+    <div class="card bad"><h4>Coi ngưỡng 0.5 là mặc định đúng</h4><p>Ngưỡng là quyết định nghiệp vụ. Với dữ liệu lệch thì 0.5 gần như luôn sai.</p></div>
+    <div class="card bad"><h4>Nói hệ số là nhân quả</h4><p>Nó là quan hệ trong dữ liệu quan sát được. Muốn nói nhân quả cần thí nghiệm hoặc thiết kế nhân quả.</p></div>
+    <div class="card bad"><h4>Dùng MSE cho bài phân loại</h4><p>Mặt mất mát không lồi, và gradient triệt tiêu ở đúng mẫu sai nặng nhất.</p></div>
+    <div class="card bad"><h4>Bỏ đa cộng tuyến bằng mọi giá</h4><p>Nó phá diễn giải chứ không phá dự đoán. Xử lý tuỳ mục tiêu.</p></div>
+  </div>
+</section>
+
+<section id="linreg-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao logistic regression dùng log loss chứ không phải MSE?</summary>
+  <p>Hai lý do. Thứ nhất, MSE ghép với sigmoid tạo ra mặt mất mát không lồi theo trọng số, nên gradient descent có thể mắc ở cực tiểu địa phương; log loss thì lồi. Thứ hai và quan trọng hơn: gradient của MSE có nhân tử <code>σ'(z) = p(1−p)</code>, giá trị này gần 0 khi model dự đoán rất sai — nên đúng ở những mẫu sai nặng nhất thì tín hiệu học lại bị triệt tiêu. Log loss triệt tiêu chính nhân tử đó, cho gradient gọn là <code>(p − y)·x</code>. Nhìn từ góc thống kê, log loss là âm log-likelihood của Bernoulli, nên tối thiểu hoá nó chính là MLE.</p></details>
+
+  <details class="qa"><summary>Vì sao L1 tạo ra hệ số bằng đúng 0 mà L2 thì không?</summary>
+  <p>Nhìn theo gradient là rõ nhất: đạo hàm của <code>|w|</code> là hằng số <code>±λ</code>, không phụ thuộc độ lớn của <code>w</code>, nên nó tiếp tục đẩy trọng số về 0 và tới được đúng 0. Đạo hàm của <code>w²</code> là <code>2λw</code>, càng gần 0 thì lực đẩy càng yếu nên chỉ tiến tới mà không bao giờ tới. Nhìn theo hình học: vùng ràng buộc của L1 là hình thoi có góc nằm trên các trục, và đường đồng mức mất mát rất dễ chạm vào góc — mà chạm góc nghĩa là một hệ số bằng 0. Vùng của L2 là hình tròn không có góc.</p></details>
+
+  <details class="qa"><summary>Giải thích hệ số logistic regression cho người không chuyên.</summary>
+  <p>Phần tuyến tính <code>w·x + b</code> chính là log-odds, nên tăng một đơn vị của biến làm odds được <b>nhân</b> với <code>e^w</code>. Với <code>w = 0.7</code> thì <code>e^0.7 ≈ 2</code>, tức odds gấp đôi khi giữ nguyên các biến khác. Điểm phải cẩn thận là odds không phải xác suất: cùng một odds ratio bằng 2 làm xác suất từ 0.1 lên 0.18 nhưng chỉ từ 0.9 lên 0.95. Nên khi trình bày cho người không chuyên, tôi thường quy về xác suất tại một mức nền cụ thể thay vì nói odds ratio.</p></details>
+
+  <details class="qa"><summary>Bốn giả định của linear regression, và vi phạm thì sao?</summary>
+  <p>Tuyến tính, phần dư độc lập, phương sai đồng nhất, phần dư phân phối chuẩn. Điểm quan trọng là chúng cần cho <b>suy luận thống kê</b> — p-value và khoảng tin cậy — chứ không phải cho khả năng dự đoán. Nếu tôi chỉ cần dự đoán và đánh giá trên tập kiểm tra riêng thì vi phạm ít nghiêm trọng hơn nhiều. Cách kiểm tra nhanh nhất là vẽ phần dư theo giá trị dự đoán: hình cong nghĩa là thiếu tuyến tính, hình phễu nghĩa là phương sai không đồng nhất, các cụm rõ rệt nghĩa là thiếu một biến phân loại.</p></details>
+
+  <details class="qa"><summary>Đa cộng tuyến — có phải luôn phải xử lý?</summary>
+  <p>Không. Nó làm ma trận <code>XᵀX</code> gần suy biến nên hệ số dao động mạnh và có thể lật dấu, tức phá <b>khả năng diễn giải từng hệ số</b>. Nhưng chất lượng dự đoán gần như không đổi. Nên nếu mục tiêu là dự đoán, tôi có thể để nguyên hoặc dùng L2 để ổn định hệ số. Nếu mục tiêu là giải thích ảnh hưởng của từng biến thì phải xử lý: bỏ một biến trong nhóm tương quan, gộp chúng lại, hoặc dùng PCA. Kiểm tra bằng VIF, vượt 5 tới 10 là đáng lo.</p></details>
+
+  <details class="qa"><summary>Vì sao vẫn dùng logistic regression khi đã có boosting và deep learning?</summary>
+  <p>Vì bốn thứ nó vẫn thắng: diễn giải được từng hệ số — bắt buộc ở tài chính và y tế nơi có yêu cầu pháp lý phải giải thích quyết định; xác suất được hiệu chỉnh tốt sẵn, không cần bước calibration; suy luận chỉ là một phép nhân vector nên phù hợp ràng buộc độ trễ rất thấp; và nó là mốc so sánh — nếu model phức tạp không thắng nổi nó thì vấn đề nằm ở dữ liệu hoặc đặc trưng chứ không ở model. Tôi luôn dựng nó làm baseline trước khi thử gì phức tạp hơn.</p></details>
+</section>
+
+<footer>Deep dive · linear &amp; logistic regression · công thức viết theo quy ước một mẫu, bỏ chỉ số batch cho gọn.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

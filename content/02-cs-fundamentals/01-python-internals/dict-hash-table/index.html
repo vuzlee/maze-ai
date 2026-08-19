@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Python dict &amp; hash table — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html">Maze<i>AI</i></a>
+  <input id="q" type="search" placeholder="Tìm trong toàn bộ kho: probe, softmax, tombstone, KV cache…" aria-label="Tìm kiếm">
+  <span class="kbd">/</span>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-dict" data-title="Python dict &amp; hash table" data-tag="Python internals" data-blurb="Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.">
+        <header class="hero">
+  <p class="eyebrow">Cheat sheet · CPython 3.12 · hash table internals</p>
+  <h1>Python <em>dict</em><br>từ trong ra ngoài</h1>
+  <p class="lede">Toàn bộ kiến thức về <b>dict</b>: hash function, hashable, collision, <b>probe sequence</b>, <b>clustering</b>, tombstone, resize, insertion order và độ phức tạp. Mọi công thức trong tài liệu này lấy đúng theo mã nguồn CPython, có ví dụ chạy được.</p>
+</header>
+
+
+<section id="dict-s1">
+  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
+  <p>Một lần <code>d[key]</code> đi qua sáu chặng. Nhớ được sơ đồ này là nhớ được 80% phần còn lại của tài liệu.</p>
+  <figure>
+    <svg viewBox="0 0 860 300" role="img" aria-label="Sơ đồ luồng từ key tới value trong dict">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#8798AA"/>
+        </marker>
+      </defs>
+      <g class="sv-b" stroke-width="1">
+        <rect x="4" y="30" width="112" height="48" rx="6"/>
+        <rect x="156" y="30" width="112" height="48" rx="6"/>
+        <rect x="308" y="30" width="140" height="48" rx="6"/>
+      </g>
+      <text class="sv-t" x="60" y="52" text-anchor="middle">key</text>
+      <text class="sv-l" x="60" y="68" text-anchor="middle">"apple"</text>
+      <text class="sv-t" x="212" y="52" text-anchor="middle">hash(key)</text>
+      <text class="sv-l" x="212" y="68" text-anchor="middle">int 64-bit</text>
+      <text class="sv-t" x="378" y="52" text-anchor="middle">hash &amp; mask</text>
+      <text class="sv-l" x="378" y="68" text-anchor="middle">mask = size − 1</text>
+      <path d="M120,54 L152,54" stroke="#8798AA" marker-end="url(#ar)"/>
+      <path d="M272,54 L304,54" stroke="#8798AA" marker-end="url(#ar)"/>
+      <path d="M378,82 L378,110" stroke="#8798AA" marker-end="url(#ar)"/>
+
+      <rect x="248" y="116" width="260" height="52" rx="6" class="sv-b" stroke-width="1"/>
+      <text class="sv-t" x="378" y="138" text-anchor="middle">dk_indices[i]</text>
+      <text class="sv-l" x="378" y="156" text-anchor="middle">bảng thưa: chỉ chứa số thứ tự entry</text>
+
+      <path d="M508,142 L560,142" stroke="#8798AA" marker-end="url(#ar)"/>
+      <rect x="566" y="116" width="140" height="52" rx="6" class="sv-b" stroke-width="1"/>
+      <text class="sv-t" x="636" y="138" text-anchor="middle">dk_entries[ix]</text>
+      <text class="sv-l" x="636" y="156" text-anchor="middle">hash | key | value</text>
+
+      <path d="M636,172 L636,204" stroke="#8798AA" marker-end="url(#ar)"/>
+      <rect x="546" y="210" width="180" height="52" rx="6" fill="#151E28" stroke="#4ECDB4"/>
+      <text class="sv-t" x="636" y="232" text-anchor="middle">key khớp?</text>
+      <text class="sv-l" x="636" y="250" text-anchor="middle">so hash rồi so ==</text>
+
+      <path d="M546,236 L470,236" stroke="#F0B44A" marker-end="url(#ar)"/>
+      <rect x="248" y="210" width="216" height="52" rx="6" fill="#151E28" stroke="#F0B44A"/>
+      <text class="sv-t" x="356" y="232" text-anchor="middle">không khớp → probe tiếp</text>
+      <text class="sv-l" x="356" y="250" text-anchor="middle">i = (i*5 + perturb + 1) &amp; mask</text>
+      <path d="M356,210 L356,180 L280,180 L280,168" stroke="#F0B44A" fill="none" marker-end="url(#ar)"/>
+
+      <text class="sv-l" x="740" y="240" fill="#4ECDB4">khớp → trả value</text>
+    </svg>
+    <figcaption>Hai bảng, không phải một: <code>dk_indices</code> là bảng hash thưa dùng để tìm; <code>dk_entries</code> là vùng dữ liệu đặc, xếp theo thứ tự chèn.</figcaption>
+  </figure>
+</section>
+
+<section id="dict-s2">
+  <div class="sh"><b>02</b><h2>Dict là gì</h2></div>
+  <ul>
+    <li>Cấu trúc lưu cặp <strong>key → value</strong>, cài đặt bằng <strong>hash table</strong>.</li>
+    <li>Lookup / insert / delete trung bình <strong>O(1)</strong>, không phụ thuộc số phần tử.</li>
+    <li>Ý chính: <strong>không tìm tuần tự</strong>. Từ chính bản thân key tính ra được vị trí cần đọc.</li>
+    <li>Đánh đổi: tốn bộ nhớ hơn list (phải để trống ~1/3 bảng), và cần key hashable.</li>
+  </ul>
+  <div class="note key">
+    <h4>Câu thần chú</h4>
+    List trả lời câu "phần tử thứ 5 ở đâu". Dict trả lời câu "key này ở đâu". Cả hai đều là truy cập mảng theo index — khác nhau ở chỗ index từ đâu ra.
+  </div>
+</section>
+
+<section id="dict-s3">
+  <div class="sh"><b>03</b><h2>Hash function</h2></div>
+  <p>Biến một object thành số nguyên có dấu 64-bit (trên nền tảng 64-bit). Số đó dùng để suy ra vị trí trong bảng.</p>
+<pre><code>&gt;&gt;&gt; hash("apple")     <span class="cm"># đổi mỗi lần chạy interpreter</span>
+-1795402529437124651
+&gt;&gt;&gt; hash(123)
+123                    <span class="cm"># int nhỏ: hash chính là nó</span>
+&gt;&gt;&gt; hash(2**61 - 1)
+0                      <span class="cm"># hash int lấy modulo 2**61-1</span>
+&gt;&gt;&gt; hash(-1), hash(-2)
+(-2, -2)               <span class="cm"># -1 bị đổi thành -2 vì -1 là mã lỗi trong C</span></code></pre>
+  <h3>Bốn tính chất phải nhớ</h3>
+  <ul>
+    <li><strong>Không cần duy nhất.</strong> Hai key khác nhau được phép trùng hash — đó là collision, xử lý sau.</li>
+    <li><strong>Bắt buộc nhất quán:</strong> <code>a == b</code> thì <code>hash(a) == hash(b)</code>. Ngược lại không đúng.</li>
+    <li><strong>Bằng nhau xuyên kiểu:</strong> <code>1 == 1.0 == True</code> nên cùng hash → trong dict chúng là <em>một</em> key duy nhất.</li>
+    <li><strong>Ngẫu nhiên hoá:</strong> hash của <code>str</code>/<code>bytes</code> có trộn seed ngẫu nhiên mỗi tiến trình (chống tấn công hash-collision DoS). Cố định bằng <code>PYTHONHASHSEED</code>. Vì vậy <em>không</em> đem hash đi lưu ra file hay làm shard key.</li>
+  </ul>
+<pre><code>&gt;&gt;&gt; d = {1: "int", 1.0: "float", True: "bool"}
+&gt;&gt;&gt; d
+{1: 'bool'}            <span class="cm"># 3 lần ghi vào cùng một ô</span></code></pre>
+</section>
+
+<section id="dict-s4">
+  <div class="sh"><b>04</b><h2>Hashable</h2></div>
+  <p>Object đủ điều kiện làm key. Ba điều kiện, thiếu một là sai:</p>
+  <ol>
+    <li>Có <code>__hash__()</code> trả về int.</li>
+    <li>Giá trị hash <strong>không đổi</strong> suốt đời object.</li>
+    <li>Tương thích với <code>__eq__()</code>: bằng nhau thì hash phải bằng nhau.</li>
+  </ol>
+  <div class="grid2">
+    <div class="card ok"><h4>Hashable</h4><p><code>int</code> <code>float</code> <code>str</code> <code>bytes</code> <code>bool</code> <code>None</code> <code>tuple</code> (nếu mọi phần tử hashable) <code>frozenset</code> <code>type</code>, object tự định nghĩa (mặc định hash theo địa chỉ)</p></div>
+    <div class="card bad"><h4>Không hashable</h4><p><code>list</code> <code>dict</code> <code>set</code> <code>bytearray</code>, và <code>tuple</code> có chứa list bên trong</p></div>
+  </div>
+<pre><code>&gt;&gt;&gt; hash((1, 2, 3))
+529344067295497451
+&gt;&gt;&gt; hash((1, [2]))
+TypeError: unhashable type: 'list'   <span class="cm"># tuple chỉ hashable nếu bên trong hashable</span></code></pre>
+  <div class="note warn">
+    <h4>Vì sao key buộc phải hashable</h4>
+    Vị trí lưu được tính từ hash. Nếu hash của key thay đổi sau khi đã lưu, dict sẽ đi tìm ở ô mới trong khi dữ liệu nằm ở ô cũ — không bao giờ tìm lại được. Chi tiết ở mục 19.
+  </div>
+</section>
+
+<section id="dict-s5">
+  <div class="sh"><b>05</b><h2>Immutable vs Mutable</h2></div>
+  <table>
+    <tr><th>Immutable — không sửa được nội dung</th><th>Mutable — sửa được nội dung</th></tr>
+    <tr><td><code>int, float, complex, bool, str, bytes, tuple, frozenset, None</code></td><td><code>list, dict, set, bytearray</code>, phần lớn class tự viết</td></tr>
+  </table>
+  <p>Quan hệ giữa hai khái niệm hay bị nhầm — nhớ theo ba gạch đầu dòng này:</p>
+  <ul>
+    <li>Immutable thì <strong>hầu hết</strong> hashable. Không phải tất cả: <code>tuple</code> chứa <code>list</code> là immutable ở tầng ngoài nhưng vẫn unhashable.</li>
+    <li>Mutable <strong>có thể</strong> hashable: object tự viết mặc định vẫn hashable (hash theo <code>id()</code>) dù bạn sửa thuộc tính nó thoải mái.</li>
+    <li>Điều Python thực sự cần không phải là "immutable", mà là <strong>hash không đổi và nhất quán với ==</strong>. Immutable chỉ là cách dễ nhất để đạt điều đó.</li>
+  </ul>
+</section>
+
+<section id="dict-s6">
+  <div class="sh"><b>06</b><h2>Từ hash sang index</h2></div>
+  <p>Kích thước bảng của CPython <strong>luôn là lũy thừa của 2</strong> (nhỏ nhất là 8). Nhờ đó phép chia lấy dư được thay bằng phép AND bit, nhanh hơn nhiều:</p>
+<pre><code><span class="cm">// mask = size - 1, ví dụ size=8 → mask=0b111</span>
+i = hash &amp; mask;      <span class="cm">// tương đương hash % size, nhưng chỉ 1 chu kỳ CPU</span></code></pre>
+  <p>Hệ quả quan trọng: chỉ <strong>các bit thấp</strong> của hash quyết định ô đầu tiên. Với <code>size = 8</code> thì các key <code>0, 8, 16, 24, 32</code> đều bắt đầu ở ô 0, dù hash của chúng khác nhau hoàn toàn. Đây chính là lý do CPython phải trộn thêm bit cao vào lúc probe (mục 10).</p>
+  <div class="rail" id="rail-mask"></div>
+  <p class="legend"><span><b style="background:var(--filled)"></b>các key 0 · 8 · 16 · 24 đều đáp xuống ô 0 khi size = 8</span></p>
+</section>
+
+<section id="dict-s7">
+  <div class="sh"><b>07</b><h2>Compact dict — cấu trúc thật</h2></div>
+  <p>Từ Python 3.6, dict không còn là một mảng entry duy nhất. Nó tách làm hai vùng:</p>
+  <ul>
+    <li><code>dk_indices</code> — <strong>bảng hash thưa</strong>, dài bằng size, mỗi ô chỉ chứa một số nguyên nhỏ: số thứ tự entry, hoặc <code>EMPTY (-1)</code>, hoặc <code>DUMMY (-2)</code>.</li>
+    <li><code>dk_entries</code> — <strong>vùng dữ liệu đặc</strong>, chỉ dài bằng ~2/3 size, mỗi entry gồm <code>{hash, key, value}</code>, ghi nối tiếp <strong>theo thứ tự chèn</strong>.</li>
+  </ul>
+  <figure>
+    <svg viewBox="0 0 860 240" role="img" aria-label="Cấu trúc compact dict gồm dk_indices và dk_entries">
+      <text class="sv-l" x="0" y="16">dk_indices (8 ô, thưa)</text>
+      <g stroke="#2A3A4C" fill="#1D2836">
+        <rect x="0" y="26" width="66" height="34" rx="4"/><rect x="70" y="26" width="66" height="34" rx="4"/>
+        <rect x="140" y="26" width="66" height="34" rx="4"/><rect x="210" y="26" width="66" height="34" rx="4"/>
+        <rect x="280" y="26" width="66" height="34" rx="4"/><rect x="350" y="26" width="66" height="34" rx="4"/>
+        <rect x="420" y="26" width="66" height="34" rx="4"/><rect x="490" y="26" width="66" height="34" rx="4"/>
+      </g>
+      <g class="sv-l" text-anchor="middle" font-size="11">
+        <text x="33" y="74">0</text><text x="103" y="74">1</text><text x="173" y="74">2</text><text x="243" y="74">3</text>
+        <text x="313" y="74">4</text><text x="383" y="74">5</text><text x="453" y="74">6</text><text x="523" y="74">7</text>
+      </g>
+      <g class="sv-t" text-anchor="middle" font-family="IBM Plex Mono" font-size="12">
+        <text x="33" y="48" fill="#8798AA">−1</text><text x="103" y="48" fill="#6C8CFF">2</text>
+        <text x="173" y="48" fill="#8798AA">−1</text><text x="243" y="48" fill="#6C8CFF">0</text>
+        <text x="313" y="48" fill="#8798AA">−1</text><text x="383" y="48" fill="#E06C7A">−2</text>
+        <text x="453" y="48" fill="#6C8CFF">1</text><text x="523" y="48" fill="#8798AA">−1</text>
+      </g>
+      <text class="sv-l" x="0" y="118">dk_entries (đặc, theo thứ tự chèn)</text>
+      <g stroke="#2A3A4C" fill="#151E28">
+        <rect x="0" y="128" width="176" height="34" rx="4"/><rect x="180" y="128" width="176" height="34" rx="4"/>
+        <rect x="360" y="128" width="176" height="34" rx="4"/>
+      </g>
+      <g class="sv-t" font-family="IBM Plex Mono" font-size="11.5" text-anchor="middle">
+        <text x="88" y="149">h · "c" · 1</text><text x="268" y="149">h · "a" · 2</text><text x="448" y="149">h · "b" · 3</text>
+      </g>
+      <g class="sv-l" text-anchor="middle"><text x="88" y="176">ix=0</text><text x="268" y="176">ix=1</text><text x="448" y="176">ix=2</text></g>
+      <path d="M243,60 L243,100 L88,100 L88,126" stroke="#6C8CFF" fill="none" stroke-dasharray="3 3"/>
+      <path d="M453,60 L453,110 L268,110 L268,126" stroke="#6C8CFF" fill="none" stroke-dasharray="3 3"/>
+      <path d="M103,60 L103,92 L448,92 L448,126" stroke="#6C8CFF" fill="none" stroke-dasharray="3 3"/>
+      <text class="sv-l" x="600" y="40">−1 = EMPTY</text>
+      <text class="sv-l" x="600" y="58" fill="#E06C7A">−2 = DUMMY (tombstone)</text>
+      <text class="sv-l" x="600" y="76" fill="#6C8CFF">≥0 = chỉ số trong dk_entries</text>
+      <text class="sv-l" x="600" y="140">Duyệt dict = đọc dk_entries</text>
+      <text class="sv-l" x="600" y="158">tuần tự → ra đúng thứ tự chèn.</text>
+    </svg>
+    <figcaption>Với <code>d = {}; d["c"]=1; d["a"]=2; d["b"]=3</code>. Bảng thưa chỉ tốn 1 byte/ô khi size ≤ 128 (2 byte tới 2¹⁵, 4 byte tới 2³¹), nên phần "để trống" của bảng hash rất rẻ.</figcaption>
+  </figure>
+  <p>Thiết kế này giải quyết hai việc cùng lúc: <strong>tiết kiệm 20–25% bộ nhớ</strong> so với dict cũ, và <strong>giữ được thứ tự chèn miễn phí</strong> (mục 18).</p>
+</section>
+
+<section id="dict-s8">
+  <div class="sh"><b>08</b><h2>Collision</h2></div>
+  <p>Hai key khác nhau nhưng cùng ra một ô. Có hai mức độ, phải phân biệt:</p>
+  <ul>
+    <li><strong>Trùng index</strong> — phổ biến, không tránh được: <code>hash(A) &amp; mask == hash(B) &amp; mask</code> dù hash khác nhau. Bảng chỉ có 8 ô mà không gian hash là 2⁶⁴.</li>
+    <li><strong>Trùng hash</strong> — hiếm, tệ hơn nhiều: <code>hash(A) == hash(B)</code>. Lúc này probe sequence của hai key <em>giống nhau hoàn toàn</em>, không cách nào tách ra được. Đây là gốc của trường hợp O(n).</li>
+  </ul>
+<pre><code>&gt;&gt;&gt; hash(-1) == hash(-2)          <span class="cm"># trùng hash thật sự</span>
+True
+&gt;&gt;&gt; 4 &amp; 7, 12 &amp; 7                 <span class="cm"># trùng index, hash vẫn khác</span>
+(4, 4)</code></pre>
+  <div class="note">
+    <h4>Nhận diện đúng khi so hai key</h4>
+    CPython so <code>hash</code> đã lưu trong entry <em>trước</em>, chỉ khi hash bằng nhau mới gọi <code>==</code>. Nhờ vậy va chạm index không kéo theo chi phí so sánh object đắt đỏ.
+  </div>
+</section>
+
+<section id="dict-s9">
+  <div class="sh"><b>09</b><h2>Chaining vs Open Addressing</h2></div>
+  <div class="grid2">
+    <div class="card">
+      <h4>Separate Chaining</h4>
+      <p>Mỗi ô giữ một danh sách liên kết. Va chạm thì nối thêm vào cuối danh sách.</p>
+      <p class="legend" style="margin-top:10px"><span>Dùng bởi Java <code>HashMap</code> (đủ dài thì đổi sang cây đỏ-đen)</span></p>
+      <ul style="font-size:14px">
+        <li>+ Load factor có thể vượt 1</li>
+        <li>+ Xoá đơn giản, không cần tombstone</li>
+        <li>− Mỗi node một lần cấp phát, con trỏ nhảy lung tung → cache miss</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Open Addressing</h4>
+      <p>Toàn bộ dữ liệu nằm trong chính mảng. Ô bị chiếm thì đi tìm ô khác theo một trật tự xác định.</p>
+      <p class="legend" style="margin-top:10px"><span>Dùng bởi Python <code>dict</code> và <code>set</code></span></p>
+      <ul style="font-size:14px">
+        <li>+ Không cấp phát thêm, dữ liệu liền khối → cache tốt</li>
+        <li>+ Ít bộ nhớ hơn</li>
+        <li>− Load factor phải &lt; 1, cần resize sớm</li>
+        <li>− Xoá phức tạp: phải đánh dấu tombstone</li>
+      </ul>
+    </div>
+  </div>
+  <figure>
+    <svg viewBox="0 0 860 170" role="img" aria-label="So sánh chaining và open addressing">
+      <text class="sv-l" x="0" y="14">CHAINING</text>
+      <g stroke="#2A3A4C" fill="#1D2836">
+        <rect x="0" y="24" width="40" height="28" rx="3"/><rect x="0" y="56" width="40" height="28" rx="3"/><rect x="0" y="88" width="40" height="28" rx="3"/>
+      </g>
+      <g stroke="#2A3A4C" fill="#151E28">
+        <rect x="66" y="56" width="52" height="28" rx="3"/><rect x="132" y="56" width="52" height="28" rx="3"/><rect x="198" y="56" width="52" height="28" rx="3"/>
+      </g>
+      <g class="sv-l" text-anchor="middle"><text x="92" y="75">A</text><text x="158" y="75">B</text><text x="224" y="75">C</text></g>
+      <g stroke="#8798AA"><path d="M40,70 L64,70"/><path d="M118,70 L130,70"/><path d="M184,70 L196,70"/></g>
+      <text class="sv-l" x="0" y="140">ba key cùng ô 1 → nối thành chuỗi ngoài bảng</text>
+
+      <text class="sv-l" x="430" y="14">OPEN ADDRESSING</text>
+      <g stroke="#2A3A4C" fill="#1D2836">
+        <rect x="430" y="46" width="46" height="30" rx="3"/><rect x="480" y="46" width="46" height="30" rx="3" fill="#6C8CFF"/>
+        <rect x="530" y="46" width="46" height="30" rx="3"/><rect x="580" y="46" width="46" height="30" rx="3" fill="#6C8CFF"/>
+        <rect x="630" y="46" width="46" height="30" rx="3"/><rect x="680" y="46" width="46" height="30" rx="3"/>
+        <rect x="730" y="46" width="46" height="30" rx="3" fill="#6C8CFF"/><rect x="780" y="46" width="46" height="30" rx="3"/>
+      </g>
+      <g font-family="IBM Plex Mono" font-size="12" text-anchor="middle" fill="#0E141B">
+        <text x="503" y="66">A</text><text x="603" y="66">B</text><text x="753" y="66">C</text>
+      </g>
+      <path d="M503,80 Q550,110 603,80" stroke="#F0B44A" fill="none"/>
+      <path d="M603,80 Q680,120 753,80" stroke="#F0B44A" fill="none"/>
+      <text class="sv-l" x="430" y="140">ba key cùng ô 1 → B, C bị đẩy tới ô khác trong cùng bảng</text>
+    </svg>
+  </figure>
+</section>
+<section id="dict-s10">
+  <div class="sh"><b>10</b><h2>Probe Sequence</h2></div>
+  <p><strong>Probe sequence</strong> là trật tự các ô được kiểm tra khi ô đầu tiên đã bị chiếm. Nó không phải chi tiết phụ — nó là <em>hợp đồng</em> giữa insert và lookup: lookup chỉ tìm ra key nếu nó đi lại đúng con đường mà insert đã đi.</p>
+  <h3>Một probe sequence tốt cần ba thứ</h3>
+  <ol>
+    <li><strong>Xác định</strong> — cùng một key luôn cho cùng một đường đi.</li>
+    <li><strong>Phủ hết bảng</strong> — nếu bảng còn ô trống thì phải tìm được, không được lặp vòng sớm.</li>
+    <li><strong>Phân tán</strong> — hai key khác nhau nên có đường đi khác nhau, tránh clustering (mục 11).</li>
+  </ol>
+  <table>
+    <tr><th>Kiểu</th><th>Công thức bước k</th><th>Vấn đề</th></tr>
+    <tr><td>Linear probing</td><td><code>(i + k) &amp; mask</code></td><td>Primary clustering nặng</td></tr>
+    <tr><td>Quadratic probing</td><td><code>(i + k²) &amp; mask</code></td><td>Secondary clustering; không chắc phủ hết bảng</td></tr>
+    <tr><td>Double hashing</td><td><code>(i + k·h₂(key)) &amp; mask</code></td><td>Tốn thêm một lần băm</td></tr>
+    <tr><td><strong>Pseudo-random</strong> ← Python</td><td><code>(i·5 + perturb + 1) &amp; mask</code></td><td>Cache locality kém hơn</td></tr>
+  </table>
+  <h3>Công thức của CPython</h3>
+<pre><code><span class="cm">// Objects/dictobject.c — PERTURB_SHIFT = 5</span>
+perturb = hash;
+i = (size_t)hash &amp; mask;
+<span class="kw">for</span> (;;) {
+    ix = dk_indices[i];
+    <span class="kw">if</span> (ix == EMPTY) <span class="kw">return</span> NOT_FOUND;      <span class="cm">// gặp ô trống là hết đường</span>
+    <span class="kw">if</span> (ix &gt;= 0 &amp;&amp; match(entries[ix])) <span class="kw">return</span> ix;
+    perturb &gt;&gt;= PERTURB_SHIFT;                <span class="cm">// bơm bit cao của hash vào</span>
+    i = (i*5 + perturb + 1) &amp; mask;
+}</code></pre>
+  <p>Hai thành phần, mỗi thành phần một nhiệm vụ:</p>
+  <ul>
+    <li><code>perturb</code> khởi tạo bằng <strong>toàn bộ 64 bit hash</strong> rồi dịch phải 5 bit mỗi bước. Nó tiêm dần các <strong>bit cao</strong> — thứ mà <code>hash &amp; mask</code> ở mục 06 đã bỏ đi — vào đường đi. Hai key cùng bit thấp nhưng khác bit cao sẽ tách nhau ngay ở bước thứ nhất.</li>
+    <li><code>i*5 + 1</code> lo phần bảo hiểm. Sau khoảng 13 bước (64 ÷ 5) <code>perturb</code> tụt về 0, công thức còn lại là <code>i = (5i + 1) &amp; mask</code>. Với mọi size là lũy thừa của 2, dãy này <strong>đi qua đúng một lần toàn bộ các ô</strong> rồi mới quay lại — nên insert không bao giờ báo "hết chỗ" khi bảng còn ô trống.</li>
+  </ul>
+  <div class="note key">
+    <h4>Vì sao là 5 và +1</h4>
+    <code>5i + 1 (mod 2ᵏ)</code> là một linear congruential generator có chu kỳ đầy đủ: hệ số 5 ≡ 1 (mod 4) và hằng số 1 lẻ. Đổi 5 thành 4 hoặc bỏ <code>+1</code> là mất tính chất này và dict sẽ có ô không bao giờ chạm tới được.
+  </div>
+
+  <h3>Thử trực tiếp</h3>
+  <div class="lab">
+    <div class="bar">
+      <div><label for="ph">hash (thập phân hoặc 0x…)</label><input id="ph" value="0xA3"></div>
+      <div><label for="ps">size của bảng</label>
+        <select id="ps"><option>8</option><option selected>32</option><option>64</option><option>128</option></select>
+      </div>
+      <button id="pgo">Chạy probe</button>
+      <button id="prnd" class="ghost">hash ngẫu nhiên</button>
+    </div>
+    <div class="rail" id="prail"></div>
+    <div class="steps" id="psteps"></div>
+    <p class="legend"><span><b style="background:var(--probe)"></b>ô được thăm, số trong ô là bước probe</span></p>
+  </div>
+
+  <h3>Ba key cùng ô đầu, ba đường đi khác nhau</h3>
+  <p>Cả ba hash dưới đây có 5 bit thấp giống nhau nên cùng đáp xuống ô 3 của bảng 32 ô. Bit cao khác nhau lập tức đẩy chúng đi ba hướng:</p>
+  <div id="pdiv"></div>
+  <div class="note">
+    <h4>Chi tiết ít ai để ý</h4>
+    Đường đi <em>không</em> đảm bảo không lặp trong giai đoạn <code>perturb</code> còn khác 0 — <code>0x2A3</code> ở trên quay lại ô 3 ở bước 3. Đó chỉ là một lần probe lãng phí, không gây sai, vì giai đoạn <code>5i+1</code> phía sau vẫn bảo đảm phủ hết bảng.
+  </div>
+</section>
+
+<section id="dict-s11">
+  <div class="sh"><b>11</b><h2>Clustering</h2></div>
+  <p><strong>Clustering</strong> là hiện tượng các ô bị chiếm dồn lại thành cụm, khiến probe sequence dài ra và O(1) trượt dần về O(n). Đây là lý do tồn tại của cách probe kỳ dị ở mục 10.</p>
+
+  <h3>Primary clustering — bệnh của linear probing</h3>
+  <p>Với <code>i+1</code>, mọi va chạm đều lấp vào ô kế tiếp, tạo ra một <strong>dải liền kề</strong>. Dải này có hai tính chất chết người:</p>
+  <ul>
+    <li><strong>Tự lớn lên.</strong> Một dải dài L thu hút bất kỳ key nào đáp xuống một trong L ô đó — xác suất bị va chạm tỉ lệ với chính độ dài dải.</li>
+    <li><strong>Dính vào nhau.</strong> Hai dải chỉ cách nhau một ô trống, khi ô đó bị lấp thì chúng nhập thành một dải dài gấp đôi.</li>
+  </ul>
+  <p>Số probe trung bình cho một lần tìm thất bại với linear probing xấp xỉ <code>(1 + 1/(1−α)²) / 2</code>, trong đó α là load factor. Ở α = 0.66 con số này khoảng 4.8; ở α = 0.9 nó vọt lên 50. Với pseudo-random probing thì chỉ là <code>1/(1−α)</code> — tương ứng 2.9 và 10.</p>
+  <div id="clust"></div>
+
+  <h3>Secondary clustering — bệnh của quadratic probing</h3>
+  <p>Quadratic probing (<code>i + k²</code>) phá được dải liền kề, nhưng vẫn còn một lỗ: <strong>đường đi chỉ phụ thuộc ô đầu tiên</strong>. Mọi key có cùng <code>hash &amp; mask</code> sẽ thăm đúng cùng một chuỗi ô theo đúng thứ tự đó — chúng chen nhau trên một hành lang chung, chỉ là hành lang này không nằm liền nhau trong bộ nhớ.</p>
+  <p>Chính điểm này là điều <code>perturb</code> của Python xử lý. Đường đi phụ thuộc <em>toàn bộ</em> 64 bit hash, không chỉ phần bị mask giữ lại, nên hai key khác hash thì khác đường ngay từ bước một — như demo ở mục 10.</p>
+
+  <h3>Cái giá phải trả: cache locality</h3>
+  <p>Linear probing có một ưu điểm thật: ô kế tiếp gần như chắc chắn đã nằm trong cache line vừa nạp, nên probe thứ hai gần như miễn phí. Pseudo-random probing nhảy lung tung, mỗi probe là một lần có thể cache miss.</p>
+  <p>CPython bù lại bằng chính <strong>compact dict</strong>: <code>dk_indices</code> chỉ tốn <strong>1 byte mỗi ô</strong> khi bảng ≤ 128 ô, nên toàn bộ bảng hash của một dict cỡ vừa nằm gọn trong một hai cache line — nhảy đi đâu thì cũng vẫn ở trong cache. Đây là ví dụ đẹp về hai quyết định thiết kế bù trừ cho nhau.</p>
+  <div class="note warn">
+    <h4>Clustering giả do tombstone</h4>
+    Ô <code>DUMMY</code> không chứa dữ liệu nhưng vẫn buộc probe đi tiếp (mục 14). Một dict bị thêm–xoá liên tục mà không resize sẽ đầy tombstone và probe sequence dài ra y như bị clustering thật, dù số phần tử thực tế rất ít.
+  </div>
+</section>
+
+<section id="dict-s12">
+  <div class="sh"><b>12</b><h2>Lookup</h2></div>
+<pre><code>tính hash(key)
+i = hash &amp; mask
+lặp:
+    ix = dk_indices[i]
+    ix == EMPTY   → KeyError            <span class="cm"># điều kiện dừng duy nhất</span>
+    ix == DUMMY   → probe tiếp
+    ix &gt;= 0       → e = dk_entries[ix]
+                    e.hash != hash        → probe tiếp   <span class="cm"># so int, rất rẻ</span>
+                    e.key is key          → trả e.value  <span class="cm"># so địa chỉ trước</span>
+                    e.key == key          → trả e.value  <span class="cm"># mới gọi __eq__</span>
+                    ngược lại             → probe tiếp</code></pre>
+  <ul>
+    <li>Gặp <strong>EMPTY</strong> mới được kết luận "không có". Đây là lý do không thể xoá thẳng một ô.</li>
+    <li>Thứ tự so sánh là <strong>hash → <code>is</code> → <code>==</code></strong>, ba lớp lọc từ rẻ đến đắt. Với key là <code>str</code> đã interned, phép <code>is</code> thường ăn ngay.</li>
+    <li><code>d[k]</code>, <code>k in d</code>, <code>d.get(k)</code> dùng chung đúng đường này; khác nhau chỉ ở cách xử lý khi không tìm thấy.</li>
+  </ul>
+</section>
+
+<section id="dict-s13">
+  <div class="sh"><b>13</b><h2>Insert</h2></div>
+<pre><code>tính hash(key)
+probe như lookup:
+    tìm thấy key    → ghi đè value, GIỮ NGUYÊN vị trí và thứ tự
+    gặp EMPTY       → đây là chỗ để ghi
+ghi:
+    dk_entries[nentries] = {hash, key, value}   <span class="cm"># nối vào cuối vùng đặc</span>
+    dk_indices[i] = nentries                    <span class="cm"># bảng thưa trỏ tới</span>
+    nentries += 1
+nếu bảng đã quá 2/3 → resize (mục 15)</code></pre>
+  <div class="note">
+    <h4>Ghi đè không đổi thứ tự</h4>
+    <code>d["a"] = 99</code> trên key đã tồn tại chỉ sửa <code>value</code> tại entry cũ. Vị trí trong <code>dk_entries</code> không đổi → <code>"a"</code> vẫn ở đúng chỗ cũ khi duyệt. Muốn đẩy nó xuống cuối thì phải <code>del</code> rồi gán lại.
+  </div>
+  <div class="note">
+    <h4>Tombstone được tái sử dụng có điều kiện</h4>
+    Trong quá trình probe, nếu gặp <code>DUMMY</code> trước <code>EMPTY</code>, CPython ghi nhớ ô đó và dùng lại nếu cuối cùng xác định key chưa tồn tại. Việc này thu hồi ô nhưng <em>không</em> làm ngắn probe sequence của các key khác.
+  </div>
+</section>
+
+<section id="dict-s14">
+  <div class="sh"><b>14</b><h2>Delete &amp; Tombstone</h2></div>
+  <p>Xoá đi qua đúng lộ trình lookup, nhưng <strong>không dọn ô</strong>. Nó ghi <code>DUMMY (−2)</code> vào <code>dk_indices[i]</code> và set <code>key</code>, <code>value</code> trong entry về NULL.</p>
+  <p>Nếu ghi <code>EMPTY</code> thay vì <code>DUMMY</code>, ô vừa xoá trở thành một điều kiện dừng giả và mọi key nằm phía sau nó trên probe sequence sẽ biến mất khỏi dict — dù dữ liệu vẫn còn trong bảng.</p>
+  <div id="tomb"></div>
+  <ul>
+    <li>Tombstone <strong>không được thu hồi ngay</strong>; chúng chỉ biến mất khi resize/rehash.</li>
+    <li>Dict chỉ thu nhỏ hoặc dọn tombstone <strong>lúc insert kích hoạt resize</strong>. Xoá hết phần tử bằng <code>del</code> không trả lại bộ nhớ; <code>d.clear()</code> mới cấp lại bảng rỗng.</li>
+    <li>Vòng lặp thêm–xoá dài hạn (dict dùng làm cache/queue) là kịch bản dễ tích tombstone nhất — cân nhắc <code>d = dict(d)</code> định kỳ để rehash.</li>
+  </ul>
+</section>
+
+<section id="dict-s15">
+  <div class="sh"><b>15</b><h2>Load factor &amp; Resize</h2></div>
+  <p><strong>Load factor</strong> α = số ô đã dùng / size. Open addressing sụp đổ khi α tiến tới 1, nên CPython giữ trần ở <strong>2/3</strong>: vùng <code>dk_entries</code> chỉ được cấp <code>2/3 × size</code> chỗ, đầy là resize.</p>
+<pre><code><span class="cm"># kích thước mới = lũy thừa của 2 nhỏ nhất ≥ used * 3   (GROWTH_RATE)</span>
+<span class="cm"># tối thiểu 8 (PyDict_MINSIZE)</span>
+
+size 8   → chứa được 5   → key thứ 6  làm bảng thành 16
+size 16  → chứa được 10  → key thứ 11 làm bảng thành 32
+size 32  → chứa được 21  → key thứ 22 làm bảng thành 64
+size 64  → chứa được 42  → key thứ 43 làm bảng thành 128</code></pre>
+<pre><code>&gt;&gt;&gt; import sys
+&gt;&gt;&gt; [sys.getsizeof(dict.fromkeys(range(n))) for n in (5, 6, 10, 11, 21, 22)]
+[224, 352, 352, 632, 632, 1168]        <span class="cm"># nhảy đúng tại 6, 11, 22</span></code></pre>
+  <h3>Resize làm gì</h3>
+  <ol>
+    <li>Cấp bảng mới, <strong>tính lại index cho toàn bộ key</strong> từ hash đã lưu sẵn trong entry — không gọi lại <code>__hash__</code>.</li>
+    <li><strong>Dọn sạch tombstone</strong> và nén <code>dk_entries</code> lại thành khối liền, tức reset luôn mọi probe sequence đã bị kéo dài.</li>
+    <li>Chi phí <strong>O(n)</strong> nhưng chỉ xảy ra khi size nhân đôi → chia đều ra là <strong>O(1)</strong> mỗi lần insert (mục 16).</li>
+  </ol>
+  <div class="note key">
+    <h4>Resize không đồng nghĩa với phình to</h4>
+    Kích thước mới tính theo <code>used</code> — số phần tử <em>còn sống</em>, không phải số ô đã chạm. Một dict 1000 key bị xoá còn 10 key, khi insert kích hoạt resize sẽ <strong>co lại</strong> về size 32. Đây là lối duy nhất để dict nhả bộ nhớ.
+  </div>
+  <p>Biết trước số lượng key thì tránh được resize dây chuyền bằng cách dựng một lần:</p>
+<pre><code>d = dict.fromkeys(keys)          <span class="cm"># cấp bảng đúng cỡ ngay từ đầu</span>
+d = {k: f(k) for k in keys}      <span class="cm"># cũng tốt hơn vòng lặp d[k] = ...</span></code></pre>
+</section>
+
+<section id="dict-s16">
+  <div class="sh"><b>16</b><h2>Complexity</h2></div>
+  <table>
+    <tr><th>Thao tác</th><th>Trung bình</th><th>Tệ nhất</th><th>Ghi chú</th></tr>
+    <tr><td><code>d[k]</code> / <code>k in d</code></td><td>O(1)</td><td>O(n)</td><td>tệ nhất khi mọi key trùng hash</td></tr>
+    <tr><td><code>d[k] = v</code></td><td>O(1)*</td><td>O(n)</td><td>* amortized, có resize</td></tr>
+    <tr><td><code>del d[k]</code></td><td>O(1)</td><td>O(n)</td><td>không giải phóng bộ nhớ</td></tr>
+    <tr><td><code>len(d)</code></td><td>O(1)</td><td>O(1)</td><td>đọc <code>ma_used</code></td></tr>
+    <tr><td>duyệt <code>for k in d</code></td><td>O(size vùng entries)</td><td>—</td><td>tính cả ô đã xoá</td></tr>
+    <tr><td><code>d.copy()</code></td><td>O(n)</td><td>O(n)</td><td>shallow</td></tr>
+    <tr><td><code>d1 == d2</code></td><td>O(n)</td><td>O(n)</td><td>không quan tâm thứ tự</td></tr>
+  </table>
+  <h3>Amortized O(1) nghĩa là gì</h3>
+  <p>Insert thứ 22 phải rehash 21 phần tử: một lần O(n) thật. Nhưng để tới được lần resize kế tiếp cần thêm ~21 lần insert rẻ. Tổng chi phí của n lần insert là O(n) vì tổng công resize là <code>n/2 + n/4 + n/8 + … &lt; n</code>. Chia đều: <strong>O(1) mỗi lần</strong>.</p>
+  <div class="note warn">
+    <h4>Amortized không phải worst-case</h4>
+    Một lần <code>d[k] = v</code> đơn lẻ vẫn có thể mất O(n). Với hệ thống realtime hay có SLA theo p99, đây là nguồn latency spike có thật — nên cấp sẵn dung lượng nếu biết trước số key.
+  </div>
+</section>
+
+<section id="dict-s17">
+  <div class="sh"><b>17</b><h2>Khi nào dict rơi xuống O(n)</h2></div>
+  <ol>
+    <li><strong><code>__hash__</code> tự viết trả về hằng số.</strong> Lỗi phổ biến nhất và tự gây ra. Mọi key cùng hash → cùng probe sequence → hash table biến thành linked list.
+<pre><code><span class="kw">class</span> Bad:
+    <span class="kw">def</span> __hash__(self): <span class="kw">return</span> 1        <span class="cm"># dict trở thành O(n)</span></code></pre></li>
+    <li><strong>Key trùng hash do thiết kế.</strong> Ví dụ hash lấy theo một field ít giá trị phân biệt (<code>hash(self.status)</code>), hoặc chỉ dùng vài bit.</li>
+    <li><strong>Tombstone tích tụ.</strong> Dict thêm–xoá liên tục mà không insert đủ để kích hoạt resize: probe sequence dài dần vì phải bước qua các ô <code>DUMMY</code> (mục 14).</li>
+    <li><strong>Va chạm ở bit thấp trên bảng nhỏ.</strong> Ít nghiêm trọng vì <code>perturb</code> tách ra nhanh, nhưng vài bước probe đầu vẫn bị lãng phí.</li>
+    <li><strong>Tấn công hash-collision.</strong> Kẻ tấn công gửi hàng nghìn key trùng hash làm request O(n²). Python chặn bằng <strong>hash randomization</strong> cho <code>str</code>/<code>bytes</code> — bật mặc định từ 3.3. Lưu ý <code>int</code> <em>không</em> được randomize (<code>hash(n) == n</code>), nên dict với key số do người ngoài kiểm soát vẫn cần cẩn thận.</li>
+  </ol>
+  <p>Về mặt thực tế: với key là <code>str</code>, <code>int</code> hay <code>tuple</code> chuẩn, xác suất gặp worst-case là con số bỏ qua được. Gần như mọi trường hợp O(n) thật trong sản phẩm đều đến từ <code>__hash__</code> tự viết.</p>
+</section>
+
+<section id="dict-s18">
+  <div class="sh"><b>18</b><h2>Insertion order</h2></div>
+  <p>Từ <strong>3.6</strong> dict giữ thứ tự chèn như một chi tiết cài đặt; từ <strong>3.7</strong> đây là <strong>cam kết trong ngôn ngữ</strong>, mọi implementation phải tuân theo.</p>
+<pre><code>&gt;&gt;&gt; d = {}; d["c"]=1; d["a"]=2; d["b"]=3
+&gt;&gt;&gt; list(d)
+['c', 'a', 'b']            <span class="cm"># thứ tự chèn, không phải thứ tự hash</span></code></pre>
+  <p><strong>Vì sao có được:</strong> duyệt dict là quét tuần tự <code>dk_entries</code> — vùng đặc được ghi nối tiếp theo đúng thứ tự chèn (mục 07). Thứ tự không phải tính năng bổ sung mà là <em>hệ quả miễn phí</em> của thiết kế tiết kiệm bộ nhớ.</p>
+  <ul>
+    <li><code>del</code> để lại một lỗ NULL trong <code>dk_entries</code>; vòng duyệt bỏ qua nó nhưng vẫn phải bước qua → dict từng xoá nhiều thì duyệt chậm hơn cho tới lần rehash.</li>
+    <li>Ghi đè value <strong>không</strong> đổi thứ tự. Muốn đưa key về cuối phải <code>del</code> rồi gán lại.</li>
+    <li><code>d1 == d2</code> <strong>không</strong> xét thứ tự. <code>OrderedDict</code> thì có xét — đó là khác biệt còn lại đáng kể của nó, cùng với <code>move_to_end()</code> và <code>popitem(last=False)</code>.</li>
+    <li>Sửa dict trong lúc đang duyệt → <code>RuntimeError: dictionary changed size during iteration</code>. Duyệt trên <code>list(d)</code> nếu cần xoá.</li>
+  </ul>
+</section>
+
+<section id="dict-s19">
+  <div class="sh"><b>19</b><h2>__hash__ &amp; __eq__</h2></div>
+  <p>Hai method này là một cặp. Hợp đồng: <strong><code>a == b</code> ⟹ <code>hash(a) == hash(b)</code></strong>. Vi phạm là dict trả về kết quả sai chứ không phải chậm.</p>
+  <p>Python bảo vệ bạn một nửa: định nghĩa <code>__eq__</code> mà không định nghĩa <code>__hash__</code> thì class <strong>tự động thành unhashable</strong> (<code>__hash__ = None</code>).</p>
+<pre><code><span class="kw">class</span> User:
+    <span class="kw">def</span> __init__(self, uid, name):
+        self.uid, self.name = uid, name
+    <span class="kw">def</span> __eq__(self, other):
+        <span class="kw">return</span> isinstance(other, User) <span class="kw">and</span> self.uid == other.uid
+    <span class="kw">def</span> __hash__(self):
+        <span class="kw">return</span> hash(self.uid)      <span class="cm"># cùng field với __eq__, không thêm không bớt</span></code></pre>
+  <p>Quy tắc: <strong>hash và eq phải đọc đúng cùng một tập field, và tập field đó không được thay đổi.</strong> Cách gọn nhất là để dataclass làm:</p>
+<pre><code><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass
+
+@dataclass(frozen=<span class="kw">True</span>)      <span class="cm"># sinh cả __eq__ và __hash__, chặn gán lại field</span>
+<span class="kw">class</span> Point:
+    x: int
+    y: int
+
+@dataclass                     <span class="cm"># eq=True, __hash__ = None → unhashable</span>
+<span class="kw">class</span> Mutable:
+    x: int</code></pre>
+  <h3>Vì sao key phải immutable — sự cố minh hoạ</h3>
+<pre><code><span class="kw">class</span> Box:
+    <span class="kw">def</span> __init__(self, v): self.v = v
+    <span class="kw">def</span> __eq__(self, o):    <span class="kw">return</span> self.v == o.v
+    <span class="kw">def</span> __hash__(self):     <span class="kw">return</span> hash(self.v)   <span class="cm"># hash phụ thuộc field sửa được</span>
+
+b = Box(1)
+d = {b: "xin chào"}
+b.v = 2                        <span class="cm"># hash đổi, nhưng dữ liệu vẫn nằm ở ô cũ</span>
+
+d[b]        <span class="cm"># KeyError — tìm ở ô mới, không có gì ở đó</span>
+list(d)     <span class="cm"># [Box(2)] — key vẫn còn nguyên trong bảng</span>
+b <span class="kw">in</span> d      <span class="cm"># False — object tự tìm chính nó không ra</span></code></pre>
+  <p>Dict không hỏng, nó chỉ đang tìm ở địa chỉ mà bạn khai. Entry đó thành rác không thể truy cập cho tới khi rehash.</p>
+</section>
+
+<section id="dict-s20">
+  <div class="sh"><b>20</b><h2>Dict vs List vs Set</h2></div>
+  <table>
+    <tr><th></th><th>list</th><th>dict</th><th>set</th></tr>
+    <tr><td>Index đến từ</td><td>vị trí (số nguyên bạn đưa)</td><td><code>hash(key) &amp; mask</code></td><td><code>hash(el) &amp; mask</code></td></tr>
+    <tr><td>Truy cập theo</td><td>thứ tự</td><td>key</td><td>chỉ kiểm tra tồn tại</td></tr>
+    <tr><td><code>x in c</code></td><td>O(n)</td><td>O(1)</td><td>O(1)</td></tr>
+    <tr><td>Lưu gì</td><td>value</td><td>key + value</td><td>chỉ key</td></tr>
+    <tr><td>Yêu cầu phần tử</td><td>bất kỳ</td><td>key hashable</td><td>phần tử hashable</td></tr>
+    <tr><td>Bộ nhớ / phần tử</td><td>thấp nhất</td><td>cao nhất</td><td>trung bình</td></tr>
+    <tr><td>Thứ tự</td><td>có</td><td>theo thứ tự chèn</td><td><strong>không</strong> đảm bảo</td></tr>
+  </table>
+  <p><code>set</code> cũng là open addressing với cùng công thức probe, nhưng <strong>không</strong> dùng thiết kế compact — nên nó không giữ thứ tự chèn, và giữ load factor thấp hơn (~3/5) để đổi tốc độ.</p>
+  <div class="note key">
+    <h4>Phản xạ khi tối ưu</h4>
+    Thấy <code>if x in some_list</code> nằm trong vòng lặp là đổi ngay sang <code>set</code>/<code>dict</code>: O(n·m) thành O(n). Đây là tối ưu Python phổ biến nhất và cũng đáng giá nhất.
+  </div>
+</section>
+
+<section id="dict-s21">
+  <div class="sh"><b>21</b><h2>API thực dụng</h2></div>
+  <table>
+    <tr><th>Việc cần làm</th><th>Cách viết</th></tr>
+    <tr><td>Đọc, không muốn KeyError</td><td><code>d.get(k)</code> · <code>d.get(k, default)</code></td></tr>
+    <tr><td>Đọc, chưa có thì tạo</td><td><code>d.setdefault(k, [])</code> — trả về giá trị đang có hoặc vừa tạo</td></tr>
+    <tr><td>Lấy ra và xoá</td><td><code>d.pop(k, default)</code></td></tr>
+    <tr><td>Lấy ra phần tử cuối</td><td><code>d.popitem()</code> — LIFO từ 3.7</td></tr>
+    <tr><td>Gộp dict</td><td><code>d1 | d2</code> (3.9+) · <code>d1 |= d2</code> · <code>{**d1, **d2}</code> · <code>d1.update(d2)</code></td></tr>
+    <tr><td>Đảo key-value</td><td><code>{v: k for k, v in d.items()}</code></td></tr>
+    <tr><td>Nhóm dữ liệu</td><td><code>defaultdict(list)</code> — không cần kiểm tra key tồn tại</td></tr>
+    <tr><td>Đếm tần suất</td><td><code>Counter(items)</code> · <code>.most_common(n)</code></td></tr>
+    <tr><td>Chặn ghi</td><td><code>types.MappingProxyType(d)</code> — view chỉ đọc</td></tr>
+    <tr><td>Rehash / dọn tombstone</td><td><code>d = dict(d)</code></td></tr>
+  </table>
+  <h3>View — không phải bản copy</h3>
+<pre><code>&gt;&gt;&gt; d = {"a": 1}
+&gt;&gt;&gt; ks = d.keys()
+&gt;&gt;&gt; d["b"] = 2
+&gt;&gt;&gt; ks
+dict_keys(['a', 'b'])            <span class="cm"># view sống, tự thấy thay đổi</span>
+&gt;&gt;&gt; d.keys() &amp; {"a", "z"}
+{'a'}                            <span class="cm"># keys() và items() hỗ trợ phép toán tập hợp</span></code></pre>
+  <div class="note warn">
+    <h4>Hai cái bẫy hay gặp</h4>
+    <code>dict.fromkeys(keys, [])</code> — mọi key <strong>dùng chung một list</strong>. Dùng <code>{k: [] for k in keys}</code>.<br>
+    <code>d.copy()</code> là shallow: value là list/dict thì vẫn chia sẻ. Dùng <code>copy.deepcopy</code> nếu cần cắt hẳn.
+  </div>
+</section>
+
+<section id="dict-s22">
+  <div class="sh"><b>22</b><h2>Hỏi đáp phỏng vấn</h2></div>
+  <table>
+    <tr><th>Câu hỏi</th><th>Trả lời gọn</th></tr>
+    <tr><td>Hash table là gì?</td><td>Mảng các ô, vị trí của mỗi phần tử được tính từ chính key qua hàm hash — nên truy cập trực tiếp bằng index thay vì tìm tuần tự.</td></tr>
+    <tr><td>Vì sao dict nhanh?</td><td>Từ key tính ra index chỉ bằng một lần hash và một phép AND, rồi đọc mảng một lần. Chi phí không phụ thuộc số phần tử.</td></tr>
+    <tr><td>Hashable là gì? Vì sao key phải hashable?</td><td>Có <code>__hash__</code>, hash bất biến, nhất quán với <code>==</code>. Vị trí lưu suy ra từ hash — hash đổi thì không tìm lại được key.</td></tr>
+    <tr><td>Mutable có thể làm key không?</td><td>Được, nếu hash không phụ thuộc phần bị sửa. Điều Python cần là hash bất biến, không phải object immutable.</td></tr>
+    <tr><td>Collision là gì?</td><td>Hai key khác nhau ra cùng index. Phân biệt trùng index (thường, xử lý được) với trùng hash (probe sequence y hệt nhau, không tách được).</td></tr>
+    <tr><td>Chaining vs Open Addressing?</td><td>Chaining treo linked list ngoài ô (Java). Open addressing tìm ô khác trong chính mảng (Python) — cache tốt hơn, ít bộ nhớ hơn, nhưng cần load factor thấp và tombstone khi xoá.</td></tr>
+    <tr><td>Probe sequence của Python?</td><td><code>i = (i*5 + perturb + 1) &amp; mask</code>, <code>perturb</code> khởi tạo bằng cả hash rồi dịch phải 5 bit mỗi bước. Bit cao được tiêm dần để tách các key trùng bit thấp; khi perturb hết, <code>5i+1</code> đảm bảo phủ toàn bảng.</td></tr>
+    <tr><td>Clustering là gì?</td><td>Primary: linear probing tạo dải liền kề tự lớn lên. Secondary: quadratic probing khiến mọi key cùng ô đầu đi chung một đường. Pseudo-random probing của Python tránh cả hai, đổi lại kém cache locality — được compact dict bù lại.</td></tr>
+    <tr><td>Tại sao xoá phải để tombstone?</td><td>Vì probe dừng khi gặp ô EMPTY. Xoá thẳng sẽ cắt đường đi và làm mất các key phía sau.</td></tr>
+    <tr><td>Resize khi nào, ra sao?</td><td>Khi vượt 2/3 size. Kích thước mới = lũy thừa 2 nhỏ nhất ≥ <code>used*3</code>; rehash toàn bộ từ hash đã lưu, dọn sạch tombstone, và có thể co lại nếu đã xoá nhiều.</td></tr>
+    <tr><td>Amortized O(1) là gì?</td><td>Resize tốn O(n) nhưng khoảng cách giữa hai lần resize tăng gấp đôi, nên tổng chi phí n lần insert vẫn là O(n) → trung bình O(1) mỗi lần. Không phải bảo đảm cho từng lần riêng lẻ.</td></tr>
+    <tr><td>Vì sao dict giữ được insertion order?</td><td>Compact dict tách bảng hash thưa (chỉ chứa chỉ số) khỏi vùng entries đặc ghi nối tiếp theo thứ tự chèn. Duyệt dict là quét vùng đặc đó.</td></tr>
+    <tr><td>Khi nào dict rơi xuống O(n)?</td><td>Chủ yếu do <code>__hash__</code> tự viết cho hash trùng nhau; ngoài ra do tombstone tích tụ, hoặc tấn công hash-collision (đã được hash randomization chặn với str).</td></tr>
+    <tr><td>Override <code>__eq__</code> thì sao?</td><td><code>__hash__</code> bị set None, class thành unhashable. Phải tự định nghĩa <code>__hash__</code> trên đúng tập field mà <code>__eq__</code> dùng, hoặc dùng <code>@dataclass(frozen=True)</code>.</td></tr>
+  </table>
+</section>
+
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

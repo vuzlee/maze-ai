@@ -5,64 +5,57 @@ mở thẳng `index.html` bằng trình duyệt là chạy.
 
 ## Cây thư mục = đúng những gì nhìn thấy trên giao diện
 
+Ba tầng: **kệ → nhóm → bài**, xếp theo syllabus ôn tập.
+
 ```
-index.html                     ← trang thư viện (các kệ sách)
-assets/
-  style.css                    ← toàn bộ CSS
-  app.js                       ← mục lục, scrollspy, bài trước/sau, tìm kiếm
-  catalog.js                   ← SINH TỰ ĐỘNG: danh mục kệ + bài
-  search-index.js              ← SINH TỰ ĐỘNG: chỉ mục tìm kiếm toàn văn
+index.html                       ← trang thư viện
+assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự động)
 content/
-  01-algorithms/               ← 1 thư mục = 1 kệ trên trang chủ
-    category.json              ← tên kệ, ghi chú, thứ tự bài
-    big-o-complexity/          ← 1 thư mục = 1 bài
-      index.html               ← nội dung bài (trang đọc được luôn)
-      lab.js                   ← script cho các lab tương tác của riêng bài đó
-    two-pointers-sliding-window/
-    binary-search/
-    …
-  02-python/
-  03-databases/
-  04-networking/
-  05-machine-learning/
-  06-deep-learning/
-  07-llm/
-  08-system-design/
-tools/
-  build.py                     ← quét content/ rồi sinh lại catalog.js + search-index.js
-archive/
-  mazeai-single-file.html      ← bản gốc gộp 1 file, giữ lại để đối chiếu
+  01-dsa/
+    category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
+    01-foundations/big-o-complexity/{index.html, lab.js}
+    02-data-structures/{stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, union-find}
+    03-algorithms/{two-pointers-sliding-window, binary-search, graph-bfs-dfs-topo, backtracking, dynamic-programming}
+  02-cs-fundamentals/
+    01-python-internals/{memory-model-mutability, iterator-generator-decorator, dict-hash-table, gil-thread-process-async}
+    02-sql/{sql-index-query-plan, sql-window-functions, transaction-isolation}
+    03-os-networking/{http-tcp-caching}
+  03-machine-learning/
+    01-classical-ml/{linear-logistic-regression, tree-ensemble-boosting}
+    02-statistics/{statistics-ab-testing}
+    03-model-evaluation/{metrics-confusion-matrix}
+    04-ml-theory/{overfitting-regularization}
+  04-deep-learning/
+    01-neural-network/{backpropagation, normalization-initialization}
+    02-cnn/{cnn-mobilenet}
+  05-llm/
+    01-transformer/{self-attention-transformer}
+    02-llm/{fine-tuning-sft-rlhf-dpo-lora}
+    03-rag/{rag-end-to-end}
+    04-llm-system/{inference-optimization}
+  06-ml-system-design/01-frameworks/{ml-system-design}
+  07-mlops/01-serving/{mlops-serving}
+tools/build.py                   ← quét content/ sinh lại catalog.js + search-index.js
+archive/mazeai-single-file.html  ← bản gốc gộp 1 file, giữ để đối chiếu
 ```
 
-Số thứ tự ở tên thư mục kệ quyết định thứ tự các kệ trên trang chủ.
-Thứ tự bài trong một kệ nằm ở `books` trong `category.json`.
-
-## Kệ hiện có
-
-| Thư mục | Kệ | Số bài |
-|---|---|---|
-| `01-algorithms` | Giải thuật & cấu trúc dữ liệu | 10 |
-| `02-python` | Python & nền tảng CS | 4 |
-| `03-databases` | SQL & cơ sở dữ liệu | 3 |
-| `04-networking` | Mạng & giao thức | 1 |
-| `05-machine-learning` | Machine learning | 5 |
-| `06-deep-learning` | Deep learning | 3 |
-| `07-llm` | LLM & GenAI | 4 |
-| `08-system-design` | Thiết kế hệ thống & MLOps | 2 |
+Số thứ tự ở tên thư mục quyết định thứ tự hiển thị. Thứ tự bài trong một nhóm nằm ở `books`
+trong `category.json`. Kệ chỉ có đúng một nhóm thì trang chủ không hiện tiêu đề nhóm.
 
 ## Thêm một bài mới
 
-1. Chép một thư mục bài có sẵn sang kệ mong muốn, đổi tên thư mục.
+1. Chép một thư mục bài có sẵn sang đúng nhóm, đổi tên thư mục.
 2. Sửa `index.html` của nó:
-   - thẻ `<article class="doc" id="art-SLUG" data-title="…" data-tag="…" data-blurb="…">`
-     — `id` phải là duy nhất trong cả kho, `data-*` chính là nội dung thẻ card ngoài trang chủ;
+   - `<article class="doc" id="art-SLUG" data-title="…" data-tag="…" data-blurb="…">`
+     — `id` phải duy nhất trong cả kho; `data-*` chính là nội dung thẻ card ngoài trang chủ;
    - mỗi mục là một `<section id="SLUG-sN">` mở đầu bằng
-     `<div class="sh"><b>01</b><h2>Tên mục</h2></div>` — mục lục bên trái tự dựng từ đây,
-     không phải khai báo ở đâu khác.
-3. Thêm tên thư mục vào `books` trong `category.json` của kệ (đặt đúng vị trí muốn nó xuất hiện).
+     `<div class="sh"><b>01</b><h2>Tên mục</h2></div>` — mục lục bên trái và breadcrumb tự dựng
+     từ đây, không phải khai báo ở đâu khác.
+3. Thêm tên thư mục vào `books` của đúng nhóm trong `category.json`.
 4. Chạy `python3 tools/build.py`.
 
-Thêm một kệ mới: tạo `content/NN-ten-ke/category.json` với `{"name", "note", "books": []}` rồi làm như trên.
+Thêm nhóm mới: tạo thư mục `NN-ten-nhom/` rồi thêm `{"dir", "name", "books"}` vào `groups`.
+Thêm kệ mới: tạo `content/NN-ten-ke/category.json` với `{"name", "note", "groups": []}`.
 
 ## Sau mỗi lần sửa nội dung
 
@@ -70,6 +63,26 @@ Thêm một kệ mới: tạo `content/NN-ten-ke/category.json` với `{"name", 
 python3 tools/build.py
 ```
 
-Lệnh này sinh lại `assets/catalog.js` và `assets/search-index.js`. Nó cũng báo các chỗ lệch:
-thư mục bài chưa được liệt kê trong `category.json`, khai báo trỏ tới thư mục không tồn tại,
-thiếu `index.html`. Không chạy lại thì bài mới sẽ không hiện ở trang chủ và không tìm được.
+Sinh lại `assets/catalog.js` và `assets/search-index.js`, đồng thời báo các chỗ lệch: thư mục bài
+chưa được liệt kê, khai báo trỏ tới thư mục không tồn tại, thiếu `index.html`. Không chạy lại thì
+bài mới không hiện ở trang chủ và không tìm được.
+
+## Chỗ trống theo syllabus
+
+Khung thư mục đã dựng sẵn cho các mảng còn thiếu bài:
+
+| Kệ / nhóm | Chưa có bài |
+|---|---|
+| `01-dsa/03-algorithms` | prefix sum · greedy · intervals · shortest path (Dijkstra) |
+| `01-dsa/02-data-structures` | linked list · trie |
+| `01-dsa` | bộ công cụ Python cho LeetCode: `bisect`, `Counter`, `defaultdict`, `deque`, comprehension |
+| `02-cs-fundamentals/02-sql` | SQL nền: JOIN · GROUP BY / HAVING · subquery · CTE · normalization |
+| `02-cs-fundamentals/03-os-networking` | process vs thread ở tầng OS · CPU scheduling · REST API · load balancing · connection pool |
+| `03-machine-learning/01-classical-ml` | SVM · KNN · Naive Bayes · K-means · PCA |
+| `03-machine-learning` | nền toán: probability · expectation/variance · Bayes · gradient · matrix · eigenvector · MLE/MAP |
+| `04-deep-learning/01-neural-network` | activation function · dropout (đang nằm rải trong bài chuẩn hoá & overfitting) |
+| `05-llm/01-transformer` | tokenization · embedding · positional encoding (bài hiện tại chỉ chạm qua) |
+| `05-llm/02-llm` | pretraining · decoding: temperature / top-k / top-p · quantization (QLoRA) |
+| `05-llm/03-rag` | vector database · chiến lược chunking · reranking chuyên sâu |
+| `06-ml-system-design` | recommendation system · LLM/RAG system (hai ví dụ thiết kế đầu–cuối) |
+| `07-mlops` | Git · Docker · Linux · FastAPI · CI/CD · experiment tracking · GPU inference |
