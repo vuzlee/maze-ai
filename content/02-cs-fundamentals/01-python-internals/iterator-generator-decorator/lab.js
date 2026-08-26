@@ -34,7 +34,7 @@ function pRender(note, ev){
   const cells = names.map((nm, i) => {
     const hot = ev && ev.stage === i;
     return `<div style="flex:1;min-width:110px;background:${hot?'var(--probe)':'var(--panel)'};
-      color:${hot?'#0E141B':'var(--muted)'};border:1px solid ${hot?'var(--probe)':'var(--rule)'};
+      color:${hot?'#14110E':'var(--muted)'};border:1px solid ${hot?'var(--probe)':'var(--rule)'};
       border-radius:6px;padding:9px 11px;font-family:var(--mono);font-size:11.5px;font-weight:${hot?600:400}">
       ${nm}${hot && ev.v !== null ? `<br><span style="font-size:14px">${ev.v}</span>` : "<br><span style='font-size:14px'>·</span>"}</div>`;
   }).join(`<div style="align-self:center;color:var(--rule);font-family:var(--mono)">→</div>`);

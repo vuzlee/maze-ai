@@ -55,7 +55,7 @@ function kBuild(){
 function kRender(note){
   const bars = KPATH.map(v =>
     `<div class="slot" style="min-width:38px;border-color:var(--probe)">
-       <u style="background:var(--probe);color:#0E141B;font-weight:600">${v}</u></div>`).join("");
+       <u style="background:var(--probe);color:#14110E;font-weight:600">${v}</u></div>`).join("");
   const res = KRES.map(r =>
     `<span style="font-family:var(--mono);font-size:11.5px;background:var(--raise);border:1px solid var(--rule);
       border-radius:4px;padding:2px 7px;margin:0 4px 4px 0;display:inline-block;color:var(--ok)">

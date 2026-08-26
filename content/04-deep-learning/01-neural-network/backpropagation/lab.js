@@ -49,7 +49,7 @@ function nRender(note){
     const active = i === NSTEP - 1;
     const col = st.t === "forward" ? "var(--filled)" : "var(--probe)";
     const bg = active ? col : (done ? "var(--panel)" : "transparent");
-    const fg = active ? "#0E141B" : (done ? "var(--text)" : "var(--rule)");
+    const fg = active ? "#14110E" : (done ? "var(--text)" : "var(--rule)");
     return `<div style="background:${bg};color:${fg};border:1px solid ${done||active?col:'var(--rule)'};
       border-radius:5px;padding:6px 10px;margin-bottom:4px;font-family:var(--mono);font-size:12px;
       font-weight:${active?600:400}">

@@ -68,7 +68,7 @@ function wCalc(){
       <td class="rl" style="text-align:left;color:var(--text)">${r.name}</td>
       <td style="font-family:var(--mono);font-size:11.5px;color:var(--muted)">${r.dept}</td>
       <td style="font-family:var(--mono);font-size:11.5px">${r.salary.toLocaleString("vi-VN")}</td>
-      <td><div class="cell" style="background:var(--probe);color:#0E141B">${r.result}</div></td></tr>`;
+      <td><div class="cell" style="background:var(--probe);color:#14110E">${r.result}</div></td></tr>`;
   });
   document.getElementById("wview").innerHTML = h + `</table></div>`;
 }

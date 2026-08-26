@@ -50,7 +50,7 @@ function mRender3(){
   const pct = v => isNaN(v) ? "–" : (100*v).toFixed(1) + "%";
 
   const cell = (v, lab, col) =>
-    `<td><div class="cell" style="background:${col};color:#0E141B;padding:11px 6px">
+    `<td><div class="cell" style="background:${col};color:#14110E;padding:11px 6px">
       <div style="font-size:14px">${R(v)}</div>
       <div style="font-size:9.5px;opacity:.75">${lab}</div></div></td>`;
 

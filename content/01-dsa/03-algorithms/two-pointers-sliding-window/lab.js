@@ -6,7 +6,7 @@ function render(note){
   const cells = [...S].map((ch, i) => {
     const inWin = i >= L && i <= R;
     const bg = inWin ? "var(--filled)" : "var(--raise)";
-    const fg = inWin ? "#0E141B" : "var(--muted)";
+    const fg = inWin ? "#14110E" : "var(--muted)";
     const mark = i === L ? "L" : (i === R ? "R" : "");
     return `<div class="slot" style="border-color:${inWin?'var(--filled)':'var(--rule)'}">
               <i>${mark || i}</i>

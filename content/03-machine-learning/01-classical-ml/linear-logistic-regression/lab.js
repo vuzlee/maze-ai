@@ -97,7 +97,7 @@ function thrCalc(){
     const col = ok ? (y === 1 ? "var(--ok)" : "var(--rule)") : "var(--tomb)";
     return `<div class="slot" style="min-width:38px;border-color:${col}">
       <i>${y === 1 ? "dương" : "âm"}</i>
-      <u style="background:${pred?col:'var(--raise)'};color:${pred?'#0E141B':'var(--muted)'};font-weight:600">${p.toFixed(2)}</u></div>`;
+      <u style="background:${pred?col:'var(--raise)'};color:${pred?'#14110E':'var(--muted)'};font-weight:600">${p.toFixed(2)}</u></div>`;
   }).join("");
   const fmt = v => isNaN(v) ? "–" : (100*v).toFixed(0) + "%";
   document.getElementById("thrview").innerHTML =

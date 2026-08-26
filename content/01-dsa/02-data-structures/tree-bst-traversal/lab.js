@@ -36,8 +36,8 @@ function tRender(note){
       const done = TORDER.includes(v);
       const hot = v === TCUR;
       let bg = "var(--raise)", fg = "var(--muted)";
-      if(done){ bg = "var(--ok)"; fg = "#0E141B"; }
-      if(hot){ bg = "var(--probe)"; fg = "#0E141B"; }
+      if(done){ bg = "var(--ok)"; fg = "#14110E"; }
+      if(hot){ bg = "var(--probe)"; fg = "#14110E"; }
       return `<div class="slot" style="border-color:${hot?'var(--probe)':'var(--rule)'};min-width:40px">
         <i>${done ? TORDER.indexOf(v)+1 : "&nbsp;"}</i>
         <u style="background:${bg};color:${fg};font-weight:${done||hot?600:400}">${v}</u></div>`;

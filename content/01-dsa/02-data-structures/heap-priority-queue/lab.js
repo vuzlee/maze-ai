@@ -14,7 +14,7 @@ function hRender(note){
     for(let k = 0; k < w && i < n; k++, i++){
       const hot = HHI.includes(i);
       const bg = hot ? "var(--probe)" : "var(--raise)";
-      const fg = hot ? "#0E141B" : "var(--text)";
+      const fg = hot ? "#14110E" : "var(--text)";
       cells.push(`<div class="slot" style="border-color:${hot?'var(--probe)':'var(--rule)'};min-width:44px">
         <i>${i}</i><u style="background:${bg};color:${fg};font-weight:${hot?600:400}">${HA[i]}</u></div>`);
     }

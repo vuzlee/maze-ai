@@ -23,36 +23,89 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
   /* ---------------- chuyển khung nhìn ---------------- */
+  /* Khi mở kết quả tìm kiếm thì cất hết phần trang chủ đi, để kết quả
+     nằm ngay đầu màn hình chứ không bị đẩy xuống dưới hero. */
   function show(which) {
-    if (lib) lib.hidden = which !== "page";
-    if (reader) reader.hidden = which !== "page";
+    var page = which === "page";
+    [lib, reader, document.querySelector(".shelfnav"),
+     document.querySelector(".mast"), document.querySelector(".libbar")]
+      .forEach(function (el) { if (el) el.hidden = !page; });
     if (results) results.hidden = which !== "res";
   }
 
   /* ---------------- trang chủ: dựng kệ ---------------- */
-  function card(b) {
-    return '<a class="bk" href="' + BASE + b.path + '">' +
-      '<div class="tag">' + esc(b.tag) + "</div>" +
-      "<h3>" + esc(b.title) + "</h3>" +
-      "<p>" + esc(b.blurb) + "</p>" +
-      '<div class="meta"><span>' + b.n + " mục</span><b>đọc →</b></div></a>";
+  function card(b, n) {
+    return '<a class="bk" data-slug="' + esc(b.slug) + '" href="' + BASE + b.path + '">' +
+      '<span class="ix">' + String(n).padStart(2, "0") + "</span>" +
+      '<span class="tt"><b>' + esc(b.title) + "</b><i>" + esc(b.blurb) + "</i></span>" +
+      '<span class="tag">' + esc(b.tag) + " · " + b.n + " mục</span>" +
+      '<span class="go">→</span></a>';
   }
 
   if (lib) {
-    lib.innerHTML = CAT.map(function (c) {
+    lib.innerHTML = CAT.map(function (c, ci) {
       var total = 0;
       c.groups.forEach(function (g) { total += g.books.length; });
-      /* kệ chỉ có một nhóm thì không cần tiêu đề nhóm */
+      /* số bài đánh liên tục trong cả kệ, như mục lục một cuốn sách */
+      var n = 0;
       var body = c.groups.map(function (g) {
-        var cards = '<div class="cards">' + g.books.map(card).join("\n") + "</div>";
-        if (c.groups.length < 2) return cards;
+        var rows = '<div class="cards">' +
+          g.books.map(function (b) { return card(b, ++n); }).join("\n") + "</div>";
+        if (c.groups.length < 2) return rows;
         return '<h3 class="sub">' + esc(g.name) +
-          '<span class="gc">' + g.books.length + " bài</span></h3>" + cards;
+          '<span class="gc">' + g.books.length + " bài</span></h3>" + rows;
       }).join("\n");
-      return '<div class="shelf"><h2>' + esc(c.name) +
-        '<span class="gc">' + total + " bài</span></h2>" +
-        '<p class="gnote">' + esc(c.note) + "</p>" + body + "</div>";
+      return '<section class="shelf" id="shelf-' + ci + '">' +
+        '<header class="shelfhead">' +
+          '<span class="num">' + String(ci + 1).padStart(2, "0") + "</span>" +
+          "<div><h2>" + esc(c.name) + "</h2>" +
+          '<p class="gnote">' + esc(c.note) + "</p></div>" +
+          '<div class="shelfstat" data-shelf="' + ci + '"><b>' + total + " bài</b>" +
+          '<span class="track"><i style="width:0%"></i></span></div>' +
+        "</header>" + body + "</section>";
     }).join("\n");
+
+    /* --- thanh kệ dính: nhảy thẳng tới một kệ, tự sáng theo vị trí cuộn --- */
+    var nav = document.getElementById("shelfnav");
+    if (nav) {
+      nav.innerHTML = CAT.map(function (c, ci) {
+        var n = 0;
+        c.groups.forEach(function (g) { n += g.books.length; });
+        return '<a href="#shelf-' + ci + '"><i>' + String(ci + 1).padStart(2, "0") + "</i>" +
+          esc(c.name) + "<em>" + n + "</em></a>";
+      }).join("");
+      var chips = [].slice.call(nav.querySelectorAll("a"));
+      var shelves = chips.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+      var spy = function () {
+        var top = window.innerHeight * 0.3, cur = 0;
+        shelves.forEach(function (s, i) { if (s && s.getBoundingClientRect().top < top) cur = i; });
+        chips.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+        var on = chips[cur];
+        if (on && nav.scrollWidth > nav.clientWidth) {
+          var l = on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2;
+          nav.scrollTo({ left: Math.max(0, l), behavior: "smooth" });
+        }
+      };
+      window.addEventListener("scroll", spy, { passive: true });
+      spy();
+    }
+
+    /* --- ba con số: quy mô kho, thấy ngay từ màn đầu --- */
+    var facts = document.getElementById("counts");
+    if (facts) {
+      var nb = 0, ns = 0;
+      CAT.forEach(function (c) {
+        c.groups.forEach(function (g) { g.books.forEach(function (b) { nb++; ns += b.n || 0; }); });
+      });
+      facts.innerHTML =
+        "<li><b>" + nb + "</b><span>bài</span></li>" +
+        "<li><b>" + CAT.length + "</b><span>kệ</span></li>" +
+        "<li><b>" + ns + "</b><span>mục</span></li>";
+    }
+
+    /* --- nút "Bắt đầu học" trỏ vào kệ đầu tiên, nút tìm mở ô tìm kiếm --- */
+    var gf = document.getElementById("goFind");
+    if (gf && qin) gf.onclick = function () { qin.focus(); };
   }
 
   /* ---------------- trang bài: mục lục + scrollspy ---------------- */
@@ -118,13 +171,13 @@
       return e.t.toLowerCase().indexOf(lo) >= 0 || e.x.toLowerCase().indexOf(lo) >= 0;
     }).slice(0, 40);
     results.innerHTML =
-      "<h2>Kết quả cho “" + esc(q) + "”</h2><p class=\"cnt\">" + hits.length + " mục</p>" +
+      "<h2>Kết quả cho <em>" + esc(q) + "</em></h2><p class=\"cnt\">" + hits.length + " mục</p>" +
       (hits.length
         ? hits.map(function (e) {
             return '<a class="hit" href="' + BASE + e.u + '"><div class="src">' + esc(e.b) + " · mục " + esc(e.n) + "</div>" +
               "<h3>" + esc(e.t) + "</h3><p>" + snippet(e.x, q) + "</p></a>";
           }).join("")
-        : '<p style="color:var(--muted)">Không có mục nào khớp. Thử từ khoá ngắn hơn, hoặc tên tiếng Anh của khái niệm.</p>');
+        : '<div class="empty-res">Không có mục nào khớp. Thử từ khoá ngắn hơn, hoặc tên tiếng Anh của khái niệm.</div>');
     show("res");
     window.scrollTo(0, 0);
   }
@@ -183,6 +236,7 @@
 
     var bar = document.createElement("div");
     bar.className = "libbar";
+    bar.hidden = lib.hidden;          /* đang xem kết quả tìm thì đừng hiện ra */
     lib.parentNode.insertBefore(bar, lib);
 
     var onlyTodo = false;
@@ -202,19 +256,31 @@
         s.classList.toggle("empty", vis.length === 0);
       });
       var pct = all.length ? Math.round(100 * n / all.length) : 0;
+
+      /* mỗi chương một tiến độ riêng, ngay cạnh tên kệ */
+      CAT.forEach(function (c, ci) {
+        var box = lib.querySelector('.shelfstat[data-shelf="' + ci + '"]');
+        if (!box) return;
+        var tot = 0, got = 0;
+        c.groups.forEach(function (g) {
+          g.books.forEach(function (b) { tot++; if (done.indexOf(b.slug) >= 0) got++; });
+        });
+        box.querySelector("b").textContent = got ? got + "/" + tot + " bài" : tot + " bài";
+        box.querySelector("i").style.width = (tot ? Math.round(100 * got / tot) : 0) + "%";
+      });
+
       bar.innerHTML =
-        "<span>đã học <b>" + n + "/" + all.length + "</b> bài</span>" +
+        "<span>Tiến độ</span>" +
+        "<b>" + n + " / " + all.length + "</b>" +
         '<span class="track"><i style="width:' + pct + '%"></i></span>' +
-        "<span>" + pct + "%</span>" +
+        '<span class="pct">' + pct + "%</span>" +
+        '<span class="acts">' +
         '<button id="fTodo"' + (onlyTodo ? ' class="on"' : "") + ">chỉ bài chưa học</button>" +
-        (n ? '<button id="fReset">xoá đánh dấu</button>' : "");
+        (n ? '<button id="fReset">xoá đánh dấu</button>' : "") + "</span>";
       document.getElementById("fTodo").onclick = function () { onlyTodo = !onlyTodo; paint(); };
       var r = document.getElementById("fReset");
       if (r) r.onclick = function () { if (confirm("Xoá toàn bộ đánh dấu đã học?")) { writeDone([]); paint(); } };
     }
-    /* gắn slug lên từng card để biết card nào ứng với bài nào */
-    var ix = 0;
-    [].slice.call(lib.querySelectorAll(".bk")).forEach(function (a) { a.setAttribute("data-slug", all[ix++].slug); });
     paint();
   }
 
@@ -276,6 +342,11 @@
   var barD = document.createElement("div");
   barD.className = "donebar";
   if (np) np.parentNode.insertBefore(barD, np);
+
+  /* thứ tự đọc đúng phải là: hết bài → đánh dấu → bài kế → dòng chân trang.
+     Trong file bài, <footer> nằm trong <article> nên phải đẩy nó xuống cuối. */
+  var ft = doc.querySelector("footer");
+  if (ft && np && np.parentNode) np.parentNode.appendChild(ft);
 
   function paintDone() {
     var is = readDone().indexOf(slug) >= 0;

@@ -10,8 +10,8 @@ function mRender(note){
   const cells = MA.map((v, i) => {
     const onStack = MST.includes(i);
     let bg = "var(--raise)", fg = "var(--muted)";
-    if(onStack){ bg = "var(--filled)"; fg = "#0E141B"; }
-    if(i === MI){ bg = "var(--probe)"; fg = "#0E141B"; }
+    if(onStack){ bg = "var(--filled)"; fg = "#14110E"; }
+    if(i === MI){ bg = "var(--probe)"; fg = "#14110E"; }
     if(MRES[i] !== undefined && MRES[i] !== -1 && !onStack && i !== MI){ bg = "var(--panel)"; fg = "var(--ok)"; }
     return `<div class="slot"><i>${i}</i>
       <u style="background:${bg};color:${fg};font-weight:${onStack||i===MI?600:400}">${v}</u></div>`;

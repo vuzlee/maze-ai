@@ -80,6 +80,10 @@ Trang bài được bố trí để học chứ không chỉ để đọc:
 
 Phím tắt: `j` mục sau · `k` mục trước · `m` đánh dấu đã học · `/` tìm toàn kho · `Esc` thoát tìm.
 
+Trang thư viện: **trang bìa** kiểu ấn phẩm — dateline, tiêu đề serif khổ lớn, ba con số quy mô kho;
+**thanh kệ dính** dưới thanh tìm kiếm để nhảy chương mà không phải cuộn; mỗi chương có thanh
+tiến độ riêng cạnh tên. Gõ `/` là ô tìm kiếm chiếm luôn màn hình, kết quả nằm ngay đầu trang.
+
 ## Khuôn bài DSA
 
 Mười bài trong `01-dsa` dùng chung một khuôn: **lõi đọc 1,5 phút, phần còn lại để tra**.
@@ -97,6 +101,50 @@ cuối Hỏi đáp              4 câu, mỗi câu trả lời 1-2 dòng
 
 160 bài LeetCode chia theo 48 pattern, mỗi bài ghi rõ luyện cái gì, cuối mỗi bài có
 thứ tự luyện gợi ý 10 bài phủ hết pattern của chủ đề đó.
+
+## Ngôn ngữ thiết kế
+
+Chất riêng của kho: **nền mực ám nâu, nhấn cam đất, tiêu đề serif** — gần với một cuốn sách
+chuyên khảo hơn là một dashboard. Toàn bộ nằm trong `assets/style.css`; sửa token ở `:root`
+là đổi cả kho. Đừng viết màu thẳng vào bài, luôn dùng `var(--…)` hoặc `rgba(var(--blue-a),…)`.
+
+**Bề mặt & chữ** — phân tầng bằng độ sáng, không bằng viền dày:
+
+| Token | Giá trị | Dùng cho |
+|---|---|---|
+| `--bg` | `#14110E` | nền trang, mực ám nâu |
+| `--panel` | `#1C1815` | thẻ, khối, bảng |
+| `--raise` | `#241F1A` | ô nổi lên trên panel |
+| `--sunk` | `#0E0C0A` | ô lõm: nền code, track tiến độ |
+| `--rule` · `--rule-hi` | `#2E2822` · `#3D352C` | hai mức đường kẻ |
+| `--text` → `--faint` | `#EDE7DE` → `#7A6F63` | bốn mức chữ |
+
+**Cam đất `--clay` `#E0855C`** là màu thương hiệu: logo, chữ nghiêng trong tiêu đề, nút chính,
+link trong bài, viền mục đang đọc, vạch hover ở đầu mỗi hàng. **Nó không mang nghĩa nội dung —
+tuyệt đối không dùng trong hình.**
+
+**Bốn màu ngữ nghĩa** — nghĩa cố định cho mọi hình, mỗi màu kèm một biến `rgb` để pha nền mờ:
+
+| Token | Giá trị | Nghĩa |
+|---|---|---|
+| `--filled` / `--blue-a` | `#8CA9F2` | dữ liệu, thứ đang xét |
+| `--probe` / `--amber-a` | `#EDB44A` | con trỏ, điểm nhấn, đáp án |
+| `--tomb` / `--red-a` | `#F2718A` | sai, bị loại, chưa thoả |
+| `--ok` / `--green-a` | `#5BCFA0` | đúng, kết quả, đã thoả |
+
+**Chữ** — cả ba font đều có bộ dấu tiếng Việt đầy đủ, đã kiểm bằng subset `vietnamese` của
+Google Fonts (Instrument Serif *không* có, đừng dùng):
+
+| Biến | Font | Dùng cho |
+|---|---|---|
+| `--display` | Newsreader | tiêu đề, tên bài, câu chốt (nghiêng), tên hàng |
+| `--body` | Be Vietnam Pro | phần đọc, nút, nhãn |
+| `--mono` | JetBrains Mono | code, số thứ tự, nhãn nhỏ chữ hoa |
+
+**Bố cục** — trang thư viện dựng như **mục lục một cuốn sách**: mỗi kệ là một chương có số treo
+ở lề trái, mỗi bài là **một hàng** (số · tên serif · tóm tắt · nhãn · mũi tên) chứ không phải thẻ —
+34 mục quét bằng mắt nhanh hơn hẳn. Trục dọc của số chương và số bài trùng nhau ở mốc `78px`;
+đổi `grid-template-columns` của `.shelfhead` hoặc `.bk` thì phải chỉnh cả hai cho khớp lại.
 
 ## Trực quan — bộ khuôn hình
 

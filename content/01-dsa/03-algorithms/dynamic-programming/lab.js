@@ -23,11 +23,11 @@ function dRender(){
       const v = DT[i][j];
       let bg = "var(--raise)", fg = "var(--muted)", bold = 400;
       if(v !== null){ bg = "var(--panel)"; fg = "var(--text)"; }
-      if(i === 0 || j === 0){ bg = "#111922"; fg = "var(--muted)"; }
+      if(i === 0 || j === 0){ bg = "#191512"; fg = "var(--muted)"; }
       const isSrc = DPICK && DPICK.src.some(s => s[0] === i && s[1] === j);
-      if(isSrc){ bg = "var(--filled)"; fg = "#0E141B"; bold = 600; }
-      if(!DDONE && i === DI && j === DJ){ bg = "var(--probe)"; fg = "#0E141B"; bold = 600; }
-      if(DDONE && i === n && j === m){ bg = "var(--ok)"; fg = "#0E141B"; bold = 600; }
+      if(isSrc){ bg = "var(--filled)"; fg = "#14110E"; bold = 600; }
+      if(!DDONE && i === DI && j === DJ){ bg = "var(--probe)"; fg = "#14110E"; bold = 600; }
+      if(DDONE && i === n && j === m){ bg = "var(--ok)"; fg = "#14110E"; bold = 600; }
       h += `<td><div class="cell" style="background:${bg};color:${fg};font-weight:${bold}">${v === null ? "·" : v}</div></td>`;
     }
     h += `</tr>`;

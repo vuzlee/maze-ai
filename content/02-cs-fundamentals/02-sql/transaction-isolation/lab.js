@@ -92,7 +92,7 @@ function tRender3(){
     const cell = v => {
       if(!v) return `<td></td>`;
       const bg = active ? "var(--probe)" : (shown ? "var(--panel)" : "transparent");
-      const fg = active ? "#0E141B" : (shown ? "var(--text)" : "var(--rule)");
+      const fg = active ? "#14110E" : (shown ? "var(--text)" : "var(--rule)");
       return `<td><div class="cell" style="background:${bg};color:${fg};text-align:left;
         font-weight:${active?600:400};padding:6px 9px">${s.op}${s.note ? ` <span style="opacity:.7">— ${s.note}</span>` : ""}</div></td>`;
     };

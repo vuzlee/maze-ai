@@ -29,8 +29,8 @@ function uRender(note){
     const hot = UHOT.includes(i);
     const root = p === i;
     let bg = root ? "var(--ok)" : "var(--raise)";
-    let fg = root ? "#0E141B" : "var(--text)";
-    if(hot){ bg = "var(--probe)"; fg = "#0E141B"; }
+    let fg = root ? "#14110E" : "var(--text)";
+    if(hot){ bg = "var(--probe)"; fg = "#14110E"; }
     return `<div class="slot" style="min-width:40px;border-color:${hot?'var(--probe)':'var(--rule)'}">
       <i>${i}</i><u style="background:${bg};color:${fg};font-weight:600">${p}</u></div>`;
   }).join("");

@@ -14,11 +14,11 @@ function gRender(){
     for(let c = 0; c < GC; c++){
       const k = gKey(r,c);
       let bg = "var(--raise)", fg = "var(--muted)", txt = "·";
-      if(WALLS.has(k)){ bg = "#0b1016"; fg = "#2A3A4C"; txt = "▓"; }
-      else if(GSEEN.has(k)){ bg = "var(--filled)"; fg = "#0E141B"; txt = GSEEN.get(k); }
-      if(k === GSTART){ bg = "var(--ok)"; fg = "#0E141B"; txt = "S"; }
-      if(k === GGOAL){ bg = GFOUND !== null ? "var(--ok)" : "var(--tomb)"; fg = "#0E141B"; txt = "G"; }
-      if(k === GHOT && k !== GSTART && k !== GGOAL){ bg = "var(--probe)"; fg = "#0E141B"; }
+      if(WALLS.has(k)){ bg = "#0b1016"; fg = "#2E2822"; txt = "▓"; }
+      else if(GSEEN.has(k)){ bg = "var(--filled)"; fg = "#14110E"; txt = GSEEN.get(k); }
+      if(k === GSTART){ bg = "var(--ok)"; fg = "#14110E"; txt = "S"; }
+      if(k === GGOAL){ bg = GFOUND !== null ? "var(--ok)" : "var(--tomb)"; fg = "#14110E"; txt = "G"; }
+      if(k === GHOT && k !== GSTART && k !== GGOAL){ bg = "var(--probe)"; fg = "#14110E"; }
       cells.push(`<div class="slot" style="min-width:30px;border-color:${k===GHOT?'var(--probe)':'var(--rule)'}">
         <u style="background:${bg};color:${fg};padding:5px 0;font-weight:600">${txt}</u></div>`);
     }
