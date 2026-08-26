@@ -39,7 +39,7 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list):
     tag = m.group(0)
     title = attr(tag, "data-title")
 
-    secs = re.findall(r'<section id="([^"]+)">(.*?)</section>', src[m.end():], re.S)
+    secs = re.findall(r'<section id="([^"]+)"[^>]*>(.*?)</section>', src[m.end():], re.S)
     for sec_id, body in secs:
         h2 = re.search(r'<div class="sh"><b>(.*?)</b><h2>(.*?)</h2>', body, re.S)
         if not h2:
