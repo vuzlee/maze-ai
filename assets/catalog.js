@@ -89,8 +89,8 @@ window.CATALOG = [
       "slug": "graph",
       "title": "Đồ thị — BFS, DFS, topo sort",
       "tag": "Kỹ thuật",
-      "blurb": "Khi nào đánh dấu đã thăm, ba cách phát hiện chu trình, hai cách sắp topo, và BFS trên không gian trạng thái.",
-      "n": 15,
+      "blurb": "Hai mẫu code, ba bẫy, và 5 pattern kèm 22 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/03-algorithms/graph-bfs-dfs-topo/index.html"
      },
      {
