@@ -80,6 +80,35 @@ Trang bài được bố trí để học chứ không chỉ để đọc:
 
 Phím tắt: `j` mục sau · `k` mục trước · `m` đánh dấu đã học · `/` tìm toàn kho · `Esc` thoát tìm.
 
+## Trực quan — bộ khuôn hình
+
+Hình là thứ giúp học nhanh nhất, nên vẽ hình phải rẻ. **[kit.html](kit.html)** là trang tra khuôn:
+mở ra, chép đoạn HTML dưới mỗi hình, thay chữ. Không phải tính toạ độ, tự co giãn theo màn hình,
+tự đúng bảng màu.
+
+| Khuôn | Dùng cho |
+|---|---|
+| `.strip` | mảng, miền đáp án, ô nhớ, dãy FALSE→TRUE |
+| `.flow` | quy trình 2–4 bước, ba nhánh của một quyết định |
+| `.cmp` | đối chiếu hai cột: hai quy ước, hai cách làm |
+| `.stack` | pipeline dọc: RAG, vòng đời request, lượt forward |
+| `.mtx` | ma trận 2×2: confusion matrix, bias–variance |
+| `.axis` | thứ có thứ tự: mức cô lập, mức nén, độ trễ |
+| `.seq` | trình tự qua lại: bắt tay TCP, giao thức hai bên |
+| `.bars` | so sánh đại lượng chênh nhau nhiều lần |
+
+Quy ước màu dùng chung cho **mọi** hình trong kho — đừng đổi nghĩa giữa các bài:
+xanh dương = dữ liệu / thứ đang xét · vàng = con trỏ, điểm nhấn, đáp án ·
+đỏ = sai, bị loại, chưa thoả · xanh lá = đúng, kết quả, đã thoả.
+
+Ba quy tắc khi soạn: mỗi mục **một** hình (cần hai hình thường là dấu hiệu mục đó nên tách đôi);
+hình phải **thay được** đoạn văn chứ không minh hoạ thêm cho nó; chữ trong hình càng ít càng tốt.
+
+Chỉ dùng SVG khi hình có đường cong, đường chéo hoặc trục toạ độ thật — mẫu ở
+[mục mảng xoay](content/01-dsa/03-algorithms/binary-search/index.html#binsearch-s9):
+`viewBox="0 0 560 200"`, cột rộng 60, cách nhau 12, đáy y=158. Giữ nguyên khung này thì mọi
+biểu đồ cột trong kho nhìn như một bộ.
+
 ## Chỗ trống theo syllabus
 
 Khung thư mục đã dựng sẵn cho các mảng còn thiếu bài:
