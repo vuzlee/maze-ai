@@ -71,17 +71,17 @@ window.CATALOG = [
       "slug": "window",
       "title": "Two pointers & sliding window",
       "tag": "Kỹ thuật",
-      "blurb": "Điều kiện để hai kỹ thuật này đúng, hai mẫu code phủ hầu hết đề, kỹ thuật at-most-K, và lằn ranh phải đổi sang prefix sum.",
-      "n": 14,
+      "blurb": "Hai mẫu code, ba bẫy, và 5 pattern kèm 22 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/03-algorithms/two-pointers-sliding-window/index.html"
      },
      {
       "dir": "binary-search",
       "slug": "binsearch",
-      "title": "Binary search — mọi biến thể",
+      "title": "Binary search",
       "tag": "Kỹ thuật",
-      "blurb": "Hai mẫu code phủ mọi đề, tìm nhị phân trên đáp án, mảng xoay, và vì sao lo < hi phải đi cùng hi = mid.",
-      "n": 15,
+      "blurb": "Một mẫu code phủ mọi đề, ba bẫy, và 5 pattern kèm 20 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/03-algorithms/binary-search/index.html"
      },
      {
