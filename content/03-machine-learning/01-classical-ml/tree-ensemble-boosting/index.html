@@ -28,38 +28,92 @@
     <main class="reader" id="stage">
       <article class="doc" id="art-trees" data-title="Cây, rừng &amp; boosting" data-tag="Dữ liệu bảng" data-blurb="Cách chọn điểm chia, bagging giảm variance boosting giảm bias, bẫy feature importance, và vì sao thắng deep learning.">
         <header class="hero">
-  <p class="eyebrow">Deep dive · Machine learning · dữ liệu bảng</p>
+  <p class="eyebrow">Machine learning · dữ liệu bảng</p>
   <h1>Cây, rừng<br>&amp; <em>boosting</em></h1>
-  <p class="lede">Một cây quyết định thì yếu. Hàng trăm cây gộp lại theo <b>hai cách khác nhau</b> cho ra hai họ model chi phối dữ liệu bảng tới hôm nay. Bài này giải thích cách chọn điểm chia, vì sao bagging giảm <b>variance</b> mà boosting giảm <b>bias</b>, cái bẫy của feature importance, và vì sao boosting vẫn thắng deep learning trên dữ liệu bảng.</p>
+  <p class="lede">Một cây thì yếu. Hàng trăm cây gộp lại theo <b>hai cách khác nhau</b> cho ra hai họ model chi phối dữ liệu bảng tới hôm nay — và hai cách đó chữa <b>hai bệnh khác nhau</b>.</p>
 </header>
 
-
-<section id="trees-s1">
+<section id="trees-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
-<pre><code>Một cây sâu           bias thấp, variance CAO      → overfit nặng
-   │
-   ├─ BAGGING: nhiều cây sâu, học SONG SONG trên dữ liệu bootstrap
-   │           lấy trung bình → giảm VARIANCE
-   │           → Random Forest
-   │
-   └─ BOOSTING: nhiều cây NÔNG, học TUẦN TỰ, mỗi cây sửa lỗi cây trước
-               → giảm BIAS
-               → Gradient Boosting, XGBoost, LightGBM</code></pre>
+
+  <p class="key">Bagging làm dịu những cây <em>quá phức tạp</em>. Boosting cộng dần những cây <em>quá đơn giản</em>. Hai bệnh, hai thuốc.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Bagging → Random Forest</h5>
+      <p><b>Cây thành phần</b> sâu, để mọc tự do</p>
+      <p><b>Học</b> song song, độc lập, trên dữ liệu bootstrap</p>
+      <p><b>Gộp</b> lấy trung bình / bỏ phiếu</p>
+      <p><b>Chữa</b> variance cao</p>
+    </div>
+    <div>
+      <h5>Boosting → XGBoost, LightGBM</h5>
+      <p><b>Cây thành phần</b> nông, 3–8 tầng</p>
+      <p><b>Học</b> tuần tự, cây sau sửa lỗi cây trước</p>
+      <p><b>Gộp</b> cộng lại, có nhân learning rate</p>
+      <p><b>Chữa</b> bias cao</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Một cây sâu có <b>bias thấp, variance cao</b> — nhớ cả nhiễu. Lấy trung bình nhiều cây như thế thì nhiễu triệt tiêu nhau.</li>
+    <li>Một cây nông có <b>bias cao, variance thấp</b> — quá đơn giản. Cộng nhiều cây như thế thì dần đủ mạnh.</li>
+    <li>Mọi câu hỏi so sánh hai họ đều quy về <b>một câu này</b>. Nhớ nó là trả lời được phần lớn.</li>
+  </ul>
+
   <div class="note key">
     <h4>Câu thần chú</h4>
-    Bagging và boosting đều gộp nhiều cây, nhưng <strong>chữa hai bệnh khác nhau</strong>. Bagging bắt đầu từ những cây <em>quá phức tạp</em> và làm dịu chúng lại. Boosting bắt đầu từ những cây <em>quá đơn giản</em> và cộng dần để đủ mạnh. Nắm được câu này là trả lời được hầu hết câu hỏi so sánh hai họ.
+    Bagging và boosting đều gộp nhiều cây, nhưng <strong>chữa hai bệnh khác nhau</strong>. Bagging bắt đầu từ những cây <em>quá phức tạp</em> và làm dịu chúng lại. Boosting bắt đầu từ những cây <em>quá đơn giản</em> và cộng dần để đủ mạnh.
   </div>
 </section>
 
-<section id="trees-s2">
+<section id="trees-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Cây quyết định</h2></div>
-<pre><code>                tuổi &lt; 30?
-              /            \
-           có                không
-      thu_nhập &lt; 20?      đã_mua_trước?
-       /        \           /       \
-    không mua  mua      mua      không mua</code></pre>
-  <p>Thuật toán học rất đơn giản và <strong>tham lam</strong>:</p>
+
+  <p class="key">Ở mỗi nút, thử <em>mọi</em> đặc trưng × <em>mọi</em> ngưỡng, chọn cặp làm giảm độ vẩn nhiều nhất. Tham lam, không nhìn xa.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 240" role="img" aria-label="Cây quyết định ba tầng chia theo tuổi, thu nhập và lịch sử mua">
+      <line x1="280" y1="46" x2="135" y2="98" stroke="#2A3A4C"></line>
+      <line x1="280" y1="46" x2="430" y2="98" stroke="#2A3A4C"></line>
+      <line x1="135" y1="136" x2="65"  y2="188" stroke="#2A3A4C"></line>
+      <line x1="135" y1="136" x2="195" y2="188" stroke="#2A3A4C"></line>
+      <line x1="430" y1="136" x2="365" y2="188" stroke="#2A3A4C"></line>
+      <line x1="430" y1="136" x2="495" y2="188" stroke="#2A3A4C"></line>
+
+      <rect x="200" y="8"  width="160" height="38" rx="6" class="sv-b"></rect>
+      <rect x="60"  y="98" width="150" height="38" rx="6" class="sv-b"></rect>
+      <rect x="350" y="98" width="160" height="38" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="280" y="32"  text-anchor="middle" fill="#DDE6EF">tuổi &lt; 30 ?</text>
+      <text class="sv-l" x="135" y="122" text-anchor="middle" fill="#DDE6EF">thu_nhập &lt; 20 ?</text>
+      <text class="sv-l" x="430" y="122" text-anchor="middle" fill="#DDE6EF">đã mua trước ?</text>
+
+      <rect x="10"  y="188" width="110" height="38" rx="6" fill="rgba(224,108,122,.15)" stroke="#E06C7A"></rect>
+      <rect x="140" y="188" width="110" height="38" rx="6" fill="rgba(78,205,180,.15)"  stroke="#4ECDB4"></rect>
+      <rect x="310" y="188" width="110" height="38" rx="6" fill="rgba(78,205,180,.15)"  stroke="#4ECDB4"></rect>
+      <rect x="440" y="188" width="110" height="38" rx="6" fill="rgba(224,108,122,.15)" stroke="#E06C7A"></rect>
+      <text class="sv-l" x="65"  y="212" text-anchor="middle" fill="#E9909B">không mua</text>
+      <text class="sv-l" x="195" y="212" text-anchor="middle" fill="#6FD9C4">mua</text>
+      <text class="sv-l" x="365" y="212" text-anchor="middle" fill="#6FD9C4">mua</text>
+      <text class="sv-l" x="495" y="212" text-anchor="middle" fill="#E9909B">không mua</text>
+
+      <text class="sv-l" x="196" y="70"  text-anchor="middle">có</text>
+      <text class="sv-l" x="364" y="70"  text-anchor="middle">không</text>
+      <text class="sv-l" x="88"  y="160" text-anchor="middle">có</text>
+      <text class="sv-l" x="180" y="160" text-anchor="middle">không</text>
+      <text class="sv-l" x="382" y="160" text-anchor="middle">có</text>
+      <text class="sv-l" x="475" y="160" text-anchor="middle">không</text>
+    </svg>
+    <figcaption>Mỗi nút là một câu hỏi có/không trên <em>một</em> đặc trưng. Đường từ gốc xuống lá chính là một luật <code>nếu … và … thì …</code> đọc được bằng tiếng người.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Chia theo A rồi trong nhánh đó chia theo B</b> chính là mô hình hoá tương tác A×B — không cần khai báo trước.</li>
+    <li>Tham lam nghĩa là <b>không tối ưu toàn cục</b>: tìm cây tối ưu là bài toán NP-đầy đủ.</li>
+    <li>Chính vì mỗi cây tham lam theo <b>một hướng khác nhau</b> mà việc gộp nhiều cây lại có tác dụng.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — bốn bước của thuật toán và hệ quả của tính tham lam</summary><div class="body">
   <ol>
     <li>Ở mỗi nút, thử <em>mọi</em> đặc trưng và <em>mọi</em> ngưỡng chia có thể.</li>
     <li>Chọn cặp làm giảm độ vẩn nhiều nhất.</li>
@@ -70,10 +124,38 @@
     <h4>Tham lam nghĩa là không tối ưu toàn cục</h4>
     Cây chọn điểm chia tốt nhất <em>tại bước hiện tại</em>, không xét xem lựa chọn đó có mở đường cho các bước sau hay không. Tìm cây tối ưu toàn cục là bài toán NP-đầy đủ. Đây là lý do một cây đơn lẻ thường không tốt, và cũng là một phần lý do việc gộp nhiều cây lại hiệu quả — mỗi cây tham lam theo một hướng khác nhau.
   </div>
+  </div></details>
 </section>
 
-<section id="trees-s3">
+<section id="trees-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Chọn điểm chia — công thức</h2></div>
+
+  <p class="key">Gini và entropy đo cùng một thứ: nút này <em>lẫn lộn</em> tới mức nào. Gain = độ vẩn cha − độ vẩn con, có trọng số theo số mẫu.</p>
+
+  <div class="bars">
+    <div class="b"><i>100% một lớp</i><u style="width:2%"></u><b>Gini = 0 · thuần khiết</b></div>
+    <div class="b"><i>90 / 10</i><u style="width:36%"></u><b>0,18</b></div>
+    <div class="b"><i>70 / 30</i><u style="width:84%"></u><b>0,42</b></div>
+    <div class="b hi"><i>50 / 50</i><u style="width:100%"></u><b>0,5 · lẫn lộn nhất</b></div>
+  </div>
+  <p class="stripnote"><span>chia càng làm hai nhánh <em>bớt lẫn lộn</em> thì gain càng lớn</span></p>
+
+  <div class="flow">
+    <div class="n"><h5>Nút cha</h5><p>100 mẫu · 50/50<br><code>G = 0,5</code></p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Nhánh trái</h5><p>60 mẫu · 50 dương/10 âm<br><code>G = 0,278</code></p></div>
+    <div class="a">+</div>
+    <div class="n ok"><h5>Nhánh phải</h5><p>40 mẫu · toàn âm<br><code>G = 0</code></p></div>
+  </div>
+  <p class="stripnote"><span>gain = 0,5 − (0,6 × 0,278 + 0,4 × 0)</span><span><em>= 0,333</em></span></p>
+
+  <ul class="why">
+    <li>Trọng số theo <b>số mẫu mỗi nhánh</b> — nhánh 3 mẫu thuần khiết không đáng bằng nhánh 300 mẫu thuần khiết.</li>
+    <li>Gini rẻ hơn entropy vì <b>không có logarithm</b>; kết quả gần như luôn giống nhau.</li>
+    <li>Bài hồi quy chỉ đổi hàm đo: <b>giảm phương sai</b> thay cho giảm độ vẩn. Cơ chế y hệt.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — công thức, ví dụ tính tay và bảng so Gini/Entropy</summary><div class="body">
 <pre><code>Gini:     G = 1 - Σ pᵢ²
 Entropy:  H = -Σ pᵢ · log₂(pᵢ)
 
@@ -93,39 +175,75 @@ Ví dụ: nút cha 100 mẫu, 50 dương / 50 âm  →  Gini = 0.5
     <tr><td>Kết quả thực tế</td><td colspan="2" style="text-align:center">Gần như giống nhau; hiếm khi đổi cây một cách đáng kể</td></tr>
     <tr><td>Mặc định</td><td>scikit-learn, CART</td><td>ID3, C4.5</td></tr>
   </table>
-  <p>Với bài hồi quy thì tiêu chí đổi thành <strong>giảm phương sai</strong> — chọn điểm chia làm tổng bình phương sai số trong hai nhánh nhỏ nhất. Cơ chế hoàn toàn giống nhau, chỉ thay hàm đo độ vẩn.</p>
+  <p>Với bài hồi quy thì tiêu chí đổi thành <strong>giảm phương sai</strong> — chọn điểm chia làm tổng bình phương sai số trong hai nhánh nhỏ nhất.</p>
+  </div></details>
 </section>
 
-<section id="trees-s4">
+<section id="trees-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Lab: tìm điểm chia tốt nhất</h2></div>
-  <p>Mười hai mẫu trên một trục. Kéo ngưỡng và xem gain thay đổi; bấm "tìm tốt nhất" để so với lựa chọn của thuật toán.</p>
-  <div class="lab">
-    <div class="bar">
-      <div><label>ngưỡng chia</label><input type="number" id="sthr" value="5.5" step="0.5" min="0" max="13"></div>
-      <div><label>tiêu chí</label>
-        <select id="scrit">
-          <option value="gini" selected>Gini</option>
-          <option value="entropy">Entropy</option>
-        </select>
+
+  <p class="key">Gain <em>không</em> tăng dần theo ngưỡng — nó nhảy bậc ở đúng chỗ tách được hai lớp. Đó là lý do phải thử mọi ngưỡng.</p>
+
+  <div class="lab" id="splab">
+    <div class="guess" id="sguess">
+      <p>Nhìn dãy dưới rồi đoán: <b>ngưỡng nào</b> cho gain lớn nhất?</p>
+      <div class="opts">
+        <button data-v="3.5">3,5</button>
+        <button data-v="6.5">6,5</button>
+        <button data-v="9.5">9,5</button>
       </div>
-      <button id="sbest">Tìm điểm chia tốt nhất</button>
-      <button class="ghost" id="srst">Đặt lại</button>
+      <p class="ans" hidden></p>
     </div>
+
+    <div class="bar">
+      <div style="flex:1"><label>tiêu chí đo độ vẩn</label><div class="scen" id="scrit"></div></div>
+    </div>
+
     <div id="sview"></div>
-    <div class="stat">
-      <u>độ vẩn nút cha <b id="sp">–</b></u>
-      <u>trái <b id="sl">–</b></u>
-      <u>phải <b id="sr">–</b></u>
-      <u>information gain <b id="sg">–</b></u>
+    <p class="stripnote" id="snote"><span></span><span></span></p>
+
+    <div class="split">
+      <div id="sgain"></div>
+      <div class="explain" id="sexp"></div>
     </div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Để ý gain <strong>không</strong> tăng đơn điệu theo ngưỡng — nó nhảy lên ở những chỗ chia tách được hai lớp. Đó là lý do thuật toán phải thử mọi ngưỡng thay vì tối ưu bằng gradient. Đổi tiêu chí sang Entropy: con số khác nhưng điểm chia tốt nhất thường vẫn thế.
-    </p>
+
+    <div class="labbar">
+      <button id="sbest">Tìm ngưỡng tốt nhất</button>
+      <button class="ghost" id="srst">Đặt lại</button>
+      <span id="sstat"></span>
+    </div>
+
+    <p class="verdict" id="sverdict" hidden></p>
   </div>
 </section>
-
-<section id="trees-s5">
+<section id="trees-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Ưu điểm riêng của cây</h2></div>
+
+  <p class="key">Cây chỉ so sánh <code>x &lt; ngưỡng</code>. Từ một câu đó suy ra hết ưu điểm — và cả điểm chí tử.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Được miễn phí</h5>
+      <p><b>Miễn chuẩn hoá</b> — đổi thang đo không đổi thứ tự, không đổi cây</p>
+      <p><b>Phi tuyến</b> — nhiều điểm chia liên tiếp xấp xỉ hàm bậc thang bất kỳ</p>
+      <p><b>Tương tác</b> — chia theo A rồi theo B chính là A×B</p>
+      <p><b>Chịu ngoại lai</b> — điểm cực lớn chỉ nằm ở một lá, không kéo lệch cả model</p>
+    </div>
+    <div>
+      <h5>Không làm được</h5>
+      <p><b>Ngoại suy</b> — ngoài phạm vi huấn luyện chỉ trả về hằng số của lá ngoài cùng</p>
+      <p><b>Ranh giới chéo</b> — phải xấp xỉ bằng rất nhiều bậc thang song song trục</p>
+      <p><b>Ổn định</b> — đổi vài mẫu có thể ra cây hoàn toàn khác</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li><b>Không ngoại suy được</b> là điểm chí tử với dữ liệu có xu hướng tăng theo thời gian — phải khử xu hướng trước hoặc dùng model tuyến tính.</li>
+    <li>Tính <b>bất ổn định</b> nghe như nhược điểm, nhưng chính nó làm bagging hiệu quả: cây càng khác nhau, lấy trung bình càng lợi.</li>
+    <li>Một ranh giới chéo mà hồi quy tuyến tính vẽ bằng <b>một đường thẳng</b> thì cây cần hàng chục điểm chia.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — bảng ưu điểm kèm lý do</summary><div class="body">
   <table>
     <tr><th>Ưu điểm</th><th>Vì sao</th></tr>
     <tr><td><strong>Không cần chuẩn hoá</strong></td><td>Cây chỉ so sánh <code>x &lt; ngưỡng</code>. Đổi thang đo không đổi thứ tự nên không đổi cây</td></tr>
@@ -134,18 +252,35 @@ Ví dụ: nút cha 100 mẫu, 50 dương / 50 âm  →  Gini = 0.5
     <tr><td><strong>Chịu được ngoại lai</strong></td><td>Một điểm cực lớn chỉ nằm ở một nhánh, không kéo lệch cả model như MSE của hồi quy tuyến tính</td></tr>
     <tr><td><strong>Xử lý dữ liệu hỗn hợp</strong></td><td>Số và phân loại đứng chung được; một số thư viện xử lý luôn giá trị thiếu</td></tr>
   </table>
-  <p>Và mặt yếu, cũng quan trọng không kém:</p>
   <ul>
-    <li><strong>Không ngoại suy được.</strong> Cây dự đoán bằng trung bình của các mẫu trong lá. Với giá trị x vượt ngoài phạm vi huấn luyện, nó trả về đúng giá trị của lá ngoài cùng — một hằng số. Đây là điểm chí tử cho dữ liệu có xu hướng tăng theo thời gian.</li>
-    <li><strong>Ranh giới song song với trục.</strong> Một ranh giới chéo cần rất nhiều bậc thang để xấp xỉ. Hồi quy tuyến tính làm việc đó bằng một đường thẳng.</li>
+    <li><strong>Không ngoại suy được.</strong> Cây dự đoán bằng trung bình của các mẫu trong lá. Với giá trị x vượt ngoài phạm vi huấn luyện, nó trả về đúng giá trị của lá ngoài cùng — một hằng số.</li>
+    <li><strong>Ranh giới song song với trục.</strong> Một ranh giới chéo cần rất nhiều bậc thang để xấp xỉ.</li>
     <li><strong>Bất ổn định.</strong> Đổi vài mẫu trong dữ liệu có thể ra một cây hoàn toàn khác. Chính tính chất này là lý do bagging hiệu quả.</li>
   </ul>
+  </div></details>
 </section>
 
-<section id="trees-s6">
+<section id="trees-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Kiểm soát overfit của một cây</h2></div>
-<pre><code>Cây để mọc tự do sẽ chia tới khi mỗi lá chỉ còn một mẫu
-→ độ chính xác 100% trên tập huấn luyện, kém thảm hại trên dữ liệu mới</code></pre>
+
+  <p class="key">Để mọc tự do, cây chia tới khi mỗi lá còn một mẫu: <em>100% trên tập huấn luyện, thảm hại trên dữ liệu mới</em>.</p>
+
+  <div class="axis">
+    <div class="stop"><b>depth = 1</b><span>một câu hỏi duy nhất · underfit</span></div>
+    <div class="stop on"><b>depth = 3–10</b><span>khoảng dùng được cho cây đơn lẻ</span></div>
+    <div class="stop"><b>depth = 20</b><span>bắt đầu học nhiễu</span></div>
+    <div class="stop"><b>không giới hạn</b><span>mỗi lá một mẫu · overfit hoàn toàn</span></div>
+  </div>
+  <p class="axiscap"><span>bias cao, variance thấp</span><span><em>núm chính để đánh đổi</em></span><span>bias thấp, variance cao</span></p>
+
+  <ul class="why">
+    <li><code>min_samples_leaf</code> thường <b>hiệu quả hơn <code>max_depth</code></b> vì nó thích ứng theo mật độ dữ liệu từng vùng.</li>
+    <li><code>max_features</code> — mỗi lần chia chỉ xét một tập con đặc trưng — chính là <b>cốt lõi của Random Forest</b>.</li>
+    <li>Dừng sớm bị <b>ngắn tầm nhìn</b>: một điểm chia trông vô ích bây giờ có thể mở đường cho hai điểm chia rất tốt bên dưới.</li>
+    <li>Thực tế ít ai cắt tỉa nữa, vì <b>ensemble chữa overfit hiệu quả hơn nhiều</b>.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — bảng tham số và chuyện dừng sớm hay cắt tỉa sau</summary><div class="body">
   <table>
     <tr><th>Tham số</th><th>Tác dụng</th><th>Ghi chú</th></tr>
     <tr><td><code>max_depth</code></td><td>Giới hạn độ sâu</td><td>Núm dễ hiểu nhất; 3–10 là khoảng thường dùng</td></tr>
@@ -158,37 +293,76 @@ Ví dụ: nút cha 100 mẫu, 50 dương / 50 âm  →  Gini = 0.5
     <h4>Dừng sớm hay cắt tỉa sau</h4>
     Dừng sớm có nhược điểm là <em>ngắn tầm nhìn</em>: một điểm chia trông vô ích ngay bây giờ có thể mở đường cho hai điểm chia rất tốt ở dưới. Cắt tỉa sau thì cho cây mọc hết rồi mới bỏ các nhánh không đáng, nên tránh được vấn đề đó. Trong thực tế người ta ít cắt tỉa vì đã có ensemble — và ensemble giải quyết overfit hiệu quả hơn nhiều.
   </div>
+  </div></details>
 </section>
 
-<section id="trees-s7">
+<section id="trees-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Bagging và Random Forest</h2></div>
+
+  <p class="key">Lấy trung bình chỉ xoá được phần variance <em>không tương quan</em>. Muốn giảm nữa thì phải làm các cây <em>khác nhau</em> đi.</p>
+
+<pre class="core"><code>Var(trung bình của B cây) = ρσ² + (1 - ρ)σ²/B
+                            └──┬──┘   └────┬────┘
+                          KHÔNG giảm     → 0 khi B lớn
+                          khi thêm cây</code></pre>
+
+  <div class="bars">
+    <div class="b"><i>1 cây</i><u style="width:100%"></u><b>variance 1,00</b></div>
+    <div class="b"><i>10 cây</i><u style="width:37%"></u><b>0,37</b></div>
+    <div class="b"><i>100 cây</i><u style="width:31%"></u><b>0,31</b></div>
+    <div class="b hi"><i>vô hạn cây</i><u style="width:30%"></u><b>0,30 — sàn = ρσ²</b></div>
+  </div>
+  <p class="stripnote"><span>ví dụ với ρ = 0,3</span><span><em>thêm cây mãi cũng không xuống dưới sàn — phải hạ ρ</em></span></p>
+
+  <ul class="why">
+    <li>Bootstrap một mình <b>chưa đủ</b>: mọi cây vẫn chọn cùng một đặc trưng mạnh làm gốc nên rất giống nhau, ρ cao.</li>
+    <li>Random Forest thêm <code>max_features</code> — mỗi lần chia chỉ xét <b>√p đặc trưng ngẫu nhiên</b>, ép các cây phải khác nhau.</li>
+    <li>Hệ quả: Random Forest <b>gần như không overfit khi tăng số cây</b>, nên số cây không phải siêu tham số cần dò.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — thuật toán bagging và vì sao max_features là mấu chốt</summary><div class="body">
 <pre><code>Bagging = Bootstrap AGGregatING
 
 Với mỗi cây trong B cây:
   1. Lấy mẫu bootstrap: rút n mẫu CÓ HOÀN LẠI từ n mẫu gốc
   2. Huấn luyện một cây SÂU, không cắt tỉa
 Dự đoán: phân loại thì bỏ phiếu, hồi quy thì lấy trung bình</code></pre>
-  <p><strong>Vì sao lấy trung bình giảm variance:</strong> nếu B model có phương sai <code>σ²</code> và tương quan đôi một là <code>ρ</code>, thì phương sai của trung bình là</p>
-<pre><code>Var = ρσ² + (1 - ρ)σ²/B
-
-B → ∞ thì số hạng thứ hai tiến về 0, nhưng số hạng ĐẦU thì không.
-→ muốn giảm variance nữa thì phải giảm ρ, tức làm các cây KHÁC NHAU hơn.</code></pre>
   <div class="note key">
     <h4>Đây chính là điều Random Forest thêm vào so với bagging thuần</h4>
     Bootstrap một mình chưa đủ: các cây vẫn rất giống nhau vì cùng chọn một đặc trưng mạnh làm gốc. Random Forest thêm <strong><code>max_features</code></strong> — mỗi lần chia chỉ được xét một tập con đặc trưng ngẫu nhiên, thường là <code>√p</code> cho phân loại. Nhờ đó cây nào không được thấy đặc trưng mạnh sẽ dùng đặc trưng khác, làm <code>ρ</code> giảm và công thức trên cho phương sai nhỏ hơn.
   </div>
   <p>Hệ quả thực tế: Random Forest gần như <strong>không overfit khi tăng số cây</strong>. Thêm cây chỉ làm ước lượng trung bình ổn định hơn — nên số cây không phải siêu tham số cần tinh chỉnh, chỉ cần đủ lớn trong ngân sách tính toán.</p>
+  </div></details>
 </section>
 
-<section id="trees-s8">
+<section id="trees-s8" class="lesson">
   <div class="sh"><b>08</b><h2>OOB score — tập kiểm tra miễn phí</h2></div>
-<pre><code>Bootstrap rút n mẫu có hoàn lại từ n mẫu.
-Xác suất một mẫu KHÔNG được chọn lần nào:
 
-    (1 - 1/n)ⁿ  →  1/e  ≈  0.368
+  <p class="key">Mỗi cây bỏ sót khoảng <em>36,8%</em> dữ liệu. Dùng đúng phần bị bỏ sót đó để chấm điểm — không phải huấn luyện lại lần nào.</p>
 
-→ khoảng 36.8% dữ liệu nằm NGOÀI mỗi cây (out-of-bag)</code></pre>
-  <p>Với mỗi mẫu, ta có thể dự đoán nó bằng <em>chỉ những cây không hề thấy nó</em>. Gộp lại được một ước lượng hiệu năng ngoài mẫu, gần tương đương cross-validation nhưng <strong>không phải huấn luyện lại lần nào</strong>.</p>
+  <div class="strip">
+    <div class="c t"><i>1</i><b>✓</b></div>
+    <div class="c t"><i>2</i><b>✓</b></div>
+    <div class="c on"><i>3</i><b>oob</b></div>
+    <div class="c t"><i>4</i><b>✓</b></div>
+    <div class="c t"><i>5</i><b>✓</b></div>
+    <div class="c on"><i>6</i><b>oob</b></div>
+    <div class="c t"><i>7</i><b>✓</b></div>
+    <div class="c on"><i>8</i><b>oob</b></div>
+    <div class="c t"><i>9</i><b>✓</b></div>
+    <div class="c t"><i>10</i><b>✓</b></div>
+  </div>
+  <p class="stripnote"><span>63,2% lọt vào túi bootstrap của cây này</span><span><em>36,8% nằm ngoài → chấm điểm cây này bằng đúng chúng</em></span></p>
+
+<pre class="core"><code>(1 - 1/n)ⁿ  →  1/e  ≈  0,368        <span class="cm"># xác suất một mẫu không được rút lần nào</span></code></pre>
+
+  <ul class="why">
+    <li>Mỗi mẫu được dự đoán bởi <b>chỉ những cây không hề thấy nó</b> — gộp lại thành một ước lượng ngoài mẫu.</li>
+    <li>Gần tương đương cross-validation nhưng <b>miễn phí</b>: <code>oob_score=True</code> là xong.</li>
+    <li><b>Hỏng khi mẫu không độc lập</b>: chuỗi thời gian, nhiều dòng cùng một khách, tương quan không gian — điểm sẽ quá lạc quan.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — code và giới hạn của OOB</summary><div class="body">
 <pre><code><span class="kw">from</span> sklearn.ensemble <span class="kw">import</span> RandomForestClassifier
 rf = RandomForestClassifier(n_estimators=<span class="st">500</span>, oob_score=<span class="kw">True</span>)
 rf.fit(X, y)
@@ -197,18 +371,35 @@ rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễ
     <h4>Khi nào OOB không dùng được</h4>
     Nó giả định các mẫu <strong>độc lập và cùng phân phối</strong>. Với dữ liệu chuỗi thời gian, dữ liệu theo nhóm (nhiều dòng của cùng một khách), hoặc dữ liệu có tương quan không gian, OOB cho điểm quá lạc quan — vì mẫu "ngoài túi" có thể là bản gần giống của một mẫu trong túi. Lúc đó phải chia theo thời gian hoặc theo nhóm.
   </div>
+  </div></details>
 </section>
 
-<section id="trees-s9">
+<section id="trees-s9" class="lesson">
   <div class="sh"><b>09</b><h2>Gradient boosting</h2></div>
+
+  <p class="key">Mỗi cây mới không học <code>y</code>. Nó học <em>phần dư</em> — thứ mà tổng các cây trước còn đang sai.</p>
+
+  <div class="stack">
+    <div class="s"><b>F₀ = trung bình của y</b><span>khởi tạo thô, sai gần như ở mọi mẫu</span></div>
+    <div class="s warn"><b>r = y − F₀</b><span>phần dư: model hiện tại còn sai bao nhiêu, ở mẫu nào</span></div>
+    <div class="s"><b>h₁ = cây nông fit trên r</b><span>cây mới học đúng phần sai đó, không học lại y</span></div>
+    <div class="s ok"><b>F₁ = F₀ + η · h₁</b><span>cộng vào một phần nhỏ · lặp lại M lần</span></div>
+  </div>
+
+  <ul class="why">
+    <li>Tên là <b>gradient</b> vì với MSE, phần dư <code>y − F(x)</code> <b>chính là</b> âm gradient của mất mát. Đổi hàm mất mát thì thay phần dư bằng gradient tương ứng, khung vẫn chạy.</li>
+    <li><code>learning_rate × n_estimators</code> gần như là <b>hằng số</b> cho cùng mức hiệu năng — giảm η mười lần thì cần khoảng mười lần số cây.</li>
+    <li>Cây phải <b>nông (3–8 tầng)</b>, khác hẳn Random Forest — cây sâu làm boosting overfit rất nhanh.</li>
+    <li>Boosting <b>CÓ overfit khi tăng số cây</b>. Bắt buộc phải có early stopping — đây là khác biệt then chốt so với Random Forest.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — thuật toán, ba siêu tham số và quan hệ giữa chúng</summary><div class="body">
 <pre><code>F₀(x) = giá trị khởi tạo (thường là trung bình của y)
 
 Lặp m = 1 .. M:
     r = y - Fₘ₋₁(x)              ← phần dư: model hiện tại còn SAI bao nhiêu
     hₘ = cây nông fit trên r      ← cây mới học chính phần sai đó
     Fₘ = Fₘ₋₁ + η · hₘ            ← cộng vào, có nhân learning rate</code></pre>
-  <p>Cụm từ "gradient" đến từ chỗ này: với hàm mất mát MSE thì phần dư <code>y − F(x)</code> <strong>chính là</strong> âm gradient của mất mát theo giá trị dự đoán. Với hàm mất mát khác — log loss, MAE — ta thay phần dư bằng âm gradient tương ứng, và toàn bộ khung vẫn hoạt động. Đó là lý do nó tên là <em>gradient</em> boosting chứ không phải <em>residual</em> boosting.</p>
-  <h3>Ba siêu tham số quan trọng nhất, và quan hệ giữa chúng</h3>
   <table>
     <tr><th>Tham số</th><th>Tác dụng</th><th>Khoảng thường dùng</th></tr>
     <tr><td><code>learning_rate</code> (η)</td><td>Mỗi cây được cộng vào bao nhiêu phần</td><td>0.01 – 0.1</td></tr>
@@ -217,16 +408,65 @@ Lặp m = 1 .. M:
   </table>
   <div class="note key">
     <h4>Quan hệ nghịch giữa hai tham số đầu</h4>
-    <code>learning_rate × n_estimators</code> gần như là một hằng số cho cùng mức hiệu năng. Giảm η mười lần thì cần khoảng mười lần số cây, nhưng thường được kết quả tốt hơn một chút vì mỗi bước cẩn thận hơn. Chiến thuật chuẩn: <strong>đặt η nhỏ, đặt n_estimators rất lớn, rồi dùng early stopping trên tập validation để tự tìm điểm dừng.</strong>
+    <code>learning_rate × n_estimators</code> gần như là một hằng số cho cùng mức hiệu năng. Chiến thuật chuẩn: <strong>đặt η nhỏ, đặt n_estimators rất lớn, rồi dùng early stopping trên tập validation để tự tìm điểm dừng.</strong>
   </div>
   <div class="note warn">
     <h4>Boosting CÓ overfit khi tăng số cây</h4>
-    Đây là khác biệt then chốt so với Random Forest. Mỗi cây mới cố sửa lỗi còn lại, nên đến lúc nào đó nó bắt đầu học cả nhiễu. Vì vậy <code>n_estimators</code> của boosting <strong>bắt buộc</strong> phải được kiểm soát bằng early stopping, còn của Random Forest thì không cần.
+    Mỗi cây mới cố sửa lỗi còn lại, nên đến lúc nào đó nó bắt đầu học cả nhiễu. Vì vậy <code>n_estimators</code> của boosting <strong>bắt buộc</strong> phải được kiểm soát bằng early stopping, còn của Random Forest thì không cần.
   </div>
+  </div></details>
 </section>
-
-<section id="trees-s10">
+<section id="trees-s10" class="lesson">
   <div class="sh"><b>10</b><h2>XGBoost và LightGBM</h2></div>
+
+  <p class="key">Khác nhau ở <em>cách mọc cây</em>: XGBoost mở đều cả tầng, LightGBM luôn chia đúng cái lá có gain lớn nhất.</p>
+
+  <figure>
+    <svg viewBox="0 0 560 240" role="img" aria-label="So sánh cách mọc cây theo tầng và theo lá">
+      <text class="sv-l" x="140" y="14" text-anchor="middle" fill="#6C8CFF">XGBoost · mọc theo tầng</text>
+      <text class="sv-l" x="430" y="14" text-anchor="middle" fill="#F0B44A">LightGBM · mọc theo lá</text>
+
+      <line x1="140" y1="48" x2="90"  y2="100" stroke="#2A3A4C"></line>
+      <line x1="140" y1="48" x2="190" y2="100" stroke="#2A3A4C"></line>
+      <line x1="90"  y1="100" x2="60"  y2="152" stroke="#2A3A4C"></line>
+      <line x1="90"  y1="100" x2="120" y2="152" stroke="#2A3A4C"></line>
+      <line x1="190" y1="100" x2="160" y2="152" stroke="#2A3A4C"></line>
+      <line x1="190" y1="100" x2="220" y2="152" stroke="#2A3A4C"></line>
+      <circle cx="140" cy="48"  r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <circle cx="90"  cy="100" r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <circle cx="190" cy="100" r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <circle cx="60"  cy="152" r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <circle cx="120" cy="152" r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <circle cx="160" cy="152" r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <circle cx="220" cy="152" r="13" fill="rgba(108,140,255,.25)" stroke="#6C8CFF"></circle>
+      <text class="sv-l" x="140" y="200" text-anchor="middle">tầng nào cũng mở hết</text>
+      <text class="sv-l" x="140" y="228" text-anchor="middle" fill="#6C8CFF">cây cân bằng · ổn định hơn</text>
+
+      <line x1="430" y1="48"  x2="385" y2="100" stroke="#2A3A4C"></line>
+      <line x1="430" y1="48"  x2="475" y2="100" stroke="#2A3A4C"></line>
+      <line x1="475" y1="100" x2="445" y2="152" stroke="#2A3A4C"></line>
+      <line x1="475" y1="100" x2="510" y2="152" stroke="#2A3A4C"></line>
+      <line x1="510" y1="152" x2="485" y2="200" stroke="#2A3A4C"></line>
+      <line x1="510" y1="152" x2="535" y2="200" stroke="#2A3A4C"></line>
+      <circle cx="430" cy="48"  r="13" fill="rgba(240,180,74,.22)" stroke="#F0B44A"></circle>
+      <circle cx="385" cy="100" r="13" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <circle cx="475" cy="100" r="13" fill="rgba(240,180,74,.22)" stroke="#F0B44A"></circle>
+      <circle cx="445" cy="152" r="13" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <circle cx="510" cy="152" r="13" fill="rgba(240,180,74,.22)" stroke="#F0B44A"></circle>
+      <circle cx="485" cy="200" r="13" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <circle cx="535" cy="200" r="13" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <text class="sv-l" x="430" y="228" text-anchor="middle" fill="#F0B44A">đi sâu vào nhánh đáng giá · dễ overfit</text>
+    </svg>
+    <figcaption>Vàng là các lá được chọn chia tiếp vì gain lớn nhất. Cùng một số lá, LightGBM đặt chúng ở chỗ có ích hơn — nên nhanh và chính xác hơn, đổi lại dễ overfit trên dữ liệu nhỏ.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Vì mọc theo lá nên LightGBM phải giới hạn bằng <code>num_leaves</code> <b>cùng</b> <code>min_data_in_leaf</code> — chỉ đặt <code>max_depth</code> là không đủ.</li>
+    <li>Đóng góp lý thuyết của XGBoost: <b>đưa regularization vào chính hàm mục tiêu</b> — phạt số lá (<code>gamma</code>) và độ lớn giá trị lá (<code>lambda</code>).</li>
+    <li>Dữ liệu đầy ID, mã sản phẩm, mã vùng thì thử <b>CatBoost</b>: target encoding có thứ tự, tránh rò rỉ nhãn.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — bảng so sánh đầy đủ</summary><div class="body">
   <table>
     <tr><th></th><th>XGBoost</th><th>LightGBM</th></tr>
     <tr><td>Cách mọc cây</td><td>Theo tầng — mở rộng đều cả tầng</td><td><strong>Theo lá</strong> — luôn chia lá có gain lớn nhất</td></tr>
@@ -236,78 +476,151 @@ Lặp m = 1 .. M:
     <tr><td>Tốc độ trên dữ liệu lớn</td><td>Nhanh</td><td><strong>Nhanh hơn</strong>, tốn ít bộ nhớ hơn</td></tr>
     <tr><td>Biến phân loại</td><td>Phải mã hoá trước</td><td>Hỗ trợ trực tiếp</td></tr>
   </table>
-  <p>Điểm đóng góp lý thuyết của XGBoost là <strong>đưa regularization vào chính hàm mục tiêu</strong>: nó phạt số lá (<code>gamma</code>) và độ lớn giá trị lá (<code>lambda</code>), rồi dùng khai triển bậc hai của mất mát để tính gain của mỗi điểm chia. Nhờ vậy quyết định chia được cân nhắc cả độ phức tạp, không chỉ mức giảm lỗi.</p>
   <div class="note">
     <h4>Còn CatBoost</h4>
-    Mạnh nhất khi có nhiều biến phân loại nhiều giá trị. Nó dùng <em>target encoding có thứ tự</em> để tránh rò rỉ nhãn — vấn đề mà mã hoá theo trung bình nhãn thông thường luôn gặp. Nếu dữ liệu của bạn đầy ID, mã sản phẩm, mã vùng thì đáng thử.
+    Mạnh nhất khi có nhiều biến phân loại nhiều giá trị. Nó dùng <em>target encoding có thứ tự</em> để tránh rò rỉ nhãn — vấn đề mà mã hoá theo trung bình nhãn thông thường luôn gặp.
   </div>
+  </div></details>
 </section>
 
-<section id="trees-s11">
+<section id="trees-s11" class="lesson">
   <div class="sh"><b>11</b><h2>Bagging so với boosting</h2></div>
+
+  <p class="key">Chọn theo <em>hoàn cảnh</em>, không theo "cái nào mạnh hơn": nhiễu nhãn và ít thời gian → rừng; cần điểm cao nhất → boosting.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Chọn Random Forest khi</h5>
+      <p>cần <b>baseline nhanh</b>, chạy tốt ngay với mặc định</p>
+      <p>dữ liệu <b>có nhiễu nhãn</b></p>
+      <p>không có thời gian tinh chỉnh</p>
+      <p>muốn <b>OOB score miễn phí</b></p>
+    </div>
+    <div>
+      <h5>Chọn boosting khi</h5>
+      <p>cần <b>điểm cao nhất</b> có thể</p>
+      <p>có <b>tập validation tốt</b> để early stopping</p>
+      <p>có thời gian dò siêu tham số</p>
+      <p>nhãn <b>sạch</b> — cây sau sẽ cố học cả nhãn sai</p>
+    </div>
+  </div>
+
   <table>
     <tr><th></th><th>Random Forest</th><th>Gradient Boosting</th></tr>
     <tr><td>Huấn luyện</td><td>Song song — các cây độc lập</td><td>Tuần tự — cây sau cần cây trước</td></tr>
     <tr><td>Cây thành phần</td><td><strong>Sâu</strong>, variance cao</td><td><strong>Nông</strong>, bias cao</td></tr>
     <tr><td>Giảm</td><td>Variance</td><td>Bias</td></tr>
     <tr><td>Tăng số cây thì</td><td>Ổn định dần, không overfit</td><td><strong>Có thể overfit</strong> — cần early stopping</td></tr>
-    <tr><td>Nhạy siêu tham số</td><td>Thấp — chạy tốt với thiết lập mặc định</td><td>Cao — cần tinh chỉnh</td></tr>
+    <tr><td>Nhạy siêu tham số</td><td>Thấp</td><td>Cao — cần tinh chỉnh</td></tr>
     <tr><td>Nhạy nhiễu nhãn</td><td>Thấp</td><td>Cao — cây sau cố học cả nhãn sai</td></tr>
     <tr><td>Hiệu năng đỉnh</td><td>Tốt</td><td><strong>Thường tốt hơn</strong></td></tr>
-    <tr><td>Chọn khi</td><td>Cần baseline nhanh, ít thời gian tinh chỉnh, dữ liệu có nhiễu nhãn</td><td>Cần điểm cao nhất, có thời gian tinh chỉnh và tập validation tốt</td></tr>
   </table>
+
   <div class="note key">
     <h4>Cách trả lời khi được hỏi so sánh</h4>
     "Random Forest gộp các cây <em>sâu</em> học song song để giảm variance; boosting cộng các cây <em>nông</em> học tuần tự để giảm bias. Hệ quả thực tế: tăng số cây của Random Forest thì an toàn, còn của boosting thì phải có early stopping. Em thường dựng Random Forest trước làm mốc vì nó chạy tốt ngay với mặc định, rồi mới sang LightGBM nếu cần điểm cao hơn."
   </div>
 </section>
 
-<section id="trees-s12">
+<section id="trees-s12" class="lesson">
   <div class="sh"><b>12</b><h2>Feature importance — và cái bẫy</h2></div>
+
+  <p class="key">Cột ID ngẫu nhiên có <em>rất nhiều ngưỡng để thử</em>, nên gần như luôn tìm được điểm chia — và leo lên đầu bảng importance dù vô dụng.</p>
+
+  <div class="bars">
+    <div class="b bad"><i>user_id</i><u style="width:100%"></u><b>0,31 ← vô dụng</b></div>
+    <div class="b"><i>số lần mua</i><u style="width:61%"></u><b>0,19</b></div>
+    <div class="b"><i>tuổi</i><u style="width:39%"></u><b>0,12</b></div>
+    <div class="b hi"><i>cột NGẪU NHIÊN<br>tự thêm vào</i><u style="width:26%"></u><b>0,08 ← vạch chuẩn</b></div>
+    <div class="b"><i>mã vùng</i><u style="width:19%"></u><b>0,06</b></div>
+    <div class="b"><i>ngày trong tuần</i><u style="width:13%"></u><b>0,04</b></div>
+  </div>
+  <p class="stripnote"><span>tự thêm một cột số ngẫu nhiên vào dữ liệu làm mốc</span><span><em>mọi đặc trưng xếp dưới nó = nhiễu</em></span></p>
+
+  <ul class="why">
+    <li><b>Gain importance</b> (mặc định của thư viện) thiên vị đặc trưng nhiều giá trị — đây là cái bẫy hay gặp nhất.</li>
+    <li><b>Permutation importance trên tập kiểm tra</b> là cách kiểm chứng: xáo trộn cột đó rồi xem hiệu năng tụt bao nhiêu.</li>
+    <li><b>SHAP</b> cho cả mức toàn cục lẫn từng dự đoán, nhưng chậm nhất.</li>
+    <li>Đúng với cả ba cách: <b>importance không phải nhân quả</b>. Nó nói model đang dựa vào gì, không nói can thiệp vào đó thì kết quả đổi thế nào.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — ba cách đo và cái bẫy của gain importance</summary><div class="body">
   <table>
     <tr><th>Cách</th><th>Đo gì</th><th>Nhược điểm</th></tr>
-    <tr><td>Gain / impurity<br><span class="cm">mặc định của thư viện</span></td><td>Tổng mức giảm độ vẩn do đặc trưng đó tạo ra</td><td><strong>Thiên vị đặc trưng nhiều giá trị</strong> — xem dưới</td></tr>
+    <tr><td>Gain / impurity<br><span class="cm">mặc định của thư viện</span></td><td>Tổng mức giảm độ vẩn do đặc trưng đó tạo ra</td><td><strong>Thiên vị đặc trưng nhiều giá trị</strong></td></tr>
     <tr><td>Permutation</td><td>Hiệu năng tụt bao nhiêu khi xáo trộn ngẫu nhiên cột đó</td><td>Chậm; chia đôi tầm quan trọng giữa các cột tương quan</td></tr>
     <tr><td>SHAP</td><td>Đóng góp của đặc trưng vào <em>từng dự đoán</em></td><td>Chậm nhất, nhưng cho cả mức toàn cục và cục bộ</td></tr>
   </table>
   <div class="note warn">
     <h4>Cái bẫy của gain importance</h4>
-    Một cột ID ngẫu nhiên hoặc một biến liên tục có rất nhiều giá trị khác nhau sẽ có <strong>rất nhiều ngưỡng chia để thử</strong>, nên gần như luôn tìm được một điểm chia làm giảm độ vẩn — kể cả khi nó chỉ đang khớp nhiễu. Kết quả là nó leo lên đầu bảng importance dù hoàn toàn vô dụng. Cách kiểm chứng: dùng permutation importance <strong>trên tập kiểm tra</strong>, hoặc thêm hẳn một cột số ngẫu nhiên vào dữ liệu rồi xem có đặc trưng nào xếp dưới nó — những cột dưới mức đó gần như chắc chắn là nhiễu.
+    Một cột ID ngẫu nhiên hoặc một biến liên tục có rất nhiều giá trị khác nhau sẽ có <strong>rất nhiều ngưỡng chia để thử</strong>, nên gần như luôn tìm được một điểm chia làm giảm độ vẩn — kể cả khi nó chỉ đang khớp nhiễu. Cách kiểm chứng: dùng permutation importance <strong>trên tập kiểm tra</strong>, hoặc thêm hẳn một cột số ngẫu nhiên vào dữ liệu rồi xem có đặc trưng nào xếp dưới nó.
   </div>
-  <p>Và điều đúng với cả ba cách: <strong>importance không phải nhân quả</strong>. Nó nói đặc trưng nào model đang dựa vào, không nói can thiệp vào đặc trưng đó sẽ làm kết quả thay đổi. Đây là câu phải nói ra khi trình bày kết quả cho bên nghiệp vụ.</p>
+  </div></details>
 </section>
 
-<section id="trees-s13">
+<section id="trees-s13" class="lesson">
   <div class="sh"><b>13</b><h2>Vì sao boosting vẫn thắng deep learning trên dữ liệu bảng</h2></div>
-  <p>Câu hỏi rất hay gặp, và câu trả lời tốt phải nêu được đặc tính của <em>dữ liệu</em>, không chỉ của model.</p>
+
+  <p class="key">Không phải vì cây mạnh hơn, mà vì dữ liệu bảng <em>thiếu đúng những thứ</em> mạng nơ-ron giỏi khai thác.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Mạng nơ-ron mạnh khi dữ liệu có</h5>
+      <p>cấu trúc <b>lân cận</b> — điểm ảnh cạnh nhau có liên quan</p>
+      <p><b>thứ tự</b> — từ trước ảnh hưởng từ sau</p>
+      <p>mọi đặc trưng <b>cùng một loại, cùng thang đo</b></p>
+      <p><b>rất nhiều dữ liệu</b> để học biểu diễn</p>
+    </div>
+    <div>
+      <h5>Nhưng dữ liệu bảng thì</h5>
+      <p>đổi thứ tự cột <b>không đổi ý nghĩa gì</b></p>
+      <p>đặc trưng <b>không đồng nhất</b>: tuổi, mã vùng, số lần mua</p>
+      <p>đầy quan hệ <b>bậc thang</b> — "trên 60 tuổi thì khác hẳn"</p>
+      <p>thường chỉ <b>vài nghìn tới vài triệu dòng</b></p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Cây biểu diễn một bậc thang bằng <b>một điểm chia</b>; mạng nơ-ron cần nhiều nơ-ron để xấp xỉ.</li>
+    <li>Có đặc trưng vô dụng thì cây <b>đơn giản không chọn</b>; mạng nơ-ron vẫn gán trọng số rồi phải học cách bỏ qua.</li>
+    <li>Deep learning thắng khi có <b>biến phân loại rất nhiều giá trị cần embedding</b> (id người dùng, id sản phẩm), khi kèm text/ảnh, hoặc khi cần huấn luyện tăng dần — đó là lý do hệ gợi ý quy mô lớn dùng mạng nơ-ron.</li>
+  </ul>
+
+  <details class="deep"><summary>Đào sâu — bảng đặc tính dữ liệu và khi nào deep learning thắng</summary><div class="body">
   <table>
     <tr><th>Đặc tính dữ liệu bảng</th><th>Vì sao cây phù hợp hơn</th></tr>
-    <tr><td>Đặc trưng <strong>không đồng nhất</strong> — tuổi, mã vùng, số lần mua, thang đo khác nhau</td><td>Cây xử lý từng đặc trưng độc lập, không cần chuẩn hoá. Mạng nơ-ron cần mọi thứ về cùng thang đo</td></tr>
+    <tr><td>Đặc trưng <strong>không đồng nhất</strong></td><td>Cây xử lý từng đặc trưng độc lập, không cần chuẩn hoá. Mạng nơ-ron cần mọi thứ về cùng thang đo</td></tr>
     <tr><td>Không có <strong>cấu trúc không gian hay thứ tự</strong></td><td>CNN và Transformer mạnh vì khai thác tính lân cận và thứ tự. Bảng dữ liệu thì đổi thứ tự cột không đổi ý nghĩa gì</td></tr>
-    <tr><td>Nhiều <strong>quan hệ bậc thang</strong> — "trên 60 tuổi thì khác hẳn"</td><td>Cây biểu diễn bậc thang bằng một điểm chia. Mạng nơ-ron cần nhiều nơ-ron để xấp xỉ một bậc</td></tr>
+    <tr><td>Nhiều <strong>quan hệ bậc thang</strong></td><td>Cây biểu diễn bậc thang bằng một điểm chia. Mạng nơ-ron cần nhiều nơ-ron để xấp xỉ một bậc</td></tr>
     <tr><td>Có <strong>đặc trưng vô dụng</strong></td><td>Cây đơn giản không chọn chúng. Mạng nơ-ron vẫn gán trọng số và phải học cách bỏ qua</td></tr>
-    <tr><td>Dữ liệu thường <strong>không quá lớn</strong> — vài nghìn tới vài triệu dòng</td><td>Deep learning cần rất nhiều dữ liệu mới vượt lên</td></tr>
+    <tr><td>Dữ liệu thường <strong>không quá lớn</strong></td><td>Deep learning cần rất nhiều dữ liệu mới vượt lên</td></tr>
   </table>
   <div class="note">
     <h4>Khi nào deep learning thắng trên dữ liệu bảng</h4>
-    Khi có <strong>biến phân loại rất nhiều giá trị cần embedding</strong> — id sản phẩm, id người dùng — vì embedding học được quan hệ giữa các giá trị, còn cây thì coi mỗi giá trị là một nhóm rời rạc. Cũng thắng khi cần <strong>học chung nhiều tác vụ</strong>, khi có <strong>dữ liệu kèm text hoặc ảnh</strong>, hoặc khi cần <strong>huấn luyện tăng dần</strong> theo dòng dữ liệu. Đó là lý do hệ gợi ý quy mô lớn dùng mạng nơ-ron chứ không dùng boosting.
+    Khi có <strong>biến phân loại rất nhiều giá trị cần embedding</strong> — id sản phẩm, id người dùng — vì embedding học được quan hệ giữa các giá trị, còn cây thì coi mỗi giá trị là một nhóm rời rạc. Cũng thắng khi cần <strong>học chung nhiều tác vụ</strong>, khi có <strong>dữ liệu kèm text hoặc ảnh</strong>, hoặc khi cần <strong>huấn luyện tăng dần</strong>.
   </div>
+  </div></details>
 </section>
 
-<section id="trees-s14">
+<section id="trees-s14" class="lesson">
   <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Sáu lỗi này chiếm gần hết số lần dùng sai cây và ensemble.</p>
+
   <div class="grid2">
     <div class="card bad"><h4>Dùng cây sâu cho boosting</h4><p>Boosting cần cây <em>nông</em>, 3–8 tầng. Cây sâu làm nó overfit rất nhanh.</p></div>
     <div class="card bad"><h4>Không dùng early stopping với boosting</h4><p>Tăng số cây mãi thì bắt đầu học nhiễu. Khác hẳn Random Forest.</p></div>
     <div class="card bad"><h4>Tin vào gain importance</h4><p>Thiên vị đặc trưng nhiều giá trị. Kiểm chứng bằng permutation trên tập kiểm tra.</p></div>
     <div class="card bad"><h4>Dùng cây cho dữ liệu có xu hướng</h4><p>Cây không ngoại suy được. Với chuỗi thời gian tăng dần, phải khử xu hướng trước hoặc dùng model tuyến tính.</p></div>
-    <div class="card bad"><h4>Tin OOB score trên dữ liệu chuỗi thời gian</h4><p>Nó giả định mẫu độc lập nên cho điểm quá lạc quan. Chia theo thời gian.</p></div>
+    <div class="card bad"><h4>Tin OOB score trên chuỗi thời gian</h4><p>Nó giả định mẫu độc lập nên cho điểm quá lạc quan. Chia theo thời gian.</p></div>
     <div class="card bad"><h4>Chuẩn hoá đặc trưng cho cây</h4><p>Không sai nhưng vô ích, chỉ thêm một bước có thể gây lỗi. Cây bất biến với phép đổi thang đo đơn điệu.</p></div>
   </div>
 </section>
 
-<section id="trees-s15">
+<section id="trees-s15" class="lesson">
   <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra đối chiếu.</p>
 
   <details class="qa"><summary>Random Forest và Gradient Boosting khác nhau thế nào?</summary>
   <p>Cả hai gộp nhiều cây nhưng chữa hai bệnh khác nhau. Random Forest huấn luyện các cây <b>sâu</b>, độc lập, song song trên dữ liệu bootstrap rồi lấy trung bình — giảm <b>variance</b>. Boosting cộng các cây <b>nông</b>, tuần tự, mỗi cây học phần sai còn lại của tổng các cây trước — giảm <b>bias</b>. Hệ quả thực tế quan trọng nhất: tăng số cây của Random Forest thì an toàn, còn boosting thì có thể overfit nên bắt buộc phải có early stopping.</p></details>
@@ -316,7 +629,7 @@ Lặp m = 1 .. M:
   <p>Vì bootstrap một mình chưa đủ. Phương sai của trung bình B model là <code>ρσ² + (1−ρ)σ²/B</code> — số hạng thứ hai tiến về 0 khi tăng B, nhưng số hạng đầu phụ thuộc tương quan <code>ρ</code> giữa các cây thì không. Nếu mọi cây đều chọn cùng một đặc trưng mạnh làm gốc thì chúng rất giống nhau, <code>ρ</code> cao, và việc lấy trung bình ít tác dụng. Giới hạn <code>max_features</code> buộc các cây dùng đặc trưng khác nhau nên <code>ρ</code> giảm và variance giảm theo.</p></details>
 
   <details class="qa"><summary>learning_rate và n_estimators quan hệ thế nào?</summary>
-  <p>Gần như nghịch đảo: tích của chúng xấp xỉ hằng số cho cùng một mức hiệu năng. Giảm learning rate mười lần thì cần khoảng mười lần số cây, đổi lại thường được kết quả tốt hơn chút vì mỗi bước cẩn thận hơn. Chiến thuật tôi dùng là đặt learning rate nhỏ khoảng 0.05, đặt n_estimators rất lớn, rồi để early stopping trên tập validation tự tìm điểm dừng — như vậy không phải dò một trong hai tham số.</p></details>
+  <p>Gần như nghịch đảo: tích của chúng xấp xỉ hằng số cho cùng một mức hiệu năng. Giảm learning rate mười lần thì cần khoảng mười lần số cây, đổi lại thường được kết quả tốt hơn chút vì mỗi bước cẩn thận hơn. Chiến thuật tôi dùng là đặt learning rate nhỏ khoảng 0.05, đặt n_estimators rất lớn, rồi để early stopping trên tập validation tự tìm điểm dừng.</p></details>
 
   <details class="qa"><summary>Vì sao boosting vẫn thắng deep learning trên dữ liệu bảng?</summary>
   <p>Vì đặc tính của dữ liệu bảng phù hợp với cây. Các đặc trưng không đồng nhất về thang đo và ý nghĩa, mà cây xử lý từng đặc trưng độc lập nên không cần chuẩn hoá. Bảng không có cấu trúc lân cận hay thứ tự để mạng nơ-ron khai thác — đổi thứ tự cột không đổi gì. Quan hệ dạng bậc thang thì một điểm chia là xong, còn mạng nơ-ron cần nhiều nơ-ron để xấp xỉ. Và dữ liệu bảng thường không đủ lớn để deep learning vượt lên. Ngược lại, deep learning thắng khi có biến phân loại nhiều giá trị cần embedding, hoặc khi phải kết hợp với text và ảnh.</p></details>
@@ -325,7 +638,7 @@ Lặp m = 1 .. M:
   <p>Đó gần như chắc chắn là hiện tượng thiên vị của gain importance. Cột có rất nhiều giá trị khác nhau cho thuật toán rất nhiều ngưỡng chia để thử, nên gần như luôn tìm được điểm chia làm giảm độ vẩn — dù chỉ đang khớp nhiễu. Tôi sẽ kiểm chứng bằng permutation importance trên tập kiểm tra, và thêm một cột số ngẫu nhiên vào dữ liệu làm mốc: đặc trưng nào xếp dưới cột ngẫu nhiên đó thì coi như không có tín hiệu. Và trong mọi trường hợp, importance không phải nhân quả.</p></details>
 
   <details class="qa"><summary>OOB score là gì và khi nào không tin được?</summary>
-  <p>Bootstrap rút n mẫu có hoàn lại nên xác suất một mẫu không được chọn lần nào là <code>(1−1/n)ⁿ ≈ 1/e ≈ 36.8%</code>. Với mỗi mẫu, ta dự đoán nó bằng chỉ những cây không hề thấy nó, gộp lại được một ước lượng ngoài mẫu mà không phải huấn luyện lại — gần tương đương cross-validation nhưng miễn phí. Không tin được khi các mẫu không độc lập: chuỗi thời gian, nhiều dòng của cùng một khách, hoặc dữ liệu có tương quan không gian — lúc đó mẫu ngoài túi có thể là bản gần giống của mẫu trong túi nên điểm quá lạc quan.</p></details>
+  <p>Bootstrap rút n mẫu có hoàn lại nên xác suất một mẫu không được chọn lần nào là <code>(1−1/n)ⁿ ≈ 1/e ≈ 36.8%</code>. Với mỗi mẫu, ta dự đoán nó bằng chỉ những cây không hề thấy nó, gộp lại được một ước lượng ngoài mẫu mà không phải huấn luyện lại — gần tương đương cross-validation nhưng miễn phí. Không tin được khi các mẫu không độc lập: chuỗi thời gian, nhiều dòng của cùng một khách, hoặc dữ liệu có tương quan không gian.</p></details>
 </section>
 
 <footer>Deep dive · cây, rừng &amp; boosting · khoảng giá trị siêu tham số là mức khởi điểm thực dụng, luôn cần điều chỉnh theo dữ liệu.</footer>

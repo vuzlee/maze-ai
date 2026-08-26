@@ -1,76 +1,137 @@
-(function(){
-/* ---------------- lab: tìm điểm chia ---------------- */
-/* 12 mẫu 1 chiều: [giá trị, lớp] */
-const SPTS = [[1,0],[2,0],[3,0],[4,1],[5,0],[6,1],[7,1],[8,1],[9,0],[10,1],[11,1],[12,1]];
+/* Lab chọn điểm chia — đoán trước, xem gain của MỌI ngưỡng, rồi so với lựa chọn của thuật toán. */
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  if (!el("splab")) return;
 
-function imp(pts, crit){
-  const n = pts.length;
-  if(!n) return 0;
-  const p1 = pts.filter(p => p[1] === 1).length / n, p0 = 1 - p1;
-  if(crit === "gini") return 1 - p1*p1 - p0*p0;
-  const lg = p => p > 0 ? p * Math.log2(p) : 0;
-  return -(lg(p1) + lg(p0));
-}
-function sGain(thr, crit){
-  const L = SPTS.filter(p => p[0] < thr), R = SPTS.filter(p => p[0] >= thr);
-  const n = SPTS.length;
-  const parent = imp(SPTS, crit);
-  const g = parent - (L.length/n * imp(L, crit) + R.length/n * imp(R, crit));
-  return {L, R, parent, iL: imp(L, crit), iR: imp(R, crit), gain: g};
-}
-function sRender(){
-  const thr = +document.getElementById("sthr").value || 5.5;
-  const crit = document.getElementById("scrit").value;
-  const {L, R, parent, iL, iR, gain} = sGain(thr, crit);
+  /* 12 mẫu trên một trục, hai lớp — có nhiễu để gain không đơn điệu */
+  var X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  var Y = ["A", "A", "A", "B", "A", "A", "B", "B", "B", "A", "B", "B"];
+  var THR = [1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5];
 
-  const cells = SPTS.map(([x, c]) => {
-    const left = x < thr;
-    const col = c === 1 ? "var(--ok)" : "var(--tomb)";
-    return `<div class="slot" style="min-width:38px;border-color:${left?'var(--filled)':'var(--probe)'}">
-      <i style="color:${left?'var(--filled)':'var(--probe)'}">${left ? "T" : "P"}</i>
-      <u style="background:${col};color:#0E141B;font-weight:600">${x}</u></div>`;
-  }).join("");
+  var crit = "gini", cut = 3.5, found = false;
 
-  /* quét mọi ngưỡng để vẽ đường gain */
-  const cands = [];
-  for(let t = 1.5; t <= 12; t += 0.5) cands.push([t, sGain(t, crit).gain]);
-  const maxG = Math.max(...cands.map(c => c[1]));
-  const bars = cands.map(([t, g]) => {
-    const h = Math.max(1, Math.round(38 * g / (maxG || 1)));
-    const hot = Math.abs(t - thr) < 0.26;
-    return `<div style="display:flex;flex-direction:column;justify-content:flex-end;align-items:center;width:20px">
-      <div style="height:${h}px;width:11px;background:${hot?'var(--probe)':'var(--rule)'};border-radius:2px"></div>
-      <span style="font-family:var(--mono);font-size:8.5px;color:${hot?'var(--probe)':'var(--muted)'};margin-top:3px">${t}</span></div>`;
-  }).join("");
-
-  document.getElementById("sview").innerHTML =
-    `<p class="legend" style="margin:2px 0 6px"><span>
-       <b style="background:var(--ok)"></b>lớp 1 &nbsp;
-       <b style="background:var(--tomb)"></b>lớp 0 &nbsp;·&nbsp; T = nhánh trái, P = nhánh phải</span></p>
-     <div style="display:flex;gap:4px;flex-wrap:wrap">${cells}</div>
-     <p class="legend" style="margin:16px 0 6px"><span>information gain theo từng ngưỡng có thể</span></p>
-     <div style="display:flex;gap:2px;align-items:flex-end;height:56px">${bars}</div>`;
-  document.getElementById("sp").textContent = parent.toFixed(3);
-  document.getElementById("sl").textContent = `${L.length} mẫu · ${iL.toFixed(3)}`;
-  document.getElementById("sr").textContent = `${R.length} mẫu · ${iR.toFixed(3)}`;
-  document.getElementById("sg").textContent = gain.toFixed(4);
-}
-document.getElementById("sbest").addEventListener("click", () => {
-  const crit = document.getElementById("scrit").value;
-  let best = 1.5, bg = -1;
-  for(let t = 1.5; t <= 12; t += 0.5){
-    const g = sGain(t, crit).gain;
-    if(g > bg){ bg = g; best = t; }
+  function impurity(g) {
+    if (!g.length) return 0;
+    var a = 0;
+    g.forEach(function (v) { if (v === "A") a++; });
+    var p = a / g.length, q = 1 - p;
+    if (crit === "gini") return 1 - p * p - q * q;
+    var h = 0;
+    [p, q].forEach(function (v) { if (v > 0) h -= v * Math.log2(v); });
+    return h;
   }
-  document.getElementById("sthr").value = best;
-  sRender();
-});
-document.getElementById("srst").addEventListener("click", () => {
-  document.getElementById("sthr").value = 5.5; sRender();
-});
-["sthr","scrit"].forEach(id => {
-  document.getElementById(id).addEventListener("input", sRender);
-  document.getElementById(id).addEventListener("change", sRender);
-});
-sRender();
+  function split(t) {
+    var L = [], R = [];
+    Y.forEach(function (y, i) { (X[i] < t ? L : R).push(y); });
+    return { L: L, R: R };
+  }
+  function gainAt(t) {
+    var s = split(t), n = Y.length;
+    return impurity(Y) - (s.L.length / n * impurity(s.L) + s.R.length / n * impurity(s.R));
+  }
+  function fmt(x) { return x.toFixed(3).replace(".", ","); }
+  function cls(g) {
+    var a = 0; g.forEach(function (v) { if (v === "A") a++; });
+    return a + " × A · " + (g.length - a) + " × B";
+  }
+
+  /* ---------- đoán trước ---------- */
+  var guess = el("sguess"), ans = guess.querySelector(".ans");
+  [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (b) {
+    b.onclick = function () {
+      [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (x) { x.classList.remove("pick"); });
+      b.classList.add("pick");
+      var v = parseFloat(b.getAttribute("data-v"));
+      cut = v; found = false;
+      ans.hidden = false;
+      ans.innerHTML = (v === 6.5
+        ? "<b>Đúng — ngưỡng 6,5.</b> "
+        : "<b>Chưa phải.</b> Ngưỡng " + fmt(v).replace(/,000$/, "") + " cho gain " + fmt(gainAt(v)) +
+          ", còn ngưỡng <b>6,5</b> cho " + fmt(gainAt(6.5)) + ". ") +
+        "Nó cắt đúng chỗ đa số A đổi sang đa số B. Để ý cột gain bên dưới: " +
+        "<b>không tăng dần</b> mà nhảy bậc — 3,5 tốt, 4,5 tụt hẳn, 6,5 lại vọt lên. " +
+        "Đó là lý do thuật toán phải <b>thử mọi ngưỡng</b> chứ không tối ưu bằng gradient được.";
+      draw();
+    };
+  });
+
+  /* ---------- tiêu chí ---------- */
+  el("scrit").innerHTML =
+    '<button data-c="gini" class="on">Gini</button><button data-c="entropy">Entropy</button>';
+  [].slice.call(el("scrit").querySelectorAll("button")).forEach(function (b) {
+    b.onclick = function () {
+      [].slice.call(el("scrit").querySelectorAll("button")).forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+      crit = b.getAttribute("data-c");
+      draw();
+    };
+  });
+
+  /* ---------- vẽ ---------- */
+  function draw() {
+    /* dãy mẫu, có vạch cắt chèn đúng vị trí ngưỡng */
+    var h = '<div class="strip">';
+    X.forEach(function (x, i) {
+      if (x > cut && X[i - 1] < cut) h += '<div class="cut"></div>';
+      h += '<div class="c ' + (Y[i] === "A" ? "f" : "t") + '"><i>' + x + "</i><b>" + Y[i] + "</b></div>";
+    });
+    el("sview").innerHTML = h + "</div>";
+
+    var s = split(cut), n = Y.length;
+    var g = gainAt(cut);
+    el("snote").innerHTML =
+      "<span>trái: " + cls(s.L) + " · độ vẩn <em>" + fmt(impurity(s.L)) + "</em></span>" +
+      "<span>ngưỡng <em>" + String(cut).replace(".", ",") + "</em></span>" +
+      "<span>phải: " + cls(s.R) + " · độ vẩn <em>" + fmt(impurity(s.R)) + "</em></span>";
+
+    /* gain của MỌI ngưỡng — bấm vào để chọn */
+    var best = THR.reduce(function (a, b) { return gainAt(b) > gainAt(a) ? b : a; });
+    var mx = gainAt(best);
+    el("sgain").innerHTML =
+      '<div class="explain" style="padding-bottom:6px"><h6>Gain của từng ngưỡng — bấm để xem</h6>' +
+      '<div class="bars">' + THR.map(function (t) {
+        var v = gainAt(t);
+        var k = t === cut ? " hi" : (t === best ? "" : "");
+        return '<div class="b' + k + '" data-t="' + t + '" style="cursor:pointer;margin:5px 0">' +
+          "<i>" + String(t).replace(".", ",") + "</i>" +
+          '<u style="width:' + (100 * v / mx).toFixed(1) + '%"></u>' +
+          "<b>" + fmt(v) + (t === best ? " ★" : "") + "</b></div>";
+      }).join("") + "</div></div>";
+    [].slice.call(el("sgain").querySelectorAll(".b")).forEach(function (b) {
+      b.onclick = function () { cut = parseFloat(b.getAttribute("data-t")); found = false; draw(); };
+    });
+
+    /* giải thích bằng số thật của ngưỡng đang chọn */
+    el("sexp").innerHTML =
+      "<h6>Tính gain ở ngưỡng " + String(cut).replace(".", ",") + "</h6>" +
+      "<p>Nút cha " + n + " mẫu, " + cls(Y) + " → độ vẩn <b>" + fmt(impurity(Y)) + "</b>.</p>" +
+      "<p>Trái " + s.L.length + " mẫu (" + cls(s.L) + ") → " + fmt(impurity(s.L)) + "<br>" +
+      "Phải " + s.R.length + " mẫu (" + cls(s.R) + ") → " + fmt(impurity(s.R)) + "</p>" +
+      '<p class="vals">gain = ' + fmt(impurity(Y)) + " − (" +
+      (s.L.length / n).toFixed(2).replace(".", ",") + "×" + fmt(impurity(s.L)) + " + " +
+      (s.R.length / n).toFixed(2).replace(".", ",") + "×" + fmt(impurity(s.R)) + ") = <b>" + fmt(g) + "</b></p>";
+
+    el("sstat").textContent = "tiêu chí " + (crit === "gini" ? "Gini" : "Entropy") +
+      " · ngưỡng tốt nhất " + String(best).replace(".", ",");
+
+    var v = el("sverdict");
+    if (found) {
+      v.hidden = false;
+      v.innerHTML = "Thuật toán chọn <b>ngưỡng " + String(best).replace(".", ",") + "</b>, gain <b>" + fmt(mx) + "</b>. " +
+        "Đổi tiêu chí sang " + (crit === "gini" ? "Entropy" : "Gini") +
+        ": con số khác hẳn nhưng <b>ngưỡng tốt nhất vẫn thế</b> — đó là lý do chọn Gini hay Entropy hiếm khi đổi cây, " +
+        "và Gini được dùng mặc định vì rẻ hơn (không có logarithm).";
+    } else {
+      v.hidden = true;
+    }
+  }
+
+  el("sbest").onclick = function () {
+    cut = THR.reduce(function (a, b) { return gainAt(b) > gainAt(a) ? b : a; });
+    found = true;
+    draw();
+  };
+  el("srst").onclick = function () { cut = 3.5; found = false; draw(); };
+
+  draw();
 })();
