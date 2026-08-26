@@ -229,20 +229,44 @@ window.CATALOG = [
       "blurb": "Vì sao không dùng MSE cho phân loại, vì sao L1 tạo hệ số 0, bốn giả định, và cách đọc odds ratio.",
       "n": 15,
       "path": "content/03-machine-learning/01-classical-ml/linear-logistic-regression/index.html"
-     },
-     {
-      "dir": "tree-ensemble-boosting",
-      "slug": "trees",
-      "title": "Cây, rừng & boosting",
-      "tag": "Dữ liệu bảng",
-      "blurb": "Cách chọn điểm chia, bagging giảm variance boosting giảm bias, bẫy feature importance, và vì sao thắng deep learning.",
-      "n": 15,
-      "path": "content/03-machine-learning/01-classical-ml/tree-ensemble-boosting/index.html"
      }
     ]
    },
    {
-    "dir": "02-statistics",
+    "dir": "02-tree-models",
+    "name": "Cây & ensemble — học theo thứ tự",
+    "books": [
+     {
+      "dir": "tree-family-overview",
+      "slug": "treeintro",
+      "title": "Bản đồ nhánh cây — bắt đầu từ đâu",
+      "tag": "Nhập môn",
+      "blurb": "Bài đầu tiên của nhánh: người ta đang cố giải quyết vấn đề gì, lịch sử 40 năm của nhánh này, hai hướng bagging và boosting, và học theo thứ tự nào.",
+      "n": 8,
+      "path": "content/03-machine-learning/02-tree-models/tree-family-overview/index.html"
+     },
+     {
+      "dir": "decision-tree",
+      "slug": "dtree",
+      "title": "Decision Tree — một cây học thế nào",
+      "tag": "Nhập môn",
+      "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba núm để hãm nó lại.",
+      "n": 12,
+      "path": "content/03-machine-learning/02-tree-models/decision-tree/index.html"
+     },
+     {
+      "dir": "tree-ensemble-boosting",
+      "slug": "trees",
+      "title": "Rừng & boosting — bản gộp",
+      "tag": "Đang tách",
+      "blurb": "Bản tổng hợp cũ: Random Forest, OOB, gradient boosting, XGBoost/LightGBM, feature importance. Sẽ tách thành từng bài riêng theo lộ trình ở bài tổng quan.",
+      "n": 15,
+      "path": "content/03-machine-learning/02-tree-models/tree-ensemble-boosting/index.html"
+     }
+    ]
+   },
+   {
+    "dir": "03-statistics",
     "name": "Thống kê & A/B testing",
     "books": [
      {
@@ -252,12 +276,12 @@ window.CATALOG = [
       "tag": "Thống kê",
       "blurb": "P-value nghĩa là gì, bốn đại lượng gắn nhau, vì sao nhìn kết quả sớm làm dương giả tăng vọt, năm cái bẫy thực tế.",
       "n": 15,
-      "path": "content/03-machine-learning/02-statistics/statistics-ab-testing/index.html"
+      "path": "content/03-machine-learning/03-statistics/statistics-ab-testing/index.html"
      }
     ]
    },
    {
-    "dir": "03-model-evaluation",
+    "dir": "04-model-evaluation",
     "name": "Đánh giá model",
     "books": [
      {
@@ -267,12 +291,12 @@ window.CATALOG = [
       "tag": "Đánh giá",
       "blurb": "Bốn ô ra mọi chỉ số, vì sao ROC-AUC nói dối khi lớp dương hiếm, chọn ngưỡng theo chi phí, và calibration.",
       "n": 15,
-      "path": "content/03-machine-learning/03-model-evaluation/metrics-confusion-matrix/index.html"
+      "path": "content/03-machine-learning/04-model-evaluation/metrics-confusion-matrix/index.html"
      }
     ]
    },
    {
-    "dir": "04-ml-theory",
+    "dir": "05-ml-theory",
     "name": "Lý thuyết & tổng quát hoá",
     "books": [
      {
@@ -282,7 +306,7 @@ window.CATALOG = [
       "tag": "Tổng quát hoá",
       "blurb": "Đọc learning curve, bias–variance, sáu nguồn rò rỉ dữ liệu, vì sao random search thắng grid, và chia dữ liệu đúng kiểu.",
       "n": 15,
-      "path": "content/03-machine-learning/04-ml-theory/overfitting-regularization/index.html"
+      "path": "content/03-machine-learning/05-ml-theory/overfitting-regularization/index.html"
      }
     ]
    }
