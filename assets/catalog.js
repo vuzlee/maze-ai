@@ -12,10 +12,10 @@ window.CATALOG = [
      {
       "dir": "big-o-complexity",
       "slug": "bigo",
-      "title": "Big-O & phân tích độ phức tạp",
+      "title": "Big-O — đọc ràng buộc là ra thuật toán",
       "tag": "Nền tảng",
-      "blurb": "Cách đếm ra O(n log n), amortized thật sự là gì, chi phí ẩn của Python, và ngưỡng n nào thì thuật toán gãy.",
-      "n": 15,
+      "blurb": "Bảng tra n → thuật toán được phép, ba quy tắc đếm, chi phí ẩn của Python, và cách nói complexity trong phỏng vấn.",
+      "n": 9,
       "path": "content/01-dsa/01-foundations/big-o-complexity/index.html"
      }
     ]
@@ -27,10 +27,10 @@ window.CATALOG = [
      {
       "dir": "stack-monotonic-queue",
       "slug": "stack",
-      "title": "Stack, monotonic stack & queue",
+      "title": "Stack & monotonic stack",
       "tag": "Cấu trúc",
-      "blurb": "Monotonic stack biến O(n²) thành O(n): phần tử lớn hơn kế tiếp, histogram, hứng nước mưa, và deque cho max cửa sổ.",
-      "n": 15,
+      "blurb": "Một mẫu code biến O(n²) thành O(n), ba bẫy, và 5 pattern kèm 19 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/02-data-structures/stack-monotonic-queue/index.html"
      },
      {
@@ -38,8 +38,8 @@ window.CATALOG = [
       "slug": "heap",
       "title": "Heap & priority queue",
       "tag": "Cấu trúc",
-      "blurb": "Cây nằm trong mảng phẳng, cơ chế sift, vì sao heapify là O(n), bốn cách giải top-K, và thứ heap không làm được.",
-      "n": 15,
+      "blurb": "Cây nằm trong mảng phẳng, một mẫu code, ba bẫy, và 5 pattern kèm 15 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/02-data-structures/heap-priority-queue/index.html"
      },
      {
@@ -47,8 +47,8 @@ window.CATALOG = [
       "slug": "tree",
       "title": "Cây, BST & các kiểu duyệt",
       "tag": "Cấu trúc",
-      "blurb": "Chọn kiểu duyệt theo nhu cầu chứ không theo thứ tự, khung đệ quy bottom-up, ba ca xoá BST, và bẫy validate BST.",
-      "n": 15,
+      "blurb": "Khung đệ quy sáu dòng, ba kiểu duyệt, ba bẫy, và 5 pattern kèm 19 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/02-data-structures/tree-bst-traversal/index.html"
      },
      {
@@ -56,8 +56,8 @@ window.CATALOG = [
       "slug": "dsu",
       "title": "Union-Find (DSU)",
       "tag": "Cấu trúc",
-      "blurb": "Vì sao cần cả hai tối ưu, khi nào thắng DFS, DSU trên 2n đỉnh cho quan hệ đối kháng, và Kruskal.",
-      "n": 15,
+      "blurb": "Hai tối ưu bắt buộc, một mẫu code 8 dòng, ba bẫy, và 5 pattern kèm 14 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/02-data-structures/union-find/index.html"
      }
     ]
@@ -98,8 +98,8 @@ window.CATALOG = [
       "slug": "backtrack",
       "title": "Backtracking",
       "tag": "Kỹ thuật",
-      "blurb": "Khung sáu dòng cho subsets, permutations, N-Queens. Vì sao phải hoàn tác, cách bỏ trùng, và cắt tỉa.",
-      "n": 15,
+      "blurb": "Khung sáu dòng cho mọi bài liệt kê, ba bẫy, và 5 pattern kèm 18 bài LeetCode có link.",
+      "n": 10,
       "path": "content/01-dsa/03-algorithms/backtracking/index.html"
      },
      {
@@ -107,8 +107,8 @@ window.CATALOG = [
       "slug": "dp",
       "title": "Dynamic programming",
       "tag": "Kỹ thuật",
-      "blurb": "Bốn câu hỏi để dựng lời giải, đường từ backtracking sang bảng, vì sao thứ tự vòng lặp knapsack khác nhau, và cách chọn trạng thái.",
-      "n": 15,
+      "blurb": "Bốn câu hỏi để dựng lời giải, ba bẫy, và 5 pattern kèm 21 bài LeetCode có link.",
+      "n": 11,
       "path": "content/01-dsa/03-algorithms/dynamic-programming/index.html"
      }
     ]

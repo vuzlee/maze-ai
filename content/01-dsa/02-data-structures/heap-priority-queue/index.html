@@ -26,158 +26,98 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-heap" data-title="Heap &amp; priority queue" data-tag="Cấu trúc" data-blurb="Cây nằm trong mảng phẳng, cơ chế sift, vì sao heapify là O(n), bốn cách giải top-K, và thứ heap không làm được.">
+      <article class="doc" id="art-heap" data-title="Heap &amp; priority queue" data-tag="Cấu trúc" data-blurb="Cây nằm trong mảng phẳng, một mẫu code, ba bẫy, và 5 pattern kèm 15 bài LeetCode có link.">
         <header class="hero">
-  <p class="eyebrow">Deep dive · DSA · cấu trúc ưu tiên</p>
+  <p class="eyebrow">DSA · 2 phút + luyện tập</p>
   <h1>Heap &amp;<br><em>priority queue</em></h1>
-  <p class="lede">Một cây nhị phân <b>lưu trong mảng phẳng</b>, không con trỏ nào. Bài này giải thích cơ chế sift, vì sao <b>heapify là O(n)</b> chứ không phải O(n log n), bốn cách giải bài top-K kèm bảng chọn, và thứ heap <b>không</b> làm được — chỗ mà nhiều candidate hứa quá lời.</p>
+  <p class="lede">Lấy phần tử nhỏ nhất trong O(log n) mà không cần sắp xếp cả mảng. Đọc 2 phút rồi xuống phần pattern.</p>
 </header>
 
+<section id="heap-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Ý tưởng</h2></div>
 
-<section id="heap-s1">
-  <div class="sh"><b>01</b><h2>Bản đồ tổng quan</h2></div>
-  <p>Heap trả lời đúng một câu hỏi, cực nhanh: <strong>phần tử nhỏ nhất (hoặc lớn nhất) hiện tại là gì?</strong> Nó không quan tâm tới bất kỳ thứ tự nào khác.</p>
-<pre><code>Lấy min           O(1)      ← chỉ đọc phần tử đầu mảng
-Xoá min           O(log n)
-Chèn              O(log n)
-Dựng từ n phần tử O(n)      ← không phải O(n log n), xem mục 06
-Tìm phần tử bất kỳ O(n)     ← heap KHÔNG làm việc này tốt</code></pre>
-  <div class="note key">
-    <h4>Nhớ một câu</h4>
-    Heap là cấu trúc <strong>được sắp xếp một phần</strong>. Nó chỉ đảm bảo cha nhỏ hơn con — không đảm bảo gì giữa hai nhánh. Trả giá bằng việc từ bỏ thứ tự toàn cục, và nhận lại việc chèn với xoá min chỉ tốn log n.
+  <p class="key">Heap là một <em>cây nằm trong mảng phẳng</em>. Chỉ đảm bảo cha nhỏ hơn con — <b>không</b> sắp xếp toàn phần.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 200" role="img" aria-label="Cây heap và mảng tương ứng">
+      <line x1="450" y1="52" x2="330" y2="112" stroke="#2A3A4C"></line>
+      <line x1="450" y1="52" x2="570" y2="112" stroke="#2A3A4C"></line>
+      <line x1="330" y1="112" x2="270" y2="172" stroke="#2A3A4C"></line>
+      <line x1="330" y1="112" x2="390" y2="172" stroke="#2A3A4C"></line>
+      <line x1="570" y1="112" x2="510" y2="172" stroke="#2A3A4C"></line>
+      <line x1="570" y1="112" x2="630" y2="172" stroke="#2A3A4C"></line>
+      <circle cx="450" cy="52"  r="21" fill="rgba(240,180,74,.25)" stroke="#F0B44A"></circle>
+      <circle cx="330" cy="112" r="21" fill="rgba(108,140,255,.22)" stroke="#6C8CFF"></circle>
+      <circle cx="570" cy="112" r="21" fill="rgba(108,140,255,.22)" stroke="#6C8CFF"></circle>
+      <circle cx="270" cy="172" r="21" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <circle cx="390" cy="172" r="21" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <circle cx="510" cy="172" r="21" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <circle cx="630" cy="172" r="21" fill="#1D2836" stroke="#2A3A4C"></circle>
+      <text class="sv-t" x="450" y="58"  text-anchor="middle" fill="#F0B44A">1</text>
+      <text class="sv-t" x="330" y="118" text-anchor="middle">3</text>
+      <text class="sv-t" x="570" y="118" text-anchor="middle">2</text>
+      <text class="sv-t" x="270" y="178" text-anchor="middle">7</text>
+      <text class="sv-t" x="390" y="178" text-anchor="middle">4</text>
+      <text class="sv-t" x="510" y="178" text-anchor="middle">9</text>
+      <text class="sv-t" x="630" y="178" text-anchor="middle">6</text>
+      <text class="sv-l" x="450" y="24" text-anchor="middle" fill="#F0B44A">gốc luôn là phần tử nhỏ nhất</text>
+      <text class="sv-l" x="120" y="118" fill="#8798AA">cha nhỏ hơn con</text>
+      <text class="sv-l" x="120" y="136" fill="#8798AA">nhưng 3 &gt; 2 vẫn hợp lệ</text>
+    </svg>
+  </figure>
+
+  <div class="strip">
+    <div class="c on"><i>0</i><b>1</b></div>
+    <div class="c t"><i>1</i><b>3</b></div>
+    <div class="c t"><i>2</i><b>2</b></div>
+    <div class="c"><i>3</i><b>7</b></div>
+    <div class="c"><i>4</i><b>4</b></div>
+    <div class="c"><i>5</i><b>9</b></div>
+    <div class="c"><i>6</i><b>6</b></div>
   </div>
-</section>
+  <p class="stripnote"><span>cha của <code>i</code> là <code>(i-1)//2</code></span><span><em>con là <code>2i+1</code> và <code>2i+2</code></em></span><span>không cần con trỏ</span></p>
 
-<section id="heap-s2">
-  <div class="sh"><b>02</b><h2>Cây nằm trong mảng — không con trỏ nào</h2></div>
-  <p>Heap là <strong>cây nhị phân hoàn chỉnh</strong>: mọi tầng đầy, trừ tầng cuối được điền từ trái sang phải. Chính tính chất "không có lỗ" cho phép lưu nó trong mảng phẳng và tính quan hệ cha–con bằng số học.</p>
-<pre><code>mảng:  [ 1, 3, 2, 7, 5, 4, 6 ]
-chỉ số:  0  1  2  3  4  5  6
-
-              1(0)
-           /        \
-        3(1)        2(2)
-       /    \      /    \
-    7(3)  5(4)  4(5)  6(6)
-
-parent(i) = (i - 1) // 2
-left(i)   = 2*i + 1
-right(i)  = 2*i + 2</code></pre>
-  <p>Ba công thức này là toàn bộ phần cài đặt. Không cấp phát node, không con trỏ, dữ liệu nằm liên tiếp trong bộ nhớ nên rất thân thiện với cache — đó là lý do heap nhanh hơn nhiều cấu trúc cây khác trong thực tế dù cùng O(log n).</p>
-  <div class="note">
-    <h4>Vì sao bắt buộc là cây hoàn chỉnh</h4>
-    Nếu cây có lỗ thì công thức chỉ số vỡ, và mảng phải chứa ô trống. Cây hoàn chỉnh cũng đảm bảo chiều cao luôn đúng bằng <code>⌊log₂ n⌋</code> — không bao giờ suy biến thành danh sách như BST. Đây là ưu điểm lớn: heap <strong>không cần cân bằng lại</strong>, nó cân bằng theo thiết kế.
-  </div>
-</section>
-
-<section id="heap-s3">
-  <div class="sh"><b>03</b><h2>Bất biến heap, và so sánh với BST</h2></div>
-<pre><code>Min-heap: a[parent(i)] &lt;= a[i]  với mọi i &gt; 0
-</code></pre>
-  <p>Chỉ vậy. Không có quan hệ nào giữa hai con của một nút, cũng không có quan hệ nào giữa hai nhánh khác nhau.</p>
-  <table>
-    <tr><th></th><th>Min-heap</th><th>BST</th></tr>
-    <tr><td>Bất biến</td><td>cha ≤ mọi con</td><td>trái &lt; nút &lt; phải</td></tr>
-    <tr><td>Lấy min</td><td>O(1)</td><td>O(log n) — đi hết bên trái</td></tr>
-    <tr><td>Tìm giá trị bất kỳ</td><td>O(n)</td><td>O(log n)</td></tr>
-    <tr><td>Duyệt theo thứ tự tăng</td><td>Phải xoá min n lần → O(n log n)</td><td>Inorder → O(n)</td></tr>
-    <tr><td>Chiều cao</td><td>Luôn log n, tự cân bằng</td><td>Tệ nhất n nếu không cân bằng</td></tr>
-    <tr><td>Bộ nhớ</td><td>Mảng phẳng, không overhead</td><td>Mỗi nút hai con trỏ</td></tr>
-  </table>
-  <p>Chọn heap khi chỉ cần <em>một đầu</em> của thứ tự. Cần tra cứu, cần khoảng, cần duyệt theo thứ tự thì dùng BST hoặc mảng đã sắp.</p>
-</section>
-
-<section id="heap-s4">
-  <div class="sh"><b>04</b><h2>sift up và sift down</h2></div>
-  <p>Mọi thao tác của heap chỉ là một trong hai động tác này.</p>
-  <h3>Chèn — đặt ở cuối rồi nổi lên</h3>
-<pre><code><span class="kw">def</span> push(a, x):
-    a.append(x)                    <span class="cm"># vào ô cuối, giữ cây hoàn chỉnh</span>
-    i = <span class="kw">len</span>(a) - <span class="st">1</span>
-    <span class="kw">while</span> i &gt; <span class="st">0</span>:
-        p = (i - <span class="st">1</span>) // <span class="st">2</span>
-        <span class="kw">if</span> a[p] &lt;= a[i]: <span class="kw">break</span>       <span class="cm"># đã đúng chỗ</span>
-        a[p], a[i] = a[i], a[p]    <span class="cm"># đổi với cha</span>
-        i = p                      <span class="cm"># O(log n): đi tối đa chiều cao cây</span></code></pre>
-  <h3>Xoá min — lấp lỗ bằng phần tử cuối rồi chìm xuống</h3>
-<pre><code><span class="kw">def</span> pop(a):
-    top = a[<span class="st">0</span>]
-    last = a.pop()                 <span class="cm"># phần tử cuối</span>
-    <span class="kw">if</span> <span class="kw">not</span> a: <span class="kw">return</span> top
-    a[<span class="st">0</span>] = last                   <span class="cm"># lấp vào gốc, cây vẫn hoàn chỉnh</span>
-    i, n = <span class="st">0</span>, <span class="kw">len</span>(a)
-    <span class="kw">while</span> <span class="kw">True</span>:
-        l, r = <span class="st">2</span>*i + <span class="st">1</span>, <span class="st">2</span>*i + <span class="st">2</span>
-        m = i
-        <span class="kw">if</span> l &lt; n <span class="kw">and</span> a[l] &lt; a[m]: m = l
-        <span class="kw">if</span> r &lt; n <span class="kw">and</span> a[r] &lt; a[m]: m = r   <span class="cm"># chọn con NHỎ HƠN trong hai con</span>
-        <span class="kw">if</span> m == i: <span class="kw">break</span>
-        a[i], a[m] = a[m], a[i]
-        i = m
-    <span class="kw">return</span> top</code></pre>
-  <div class="note warn">
-    <h4>Vì sao phải lấp bằng phần tử cuối</h4>
-    Đó là cách duy nhất giữ cây hoàn chỉnh mà không dời hàng loạt phần tử. Nếu đưa con nhỏ hơn lên gốc rồi đệ quy xuống, cây sẽ có lỗ ở giữa và công thức chỉ số vỡ. Chi tiết này hay bị code sai khi tự cài heap.
-  </div>
-  <p>Điểm khác biệt cần biết: sift up so <strong>một</strong> lần mỗi tầng, sift down so <strong>hai</strong> lần mỗi tầng (chọn con nhỏ hơn trước). Nên xoá min đắt hơn chèn khoảng gấp đôi về số phép so sánh, dù cùng O(log n).</p>
-</section>
-
-<section id="heap-s5">
-  <div class="sh"><b>05</b><h2>heapq trong Python</h2></div>
-<pre><code><span class="kw">import</span> heapq
-
-h = [<span class="st">5</span>, <span class="st">1</span>, <span class="st">8</span>, <span class="st">3</span>]
-heapq.heapify(h)              <span class="cm"># O(n) — sửa tại chỗ thành heap</span>
-heapq.heappush(h, <span class="st">2</span>)          <span class="cm"># O(log n)</span>
-heapq.heappop(h)              <span class="cm"># O(log n) — trả về phần tử NHỎ nhất</span>
-h[<span class="st">0</span>]                          <span class="cm"># O(1) — xem min mà không xoá</span>
-
-heapq.heappushpop(h, x)       <span class="cm"># push rồi pop — một lần sift, nhanh hơn hai lệnh</span>
-heapq.heapreplace(h, x)       <span class="cm"># pop rồi push — thứ tự ngược lại, chú ý khác biệt</span>
-heapq.nlargest(<span class="st">3</span>, data)       <span class="cm"># O(n log k) — bên trong là heap kích thước k</span></code></pre>
-  <div class="note key">
-    <h4>heapq chỉ có min-heap</h4>
-    Cần max-heap thì đẩy giá trị âm vào: <code>heappush(h, -x)</code> rồi <code>-heappop(h)</code>. Với object thì đẩy tuple <code>(-priority, item)</code>. Đây là câu hỏi hay gặp và cũng là bug hay gặp — quên dấu trừ ở một trong hai chỗ.
-  </div>
-  <h3>Tuple và bẫy so sánh</h3>
-<pre><code>heapq.heappush(h, (priority, task))     <span class="cm"># so theo priority trước</span>
-
-<span class="cm"># nếu priority trùng nhau, Python so sang phần tử thứ hai:</span>
-heapq.heappush(h, (<span class="st">2</span>, task_obj))         <span class="cm"># TypeError nếu task_obj không so sánh được!</span>
-
-<span class="cm"># cách chữa: chèn một số thứ tự làm khoá phá hoà</span>
-counter = itertools.count()
-heapq.heappush(h, (priority, <span class="kw">next</span>(counter), task_obj))</code></pre>
-  <p>Số thứ tự vừa phá được hoà, vừa đảm bảo hai việc cùng ưu tiên thì cái tới trước ra trước — hành vi thường được mong đợi ở một hàng đợi công việc.</p>
-</section>
-
-<section id="heap-s6">
-  <div class="sh"><b>06</b><h2>Vì sao heapify là O(n), không phải O(n log n)</h2></div>
-  <p>Câu hỏi phân biệt người đọc kỹ. Trực giác sai: "n phần tử, mỗi phần tử sift O(log n), vậy là O(n log n)". Sai vì <strong>hầu hết phần tử không sift được bao xa</strong>.</p>
-<pre><code><span class="kw">def</span> heapify(a):
-    n = <span class="kw">len</span>(a)
-    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n // <span class="st">2</span> - <span class="st">1</span>, -<span class="st">1</span>, -<span class="st">1</span>):   <span class="cm">← bắt đầu từ cha CUỐI CÙNG, đi ngược</span>
-        sift_down(a, i, n)</code></pre>
-  <p>Hai chi tiết làm nên O(n):</p>
-  <ul>
-    <li><strong>Bỏ qua nửa mảng.</strong> Các lá không cần sift — và một nửa số nút của cây hoàn chỉnh là lá.</li>
-    <li><strong>Nút càng nhiều thì càng gần lá.</strong> Nút ở gần lá chỉ sift được 1–2 tầng. Chỉ đúng một nút — gốc — phải sift trọn <code>log n</code> tầng.</li>
+  <ul class="why">
+    <li>Lấy nhỏ nhất <b>O(log n)</b>, xem nhỏ nhất <b>O(1)</b>, thêm <b>O(log n)</b>.</li>
+    <li>Tìm một phần tử bất kỳ vẫn là <b>O(n)</b> — heap không làm việc đó.</li>
   </ul>
-<pre><code>Ở tầng cách lá h tầng: có khoảng n / 2^(h+1) nút, mỗi nút sift tối đa h tầng.
+</section>
 
-Tổng công việc = Σ (n / 2^(h+1)) · h   với h = 0 … log n
-               = n · Σ h / 2^(h+1)
-               = n · (1/4 + 2/8 + 3/16 + ...)
-               ≈ n · 1                     ← chuỗi này hội tụ về 1
-               = O(n)</code></pre>
-  <div class="note">
-    <h4>So sánh với dựng heap bằng n lần push</h4>
-    Đẩy lần lượt n phần tử là <code>O(n log n)</code> thật, vì sift <em>up</em> thì nút mới luôn ở tầng cuối — nơi xa gốc nhất. Đúng ngược lại với sift <em>down</em>. Vậy nên có sẵn mảng thì luôn dùng <code>heapify</code>, đừng push từng phần tử. Lab dưới đây đếm số phép đổi chỗ của cả hai cách để bạn thấy khoảng cách.
+<section id="heap-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Mẫu code cần thuộc</h2></div>
+
+  <p class="key">Python chỉ có <em>min-heap</em>. Cần max-heap thì <b>đẩy số âm vào</b>.</p>
+
+<pre class="core"><code><span class="kw">import</span> heapq
+h = []
+heapq.heappush(h, x)          <span class="cm"># O(log n)</span>
+heapq.heappop(h)              <span class="cm"># lấy NHỎ NHẤT, O(log n)</span>
+h[<span class="st">0</span>]                          <span class="cm"># xem nhỏ nhất, O(1)</span>
+heapq.heapify(a)              <span class="cm"># biến list thành heap tại chỗ, O(n)</span>
+
+heapq.heappush(h, (-val, x))  <span class="cm"># MAX-heap: đảo dấu</span>
+heapq.heappush(h, (ưu_tiên, thứ_tự, obj))   <span class="cm"># tránh so sánh obj khi trùng ưu tiên</span></code></pre>
+
+  <p class="stripnote"><span><em>Giữ K phần tử lớn nhất</em>: dùng min-heap kích thước K, mỗi lần đầy thì <code>heappushpop</code> — O(n log K).</span></p>
+</section>
+
+<section id="heap-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Ba bẫy</h2></div>
+
+  <p class="key">Bẫy đầu tiên làm code <em>chết ngay khi chạy</em>, hai bẫy sau làm chậm.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Đẩy object vào heap</h4><p>Hai phần tử cùng ưu tiên → Python so sánh tiếp phần tử thứ hai → lỗi nếu object không so sánh được. Thêm một số thứ tự vào giữa.</p></div>
+    <div class="card bad"><h4>Dùng max-heap mà quên đảo dấu lúc lấy ra</h4><p>Đẩy <code>-val</code> thì khi pop phải nhớ <code>-heappop(h)[0]</code>.</p></div>
+    <div class="card bad"><h4>Sắp xếp cả mảng để lấy top-K</h4><p><code>O(n log n)</code> trong khi heap kích thước K chỉ tốn <code>O(n log K)</code>.</p></div>
   </div>
 </section>
 
-<section id="heap-s7">
-  <div class="sh"><b>07</b><h2>Lab: dựng heap theo hai cách</h2></div>
+<section id="heap-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Lab: dựng heap theo hai cách</h2></div>
+
+  <p class="key"><code>heapify</code> là <em>O(n)</em>, đẩy lần lượt là <em>O(n log n)</em>. Chạy cả hai rồi so số phép đổi chỗ.</p>
+
   <div class="lab">
     <div class="bar">
       <div><label>mảng</label><input type="text" id="harr" value="9 4 7 1 8 2 6 3" style="width:200px"></div>
@@ -198,169 +138,100 @@ Tổng công việc = Σ (n / 2^(h+1)) · h   với h = 0 … log n
       <u>trạng thái <b id="hstate">chưa chạy</b></u>
     </div>
     <div class="steps" id="hlog"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Chạy hết cả hai cách trên cùng mảng rồi so số phép đổi chỗ. Mảng càng lớn thì khoảng cách càng rõ — đó là O(n) so với O(n log n) nhìn bằng con số cụ thể.
-    </p>
   </div>
 </section>
 
-<section id="heap-s8">
-  <div class="sh"><b>08</b><h2>Top-K — bốn cách, biết chọn mới là hiểu</h2></div>
-  <p>"Tìm k phần tử lớn nhất trong n phần tử" là một trong những câu hỏi được hỏi nhiều nhất. Có bốn lời giải và câu trả lời tốt là nêu đủ rồi chọn theo ràng buộc.</p>
-  <table>
-    <tr><th>Cách</th><th>Thời gian</th><th>Bộ nhớ</th><th>Chọn khi</th></tr>
-    <tr><td>Sắp xếp rồi lấy k đầu</td><td>O(n log n)</td><td>O(1)</td><td>k gần bằng n, hoặc cần cả thứ tự</td></tr>
-    <tr><td>Min-heap kích thước k</td><td>O(n log k)</td><td>O(k)</td><td><strong>k ≪ n</strong>, hoặc dữ liệu là dòng chảy</td></tr>
-    <tr><td>Quickselect</td><td>O(n) trung bình</td><td>O(1)</td><td>Có toàn bộ mảng, không cần thứ tự trong k</td></tr>
-    <tr><td>Đếm / bucket</td><td>O(n)</td><td>O(miền giá trị)</td><td>Giá trị là số nguyên trong miền hẹp</td></tr>
-  </table>
-<pre><code><span class="cm"># min-heap kích thước k: giữ đúng k phần tử lớn nhất đã thấy</span>
-<span class="kw">def</span> top_k(nums, k):
-    h = []
-    <span class="kw">for</span> x <span class="kw">in</span> nums:
-        <span class="kw">if</span> <span class="kw">len</span>(h) &lt; k:
-            heapq.heappush(h, x)
-        <span class="kw">elif</span> x &gt; h[<span class="st">0</span>]:                 <span class="cm"># lớn hơn phần tử nhỏ nhất trong top hiện tại</span>
-            heapq.heapreplace(h, x)      <span class="cm"># pop rồi push — một lần sift</span>
-    <span class="kw">return</span> h                            <span class="cm"># k phần tử lớn nhất, không theo thứ tự</span></code></pre>
-  <div class="note key">
-    <h4>Vì sao tìm k LỚN nhất lại dùng MIN-heap</h4>
-    Vì ta cần biết nhanh <em>ứng viên yếu nhất trong nhóm đang giữ</em>, để so với phần tử mới và loại nó nếu cần. Phần tử yếu nhất của nhóm k lớn nhất chính là min của nhóm. Đây là câu hỏi bẫy rất hay gặp, và trả lời ngược là mất điểm ngay.
-  </div>
-  <p><strong>Lợi thế riêng của heap:</strong> nó là cách duy nhất trong bảng chạy được trên <em>dòng dữ liệu</em> — dữ liệu chảy qua một lần, không lưu hết được, bộ nhớ chỉ O(k). Nêu điểm này khi interviewer thêm điều kiện "n rất lớn, không vừa RAM".</p>
-</section>
+<section id="heap-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Pattern 1 — top K</h2></div>
 
-<section id="heap-s9">
-  <div class="sh"><b>09</b><h2>Gộp k danh sách đã sắp xếp</h2></div>
-<pre><code><span class="kw">def</span> merge_k(lists):
-    h = []
-    <span class="kw">for</span> i, lst <span class="kw">in</span> <span class="kw">enumerate</span>(lists):
-        <span class="kw">if</span> lst: heapq.heappush(h, (lst[<span class="st">0</span>], i, <span class="st">0</span>))   <span class="cm"># (giá trị, danh sách nào, vị trí nào)</span>
-    out = []
-    <span class="kw">while</span> h:
-        val, i, j = heapq.heappop(h)
-        out.append(val)
-        <span class="kw">if</span> j + <span class="st">1</span> &lt; <span class="kw">len</span>(lists[i]):
-            heapq.heappush(h, (lists[i][j+<span class="st">1</span>], i, j+<span class="st">1</span>))
-    <span class="kw">return</span> out          <span class="cm"># O(N log k) với N là tổng số phần tử</span></code></pre>
-  <p>Heap luôn chỉ chứa tối đa <code>k</code> phần tử — một ứng viên đầu mỗi danh sách. Vì vậy mỗi thao tác là <code>log k</code>, không phải <code>log N</code>.</p>
-  <p>So với cách nối hết rồi sắp xếp là <code>O(N log N)</code>: khi <code>k</code> nhỏ mà mỗi danh sách rất dài, khoảng cách là đáng kể. Và cách heap còn chạy được khi các danh sách là dòng dữ liệu không biết trước độ dài — đây chính là thuật toán dùng trong sắp xếp ngoại vi khi dữ liệu không vừa RAM.</p>
-</section>
+  <p class="sig">Dấu hiệu: "K phần tử lớn nhất / nhỏ nhất / hay gặp nhất / gần nhất"</p>
 
-<section id="heap-s10">
-  <div class="sh"><b>10</b><h2>Hai heap — trung vị của dòng dữ liệu</h2></div>
-  <p>Bài kinh điển: số liên tục chảy vào, mỗi lúc phải trả về trung vị. Lời giải là cắt dữ liệu làm hai nửa và giữ mỗi nửa bằng một heap hướng khác nhau.</p>
-<pre><code>nửa nhỏ:  max-heap  →  đỉnh là số LỚN NHẤT của nửa nhỏ
-nửa lớn:  min-heap  →  đỉnh là số NHỎ NHẤT của nửa lớn
-→ trung vị luôn nằm ở một trong hai đỉnh</code></pre>
-<pre><code><span class="kw">class</span> MedianFinder:
-    <span class="kw">def</span> __init__(self):
-        self.lo = []   <span class="cm"># max-heap, lưu giá trị ÂM</span>
-        self.hi = []   <span class="cm"># min-heap</span>
+  <p>Min-heap giữ đúng K phần tử. Đầy thì đẩy vào và lấy nhỏ nhất ra — <code>O(n log K)</code>.</p>
 
-    <span class="kw">def</span> add(self, x):
-        heapq.heappush(self.lo, -x)                      <span class="cm"># luôn vào nửa nhỏ trước</span>
-        heapq.heappush(self.hi, -heapq.heappop(self.lo)) <span class="cm"># chuyển max của nửa nhỏ sang</span>
-        <span class="kw">if</span> <span class="kw">len</span>(self.hi) &gt; <span class="kw">len</span>(self.lo):                    <span class="cm"># cân lại kích thước</span>
-            heapq.heappush(self.lo, -heapq.heappop(self.hi))
-
-    <span class="kw">def</span> median(self):
-        <span class="kw">if</span> <span class="kw">len</span>(self.lo) &gt; <span class="kw">len</span>(self.hi): <span class="kw">return</span> -self.lo[<span class="st">0</span>]
-        <span class="kw">return</span> (-self.lo[<span class="st">0</span>] + self.hi[<span class="st">0</span>]) / <span class="st">2</span></code></pre>
-  <p><strong>Vì sao ba dòng trong <code>add</code> lại viết như vậy:</strong> đẩy vào nửa nhỏ rồi chuyển ngay phần tử lớn nhất sang nửa lớn — thao tác đó đảm bảo mọi phần tử của nửa nhỏ đều ≤ mọi phần tử của nửa lớn, không cần so sánh gì thêm. Sau đó chỉ cần cân kích thước. Cách này ngắn và không có ca biên.</p>
-  <p>Chi phí: <code>O(log n)</code> mỗi lần thêm, <code>O(1)</code> mỗi lần lấy trung vị. Bài mở rộng "trung vị của cửa sổ trượt" khó hơn nhiều vì phải xoá phần tử ở giữa heap — xem mục kế tiếp.</p>
-</section>
-
-<section id="heap-s11">
-  <div class="sh"><b>11</b><h2>Heap trong Dijkstra và xoá lười</h2></div>
-<pre><code><span class="kw">def</span> dijkstra(g, src):
-    dist = {src: <span class="st">0</span>}
-    h = [(<span class="st">0</span>, src)]
-    <span class="kw">while</span> h:
-        d, u = heapq.heappop(h)
-        <span class="kw">if</span> d &gt; dist.get(u, <span class="kw">float</span>(<span class="st">"inf"</span>)): <span class="kw">continue</span>   <span class="cm">← xoá lười, xem giải thích</span>
-        <span class="kw">for</span> v, w <span class="kw">in</span> g[u]:
-            nd = d + w
-            <span class="kw">if</span> nd &lt; dist.get(v, <span class="kw">float</span>(<span class="st">"inf"</span>)):
-                dist[v] = nd
-                heapq.heappush(h, (nd, v))            <span class="cm"># đẩy bản mới, không sửa bản cũ</span>
-    <span class="kw">return</span> dist                                       <span class="cm"># O((V + E) log V)</span></code></pre>
-  <div class="note key">
-    <h4>Xoá lười — mẹo quan trọng nhất khi dùng heap thực tế</h4>
-    Lý thuyết đòi hỏi thao tác <em>giảm khoá</em>: tìm đỉnh trong heap rồi hạ giá trị của nó. Nhưng heap không tìm được phần tử bất kỳ trong O(log n). Giải pháp thực dụng: <strong>đẩy thêm một bản mới và bỏ qua bản cũ khi lấy ra</strong>. Heap phình tới O(E) phần tử thay vì O(V), nhưng code ngắn hơn nhiều và độ phức tạp không đổi vì <code>log E = O(log V)</code> trên đồ thị đơn.
-  </div>
-  <p>Cùng khuôn xoá lười này giải bài "trung vị của cửa sổ trượt", bài lịch trình công việc, và mọi tình huống cần loại phần tử đã hết hạn khỏi heap. Nhớ điều kiện kiểm tra hợp lệ ngay sau khi pop — thiếu nó là thuật toán vẫn chạy nhưng chậm và có thể sai.</p>
-</section>
-
-<section id="heap-s12">
-  <div class="sh"><b>12</b><h2>Heap không làm được gì</h2></div>
-  <p>Biết giới hạn là phần thường thiếu ở candidate. Bốn việc heap làm tệ:</p>
-  <ul>
-    <li><strong>Tìm một giá trị bất kỳ — O(n).</strong> Không có thứ tự giữa các nhánh nên phải quét hết. Cần tra cứu thì kèm thêm một dict, hoặc dùng cấu trúc khác.</li>
-    <li><strong>Xoá phần tử ở giữa — O(n) để tìm.</strong> Chữa bằng xoá lười, hoặc giữ một dict ánh xạ giá trị tới chỉ số và tự cài lại heap.</li>
-    <li><strong>Duyệt theo thứ tự tăng — O(n log n).</strong> Phải pop n lần. Cần điều này thì đơn giản là sắp xếp mảng.</li>
-    <li><strong>Truy vấn khoảng, phần tử thứ k, phần tử liền trước.</strong> Không hỗ trợ. Dùng cây cân bằng hoặc mảng đã sắp.</li>
-  </ul>
-  <p>Python không có cây cân bằng sẵn trong thư viện chuẩn. Ba lựa chọn thực tế:</p>
-  <table>
-    <tr><th>Cần gì</th><th>Dùng</th><th>Chi phí</th></tr>
-    <tr><td>Chỉ min hoặc max</td><td><code>heapq</code></td><td>O(log n) chèn / xoá</td></tr>
-    <tr><td>Tra theo khoá + min</td><td><code>heapq</code> + dict, xoá lười</td><td>O(log n), bộ nhớ tăng</td></tr>
-    <tr><td>Thứ tự đầy đủ, phần tử thứ k</td><td><code>sortedcontainers.SortedList</code></td><td>O(log n) — thư viện ngoài</td></tr>
-    <tr><td>Đọc nhiều, ghi ít</td><td>Mảng đã sắp + <code>bisect</code></td><td>Tra O(log n), chèn O(n)</td></tr>
-  </table>
-</section>
-
-<section id="heap-s13">
-  <div class="sh"><b>13</b><h2>Bảng nhận diện đề</h2></div>
-  <table>
-    <tr><th>Đề nói gì</th><th>Dùng</th></tr>
-    <tr><td>"k phần tử lớn nhất / nhỏ nhất", "k phần tử hay gặp nhất"</td><td>Heap kích thước k — O(n log k)</td></tr>
-    <tr><td>"phần tử thứ k lớn nhất", có sẵn cả mảng</td><td>Quickselect O(n), hoặc heap nếu k nhỏ</td></tr>
-    <tr><td>"gộp k danh sách / k dòng dữ liệu đã sắp"</td><td>Heap chứa k ứng viên</td></tr>
-    <tr><td>"trung vị của dòng dữ liệu"</td><td>Hai heap ngược hướng</td></tr>
-    <tr><td>"lịch trình", "công việc có ưu tiên", "phòng họp"</td><td>Heap theo thời gian kết thúc</td></tr>
-    <tr><td>"đường đi ngắn nhất có trọng số dương"</td><td>Dijkstra + heap + xoá lười</td></tr>
-    <tr><td>"dòng dữ liệu vô hạn, bộ nhớ hạn chế"</td><td>Heap kích thước k — chỉ cách này chạy được</td></tr>
-    <tr><td>Cần cả tra cứu lẫn lấy min</td><td>Heap + dict, hoặc SortedList</td></tr>
-  </table>
-</section>
-
-<section id="heap-s14">
-  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
-  <div class="grid2">
-    <div class="card bad"><h4>Dùng max-heap cho bài k lớn nhất</h4><p>Sai hướng. Cần min-heap để biết ứng viên yếu nhất trong nhóm đang giữ mà loại nó.</p></div>
-    <div class="card bad"><h4>Quên dấu trừ ở một trong hai chỗ</h4><p>Đẩy <code>-x</code> mà lấy ra không đảo lại, hoặc ngược lại. Kết quả sai âm thầm.</p></div>
-    <div class="card bad"><h4>Push từng phần tử khi đã có sẵn mảng</h4><p>O(n log n) thay vì O(n). Dùng <code>heapify</code>.</p></div>
-    <div class="card bad"><h4>Đẩy tuple có object không so sánh được</h4><p><code>TypeError</code> khi ưu tiên trùng nhau. Chèn một số thứ tự làm khoá phá hoà.</p></div>
-    <div class="card bad"><h4>Quên kiểm tra hợp lệ sau pop trong Dijkstra</h4><p>Xử lý lại đỉnh đã chốt, thuật toán chậm đi và có thể sai với biến thể có điều kiện.</p></div>
-    <div class="card bad"><h4>Tin rằng heap[1] là phần tử nhỏ thứ hai</h4><p>Không đúng. Nhỏ thứ hai là một trong hai con của gốc, phải so cả hai.</p></div>
+  <div class="probs">
+    <a href="https://leetcode.com/problems/kth-largest-element-in-an-array/" target="_blank" rel="noopener"><i>215</i><b>Kth Largest Element in an Array <em>— bài mẫu</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/top-k-frequent-elements/" target="_blank" rel="noopener"><i>347</i><b>Top K Frequent Elements <em>— đếm rồi heap theo tần suất</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/k-closest-points-to-origin/" target="_blank" rel="noopener"><i>973</i><b>K Closest Points to Origin <em>— khoảng cách làm khoá</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/top-k-frequent-words/" target="_blank" rel="noopener"><i>692</i><b>Top K Frequent Words <em>— khoá ghép: tần suất rồi từ điển</em></b><u class="m">medium</u></a>
   </div>
 </section>
 
-<section id="heap-s15">
-  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+<section id="heap-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Pattern 2 — gộp nhiều dãy đã sắp xếp</h2></div>
 
-  <details class="qa"><summary>Vì sao heapify là O(n) mà dựng bằng n lần push lại là O(n log n)?</summary>
-  <p>Vì hướng sift khác nhau. <code>heapify</code> dùng sift down từ dưới lên: một nửa số nút là lá không phải làm gì, và nút càng nhiều thì càng gần lá nên sift càng ngắn. Tổng công việc là <code>n · Σ h/2^(h+1)</code>, chuỗi này hội tụ nên ra O(n). Push dùng sift up: phần tử mới luôn ở tầng cuối, tức xa gốc nhất, nên mỗi lần có thể tốn trọn <code>log n</code>. Kết luận thực tế: có sẵn mảng thì luôn dùng heapify.</p></details>
+  <p class="sig">Dấu hiệu: "k danh sách đã sắp xếp" · "cặp có tổng nhỏ nhất" · ma trận sắp xếp theo dòng</p>
 
-  <details class="qa"><summary>Tìm k phần tử lớn nhất — bạn dùng max-heap hay min-heap?</summary>
-  <p>Min-heap kích thước k. Vì ta cần biết nhanh phần tử <em>yếu nhất</em> trong nhóm k đang giữ, để so với phần tử mới và loại nếu nó nhỏ hơn. Phần tử yếu nhất của nhóm k lớn nhất chính là min của nhóm. Chi phí O(n log k) thời gian và O(k) bộ nhớ — và đây là cách duy nhất chạy được khi dữ liệu là dòng chảy không lưu hết được.</p></details>
+  <p>Heap giữ <b>một ứng viên từ mỗi dãy</b>. Lấy ra cái nhỏ nhất, đẩy phần tử kế tiếp của chính dãy đó vào.</p>
 
-  <details class="qa"><summary>Heap khác BST ở đâu, khi nào chọn cái nào?</summary>
-  <p>Heap chỉ đảm bảo cha nhỏ hơn con, nên lấy min là O(1) nhưng tìm giá trị bất kỳ là O(n). BST đảm bảo thứ tự đầy đủ nên tìm là O(log n), duyệt theo thứ tự là O(n), nhưng lấy min mất O(log n) và cây có thể suy biến nếu không cân bằng. Chọn heap khi chỉ cần một đầu của thứ tự; chọn BST khi cần tra cứu, truy vấn khoảng, hoặc phần tử thứ k. Heap còn thắng về bộ nhớ vì là mảng phẳng, không con trỏ.</p></details>
-
-  <details class="qa"><summary>Dijkstra cần thao tác giảm khoá, nhưng heapq không có — xử lý thế nào?</summary>
-  <p>Dùng xoá lười: khi tìm được đường ngắn hơn thì đẩy thêm một bản ghi mới vào heap thay vì sửa bản cũ, và khi pop ra thì bỏ qua nếu khoảng cách lớn hơn khoảng cách tốt nhất đã biết. Heap phình tới O(E) phần tử thay vì O(V), nhưng độ phức tạp vẫn là <code>O((V+E) log V)</code> vì <code>log E</code> cùng cấp với <code>log V</code>. Đổi lại code ngắn hơn nhiều so với tự cài heap có ánh xạ chỉ số.</p></details>
-
-  <details class="qa"><summary>Tìm phần tử thứ k lớn nhất trong mảng có sẵn — cách nào tốt nhất?</summary>
-  <p>Quickselect, O(n) trung bình và O(1) bộ nhớ phụ. Nó phân hoạch quanh pivot rồi chỉ đệ quy vào nửa chứa vị trí thứ k, nên tổng chi phí là chuỗi hình học <code>n + n/2 + n/4 + … = 2n</code>. Trường hợp tệ nhất là O(n²) nhưng pivot ngẫu nhiên làm xác suất đó không đáng kể. Nếu k rất nhỏ hoặc dữ liệu là dòng chảy thì heap kích thước k tốt hơn; nếu cần cả thứ tự của k phần tử thì sắp xếp cho gọn.</p></details>
-
-  <details class="qa"><summary>Trung vị của dòng dữ liệu — thiết kế thế nào?</summary>
-  <p>Hai heap: max-heap giữ nửa nhỏ, min-heap giữ nửa lớn, luôn duy trì kích thước lệch nhau tối đa một. Trung vị nằm ở đỉnh heap lớn hơn, hoặc là trung bình hai đỉnh khi hai nửa bằng nhau. Mỗi lần thêm là O(log n), mỗi lần đọc là O(1). Mẹo cài đặt: luôn đẩy vào nửa nhỏ rồi chuyển ngay đỉnh của nó sang nửa lớn, như vậy bất biến "mọi phần tử nửa nhỏ ≤ mọi phần tử nửa lớn" tự đúng mà không cần so sánh điều kiện.</p></details>
+  <div class="probs">
+    <a href="https://leetcode.com/problems/merge-k-sorted-lists/" target="_blank" rel="noopener"><i>23</i><b>Merge k Sorted Lists <em>— bài mẫu, phải làm</em></b><u class="h">hard</u></a>
+    <a href="https://leetcode.com/problems/find-k-pairs-with-smallest-sums/" target="_blank" rel="noopener"><i>373</i><b>Find K Pairs with Smallest Sums <em>— cùng ý tưởng trên hai mảng</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/kth-smallest-element-in-a-sorted-matrix/" target="_blank" rel="noopener"><i>378</i><b>Kth Smallest in Sorted Matrix <em>— heap hoặc binary search</em></b><u class="m">medium</u></a>
+  </div>
 </section>
 
-<footer>Deep dive · heap &amp; priority queue · mọi đoạn code chạy được nguyên trạng trên Python 3 với module heapq.</footer>
+<section id="heap-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Pattern 3 — mô phỏng theo độ ưu tiên</h2></div>
+
+  <p class="sig">Dấu hiệu: "luôn lấy cái lớn nhất ra xử lý" · lịch chạy tác vụ · sắp lại chuỗi</p>
+
+  <div class="probs">
+    <a href="https://leetcode.com/problems/last-stone-weight/" target="_blank" rel="noopener"><i>1046</i><b>Last Stone Weight <em>— max-heap, dễ nhất</em></b><u class="e">easy</u></a>
+    <a href="https://leetcode.com/problems/task-scheduler/" target="_blank" rel="noopener"><i>621</i><b>Task Scheduler <em>— luôn chạy tác vụ còn nhiều nhất</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/reorganize-string/" target="_blank" rel="noopener"><i>767</i><b>Reorganize String <em>— xen kẽ hai ký tự nhiều nhất</em></b><u class="m">medium</u></a>
+  </div>
+</section>
+
+<section id="heap-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Pattern 4 — hai heap giữ trung vị</h2></div>
+
+  <p class="sig">Dấu hiệu: "trung vị của luồng dữ liệu" · cần phần tử giữa mà dữ liệu tới dần</p>
+
+  <p>Max-heap giữ <b>nửa nhỏ</b>, min-heap giữ <b>nửa lớn</b>. Cân hai bên chênh nhau tối đa một phần tử; trung vị nằm ở đỉnh.</p>
+
+  <div class="probs">
+    <a href="https://leetcode.com/problems/find-median-from-data-stream/" target="_blank" rel="noopener"><i>295</i><b>Find Median from Data Stream <em>— bài mẫu</em></b><u class="h">hard</u></a>
+    <a href="https://leetcode.com/problems/sliding-window-median/" target="_blank" rel="noopener"><i>480</i><b>Sliding Window Median <em>— thêm phần xoá phần tử trôi khỏi cửa sổ</em></b><u class="h">hard</u></a>
+  </div>
+</section>
+
+<section id="heap-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Pattern 5 — Dijkstra</h2></div>
+
+  <p class="sig">Dấu hiệu: đồ thị có <b>trọng số</b> · "chi phí nhỏ nhất" — BFS thường sai ngay</p>
+
+  <p>Đổi hàng đợi của BFS thành heap là ra Dijkstra. Chi tiết ở bài <a href="../graph-bfs-dfs-topo/index.html#graph-s9">Đồ thị</a>.</p>
+
+  <div class="probs">
+    <a href="https://leetcode.com/problems/network-delay-time/" target="_blank" rel="noopener"><i>743</i><b>Network Delay Time <em>— Dijkstra bản gốc</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/path-with-minimum-effort/" target="_blank" rel="noopener"><i>1631</i><b>Path With Minimum Effort <em>— Dijkstra trên lưới</em></b><u class="m">medium</u></a>
+  </div>
+
+  <div class="note">
+    <h4>Thứ tự luyện gợi ý</h4>
+    1046 → <b>215</b> → 347 → 973 → 23 → 621 → 378 → 295 → 743 → 480.
+  </div>
+</section>
+
+<section id="heap-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao heapify là O(n) chứ không phải O(n log n)?</summary>
+  <p>Phần lớn nút nằm ở tầng đáy và <b>gần như không phải sift xuống</b>. Tổng chi phí là chuỗi hội tụ về 2n.</p></details>
+
+  <details class="qa"><summary>Top-K: heap hay sắp xếp?</summary>
+  <p>Heap kích thước K: <code>O(n log K)</code>, tốt hơn sắp xếp <code>O(n log n)</code> khi K nhỏ. Cần cả K phần tử theo thứ tự thì mới sắp.</p></details>
+
+  <details class="qa"><summary>Python chỉ có min-heap, làm max-heap thế nào?</summary>
+  <p>Đẩy <code>-val</code> vào rồi đảo dấu khi lấy ra. Với object thì đẩy tuple <code>(-ưu_tiên, thứ_tự, obj)</code>.</p></details>
+
+  <details class="qa"><summary>Heap có tìm được một phần tử bất kỳ không?</summary>
+  <p>Không nhanh — <b>O(n)</b>, vì heap chỉ đảm bảo quan hệ cha–con. Cần tìm nhanh thì dùng dict kèm theo.</p></details>
+</section>
+
+<footer>DSA · heap &amp; priority queue · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

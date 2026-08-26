@@ -80,6 +80,24 @@ Trang bài được bố trí để học chứ không chỉ để đọc:
 
 Phím tắt: `j` mục sau · `k` mục trước · `m` đánh dấu đã học · `/` tìm toàn kho · `Esc` thoát tìm.
 
+## Khuôn bài DSA
+
+Mười bài trong `01-dsa` dùng chung một khuôn: **lõi đọc 1,5 phút, phần còn lại để tra**.
+
+```
+01  Ý tưởng               1 hình + 1 câu chốt + 2 gạch đầu dòng
+02  Mẫu code cần thuộc    1-2 khối 6-8 dòng
+03  Ba bẫy                3 thẻ ngắn
+04  Lab                   chạy từng bước
+─────────────────────────  hết phần đọc
+05+ Mỗi pattern một mục   dấu hiệu nhận đề (.sig) → sửa gì trong mẫu →
+                          danh sách bài LeetCode có link (.probs)
+cuối Hỏi đáp              4 câu, mỗi câu trả lời 1-2 dòng
+```
+
+160 bài LeetCode chia theo 48 pattern, mỗi bài ghi rõ luyện cái gì, cuối mỗi bài có
+thứ tự luyện gợi ý 10 bài phủ hết pattern của chủ đề đó.
+
 ## Trực quan — bộ khuôn hình
 
 Hình là thứ giúp học nhanh nhất, nên vẽ hình phải rẻ. **[kit.html](kit.html)** là trang tra khuôn:
