@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Self-attention — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-attn" data-title="Self-attention" data-tag="Transformer" data-blurb="Q/K/V là gì, vì sao chia căn d_k, hai loại mask đừng nhầm, multi-head, complexity bậc hai, và KV cache quyết định chi phí phục vụ.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Transformer · cơ chế</p>
+  <h1>Self-<em>attention</em></h1>
+  <p class="lede">Một phép tổng có trọng số, nhưng trọng số do <b>chính dữ liệu quyết định</b> — đó là toàn bộ ý tưởng. Bài này dẫn từ Q/K/V tới scaled dot-product, giải thích vì sao phải chia căn <code>d_k</code>, phân biệt hai loại mask, và cho thấy KV cache đổi bộ nhớ lấy tốc độ thế nào.</p>
+</header>
+
+<section id="attn-s1">
+  <div class="sh"><b>01</b><h2>Overview</h2></div>
+  <p>Một model GPT chỉ làm đúng một việc: nhận một chuỗi token, trả về phân phối xác suất cho token kế tiếp. Mọi thứ bên dưới là chi tiết của việc đó.</p>
+<pre><code>"Con mèo ngồi"
+   │  tokenization                      list[int]        (T,)
+   ▼
+[1044, 8712, 3390]
+   │  embedding lookup                  (T, d)
+   ▼
+X                                       (3, 768)
+   │  + positional information
+   ▼
+X                                       (3, 768)
+   │
+   ├──────── block 1 ─────────┐
+   │   x = x + attn(ln1(x))   │         (3, 768)
+   │   x = x + ffn(ln2(x))    │         (3, 768)
+   └──────────────────────────┘
+   │  × N block (GPT-2 small: N = 12)
+   ▼
+H                                       (3, 768)
+   │  final LayerNorm + W_out           (768, 50257)
+   ▼
+logits                                  (3, 50257)
+   │  lấy dòng cuối, softmax
+   ▼
+p(token kế tiếp)                        (50257,)</code></pre>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    Attention <strong>trộn thông tin giữa các token</strong>. FFN <strong>xử lý từng token riêng lẻ</strong>. Cả model chỉ là hai việc đó lặp lại N lần, cộng với đường tắt residual để gradient chảy được.
+  </div>
+</section>
+
+<section id="attn-s2">
+  <div class="sh"><b>02</b><h2>Vì sao cần attention</h2></div>
+  <p>Trước Transformer, xử lý chuỗi dùng RNN/LSTM: đọc token theo thứ tự, nén toàn bộ quá khứ vào một vector trạng thái. Ba vấn đề:</p>
+  <ul>
+    <li><strong>Nghẽn cổ chai.</strong> Toàn bộ câu dài phải nhét vừa một vector kích thước cố định.</li>
+    <li><strong>Đường gradient dài.</strong> Từ token 1 tới token 500 phải đi qua 500 bước nhân ma trận, gradient teo dần trên đường đi.</li>
+    <li><strong>Không song song hoá được khi huấn luyện.</strong> Phải tính xong bước t mới tính được bước t+1.</li>
+  </ul>
+  <p>Attention giải quyết cả ba bằng một ý tưởng: <strong>mỗi token nối trực tiếp tới mọi token khác</strong>. Đường đi giữa hai token bất kỳ luôn dài đúng một bước, và mọi vị trí tính được cùng lúc.</p>
+  <div class="note warn">
+    <h4>Cái giá</h4>
+    Nối tất cả với tất cả nghĩa là chi phí tỉ lệ với <code>T²</code> thay vì <code>T</code>. RNN xử lý câu dài rẻ hơn nhiều — đó là lý do context dài đến giờ vẫn đắt. Chi tiết ở mục 16.
+  </div>
+</section>
+
+<section id="attn-s3">
+  <div class="sh"><b>03</b><h2>Q, K, V là gì</h2></div>
+  <p>Từ cùng một vector token <code>x</code>, ta chiếu qua ba ma trận học được để ra ba vai trò khác nhau:</p>
+  <table>
+    <tr><th>Vai</th><th>Nghĩa đen</th><th>Ví dụ</th></tr>
+    <tr><td><code>Q</code> query</td><td>Tôi đang cần thông tin gì</td><td>Token "nó" hỏi: danh từ nào ở phía trước có thể là chủ thể của tôi?</td></tr>
+    <tr><td><code>K</code> key</td><td>Tôi có thể trả lời loại câu hỏi nào</td><td>Token "con mèo" báo: tôi là một danh từ giống đực số ít</td></tr>
+    <tr><td><code>V</code> value</td><td>Nội dung tôi mang đi nếu được chọn</td><td>Thông tin ngữ nghĩa của "con mèo" để trộn vào "nó"</td></tr>
+  </table>
+<pre><code>x:   (T, d)      = (3, 768)
+W_q: (d, d_k)    = (768, 64)      <span class="cm"># cho một head</span>
+W_k: (d, d_k)    = (768, 64)
+W_v: (d, d_v)    = (768, 64)
+
+Q = x @ W_q      <span class="cm"># (3, 64)</span>
+K = x @ W_k      <span class="cm"># (3, 64)</span>
+V = x @ W_v      <span class="cm"># (3, 64)</span></code></pre>
+  <div class="note">
+    <h4>Vì sao phải tách ba, không dùng thẳng x</h4>
+    Nếu lấy tích <code>x·xᵀ</code> thì mỗi token luôn giống chính nó nhất, và quan hệ luôn đối xứng: A chú ý tới B đúng bằng B chú ý tới A. Nhưng ngôn ngữ không đối xứng — đại từ cần danh từ nhiều hơn danh từ cần đại từ. Tách <code>W_q</code> và <code>W_k</code> cho phép ma trận chú ý <strong>bất đối xứng</strong>. Tách thêm <code>W_v</code> để "tiêu chí tìm kiếm" và "nội dung mang đi" là hai thứ độc lập.
+  </div>
+</section>
+
+<section id="attn-s4">
+  <div class="sh"><b>04</b><h2>Scaled dot-product attention</h2></div>
+  <p>Toàn bộ công thức nằm trong bốn dòng:</p>
+<pre><code>scores  = Q @ K.T / sqrt(d_k)     <span class="cm"># (T, T)  — độ hợp nhau giữa mọi cặp</span>
+scores  = scores + mask           <span class="cm"># (T, T)  — che tương lai, xem mục 10</span>
+weights = softmax(scores, dim=-1) <span class="cm"># (T, T)  — mỗi DÒNG cộng lại bằng 1</span>
+out     = weights @ V             <span class="cm"># (T, d_v) — tổng có trọng số của V</span></code></pre>
+  <h3>Đọc từng bước bằng lời</h3>
+  <ol>
+    <li><code>Q @ K.T</code> — với mỗi token i, tính tích vô hướng giữa query của nó và key của mọi token j. Tích lớn nghĩa là "cái tôi cần" khớp với "cái anh có".</li>
+    <li>Chia <code>sqrt(d_k)</code> — giữ độ lớn của scores ổn định. Lý do đầy đủ ở mục kế tiếp.</li>
+    <li><code>softmax</code> theo <strong>dòng</strong> — biến điểm số thành tỉ lệ chú ý cộng lại bằng 1. Đây là chỗ hay nhầm chiều nhất khi tự code.</li>
+    <li><code>weights @ V</code> — token i nhận về trung bình có trọng số của value các token. Chú ý 70% vào token 2 thì lấy 70% nội dung của nó.</li>
+  </ol>
+<pre><code><span class="kw">import</span> torch, torch.nn.functional <span class="kw">as</span> F
+
+<span class="kw">def</span> attention(Q, K, V, mask=<span class="kw">None</span>):
+    d_k = Q.size(-1)
+    scores = Q @ K.transpose(-2, -1) / d_k ** <span class="st">0.5</span>   <span class="cm"># (T, T)</span>
+    <span class="kw">if</span> mask <span class="kw">is not None</span>:
+        scores = scores.masked_fill(mask == <span class="st">0</span>, <span class="kw">float</span>(<span class="st">"-inf"</span>))
+    w = F.softmax(scores, dim=-<span class="st">1</span>)
+    <span class="kw">return</span> w @ V, w</code></pre>
+</section>
+
+<section id="attn-s5">
+  <div class="sh"><b>05</b><h2>Vì sao chia căn d_k</h2></div>
+  <p>Đây là câu hỏi phỏng vấn kinh điển, và câu trả lời "để chuẩn hoá" bị coi là chưa hiểu.</p>
+  <p>Giả sử các thành phần của <code>q</code> và <code>k</code> độc lập, trung bình 0, phương sai 1. Tích vô hướng của hai vector <code>d_k</code> chiều là tổng của <code>d_k</code> số hạng độc lập:</p>
+<pre><code>q·k = Σ q_i · k_i          (i = 1..d_k)
+
+E[q·k]   = 0
+Var[q·k] = d_k             <span class="cm"># phương sai cộng dồn</span>
+std[q·k] = sqrt(d_k)       <span class="cm"># → với d_k = 64, scores dao động cỡ ±8</span></code></pre>
+  <p>Scores càng lớn thì softmax càng nhọn. Khi một giá trị vượt trội hẳn, phân phối tiến về one-hot, và <strong>đạo hàm của softmax tiến về 0</strong> — gradient không chảy về được, model đứng học ngay từ đầu.</p>
+  <p>Chia cho <code>sqrt(d_k)</code> đưa phương sai về lại 1, bất kể chọn <code>d_k</code> bằng bao nhiêu. Nhờ vậy tăng số chiều mà không phải chỉnh lại cách khởi tạo.</p>
+  <div class="note key">
+    <h4>Cách trả lời gọn trong phỏng vấn</h4>
+    Tích vô hướng có phương sai tỉ lệ với <code>d_k</code>. Không chia thì với <code>d_k</code> lớn, softmax bão hoà thành one-hot và gradient triệt tiêu. Chia <code>sqrt(d_k)</code> giữ phương sai bằng 1 nên softmax nằm trong vùng có gradient tốt.
+  </div>
+  <p>Lab ở mục kế tiếp cho bạn tự bật tắt phép chia này và nhìn phân phối sập thành one-hot.</p>
+</section>
+
+<section id="attn-s6">
+  <div class="sh"><b>06</b><h2>Lab: nhìn attention weights thay đổi</h2></div>
+  <p>Sáu token, một head. Bảng dưới là ma trận chú ý: <strong>dòng i</strong> cho biết token i phân bổ sự chú ý của nó cho các token nào. Mỗi dòng luôn cộng lại bằng 1.</p>
+
+  <div class="lab">
+    <div class="bar">
+      <div>
+        <label>d_k (số chiều)</label>
+        <select id="dk">
+          <option value="8">8</option>
+          <option value="64" selected>64</option>
+          <option value="256">256</option>
+          <option value="1024">1024</option>
+        </select>
+      </div>
+      <div>
+        <label>temperature</label>
+        <input type="number" id="temp" value="1" step="0.1" min="0.1" max="5">
+      </div>
+      <label class="chk"><input type="checkbox" id="scale" checked> chia sqrt(d_k)</label>
+      <label class="chk"><input type="checkbox" id="causal" checked> causal mask</label>
+      <button class="ghost" id="reset">Đặt lại</button>
+    </div>
+    <div class="hm" id="hm"></div>
+    <div class="stat">
+      <u>độ lệch chuẩn của scores <b id="sd">–</b></u>
+      <u>entropy trung bình mỗi dòng <b id="ent">–</b></u>
+      <u>trọng số lớn nhất <b id="mx">–</b></u>
+    </div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Thử: chọn <code>d_k = 1024</code> rồi <strong>bỏ tick</strong> chia sqrt. Entropy tụt gần 0 và mọi dòng chỉ còn một ô sáng — đó chính là softmax bão hoà. Bật lại phép chia, phân phối mềm trở lại dù <code>d_k</code> vẫn là 1024.
+    </p>
+  </div>
+</section>
+
+<section id="attn-s7">
+  <div class="sh"><b>07</b><h2>Masking — hai loại, đừng nhầm</h2></div>
+  <h3>Causal mask (che tương lai)</h3>
+  <p>Khi huấn luyện, ta đưa cả câu vào cùng lúc và bắt model đoán token kế tiếp ở <em>mọi</em> vị trí song song. Nếu token 3 nhìn thấy token 4, nó chỉ việc chép đáp án. Mask tam giác trên bằng <code>-inf</code> chặn điều đó.</p>
+<pre><code>mask = torch.tril(torch.ones(T, T))     <span class="cm"># tam giác dưới toàn 1</span>
+
+scores trước softmax:            sau khi mask:
+[ 2.1  0.4  1.3  0.8 ]           [ 2.1  -inf -inf -inf ]
+[ 0.9  1.7  0.2  1.1 ]           [ 0.9   1.7 -inf -inf ]
+[ 1.4  0.3  2.2  0.6 ]           [ 1.4   0.3  2.2 -inf ]
+[ 0.7  1.2  0.5  1.9 ]           [ 0.7   1.2  0.5  1.9 ]</code></pre>
+  <p>Dùng <code>-inf</code> chứ không dùng 0, vì <code>softmax(-inf) = 0</code> chính xác. Đặt 0 thì <code>exp(0) = 1</code>, ô bị che vẫn nhận trọng số đáng kể.</p>
+  <div class="note key">
+    <h4>Vì sao mask lại là điều kiện để huấn luyện song song</h4>
+    Không có mask thì phải chạy T lượt, mỗi lượt cho một vị trí. Có mask thì một lượt duy nhất cho ra T dự đoán, mỗi dự đoán chỉ dựa trên quá khứ của nó. Đây là lý do Transformer huấn luyện nhanh hơn RNN nhiều lần, dù lúc sinh chữ vẫn tuần tự.
+  </div>
+  <h3>Padding mask (che ô đệm)</h3>
+  <p>Gộp nhiều câu dài ngắn khác nhau vào một batch thì phải đệm cho bằng nhau. Ô đệm không mang nghĩa, phải che, nếu không model học được thống kê rác từ chúng.</p>
+  <div class="note warn">
+    <h4>Bẫy</h4>
+    Hai mask phải <strong>cộng gộp</strong>, không thay thế nhau. Quên padding mask thường không gây lỗi runtime — chỉ làm chất lượng tụt một cách khó hiểu, và lỗi này rất khó truy ra.
+  </div>
+</section>
+
+<section id="attn-s8">
+  <div class="sh"><b>08</b><h2>Multi-head attention</h2></div>
+  <p>Một head chỉ học được một kiểu quan hệ. Với <code>h</code> head, ta chạy <code>h</code> phép attention độc lập trên các không gian con nhỏ hơn, rồi ghép lại.</p>
+<pre><code>d = 768, h = 12  →  d_k = d / h = 64
+
+x            (T, 768)
+ ↓ W_q, W_k, W_v: (768, 768) rồi tách thành 12 nhóm 64 chiều
+Q, K, V      (h, T, 64)          <span class="cm"># 12 head chạy song song</span>
+ ↓ attention từng head
+heads        (h, T, 64)
+ ↓ concat theo chiều cuối
+concat       (T, 768)
+ ↓ W_o: (768, 768)               <span class="cm"># trộn lại thông tin giữa các head</span>
+out          (T, 768)</code></pre>
+  <p><strong>Tổng chi phí không đổi.</strong> Chia 768 chiều cho 12 head, mỗi head 64 chiều — cộng lại vẫn là 768. Multi-head gần như miễn phí so với một head to.</p>
+  <h3>Mỗi head học gì</h3>
+  <p>Phân tích trên model đã huấn luyện cho thấy các head chuyên hoá: head bám token liền trước, head nối đại từ với danh từ tương ứng, head khớp dấu ngoặc mở với ngoặc đóng, head theo dõi động từ chính. Không ai lập trình việc này — nó nổi lên từ dữ liệu.</p>
+  <div class="note">
+    <h4>Vì sao cần W_o</h4>
+    Sau concat, các head chỉ nằm cạnh nhau chứ chưa nói chuyện với nhau. <code>W_o</code> là lớp trộn cho phép model kết hợp kết luận của nhiều head thành một biểu diễn thống nhất. Bỏ <code>W_o</code> thì multi-head chỉ còn là nhiều kênh song song rời rạc.
+  </div>
+</section>
+
+<section id="attn-s9">
+  <div class="sh"><b>09</b><h2>Complexity — vì sao context dài lại đắt</h2></div>
+  <table>
+    <tr><th>Bước</th><th>Thời gian</th><th>Bộ nhớ</th></tr>
+    <tr><td>Chiếu ra Q, K, V</td><td><code>O(T · d²)</code></td><td><code>O(T · d)</code></td></tr>
+    <tr><td><code>Q @ K.T</code></td><td><code>O(T² · d)</code></td><td><code>O(T²)</code> ← ma trận chú ý</td></tr>
+    <tr><td><code>weights @ V</code></td><td><code>O(T² · d)</code></td><td><code>O(T · d)</code></td></tr>
+    <tr><td>FFN</td><td><code>O(T · d²)</code></td><td><code>O(T · d)</code></td></tr>
+  </table>
+  <p>Tổng: <code>O(T²·d + T·d²)</code>. Số hạng nào lớn hơn phụ thuộc quan hệ giữa <code>T</code> và <code>d</code>:</p>
+  <ul>
+    <li><code>T = 512, d = 768</code> — FFN và các phép chiếu chiếm phần lớn thời gian. Attention chưa phải nút thắt.</li>
+    <li><code>T = 32000, d = 768</code> — số hạng <code>T²</code> áp đảo. Tăng context gấp đôi thì chi phí attention gấp bốn.</li>
+  </ul>
+  <div class="note warn">
+    <h4>Chỗ hay nói sai</h4>
+    Nhiều người nói "attention luôn là nút thắt". Không đúng ở context ngắn. Câu trả lời chuẩn là: chi phí có hai số hạng, <code>T²d</code> và <code>Td²</code>, và cái nào chiếm ưu thế tuỳ tỉ lệ <code>T</code> với <code>d</code>.
+  </div>
+  <h3>FlashAttention giải quyết chuyện gì</h3>
+  <p>Nó <strong>không</strong> làm giảm độ phức tạp tính toán — vẫn là <code>O(T²·d)</code>. Cái nó bỏ đi là việc <em>ghi ma trận T×T ra bộ nhớ chính</em>: tính theo từng khối ngay trong bộ nhớ tốc độ cao của GPU, nên bộ nhớ giảm từ <code>O(T²)</code> xuống <code>O(T)</code> và tốc độ tăng vài lần vì bớt di chuyển dữ liệu. Đây là câu hỏi phân biệt người đọc kỹ và người chỉ nghe tên.</p>
+</section>
+
+<section id="attn-s10">
+  <div class="sh"><b>10</b><h2>KV cache — thứ quyết định chi phí phục vụ</h2></div>
+  <p>Sinh chữ là tuần tự: mỗi lần chỉ ra một token, rồi nối vào đầu vào và chạy lại. Nếu tính lại từ đầu mỗi bước thì sinh 1000 token tốn công gấp cả nghìn lần cần thiết.</p>
+  <p>Nhận xét mấu chốt: với causal mask, <strong>K và V của các token cũ không bao giờ thay đổi</strong>. Vậy thì lưu lại.</p>
+<pre><code>Không cache — sinh token thứ t:
+  tính Q, K, V cho cả t token       →  O(t · d²) mỗi bước
+  tổng cho N token                  →  O(N² · d²)
+
+Có cache — sinh token thứ t:
+  chỉ tính Q, K, V cho token mới    →  O(d²) mỗi bước
+  attention của nó với t key đã lưu →  O(t · d)</code></pre>
+  <h3>Hai pha có đặc tính hoàn toàn khác nhau</h3>
+  <table>
+    <tr><th></th><th>Prefill</th><th>Decode</th></tr>
+    <tr><td>Làm gì</td><td>Xử lý toàn bộ prompt một lượt</td><td>Sinh từng token một</td></tr>
+    <tr><td>Nghẽn ở</td><td>Tính toán — GPU chạy hết công suất</td><td>Băng thông bộ nhớ — phải đọc lại toàn bộ trọng số cho mỗi token</td></tr>
+    <tr><td>Chỉ số theo dõi</td><td>Thời gian tới token đầu tiên</td><td>Thời gian giữa hai token</td></tr>
+    <tr><td>Cách tăng tốc</td><td>Chia khối, xử lý song song</td><td>Gộp batch nhiều request, lượng tử hoá, giảm số KV head</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao decode nghẽn ở bộ nhớ chứ không ở phép tính</h4>
+    Sinh một token cần đọc <em>toàn bộ</em> trọng số model từ VRAM, nhưng chỉ thực hiện một lượng phép tính rất nhỏ trên chúng. GPU rảnh rỗi chờ dữ liệu. Đây chính là lý do gộp batch lại hiệu quả đến vậy: đã tốn công đọc trọng số rồi thì phục vụ 32 request cùng lúc gần như không tốn thêm.
+  </div>
+  <h3>Cache tốn bao nhiêu</h3>
+<pre><code>bytes/token = 2 (K và V) × n_layers × n_kv_heads × d_head × bytes_per_value
+
+LLaMA-2 7B, fp16, MHA đầy đủ:
+  2 × 32 × 32 × 128 × 2 = 524,288 bytes ≈ 0.5 MB / token
+
+Một context 8000 token  →  ~4 GB chỉ riêng cache
+32 request đồng thời    →  ~128 GB — vượt xa một GPU 80GB</code></pre>
+  <p>Con số này là lý do tồn tại của GQA, lượng tử hoá cache, và PagedAttention. Nó cũng là lý do độ dài context được tính tiền.</p>
+</section>
+
+<section id="attn-s11">
+  <div class="sh"><b>11</b><h2>MHA, MQA, GQA</h2></div>
+  <p>Cả ba chỉ khác nhau ở một chỗ: <strong>bao nhiêu head dùng chung một bộ K/V</strong>. Số query head luôn giữ nguyên.</p>
+  <table>
+    <tr><th>Kiểu</th><th>K/V head</th><th>KV cache</th><th>Chất lượng</th></tr>
+    <tr><td>MHA</td><td>Bằng số query head (32)</td><td>Gốc, 100%</td><td>Cao nhất</td></tr>
+    <tr><td>MQA</td><td>Đúng 1, mọi head dùng chung</td><td>1/32 — giảm 32 lần</td><td>Tụt rõ ở tác vụ khó</td></tr>
+    <tr><td>GQA</td><td>Một nhóm, ví dụ 8</td><td>1/4</td><td>Gần bằng MHA</td></tr>
+  </table>
+  <p>GQA là điểm cân bằng nên gần như mọi model mở hiện nay đều dùng. Query vẫn có 32 góc nhìn riêng, nhưng bốn head liền nhau chia sẻ cùng một bộ khoá và giá trị.</p>
+  <div class="note">
+    <h4>Nối lại với mục trước</h4>
+    Đây chính là biến <code>n_kv_heads</code> trong công thức tính cache. Đổi từ 32 xuống 8 làm cache giảm bốn lần, tức là phục vụ được gấp bốn số request đồng thời trên cùng một GPU. Đó là toàn bộ động cơ của GQA — không phải để model thông minh hơn.
+  </div>
+</section>
+
+<section id="attn-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Lỗi hay gặp khi tự code</h2></div>
+
+  <p class="key">Năm lỗi này đều để model <em>vẫn chạy và loss vẫn giảm</em> — nên chúng sống rất lâu.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Softmax sai chiều</h4><p><code>softmax(scores, dim=0)</code> thay vì <code>dim=-1</code>. Model vẫn chạy, mất mát vẫn giảm chậm chạp, nhưng không bao giờ tốt. Kiểm tra bằng <code>w.sum(-1)</code> phải ra toàn số 1.</p></div>
+    <div class="card bad"><h4>Mask bằng 0 thay vì -inf</h4><p><code>exp(0)=1</code> nên ô bị che vẫn nhận trọng số. Model nhìn lén tương lai, loss thấp giả tạo lúc train rồi sinh chữ vô nghĩa lúc chạy thật.</p></div>
+    <div class="card bad"><h4>Quên chia sqrt(d_k)</h4><p>Với <code>d_k</code> nhỏ thì vẫn học được, nên bug này sống sót lâu. Với <code>d_k</code> lớn thì loss đứng im ngay từ bước đầu.</p></div>
+    <div class="card bad"><h4>Nhầm thứ tự reshape khi tách head</h4><p>Phải <code>view(T, h, d_k).transpose(1,2)</code>. Làm ngược thì các chiều bị trộn lẫn giữa các head — không có lỗi shape, chỉ có model không học được.</p></div>
+    <div class="card bad"><h4>KV cache không cắt theo độ dài</h4><p>Cache phình mãi qua các lượt hội thoại cho tới khi hết VRAM. Lỗi này chỉ lộ ra ở phiên chat dài, nên hay lọt qua khâu kiểm thử.</p></div>
+  </div>
+</section>
+
+<section id="attn-s13" class="lesson">
+  <div class="sh"><b>13</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Giải thích self-attention trong 60 giây.</summary>
+  <p>Mỗi token sinh ra ba vector: query là thứ nó đang tìm, key là thứ nó có thể cung cấp, value là nội dung nó mang đi. Nhân query của token i với key của mọi token cho ra điểm hợp nhau, chia căn số chiều rồi qua softmax thành tỉ lệ chú ý cộng lại bằng 1. Đầu ra của token i là tổng có trọng số các value theo tỉ lệ đó. <b>Kết quả: mỗi token thu về đúng phần thông tin nó cần từ phần còn lại của câu, và mọi vị trí tính được song song.</b></p></details>
+
+  <details class="qa"><summary>Vì sao chia cho căn bậc hai của d_k?</summary>
+  <p>Tích vô hướng của hai vector d_k chiều có phương sai tỉ lệ với d_k, nên độ lệch chuẩn là căn d_k. Scores lớn làm softmax bão hoà về one-hot, đạo hàm tiến về 0 và model không học được. Chia căn d_k đưa phương sai về 1, giữ softmax trong vùng có gradient dùng được, và làm điều đó độc lập với việc chọn d_k bằng bao nhiêu.</p></details>
+
+  <details class="qa"><summary>Multi-head khác một head to ở chỗ nào?</summary>
+  <p>Cùng tổng số chiều, nên chi phí gần như bằng nhau. Khác biệt là một head chỉ tạo ra một phân phối chú ý duy nhất, tức là một kiểu quan hệ. Chia thành nhiều head cho phép model đồng thời bám nhiều quan hệ khác nhau — một head theo từ liền trước, một head nối đại từ với danh từ, một head khớp dấu ngoặc. Sau đó W_o trộn các kết luận đó lại.</p></details>
+
+  <details class="qa"><summary>KV cache đánh đổi cái gì lấy cái gì?</summary>
+  <p>Đổi bộ nhớ lấy tốc độ. Không cache thì sinh N token tốn công bậc hai theo N; có cache thì mỗi bước chỉ tính cho một token mới. Cái giá là bộ nhớ tăng tuyến tính theo độ dài chuỗi và theo số request đồng thời — với LLaMA-2 7B fp16 là khoảng 0.5MB mỗi token, nên context 8K đã ăn 4GB cho một request. Đó là lý do có GQA và lượng tử hoá cache.</p></details>
+
+  <details class="qa"><summary>Vì sao context dài lại đắt, và FlashAttention sửa được phần nào?</summary>
+  <p>Chi phí attention có số hạng T² vì mọi token nối với mọi token, nên tăng context gấp đôi thì phần này gấp bốn. FlashAttention <b>không</b> giảm số phép tính — nó tính theo khối trong bộ nhớ tốc độ cao của GPU và không bao giờ ghi ma trận T×T ra bộ nhớ chính. Kết quả là bộ nhớ giảm từ bậc hai xuống tuyến tính và nhanh hơn vài lần nhờ bớt di chuyển dữ liệu.</p></details>
+</section>
+
+<footer>Deep dive · self-attention · phần token hoá, embedding, block và đầu ra nằm ở bài <a href="../transformer-architecture/index.html">Kiến trúc Transformer</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

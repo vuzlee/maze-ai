@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLOps &amp; model serving — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-mlops" data-title="MLOps &amp; model serving" data-tag="Operations" data-blurb="Ba thứ thay đổi, bốn chiến lược triển khai kèm bán kính rủi ro, phát hiện drift bằng PSI, point-in-time correctness.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Hệ thống · vận hành ML</p>
+  <h1>MLOps &amp; model <em>serving</em></h1>
+  <p class="lede">Phần mềm thường có một thứ thay đổi: code. Hệ thống ML có <b>ba</b> — code, dữ liệu, model — và mọi khó khăn đến từ đó. Bài này chốt bốn chiến lược triển khai kèm bán kính rủi ro, cách <b>phát hiện drift</b> bằng số, bốn tầng giám sát, và bài toán <b>point-in-time correctness</b>.</p>
+</header>
+
+
+<section id="mlops-s1">
+  <div class="sh"><b>01</b><h2>Overview</h2></div>
+<pre><code>DỮ LIỆU → PIPELINE HUẤN LUYỆN → MODEL REGISTRY → TRIỂN KHAI → GIÁM SÁT
+   ↑                                                                │
+   └────────────────── huấn luyện lại khi có tín hiệu ───────────────┘
+
+Mỗi mũi tên là một nơi có thể vỡ, và phần lớn sự cố ML trong sản xuất
+KHÔNG phải lỗi model — mà là lỗi ở các mũi tên này.</code></pre>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    Trong hệ thống ML, <strong>model chỉ là một phần rất nhỏ</strong>. Phần lớn công sức và phần lớn sự cố nằm ở dữ liệu, hạ tầng đặc trưng, triển khai và giám sát. Nói được điều này là dấu hiệu bạn đã vận hành hệ thống thật, không chỉ huấn luyện model trên notebook.
+  </div>
+</section>
+
+<section id="mlops-s2">
+  <div class="sh"><b>02</b><h2>Ba thứ thay đổi — vì sao ML khác phần mềm thường</h2></div>
+  <table>
+    <tr><th></th><th>Phần mềm thường</th><th>Hệ thống ML</th></tr>
+    <tr><td>Thứ thay đổi</td><td>Code</td><td><strong>Code + dữ liệu + model</strong></td></tr>
+    <tr><td>Kiểm thử</td><td>Đầu vào cố định → đầu ra cố định</td><td>Đầu ra là phân phối; "đúng" là một khoảng</td></tr>
+    <tr><td>Hỏng thế nào</td><td>Ném lỗi, sập, log stack trace</td><td><strong>Âm thầm kém đi</strong> mà không có lỗi nào</td></tr>
+    <tr><td>Tự hỏng theo thời gian</td><td>Không — code không đổi thì hành vi không đổi</td><td><strong>Có</strong> — thế giới đổi thì model lạc hậu dù code y nguyên</td></tr>
+    <tr><td>Tái lập</td><td>Cùng code cho cùng kết quả</td><td>Cần cả cùng dữ liệu, cùng seed, cùng thư viện, cùng phần cứng</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Hai dòng giữa là gốc của mọi khó khăn</h4>
+    Một API hỏng thì trả về mã 500 và bạn biết ngay. Một model hỏng thì vẫn trả về 200 với một con số <em>trông hợp lý</em> nhưng sai. Không có exception, không có alert từ hệ thống thông thường. Đó là lý do giám sát ML phải là một tầng <strong>riêng</strong>, và lý do nó không thể chỉ dựa vào công cụ giám sát hạ tầng.
+  </div>
+</section>
+
+<section id="mlops-s3">
+  <div class="sh"><b>03</b><h2>Đánh phiên bản — bốn thứ, không phải một</h2></div>
+  <table>
+    <tr><th>Đánh phiên bản</th><th>Công cụ</th><th>Vì sao cần</th></tr>
+    <tr><td>Code</td><td>Git</td><td>Hiển nhiên</td></tr>
+    <tr><td><strong>Dữ liệu</strong></td><td>DVC, LakeFS, hoặc chỉ cần snapshot có nhãn thời gian</td><td>Không biết đã huấn luyện trên dữ liệu nào thì không tái lập được, và không debug được</td></tr>
+    <tr><td><strong>Model</strong></td><td>MLflow, W&amp;B, registry của nền tảng</td><td>Cần biết model đang chạy là artifact nào, từ commit nào, dữ liệu nào</td></tr>
+    <tr><td>Định nghĩa đặc trưng</td><td>Feature store, hoặc code có phiên bản</td><td>Đặc trưng đổi định nghĩa mà model không huấn luyện lại là một dạng lệch âm thầm</td></tr>
+    <tr><td>Môi trường</td><td>Docker, lock file</td><td>Đổi phiên bản một thư viện có thể đổi kết quả</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Câu hỏi kiểm tra một hệ thống có đủ chín chưa</h4>
+    <strong>"Model đang chạy trên production là từ commit nào, dữ liệu nào, và bạn dựng lại nó trong bao lâu?"</strong> Nếu câu trả lời không rõ ràng và dưới một ngày, hệ thống đó chưa đủ chín — và khi có sự cố thì không ai debug được. Nêu chính câu hỏi này trong phỏng vấn là cách nhanh nhất cho thấy bạn hiểu vấn đề.
+  </div>
+</section>
+
+<section id="mlops-s4">
+  <div class="sh"><b>04</b><h2>Tái lập được — tới mức nào là đủ</h2></div>
+<pre><code>Cần ghi lại:
+    - commit của code
+    - phiên bản hoặc snapshot của dữ liệu
+    - toàn bộ siêu tham số
+    - seed ngẫu nhiên
+    - phiên bản thư viện, phiên bản CUDA
+    - loại phần cứng</code></pre>
+  <div class="note">
+    <h4>Nhưng tái lập từng bit trên GPU là không khả thi</h4>
+    Thứ tự cộng dồn trong các phép song song không xác định, nên hai lần chạy cùng cấu hình vẫn cho trọng số khác nhau ở những chữ số cuối. Mục tiêu thực tế không phải giống từng bit mà là <strong>giống trong khoảng dung sai</strong>: chạy lại phải cho metric nằm trong dao động bình thường giữa các seed. Biết được ranh giới này — và biết dao động giữa các seed của bài toán mình làm là bao nhiêu — là dấu hiệu của người đã đo.
+  </div>
+  <p>Hệ quả thực dụng: nếu hai model chênh nhau 0.3% AUC mà dao động giữa các seed là 0.5%, thì bạn <em>chưa</em> chứng minh được model nào tốt hơn. Chạy nhiều seed rồi báo trung bình kèm độ lệch chuẩn là cách làm đúng.</p>
+</section>
+
+<section id="mlops-s5">
+  <div class="sh"><b>05</b><h2>Model registry và quy trình thăng cấp</h2></div>
+<pre><code>huấn luyện → artifact có phiên bản
+    ↓  cổng kiểm 1: metric offline vượt mốc?
+staging     → chạy trên môi trường giống production
+    ↓  cổng kiểm 2: kiểm hồi quy, kiểm độ trễ, kiểm dữ liệu biên
+shadow      → nhận lưu lượng thật, KHÔNG trả kết quả cho người dùng
+    ↓  cổng kiểm 3: dự đoán có hợp lý? độ trễ có đạt?
+canary      → 1–5% lưu lượng thật
+    ↓  cổng kiểm 4: guardrail không xấu đi?
+production  → tăng dần tới 100%</code></pre>
+  <table>
+    <tr><th>Cổng kiểm</th><th>Bắt được gì</th></tr>
+    <tr><td>Metric offline</td><td>Model tệ hơn baseline</td></tr>
+    <tr><td>Kiểm hồi quy</td><td>Mất một khả năng cũ; sai trên các ca đã biết</td></tr>
+    <tr><td>Kiểm độ trễ</td><td>Model đúng nhưng quá chậm cho ngân sách</td></tr>
+    <tr><td><strong>Shadow</strong></td><td><strong>Training–serving skew</strong> — đặc trưng lúc phục vụ khác lúc huấn luyện</td></tr>
+    <tr><td>Canary</td><td>Tác động thật lên metric nghiệp vụ và guardrail</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Shadow là cổng kiểm giá trị nhất và hay bị bỏ qua nhất</h4>
+    Nó là cách <em>duy nhất</em> phát hiện training–serving skew trước khi người dùng bị ảnh hưởng: model nhận đúng lưu lượng thật, tính đặc trưng qua đúng đường phục vụ, và bạn so phân phối dự đoán với lúc offline. Nếu hai phân phối lệch nhau thì có gì đó khác giữa hai đường tính đặc trưng — và bạn biết điều đó với <strong>0% rủi ro cho người dùng</strong>.
+  </div>
+</section>
+
+<section id="mlops-s6">
+  <div class="sh"><b>06</b><h2>Đóng gói và phục vụ</h2></div>
+  <table>
+    <tr><th>Quyết định</th><th>Lựa chọn</th><th>Ghi chú</th></tr>
+    <tr><td>Giao thức</td><td>REST hay gRPC</td><td>gRPC nhanh hơn cho tải nội bộ nhờ nhị phân và HTTP/2; REST dễ tích hợp hơn</td></tr>
+    <tr><td>Định dạng model</td><td>Native, ONNX, TensorRT</td><td>ONNX cho tính di động; TensorRT cho tốc độ trên GPU NVIDIA</td></tr>
+    <tr><td>Máy phục vụ</td><td>Triton, TorchServe, hoặc tự viết FastAPI</td><td>Máy phục vụ chuyên dụng có sẵn dynamic batching và quản nhiều model</td></tr>
+    <tr><td><strong>Dynamic batching</strong></td><td>Gom request đến trong một cửa sổ nhỏ</td><td>Tăng thông lượng nhiều, thêm độ trễ nhỏ — gần như luôn đáng</td></tr>
+    <tr><td>Tự động co giãn</td><td>Theo QPS hoặc theo độ dài hàng đợi</td><td>Model nặng có thời gian khởi động lâu; phải tính vào ngưỡng co giãn</td></tr>
+  </table>
+  <div class="note">
+    <h4>Về dynamic batching</h4>
+    Máy phục vụ chờ một cửa sổ rất ngắn — ví dụ 5ms — để gom các request đến trong khoảng đó thành một batch. Thêm tối đa 5ms độ trễ nhưng thông lượng có thể tăng nhiều lần, vì GPU vốn xử lý một batch gần bằng chi phí xử lý một mẫu. Đây là cùng nguyên lý với batching trong suy luận LLM: phần cứng bị chặn bởi việc đọc trọng số, không bởi số mẫu.
+  </div>
+  <p>Một chi tiết vận hành hay bị bỏ qua: <strong>thời gian khởi động</strong>. Model lớn mất hàng chục giây tới vài phút để nạp, nên khi tự động co giãn kích hoạt thì máy mới chưa sẵn sàng ngay. Phải giữ một mức dư, hoặc dùng cơ chế nạp trước, hoặc cảnh báo dựa trên xu hướng thay vì ngưỡng tức thời.</p>
+</section>
+
+<section id="mlops-s7">
+  <div class="sh"><b>07</b><h2>Lab: chiến lược triển khai</h2></div>
+  <p>Chọn chiến lược và nhập tình huống để xem <strong>bao nhiêu người dùng bị ảnh hưởng</strong> trước khi bạn kịp phát hiện và quay lại.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>chiến lược</label>
+        <select id="dstrat">
+          <option value="shadow">shadow — 0% lưu lượng thật</option>
+          <option value="canary" selected>canary — tăng dần</option>
+          <option value="bluegreen">blue-green — chuyển 100%</option>
+          <option value="all">triển khai thẳng 100%</option>
+        </select>
+      </div>
+      <div><label>QPS</label><input type="number" id="dqps" value="5000" min="1"></div>
+      <div><label>% lưu lượng cho model mới</label><input type="number" id="dpct" value="5" min="0" max="100"></div>
+      <div><label>thời gian phát hiện (phút)</label><input type="number" id="ddet" value="10" min="1"></div>
+      <div><label>thời gian quay lại (phút)</label><input type="number" id="drb" value="2" min="0"></div>
+      <div><label>% request bị lỗi</label><input type="number" id="derr" value="20" min="0" max="100"></div>
+    </div>
+    <div id="depview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      So canary 5% với triển khai thẳng 100%: cùng một model lỗi, cùng thời gian phát hiện, nhưng số request bị ảnh hưởng chênh <strong>hai chục lần</strong>. Rồi thử giảm thời gian phát hiện từ 10 phút xuống 1 phút — giám sát tốt có giá trị tương đương với việc giảm tỉ lệ lưu lượng.
+    </p>
+  </div>
+</section>
+
+<section id="mlops-s8">
+  <div class="sh"><b>08</b><h2>Rollback và đường rơi về</h2></div>
+<pre><code>Ba mức, theo thứ tự áp dụng:
+
+1. QUAY LẠI PHIÊN BẢN TRƯỚC   model cũ vẫn nằm sẵn, chỉ đổi cấu hình
+                              → phải làm được trong VÀI PHÚT, không cần build lại
+
+2. RƠI VỀ MODEL ĐƠN GIẢN      model nhỏ hơn, cũ hơn, nhưng chắc chắn chạy
+
+3. RƠI VỀ QUY TẮC             logic tĩnh hoặc giá trị mặc định
+                              → tính năng suy giảm nhưng KHÔNG chết</code></pre>
+  <table>
+    <tr><th>Nguyên tắc</th><th>Chi tiết</th></tr>
+    <tr><td><strong>Rollback phải là đổi cấu hình</strong></td><td>Không phải triển khai lại. Nếu phải build lại thì đã mất 20 phút quý giá</td></tr>
+    <tr><td><strong>Không để model chặn luồng chính</strong></td><td>Đặt timeout cho lệnh gọi model; quá hạn thì dùng giá trị mặc định thay vì để request treo</td></tr>
+    <tr><td><strong>Tập huấn rollback</strong></td><td>Một quy trình chưa từng chạy thử thì không tồn tại. Diễn tập định kỳ</td></tr>
+    <tr><td><strong>Giữ model cũ đủ lâu</strong></td><td>Vì có sự cố chỉ phát hiện sau vài ngày</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Suy giảm có kiểm soát</h4>
+    Điều quan trọng nhất về thiết kế: <strong>hệ thống phải sống được khi model chết</strong>. Trang gợi ý có thể hiển thị nội dung phổ biến; hệ thống gian lận có thể rơi về quy tắc; ô tìm kiếm có thể dùng khớp từ khoá thuần. Một tính năng suy giảm luôn tốt hơn một trang lỗi, và nêu được điều này ở vòng thiết kế gần như luôn được ghi nhận.
+  </div>
+</section>
+
+<section id="mlops-s9">
+  <div class="sh"><b>09</b><h2>Bốn tầng giám sát</h2></div>
+  <table>
+    <tr><th>Tầng</th><th>Theo dõi</th><th>Phát hiện được</th><th>Độ trễ tín hiệu</th></tr>
+    <tr><td><strong>1. Hạ tầng</strong></td><td>CPU, bộ nhớ, p99, tỉ lệ lỗi, tỉ lệ timeout</td><td>Sự cố kỹ thuật</td><td>Tức thời</td></tr>
+    <tr><td><strong>2. Dữ liệu</strong></td><td>Phân phối đặc trưng, tỉ lệ giá trị thiếu, giá trị ngoài khoảng, schema</td><td><strong>Nguồn dữ liệu chết, đổi định dạng, drift</strong></td><td>Tức thời</td></tr>
+    <tr><td><strong>3. Model</strong></td><td>Phân phối điểm dự đoán, tỉ lệ vượt ngưỡng, và hiệu năng khi có nhãn</td><td>Model lạc hậu, lệch đường tính đặc trưng</td><td>Điểm: tức thời. Hiệu năng: chờ nhãn</td></tr>
+    <tr><td><strong>4. Nghiệp vụ</strong></td><td>Doanh thu, tương tác, khiếu nại</td><td>Tác động thật</td><td>Chậm và nhiễu</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Tầng 2 là tầng đáng đầu tư nhất</h4>
+    Vì nó cho tín hiệu <strong>tức thời</strong> trong khi nhãn thật có thể đến sau hàng tuần. Và nó bắt được cả một lớp sự cố mà không tầng nào khác bắt được: một trường bị đổi tên ở nguồn, một API trả về rỗng, một job ETL chết lặng lẽ. Những sự cố này làm model kém đi ngay lập tức mà mọi chỉ số hạ tầng đều xanh. Nói "em theo dõi phân phối đặc trưng vì nhãn đến muộn" là câu trả lời rất mạnh.
+  </div>
+  <p>Một chi tiết đáng thêm: theo dõi <strong>theo phân khúc</strong>, không chỉ tổng thể. Model có thể giữ nguyên hiệu năng chung nhưng tụt hẳn trên một nhóm — một vùng địa lý, một loại thiết bị, một phân khúc khách hàng — và con số trung bình che mất điều đó hoàn toàn.</p>
+</section>
+
+<section id="mlops-s10">
+  <div class="sh"><b>10</b><h2>Phát hiện drift bằng số</h2></div>
+<pre><code>Hai loại drift, khác nhau về bản chất:
+
+DATA DRIFT       P(x) đổi — phân phối đầu vào thay đổi
+                 ví dụ: nhóm người dùng mới có hành vi khác
+                 → phát hiện được NGAY, không cần nhãn
+
+CONCEPT DRIFT    P(y|x) đổi — quan hệ giữa đầu vào và nhãn thay đổi
+                 ví dụ: kẻ gian đổi thủ đoạn nên cùng đặc trưng giờ mang nghĩa khác
+                 → CHỈ phát hiện được khi có nhãn → luôn muộn</code></pre>
+  <table>
+    <tr><th>Công cụ</th><th>Dùng cho</th><th>Ngưỡng tham chiếu</th></tr>
+    <tr><td><strong>PSI</strong> — Population Stability Index</td><td>Đặc trưng số hoặc đã chia khoảng</td><td>&lt; 0.1 ổn định · 0.1–0.25 đáng chú ý · <strong>&gt; 0.25 drift rõ</strong></td></tr>
+    <tr><td>Kiểm định KS</td><td>Đặc trưng liên tục</td><td>Nhạy quá với dữ liệu lớn — p-value luôn nhỏ, nên xem độ lớn thay vì p-value</td></tr>
+    <tr><td>Chi-square</td><td>Đặc trưng phân loại</td><td>Cùng cảnh báo như trên</td></tr>
+    <tr><td>Phân phối điểm dự đoán</td><td>Toàn model</td><td>Chỉ số tổng hợp tốt nhất — nó gộp mọi thay đổi đầu vào</td></tr>
+  </table>
+<pre><code>PSI = Σ (tỉ_lệ_mới - tỉ_lệ_gốc) × ln(tỉ_lệ_mới / tỉ_lệ_gốc)
+      trên các khoảng của đặc trưng</code></pre>
+  <div class="note warn">
+    <h4>Cảnh báo về kiểm định thống kê cho drift</h4>
+    Với hàng triệu mẫu, kiểm định KS sẽ báo "khác biệt có ý nghĩa" cho <em>mọi</em> đặc trưng, kể cả những thay đổi hoàn toàn vô hại — đây chính là vấn đề đã nói ở bài <em>Thống kê &amp; A/B testing</em>: sample size lớn làm mọi khác biệt trở nên có ý nghĩa thống kê. Nên hãy dùng <strong>độ lớn</strong> như PSI, và luôn kiểm tra bằng mắt bằng cách vẽ hai phân phối lên nhau.
+  </div>
+</section>
+
+<section id="mlops-s11">
+  <div class="sh"><b>11</b><h2>Huấn luyện lại — khi nào và bằng gì</h2></div>
+  <table>
+    <tr><th>Cơ chế kích hoạt</th><th>Cách làm</th><th>Phù hợp khi</th></tr>
+    <tr><td><strong>Theo lịch</strong></td><td>Hằng ngày, hằng tuần, hằng tháng</td><td>Đơn giản nhất, dự đoán được. Mặc định tốt</td></tr>
+    <tr><td>Theo drift</td><td>PSI vượt ngưỡng thì chạy pipeline</td><td>Khi drift không đều — có lúc yên có lúc đột biến</td></tr>
+    <tr><td>Theo hiệu năng</td><td>Metric tụt dưới mốc</td><td>Chỉ dùng được nếu nhãn về nhanh</td></tr>
+    <tr><td>Theo lượng dữ liệu</td><td>Có thêm N mẫu mới thì huấn luyện lại</td><td>Giai đoạn đầu khi dữ liệu còn ít</td></tr>
+  </table>
+  <p><strong>Chọn tần suất theo tốc độ drift, không theo thói quen.</strong> Bài phát hiện gian lận có kẻ tấn công thích ứng liên tục nên có thể cần hằng ngày; bài phân loại ảnh sản phẩm có thể để hàng tháng mà không mất gì. Và mọi lần huấn luyện lại đều phải đi qua đúng các cổng kiểm ở mục 05 — <em>model mới không tự động tốt hơn model cũ</em>.</p>
+  <div class="note">
+    <h4>Huấn luyện lại từ đầu hay huấn luyện tiếp</h4>
+    Huấn luyện lại từ đầu trên cửa sổ dữ liệu gần nhất thì đơn giản và dự đoán được, nhưng đắt. Huấn luyện tiếp từ trọng số cũ thì rẻ hơn nhiều nhưng sai lệch tích luỹ dần qua các vòng và khó phát hiện. Cách thực dụng phổ biến: huấn luyện tiếp thường xuyên, và <strong>định kỳ huấn luyện lại từ đầu</strong> để làm mốc so sánh và cắt sai lệch tích luỹ.
+  </div>
+</section>
+
+<section id="mlops-s12">
+  <div class="sh"><b>12</b><h2>Feature store và point-in-time correctness</h2></div>
+<pre><code>VẤN ĐỀ: cùng một đặc trưng phải tính hai lần, ở hai môi trường khác nhau
+
+    huấn luyện:  SQL trên kho dữ liệu, xử lý theo lô, dữ liệu lịch sử
+    phục vụ:     Python trong service, từng request, dữ liệu trực tiếp
+
+    → khác nhau ở cách xử lý giá trị thiếu, múi giờ, làm tròn, thứ tự sự kiện
+    → model bị lệch mà KHÔNG BÁO LỖI, chỉ kém đi một cách khó hiểu
+
+GIẢI PHÁP: một nơi duy nhất định nghĩa đặc trưng, sinh ra cả hai đường.</code></pre>
+  <h3>Point-in-time correctness — phần khó nhất</h3>
+<pre><code>Muốn tạo mẫu huấn luyện cho một dự đoán tại 10:00 ngày 5/3.
+Đặc trưng "tổng số đơn của khách" phải là giá trị TẠI ĐÚNG thời điểm đó —
+KHÔNG phải giá trị hôm nay.
+
+Nếu lấy giá trị hôm nay: đặc trưng đã chứa thông tin của tương lai
+→ rò rỉ thời gian → model rất tốt khi thử, vô dụng khi chạy thật.
+
+Feature store lưu đặc trưng kèm DẤU THỜI GIAN SỰ KIỆN, và khi ghép nhãn
+với đặc trưng thì nó ghép theo "giá trị mới nhất TRƯỚC mốc dự đoán".</code></pre>
+  <div class="note key">
+    <h4>Vì sao đây là điểm đáng nêu trong phỏng vấn</h4>
+    Point-in-time correctness là lý do <em>chính</em> feature store tồn tại — không phải vì nó là một cái cache tiện lợi. Tự viết phép ghép đúng theo thời điểm cho hàng chục đặc trưng là việc rất dễ sai, và sai thì tạo ra rò rỉ thời gian mà không có dấu hiệu nào. Nói được điều này phân biệt rõ với việc chỉ kể tên công cụ.
+  </div>
+  <p>Và cần biết khi nào <em>không</em> cần feature store: nếu chỉ có vài đặc trưng đơn giản, hoặc mọi thứ tính được từ chính request, thì thêm một hệ thống nữa là chi phí không đáng. Nó bắt đầu có lãi khi có nhiều model dùng chung đặc trưng, hoặc khi có nhiều đặc trưng tổng hợp theo cửa sổ thời gian.</p>
+</section>
+
+<section id="mlops-s13">
+  <div class="sh"><b>13</b><h2>Ba mức trưởng thành</h2></div>
+  <table>
+    <tr><th>Mức</th><th>Đặc điểm</th><th>Dấu hiệu nhận biết</th></tr>
+    <tr><td><strong>0 — thủ công</strong></td><td>Huấn luyện trên notebook, giao model bằng tay</td><td>Không ai dựng lại được model đang chạy; huấn luyện lại là một dự án nhỏ</td></tr>
+    <tr><td><strong>1 — pipeline tự động</strong></td><td>Pipeline huấn luyện chạy được bằng một lệnh; có registry và giám sát</td><td>Huấn luyện lại là việc thường ngày; có cổng kiểm trước khi triển khai</td></tr>
+    <tr><td><strong>2 — CI/CD cho pipeline</strong></td><td>Bản thân pipeline cũng được kiểm thử và triển khai tự động; huấn luyện lại tự kích hoạt</td><td>Từ ý tưởng tới production là vài giờ; có A/B test tự động</td></tr>
+  </table>
+  <div class="note">
+    <h4>Mức nào là đủ</h4>
+    <strong>Mức 1 là đủ cho phần lớn tổ chức</strong>, và cố nhảy lên mức 2 quá sớm là một dạng tối ưu quá mức — bạn xây hạ tầng cho một tần suất huấn luyện lại mà mình chưa cần. Câu trả lời mạnh trong phỏng vấn là nói mình đang ở mức nào, <em>vì sao mức đó phù hợp với bài toán</em>, và bước tiếp theo sẽ là gì khi nào — thay vì kể tên hết mọi công cụ MLOps.
+  </div>
+</section>
+
+<section id="mlops-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Không đánh phiên bản dữ liệu</h4><p>Không tái lập được, không debug được. Snapshot có nhãn thời gian là mức tối thiểu.</p></div>
+    <div class="card bad"><h4>Bỏ qua bước shadow</h4><p>Mất cơ hội duy nhất phát hiện training–serving skew với 0% rủi ro.</p></div>
+    <div class="card bad"><h4>Rollback phải build lại</h4><p>Mất hàng chục phút trong lúc đang có sự cố. Rollback phải là đổi cấu hình.</p></div>
+    <div class="card bad"><h4>Chỉ giám sát hạ tầng</h4><p>Model hỏng vẫn trả về 200 với con số trông hợp lý. Cần tầng giám sát dữ liệu.</p></div>
+    <div class="card bad"><h4>Dùng p-value của KS test để báo drift</h4><p>Với dữ liệu lớn thì mọi đặc trưng đều "có ý nghĩa". Dùng độ lớn như PSI.</p></div>
+    <div class="card bad"><h4>Ghép đặc trưng không đúng thời điểm</h4><p>Rò rỉ thời gian. Model tốt khi thử, vô dụng khi chạy thật.</p></div>
+  </div>
+</section>
+
+<section id="mlops-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao vận hành hệ thống ML khó hơn phần mềm thường?</summary>
+  <p>Vì có <b>ba</b> thứ thay đổi thay vì một: code, dữ liệu, và model. Hai hệ quả nặng nhất: hệ thống ML hỏng <b>âm thầm</b> — vẫn trả về 200 với một con số trông hợp lý nhưng sai, không có exception nào để bắt; và nó <b>tự lạc hậu theo thời gian</b> vì thế giới đổi dù code y nguyên. Đó là lý do giám sát ML phải là một tầng riêng chứ không dựa được vào công cụ giám sát hạ tầng, và lý do phải đánh phiên bản cả dữ liệu và model chứ không chỉ code.</p></details>
+
+  <details class="qa"><summary>Bạn triển khai một model mới thế nào?</summary>
+  <p>Qua các cổng kiểm tăng dần. Metric offline vượt mốc baseline. Staging với kiểm hồi quy và kiểm độ trễ. Rồi <b>shadow</b> — nhận lưu lượng thật nhưng không trả kết quả cho người dùng; đây là cổng giá trị nhất vì nó là cách duy nhất phát hiện training–serving skew với 0% rủi ro, bằng cách so phân phối dự đoán online với offline. Rồi canary 1–5% để đo tác động thật lên guardrail, rồi tăng dần. Và trước khi bắt đầu, tôi phải đảm bảo rollback là <b>đổi cấu hình</b> chứ không phải triển khai lại — vài phút, không phải hai chục phút.</p></details>
+
+  <details class="qa"><summary>Làm sao biết model đang tệ đi trên production?</summary>
+  <p>Bốn tầng, và tầng quan trọng nhất là <b>giám sát dữ liệu</b> vì nó cho tín hiệu tức thời trong khi nhãn thật có thể đến sau hàng tuần. Tôi theo dõi phân phối từng đặc trưng, tỉ lệ giá trị thiếu, và phân phối điểm dự đoán — chúng bắt được cả lớp sự cố hạ tầng như một trường bị đổi tên hay một job ETL chết lặng lẽ, những thứ làm model kém ngay mà mọi chỉ số hạ tầng vẫn xanh. Rồi hiệu năng theo nhãn thật và metric nghiệp vụ khi có. Và luôn theo dõi <b>theo phân khúc</b>, vì con số trung bình che mất việc model tụt hẳn trên một nhóm.</p></details>
+
+  <details class="qa"><summary>Data drift và concept drift khác nhau thế nào?</summary>
+  <p>Data drift là <code>P(x)</code> đổi — phân phối đầu vào thay đổi, ví dụ có nhóm người dùng mới hành vi khác. Phát hiện được ngay, không cần nhãn. Concept drift là <code>P(y|x)</code> đổi — quan hệ giữa đầu vào và nhãn thay đổi, ví dụ kẻ gian đổi thủ đoạn nên cùng một đặc trưng giờ mang nghĩa khác. Loại này chỉ phát hiện được khi có nhãn nên luôn muộn. Đo bằng PSI với ngưỡng tham chiếu 0.1 và 0.25; tôi tránh dùng p-value của KS test vì với hàng triệu mẫu thì mọi đặc trưng đều "có ý nghĩa" — cần độ lớn, không cần ý nghĩa thống kê.</p></details>
+
+  <details class="qa"><summary>Feature store giải quyết vấn đề gì?</summary>
+  <p>Hai vấn đề. Thứ nhất là training–serving skew: cùng một đặc trưng phải tính bằng SQL trên kho dữ liệu lúc huấn luyện và bằng Python trong service lúc phục vụ, và chúng dễ khác nhau ở xử lý giá trị thiếu, múi giờ, làm tròn — model lệch mà không báo lỗi. Feature store là một nơi duy nhất định nghĩa đặc trưng, sinh ra cả hai đường. Thứ hai và quan trọng hơn là <b>point-in-time correctness</b>: khi tạo mẫu huấn luyện, đặc trưng phải là giá trị tại đúng thời điểm dự đoán chứ không phải giá trị hôm nay, nếu không là rò rỉ thời gian. Tự viết phép ghép đó cho hàng chục đặc trưng rất dễ sai.</p></details>
+
+  <details class="qa"><summary>Model chết lúc 2 giờ sáng thì sao?</summary>
+  <p>Hệ thống phải sống được mà không có model. Ba mức rơi về: quay lại phiên bản model trước — phải làm được bằng đổi cấu hình trong vài phút; rơi về một model đơn giản hơn nhưng chắc chắn chạy; rơi về quy tắc tĩnh hoặc giá trị mặc định. Kèm hai chi tiết: đặt timeout cho lệnh gọi model để nó không treo cả request, và diễn tập rollback định kỳ — một quy trình chưa từng chạy thử thì coi như không tồn tại. Trang gợi ý hiển thị nội dung phổ biến vẫn tốt hơn một trang lỗi.</p></details>
+</section>
+
+<footer>Deep dive · MLOps &amp; phục vụ model · ngưỡng PSI là mức tham chiếu thông dụng, nên hiệu chỉnh theo dữ liệu của bạn.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

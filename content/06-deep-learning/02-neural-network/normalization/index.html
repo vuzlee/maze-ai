@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Normalization — BatchNorm &amp; LayerNorm — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-norm" data-title="Normalization — BatchNorm &amp; LayerNorm" data-tag="Foundations" data-blurb="BatchNorm phụ thuộc batch size ra sao, vì sao Transformer dùng LayerNorm, Pre-LN so với Post-LN, và cách chẩn đoán bằng thống kê activation.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · nền tảng</p>
+  <h1>Normalization — BatchNorm &amp; <em>LayerNorm</em></h1>
+  <p class="lede">BatchNorm hay LayerNorm không phải chuyện sở thích — nó quyết định model của bạn có <b>phụ thuộc batch size</b> hay không, và có suy luận từng mẫu được hay không. Bài này giải thích BatchNorm thật sự làm gì, vì sao Transformer bỏ nó, và đặt norm trước hay sau khối residual.</p>
+</header>
+
+<section id="norm-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vì sao cần chuẩn hoá</h2></div>
+
+  <p class="key">Khởi tạo chỉ đặt đúng độ lớn ở <em>bước đầu tiên</em>. Chuẩn hoá là thứ giữ nó đúng suốt quá trình huấn luyện.</p>
+
+  <ul class="why">
+    <li>Sau vài trăm bước cập nhật, phân bố đầu vào của mỗi lớp <b>trôi đi</b> so với lúc khởi tạo — lớp sau phải liên tục đuổi theo lớp trước.</li>
+    <li>Chuẩn hoá ép lại trung bình và phương sai ở giữa mạng, rồi thêm hai tham số học được <code>γ</code> và <code>β</code> để mạng tự lấy lại độ tự do nếu cần.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần đặt đúng độ lớn ở bước đầu — công thức <code>√(1/n)</code>, Xavier và He — nằm ở bài
+    <a href="../weight-initialization/index.html">Khởi tạo trọng số</a>.
+  </div>
+</section>
+
+<section id="norm-s2">
+  <div class="sh"><b>02</b><h2>BatchNorm</h2></div>
+<pre><code>Với mỗi ĐẶC TRƯNG, tính thống kê trên toàn BATCH:
+
+    μ  = mean(x)  theo chiều batch
+    σ² = var(x)   theo chiều batch
+    x̂  = (x - μ) / √(σ² + ε)
+    y  = γ · x̂ + β                ← γ và β là tham số HỌC ĐƯỢC</code></pre>
+  <p><strong>Vì sao cần <code>γ</code> và <code>β</code>:</strong> chuẩn hoá cứng về trung bình 0 phương sai 1 có thể làm mất khả năng biểu diễn — ví dụ với sigmoid thì vùng quanh 0 gần như tuyến tính. Hai tham số này cho mạng <em>tự học lại</em> thang đo và độ dịch phù hợp, kể cả học ra phép biến đổi ngược nếu chuẩn hoá là có hại.</p>
+  <h3>Hai chế độ — nguồn của nhiều bug</h3>
+  <table>
+    <tr><th></th><th>Lúc huấn luyện</th><th>Lúc suy luận</th></tr>
+    <tr><td>Dùng thống kê</td><td>Của <strong>batch hiện tại</strong></td><td>Của <strong>trung bình động</strong> tích luỹ khi huấn luyện</td></tr>
+    <tr><td>Cùng một đầu vào</td><td>Cho kết quả <em>khác nhau</em> tuỳ các mẫu khác trong batch</td><td>Luôn cho cùng kết quả</td></tr>
+    <tr><td>Điều kiện</td><td><code>model.train()</code></td><td><code>model.eval()</code></td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Quên <code>model.eval()</code></h4>
+    Lúc đánh giá, BatchNorm vẫn dùng thống kê của batch hiện tại. Với batch nhỏ thì thống kê rất nhiễu, và tệ hơn — <strong>dự đoán cho một mẫu phụ thuộc vào các mẫu khác cùng batch</strong>. Kết quả đánh giá không tái lập được và thường tệ hơn thực tế. Đây là bug âm thầm phổ biến nhất liên quan tới BatchNorm.
+  </div>
+</section>
+
+<section id="norm-s3">
+  <div class="sh"><b>03</b><h2>Phụ thuộc batch size — hệ quả thực tế</h2></div>
+<pre><code>BatchNorm tính trung bình và phương sai từ các mẫu trong batch.
+
+batch = 256  →  thống kê ổn định, chính xác
+batch = 8    →  thống kê nhiễu, chất lượng tụt rõ
+batch = 1    →  phương sai bằng 0, BatchNorm VÔ NGHĨA</code></pre>
+  <p>Đây không phải vấn đề lý thuyết — nó chặn hẳn một số ứng dụng:</p>
+  <table>
+    <tr><th>Tình huống</th><th>Vấn đề</th><th>Giải pháp</th></tr>
+    <tr><td>Phát hiện vật thể, phân đoạn ảnh</td><td>Ảnh độ phân giải cao nên batch chỉ được 2–4</td><td><strong>GroupNorm</strong></td></tr>
+    <tr><td>Huấn luyện phân tán nhiều GPU</td><td>Mỗi GPU chỉ thấy một phần batch</td><td>SyncBatchNorm — đồng bộ thống kê giữa các GPU, nhưng tốn giao tiếp</td></tr>
+    <tr><td>Chuỗi dài ngắn khác nhau</td><td>Token đệm làm nhiễu thống kê</td><td><strong>LayerNorm</strong></td></tr>
+    <tr><td>Phục vụ từng request lẻ</td><td>Không có batch để tính thống kê</td><td>Dùng trung bình động — và phải nhớ <code>model.eval()</code></td></tr>
+    <tr><td>Reinforcement learning</td><td>Phân phối dữ liệu đổi liên tục nên trung bình động luôn lạc hậu</td><td>LayerNorm hoặc không dùng norm</td></tr>
+  </table>
+  <p>Bảng này giải thích tại sao BatchNorm — dù thống trị thị giác máy tính trong nhiều năm — lại gần như không xuất hiện trong NLP và các model sinh.</p>
+</section>
+
+<section id="norm-s4">
+  <div class="sh"><b>04</b><h2>LayerNorm và các biến thể</h2></div>
+<pre><code>Tưởng tượng tensor có shape (N mẫu, C đặc trưng). Mỗi loại norm tính
+thống kê trên một chiều khác nhau:
+
+BatchNorm    ────────────►   theo chiều N, riêng cho từng đặc trưng
+LayerNorm    │              theo chiều C, riêng cho từng mẫu
+             ▼
+InstanceNorm                 từng mẫu, từng kênh (cho ảnh)
+GroupNorm                    từng mẫu, theo NHÓM kênh — trung gian giữa Layer và Instance</code></pre>
+  <table>
+    <tr><th>Loại</th><th>Tính thống kê trên</th><th>Phụ thuộc batch</th><th>Dùng ở</th></tr>
+    <tr><td>BatchNorm</td><td>Chiều batch, từng đặc trưng</td><td><strong>Có</strong></td><td>CNN với batch lớn</td></tr>
+    <tr><td>LayerNorm</td><td>Chiều đặc trưng, từng mẫu</td><td>Không</td><td><strong>Transformer</strong>, RNN</td></tr>
+    <tr><td>GroupNorm</td><td>Nhóm kênh, từng mẫu</td><td>Không</td><td>Phát hiện, phân đoạn — batch nhỏ</td></tr>
+    <tr><td>InstanceNorm</td><td>Từng kênh, từng mẫu</td><td>Không</td><td>Chuyển đổi phong cách ảnh</td></tr>
+    <tr><td><strong>RMSNorm</strong></td><td>Như LayerNorm nhưng <em>không trừ trung bình</em></td><td>Không</td><td>LLaMA và phần lớn LLM mới</td></tr>
+  </table>
+  <div class="note key">
+    <h4>RMSNorm — vì sao model mới chuyển sang nó</h4>
+<pre style="margin:8px 0"><code>LayerNorm:  y = γ · (x - μ) / √(σ² + ε)
+RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ trung bình</code></pre>
+    Bỏ được một lượt tính trung bình và một phép trừ, nên nhanh hơn khoảng 10–15% ở lớp norm mà chất lượng gần như không đổi. Thực nghiệm cho thấy phần <em>chia cho độ lớn</em> mới là phần quan trọng, còn phần <em>căn giữa</em> thì gần như không đóng góp. Đây là loại chi tiết cho thấy bạn theo dõi kiến trúc hiện đại.
+  </div>
+</section>
+
+<section id="norm-s5">
+  <div class="sh"><b>05</b><h2>BatchNorm thật sự làm gì</h2></div>
+  <p>Bài báo gốc giải thích bằng khái niệm <em>internal covariate shift</em>: phân phối đầu vào của mỗi lớp thay đổi khi các lớp trước cập nhật, và BatchNorm giữ nó ổn định. Cách giải thích này được nhắc lại khắp nơi — nhưng nghiên cứu sau đó cho thấy nó <strong>có lẽ không phải nguyên nhân chính</strong>.</p>
+<pre><code>Thí nghiệm phản chứng (Santurkar và cộng sự, 2018):
+
+Cố ý TIÊM nhiễu vào sau lớp BatchNorm để phá vỡ sự ổn định của phân phối
+— tức tái tạo lại internal covariate shift một cách chủ động.
+
+Kết quả: mạng vẫn huấn luyện nhanh và tốt như thường.
+
+→ nếu ổn định phân phối là cơ chế chính, việc phá nó phải làm mất lợi ích.
+   Nó không mất. Vậy cơ chế phải là thứ khác.</code></pre>
+  <p>Giải thích được cho là đúng hơn: BatchNorm <strong>làm mặt mất mát trơn hơn</strong>. Nó giới hạn độ lớn của gradient và của độ cong, nên bước cập nhật trở nên dự đoán được — cho phép dùng learning rate lớn hơn mà không phân kỳ.</p>
+  <div class="note">
+    <h4>Vì sao đáng biết chi tiết này</h4>
+    Không phải để bác bỏ ai. Mà vì nếu bạn nói "BatchNorm giảm internal covariate shift" một cách chắc nịch trước một interviewer đã đọc bài báo phản chứng, bạn mất điểm. Cách nói an toàn và chính xác: <em>"Bài báo gốc giải thích bằng internal covariate shift, nhưng công trình sau cho thấy cơ chế chính có lẽ là làm mượt mặt mất mát, cho phép learning rate lớn hơn."</em> Câu này cho thấy bạn đọc cả hai.
+  </div>
+</section>
+
+<section id="norm-s6">
+  <div class="sh"><b>06</b><h2>Đặt norm ở đâu</h2></div>
+  <h3>Trước hay sau activation</h3>
+<pre><code>Bài báo gốc:      conv → BN → ReLU        ← vẫn là mặc định phổ biến nhất
+Biến thể:         conv → ReLU → BN        ← đôi khi tốt hơn chút, ít dùng
+Pre-activation:   BN → ReLU → conv        ← ResNet v2, ổn định hơn cho mạng rất sâu</code></pre>
+  <h3>Pre-LN và Post-LN trong Transformer</h3>
+<pre><code>Post-LN (bài báo gốc):   x = LN(x + attn(x))
+Pre-LN (model hiện nay): x = x + attn(LN(x))</code></pre>
+  <table>
+    <tr><th></th><th>Post-LN</th><th>Pre-LN</th></tr>
+    <tr><td>Đường residual</td><td>Bị LayerNorm cắt ngang</td><td><strong>Sạch hoàn toàn</strong> từ đầu tới cuối</td></tr>
+    <tr><td>Độ ổn định</td><td>Cần giai đoạn khởi động learning rate cẩn thận</td><td>Ổn định, ít cần khởi động</td></tr>
+    <tr><td>Mạng rất sâu</td><td>Khó huấn luyện</td><td>Huấn luyện được hàng trăm lớp</td></tr>
+    <tr><td>Dùng ở</td><td>Transformer gốc, BERT</td><td><strong>GPT, LLaMA, gần như mọi model mới</strong></td></tr>
+  </table>
+  <p><strong>Lý do sâu xa:</strong> với Pre-LN, gradient có một đường đi từ loss function về tới lớp đầu mà không đi qua bất kỳ phép chuẩn hoá nào — giống hệt lập luận về residual connection ở bài backprop. Post-LN thì mỗi khối đều có một LayerNorm chắn trên đường đó.</p>
+  <div class="note warn">
+    <h4>Chi tiết cài đặt: bỏ bias khi có norm ngay sau</h4>
+    <code>conv → BN</code> thì bias của conv là <strong>dư thừa</strong>: BatchNorm trừ trung bình đi nên mọi hằng số cộng vào đều bị triệt tiêu, và <code>β</code> của BN đã đóng vai trò bias. Đặt <code>bias=False</code> để tiết kiệm tham số và một phép cộng. Cùng lý do áp dụng cho <code>Linear → LayerNorm</code>.
+  </div>
+</section>
+
+<section id="norm-s7">
+  <div class="sh"><b>07</b><h2>Weight decay và norm</h2></div>
+<pre><code>Weight decay = L2 regularization: phạt tổng bình phương trọng số.
+
+Nhưng KHÔNG nên áp dụng cho:
+    - γ và β của các lớp norm
+    - bias
+    - embedding (thường không, tuỳ trường hợp)</code></pre>
+  <p><strong>Vì sao không phạt <code>γ</code>:</strong> nó là tham số thang đo, không phải tham số biểu diễn. Đẩy <code>γ</code> về 0 nghĩa là <em>tắt</em> tín hiệu đi qua lớp đó — không phải làm model đơn giản hơn mà là làm nó mất khả năng. Tương tự, <code>β</code> và bias chỉ dịch chuyển giá trị, không liên quan tới độ phức tạp của hàm mà model biểu diễn.</p>
+<pre><code><span class="cm"># cách làm đúng trong PyTorch — tách tham số thành hai nhóm</span>
+decay, no_decay = [], []
+<span class="kw">for</span> name, p <span class="kw">in</span> model.named_parameters():
+    <span class="kw">if</span> p.ndim &lt;= <span class="st">1</span> <span class="kw">or</span> name.endswith(<span class="st">".bias"</span>):   <span class="cm"># norm và bias đều là tensor 1 chiều</span>
+        no_decay.append(p)
+    <span class="kw">else</span>:
+        decay.append(p)
+
+optimizer = torch.optim.AdamW([
+    {<span class="st">"params"</span>: decay,    <span class="st">"weight_decay"</span>: <span class="st">0.1</span>},
+    {<span class="st">"params"</span>: no_decay, <span class="st">"weight_decay"</span>: <span class="st">0.0</span>},
+])</code></pre>
+  <div class="note">
+    <h4>Một điểm về Adam và AdamW</h4>
+    Trong Adam gốc, weight decay được cộng vào gradient nên nó bị chia bởi thang đo thích ứng của Adam — hiệu quả thực tế khác nhau giữa các tham số và không còn là L2 đúng nghĩa. AdamW tách phần suy giảm ra khỏi gradient và áp trực tiếp lên trọng số, nên nó là L2 thật. Đó là lý do <strong>AdamW là mặc định</strong> cho mọi model lớn hiện nay.
+  </div>
+</section>
+
+<section id="norm-s8">
+  <div class="sh"><b>08</b><h2>Chẩn đoán bằng thống kê</h2></div>
+  <p>Khi mạng không học, hai đại lượng đáng in ra trước mọi thứ khác:</p>
+<pre><code><span class="cm"># 1. độ lệch chuẩn của activation theo từng lớp</span>
+<span class="kw">for</span> name, m <span class="kw">in</span> model.named_modules():
+    m.register_forward_hook(
+        <span class="kw">lambda</span> mod, inp, out, n=name: <span class="kw">print</span>(n, out.std().item()))
+
+<span class="cm"># 2. norm của gradient theo từng lớp</span>
+<span class="kw">for</span> name, p <span class="kw">in</span> model.named_parameters():
+    <span class="kw">if</span> p.grad <span class="kw">is not</span> <span class="kw">None</span>:
+        <span class="kw">print</span>(name, p.grad.norm().item())</code></pre>
+  <table>
+    <tr><th>Quan sát</th><th>Chẩn đoán</th><th>Xử lý</th></tr>
+    <tr><td>std activation giảm dần về 0 theo độ sâu</td><td>Khởi tạo quá nhỏ, hoặc thiếu norm</td><td>He init, thêm norm</td></tr>
+    <tr><td>std activation tăng theo hàm mũ</td><td>Khởi tạo quá lớn</td><td>Giảm scale khởi tạo, thêm norm</td></tr>
+    <tr><td>Gradient norm gần 0 ở lớp đầu, bình thường ở lớp cuối</td><td>Gradient teo dần</td><td>ReLU, residual, norm</td></tr>
+    <tr><td>Gradient norm <strong>đúng bằng 0</strong></td><td>Đồ thị tính toán bị ngắt — có <code>detach()</code>, <code>no_grad()</code>, hoặc gán tại chỗ</td><td>Truy lại đường lan truyền</td></tr>
+    <tr><td>Gradient norm nhảy vọt bất thường</td><td>Gradient nổ, thường do một batch có ngoại lai</td><td>Gradient clipping</td></tr>
+    <tr><td>Mất mát thành <code>NaN</code> sau vài bước</td><td>Learning rate quá lớn, hoặc chia cho 0 ở đâu đó</td><td>Giảm learning rate; kiểm tra <code>log(0)</code> và <code>sqrt</code> của số âm</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Mức tham chiếu</h4>
+    Với mạng khởi tạo tốt, <strong>độ lệch chuẩn của activation nên gần như phẳng qua các lớp</strong> — dao động trong khoảng vài chục phần trăm là bình thường, giảm hoặc tăng hàng chục lần thì không. Đó là toàn bộ nội dung mà lab ở mục 04 minh hoạ, và là bài kiểm tra đầu tiên nên làm với một kiến trúc tự viết.
+  </div>
+</section>
+
+<section id="norm-s9">
+  <div class="sh"><b>09</b><h2>Bảng chọn norm</h2></div>
+  <table>
+    <tr><th>Tình huống</th><th>Chọn</th></tr>
+    <tr><td>CNN phân loại ảnh, batch từ 32 trở lên</td><td><strong>BatchNorm</strong></td></tr>
+    <tr><td>Phát hiện vật thể, phân đoạn, batch 2–8</td><td><strong>GroupNorm</strong></td></tr>
+    <tr><td>Transformer, NLP, model sinh</td><td><strong>LayerNorm</strong> đặt kiểu Pre-LN</td></tr>
+    <tr><td>LLM, quan tâm tốc độ từng phần trăm</td><td><strong>RMSNorm</strong></td></tr>
+    <tr><td>RNN</td><td>LayerNorm — BatchNorm không phù hợp với chiều thời gian</td></tr>
+    <tr><td>Reinforcement learning</td><td>LayerNorm, hoặc không dùng norm</td></tr>
+    <tr><td>Phục vụ từng request lẻ, không có batch</td><td>Bất cứ gì <em>không</em> phụ thuộc batch</td></tr>
+  </table>
+  <p>Và về khởi tạo, quy tắc gọn: <strong>ReLU thì He, tanh và sigmoid thì Xavier</strong>, bias bằng 0, và với ResNet rất sâu thì <code>γ = 0</code> ở lớp norm cuối mỗi khối.</p>
+</section>
+
+<section id="norm-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Năm lỗi này chiếm gần hết số lần dùng sai lớp chuẩn hoá.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Quên <code>model.eval()</code></h4><p>BatchNorm dùng thống kê batch lúc đánh giá; dự đoán một mẫu phụ thuộc các mẫu khác cùng batch.</p></div>
+    <div class="card bad"><h4>BatchNorm với batch rất nhỏ</h4><p>Thống kê nhiễu, chất lượng tụt. Dùng GroupNorm.</p></div>
+    <div class="card bad"><h4>Áp weight decay lên <code>γ</code> và bias</h4><p>Đẩy thang đo về 0 là tắt tín hiệu, không phải regularize. Tách hai nhóm tham số.</p></div>
+    <div class="card bad"><h4>Để bias trong lớp ngay trước norm</h4><p>Dư thừa vì norm trừ trung bình và đã có <code>β</code>.</p></div>
+    <div class="card bad"><h4>Nói BatchNorm giảm internal covariate shift một cách chắc nịch</h4><p>Đã có nghiên cứu phản chứng. Nên nói cả hai cách giải thích.</p></div>
+  </div>
+</section>
+
+<section id="norm-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>BatchNorm và LayerNorm khác nhau thế nào, khi nào dùng cái nào?</summary>
+  <p>BatchNorm tính trung bình và phương sai theo chiều <b>batch</b>, riêng cho từng đặc trưng; LayerNorm tính theo chiều <b>đặc trưng</b>, riêng cho từng mẫu. Hệ quả là LayerNorm không phụ thuộc batch size, không bị token đệm làm nhiễu, và hoạt động giống hệt lúc train và lúc suy luận — nên NLP và Transformer dùng nó. BatchNorm cần batch đủ lớn để thống kê ổn định, và có hai chế độ khác nhau nên phải nhớ <code>model.eval()</code>. Với batch nhỏ trong bài phát hiện hay phân đoạn thì GroupNorm là lựa chọn trung gian.</p></details>
+
+  <details class="qa"><summary>BatchNorm thật sự hoạt động nhờ cơ chế gì?</summary>
+  <p>Bài báo gốc giải thích bằng internal covariate shift — giữ phân phối đầu vào của mỗi lớp ổn định. Nhưng công trình sau đó cho thấy cơ chế chính có lẽ khác: thí nghiệm cố ý tiêm nhiễu sau lớp BatchNorm để phá vỡ sự ổn định phân phối, mà mạng vẫn huấn luyện nhanh như thường. Giải thích được cho là đúng hơn là BatchNorm <b>làm mặt mất mát trơn hơn</b>, giới hạn độ lớn gradient và độ cong, nên cho phép dùng learning rate lớn hơn mà không phân kỳ. Tôi thường nói cả hai cách giải thích khi được hỏi.</p></details>
+
+  <details class="qa"><summary>Vì sao Transformer hiện nay dùng Pre-LN thay vì Post-LN?</summary>
+  <p>Vì Pre-LN giữ đường residual <b>sạch hoàn toàn</b>: gradient có một đường từ loss function về tới lớp đầu mà không đi qua phép chuẩn hoá nào. Post-LN thì mỗi khối có một LayerNorm chắn trên đường đó, nên huấn luyện kém ổn định và cần giai đoạn khởi động learning rate rất cẩn thận, đặc biệt với mạng sâu. Bài báo Transformer gốc và BERT dùng Post-LN; GPT, LLaMA và gần như mọi model mới dùng Pre-LN.</p></details>
+
+  <details class="qa"><summary>Vì sao không áp weight decay lên tham số của lớp norm?</summary>
+  <p>Vì <code>γ</code> là tham số thang đo, không phải tham số biểu diễn. Đẩy nó về 0 nghĩa là tắt tín hiệu đi qua lớp đó — làm model mất khả năng, không phải làm nó đơn giản hơn. Tương tự với <code>β</code> và bias: chúng chỉ dịch chuyển giá trị, không liên quan tới độ phức tạp của hàm model biểu diễn. Cách làm đúng là tách tham số thành hai nhóm, thường theo tiêu chí tensor một chiều thì không áp decay. Và dùng AdamW chứ không Adam, vì Adam gốc cộng weight decay vào gradient nên nó bị chia bởi thang đo thích ứng và không còn là L2 đúng nghĩa.</p></details>
+</section>
+
+<footer>Deep dive · chuẩn hoá · phần đặt đúng độ lớn ở bước đầu nằm ở bài <a href="../weight-initialization/index.html">Khởi tạo trọng số</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

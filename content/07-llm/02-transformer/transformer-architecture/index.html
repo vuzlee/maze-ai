@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformer architecture — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-tfm" data-title="Transformer architecture" data-tag="Transformer" data-blurb="Tokenization, embedding, positional encoding, residual và LayerNorm, FFN chứa phần lớn tham số, một block hoàn chỉnh, và encoder hay decoder.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Transformer · kiến trúc</p>
+  <h1>Transformer <em>architecture</em></h1>
+  <p class="lede">Attention chỉ là một lớp. Bài này lắp phần còn lại: <b>token hoá, embedding, vị trí</b> ở đầu vào; <b>residual, LayerNorm, FFN</b> trong mỗi block; và cách một hidden state biến thành chữ ở đầu ra — kèm lab tự đếm tham số và bộ nhớ.</p>
+</header>
+
+<section id="tfm-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Từ một phép attention tới một model</h2></div>
+
+  <p class="key">Attention chỉ là <em>một lớp</em>. Thứ biến nó thành model là những gì bọc quanh: token hoá, embedding, vị trí, residual, FFN, và đầu ra.</p>
+
+  <ul class="why">
+    <li>Attention là phép tổng có trọng số trên một <b>tập</b> — tự nó không biết thứ tự, không biết chữ, không sinh ra được token nào cả.</li>
+    <li>Phần lớn <b>tham số</b> của một Transformer nằm ở FFN chứ không ở attention. Phần lớn <b>chi phí context dài</b> thì ngược lại.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần Q/K/V, scaled dot-product, masking, multi-head và KV cache nằm ở bài
+    <a href="../self-attention/index.html">Self-attention</a>.
+  </div>
+</section>
+
+<section id="tfm-s2">
+  <div class="sh"><b>02</b><h2>Tokenization</h2></div>
+  <p>Model không đọc chữ, nó đọc số. Tokenizer cắt văn bản thành các mảnh có trong từ điển (thường bằng thuật toán BPE) rồi tra ra id.</p>
+<pre><code><span class="kw">from</span> transformers <span class="kw">import</span> AutoTokenizer
+tok = AutoTokenizer.from_pretrained(<span class="st">"gpt2"</span>)
+
+tok.encode(<span class="st">"unbelievable"</span>)      <span class="cm"># [403, 6667, 12472]  → "un" + "bel" + "ievable"</span>
+tok.encode(<span class="st">"the"</span>)               <span class="cm"># [1169]              → 1 token</span>
+tok.encode(<span class="st">" the"</span>)              <span class="cm"># [262]  KHÁC id trên: dấu cách nằm trong token</span>
+tok.encode(<span class="st">"Con mèo ngồi"</span>)      <span class="cm"># 8 token — tiếng Việt tốn hơn nhiều</span></code></pre>
+  <h3>Ba hệ quả thực tế</h3>
+  <ul>
+    <li><strong>Chi phí tính theo token, không theo từ.</strong> Tiếng Việt có dấu thường tốn gấp 2–3 lần tiếng Anh cho cùng nội dung, vì các tổ hợp dấu ít xuất hiện trong dữ liệu huấn luyện tokenizer.</li>
+    <li><strong>Dấu cách thuộc về token.</strong> <code>"the"</code> và <code>" the"</code> là hai id khác nhau. Đây là nguồn lỗi kinh điển khi tự ghép prompt bằng tay.</li>
+    <li><strong>Model không thấy chữ cái.</strong> Vì vậy nó đếm sai số ký tự, làm sai phép đảo chữ, và tính toán số nhiều chữ số kém — số bị cắt thành nhiều mảnh không theo hàng đơn vị.</li>
+  </ul>
+  <div class="note">
+    <h4>Câu hỏi hay gặp</h4>
+    <em>Vì sao LLM không đếm được số chữ r trong "strawberry"?</em> Vì đầu vào của nó là ba token, không phải mười ký tự. Nó chưa bao giờ nhìn thấy từng chữ cái.
+  </div>
+</section>
+
+<section id="tfm-s3">
+  <div class="sh"><b>03</b><h2>Embedding</h2></div>
+  <p>Bảng tra cứu: mỗi id ứng với một vector <code>d</code> chiều, học được trong lúc huấn luyện.</p>
+<pre><code>W_emb: (V, d) = (50257, 768)          <span class="cm"># GPT-2 small</span>
+ids:   [1044, 8712, 3390]             <span class="cm"># (T,)</span>
+X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span></code></pre>
+  <p>Không có phép nhân ma trận nào ở đây — chỉ là lấy dòng theo chỉ số. Bảng này thường chiếm phần lớn tham số của model nhỏ: <code>50257 × 768 ≈ 38.6M</code>, trong khi cả 12 block cộng lại khoảng <code>85M</code>.</p>
+  <div class="note key">
+    <h4>Weight tying</h4>
+    Nhiều model dùng lại chính <code>W_emb</code> (chuyển vị) làm ma trận chiếu ra logits. Tiết kiệm được <code>V × d</code> tham số, và có lý do trực giác: cùng một không gian nghĩa dùng cho cả đọc vào lẫn viết ra.
+  </div>
+</section>
+
+<section id="tfm-s4">
+  <div class="sh"><b>04</b><h2>Positional encoding</h2></div>
+  <p>Attention là phép tổng có trọng số trên một tập hợp — nó <strong>không có khái niệm thứ tự</strong>. Nếu không thêm gì, "mèo đuổi chuột" và "chuột đuổi mèo" cho ra hidden state giống hệt nhau, chỉ hoán vị dòng.</p>
+<pre><code><span class="cm"># chứng minh trong đầu: attention(X) với X đảo dòng</span>
+<span class="cm"># = attention(X) rồi đảo dòng kết quả  → permutation equivariant</span></code></pre>
+  <h3>Ba cách thêm vị trí</h3>
+  <table>
+    <tr><th>Cách</th><th>Cơ chế</th><th>Điểm mạnh / yếu</th></tr>
+    <tr><td>Sinusoidal<br><span class="cm">Transformer gốc</span></td><td>Cộng vào embedding một vector sin/cos với nhiều tần số khác nhau</td><td>Không tốn tham số, ngoại suy được ra độ dài chưa gặp — nhưng yếu trong thực tế</td></tr>
+    <tr><td>Learned absolute<br><span class="cm">GPT-2, BERT</span></td><td>Một bảng <code>(T_max, d)</code> học được, cộng vào embedding</td><td>Đơn giản, hiệu quả — nhưng cứng độ dài tối đa, vượt là hỏng</td></tr>
+    <tr><td>RoPE<br><span class="cm">LLaMA, Qwen, hầu hết model mới</span></td><td>Xoay từng cặp chiều của Q và K một góc tỉ lệ với vị trí</td><td>Mã hoá <em>khoảng cách tương đối</em> ngay trong tích Q·K, nới context dễ hơn</td></tr>
+  </table>
+  <p><strong>Vì sao RoPE thắng:</strong> khi xoay cả Q ở vị trí <code>m</code> và K ở vị trí <code>n</code>, tích vô hướng chỉ còn phụ thuộc hiệu <code>m − n</code>. Model học được quan hệ "cách nhau 3 từ" thay vì "từ này ở ô số 412", nên chuyển sang câu dài hơn ít gãy hơn.</p>
+</section>
+
+<section id="tfm-s5">
+  <div class="sh"><b>05</b><h2>Residual và LayerNorm</h2></div>
+  <h3>Residual — đường tắt cho gradient</h3>
+  <p>Mỗi khối con đều viết dưới dạng <code>x = x + f(x)</code>. Nhờ đó đạo hàm luôn có một thành phần bằng 1 chảy thẳng về, không bị nhân dần qua hàng chục lớp. Đây là điều kiện cần để huấn luyện được model sâu 32, 80 hay 100 lớp.</p>
+  <p>Cách nhìn khác, rất hữu ích khi trả lời phỏng vấn: <strong>residual stream là một băng thông tin chạy dọc model</strong>. Mỗi block <em>đọc</em> từ băng đó, tính ra thứ gì đó, rồi <em>cộng thêm</em> vào băng. Không block nào ghi đè thông tin của block trước.</p>
+  <h3>LayerNorm — giữ độ lớn ổn định</h3>
+<pre><code>y = (x - mean(x)) / sqrt(var(x) + eps) * gamma + beta
+<span class="cm"># mean và var tính trên chiều đặc trưng, TỪNG token một</span></code></pre>
+  <table>
+    <tr><th></th><th>BatchNorm</th><th>LayerNorm</th></tr>
+    <tr><td>Chuẩn hoá theo</td><td>Toàn batch, từng đặc trưng</td><td>Từng mẫu, toàn bộ đặc trưng</td></tr>
+    <tr><td>Phụ thuộc batch size</td><td>Có — batch nhỏ thì thống kê nhiễu</td><td>Không</td></tr>
+    <tr><td>Chuỗi dài ngắn khác nhau</td><td>Rắc rối vì có ô đệm</td><td>Không ảnh hưởng</td></tr>
+    <tr><td>Train và inference</td><td>Hai chế độ khác nhau</td><td>Giống hệt nhau</td></tr>
+  </table>
+  <p>Bốn dòng trên là toàn bộ lý do NLP dùng LayerNorm. Trong đó dòng cuối quan trọng nhất khi triển khai: BatchNorm phải giữ thống kê trung bình động, sinh ra khác biệt giữa lúc train và lúc phục vụ.</p>
+  <div class="note key">
+    <h4>Pre-LN và Post-LN</h4>
+    Bài báo gốc đặt LayerNorm <em>sau</em> khối con: <code>x = LN(x + f(x))</code>. Model hiện nay gần như đều đặt <em>trước</em>: <code>x = x + f(LN(x))</code>. Pre-LN giữ đường residual hoàn toàn sạch nên huấn luyện ổn định hơn, không cần giai đoạn khởi động learning rate quá thận trọng.
+  </div>
+</section>
+
+<section id="tfm-s6">
+  <div class="sh"><b>06</b><h2>FFN — nơi chứa phần lớn tham số</h2></div>
+<pre><code>FFN(x) = W_2 @ activation(W_1 @ x + b_1) + b_2
+
+W_1: (d, 4d) = (768, 3072)     <span class="cm"># nở ra 4 lần</span>
+W_2: (4d, d) = (3072, 768)     <span class="cm"># nén lại</span></code></pre>
+  <p>Áp dụng độc lập cho từng vị trí — token này không nhìn token kia ở đây. Toàn bộ việc trao đổi thông tin giữa các token đã xong ở tầng attention.</p>
+  <p>Đếm nhanh cho một block GPT-2 small:</p>
+  <table>
+    <tr><th>Thành phần</th><th>Tham số</th><th>Tỉ lệ</th></tr>
+    <tr><td>Attention (W_q, W_k, W_v, W_o)</td><td><code>4 × 768² ≈ 2.36M</code></td><td>33%</td></tr>
+    <tr><td>FFN (W_1, W_2)</td><td><code>2 × 768 × 3072 ≈ 4.72M</code></td><td>67%</td></tr>
+  </table>
+  <p>Hai phần ba tham số nằm ở FFN. Nghiên cứu diễn giải model cho rằng đây là nơi lưu <strong>kiến thức dạng sự kiện</strong> — hoạt động gần như một bộ nhớ khoá–giá trị, trong khi attention lo phần định tuyến thông tin.</p>
+  <div class="note">
+    <h4>Vì sao nở gấp 4</h4>
+    Không có định lý nào cả — là hằng số kinh nghiệm từ bài báo gốc và được giữ lại vì hoạt động tốt. Model mới dùng SwiGLU thường lấy khoảng <code>8/3 · d</code> để giữ tổng tham số tương đương, vì SwiGLU cần ba ma trận thay vì hai.
+  </div>
+</section>
+
+<section id="tfm-s7">
+  <div class="sh"><b>07</b><h2>Một block hoàn chỉnh</h2></div>
+  <figure>
+    <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ một block Transformer kiểu pre-LN">
+      <line x1="40" y1="130" x2="690" y2="130" stroke="#8CA9F2" stroke-width="2"/>
+      <text class="sv-l" x="40" y="118">residual stream (T, d)</text>
+
+      <rect class="sv-b" x="150" y="60" width="90" height="40" rx="5"/>
+      <text class="sv-t" x="195" y="85" text-anchor="middle">LayerNorm</text>
+      <rect class="sv-b" x="260" y="60" width="110" height="40" rx="5"/>
+      <text class="sv-t" x="315" y="85" text-anchor="middle">Attention</text>
+      <path d="M150 130 L150 80 L150 80" stroke="#9A8F81" fill="none"/>
+      <path d="M240 80 L260 80" stroke="#9A8F81" fill="none" marker-end="url(#a)"/>
+      <path d="M370 80 L400 80 L400 130" stroke="#9A8F81" fill="none" marker-end="url(#a)"/>
+      <circle cx="400" cy="130" r="9" fill="#1C1815" stroke="#8CA9F2"/>
+      <text class="sv-t" x="400" y="135" text-anchor="middle" fill="#8CA9F2">+</text>
+
+      <rect class="sv-b" x="440" y="170" width="90" height="40" rx="5"/>
+      <text class="sv-t" x="485" y="195" text-anchor="middle">LayerNorm</text>
+      <rect class="sv-b" x="550" y="170" width="70" height="40" rx="5"/>
+      <text class="sv-t" x="585" y="195" text-anchor="middle">FFN</text>
+      <path d="M440 130 L440 190" stroke="#9A8F81" fill="none"/>
+      <path d="M530 190 L550 190" stroke="#9A8F81" fill="none" marker-end="url(#a)"/>
+      <path d="M620 190 L650 190 L650 130" stroke="#9A8F81" fill="none" marker-end="url(#a)"/>
+      <circle cx="650" cy="130" r="9" fill="#1C1815" stroke="#8CA9F2"/>
+      <text class="sv-t" x="650" y="135" text-anchor="middle" fill="#8CA9F2">+</text>
+
+      <text class="sv-l" x="150" y="45">trộn thông tin giữa các token</text>
+      <text class="sv-l" x="440" y="240">xử lý từng token riêng lẻ</text>
+      <defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 z" fill="#9A8F81"/></marker></defs>
+    </svg>
+    <figcaption>Một block kiểu pre-LN. Đường ngang là residual stream — nó không bao giờ bị ghi đè, chỉ được cộng thêm.</figcaption>
+  </figure>
+<pre><code><span class="kw">class</span> Block(nn.Module):
+    <span class="kw">def</span> forward(self, x):
+        x = x + self.attn(self.ln1(x))    <span class="cm"># trộn giữa các token</span>
+        x = x + self.ffn(self.ln2(x))     <span class="cm"># xử lý từng token</span>
+        <span class="kw">return</span> x</code></pre>
+  <p>Toàn bộ GPT chỉ là lớp này lặp lại: 12 lần với GPT-2 small, 32 lần với LLaMA-7B, 80 lần với các model 70B. Shape đi vào và đi ra luôn giống hệt nhau — đó là lý do xếp chồng được tuỳ ý.</p>
+</section>
+
+<section id="tfm-s8">
+  <div class="sh"><b>08</b><h2>Từ hidden state ra chữ</h2></div>
+<pre><code>H        (T, d)      = (3, 768)      <span class="cm"># sau block cuối</span>
+H        = final_ln(H)
+logits   = H @ W_out                 <span class="cm"># (3, 50257)</span>
+logits   = logits[-1]                <span class="cm"># chỉ quan tâm vị trí cuối khi sinh chữ</span>
+probs    = softmax(logits / T)       <span class="cm"># T = temperature</span></code></pre>
+  <h3>Ba núm điều chỉnh lúc sinh</h3>
+  <table>
+    <tr><th>Núm</th><th>Làm gì</th><th>Đặt sai thì</th></tr>
+    <tr><td><code>temperature</code></td><td>Chia logits trước softmax. Nhỏ hơn 1 làm phân phối nhọn, lớn hơn 1 làm phẳng</td><td>0.1: lặp câu, cụt ý tưởng. 1.8: lạc đề, bịa tên riêng</td></tr>
+    <tr><td><code>top-k</code></td><td>Chỉ giữ k token xác suất cao nhất rồi mới lấy mẫu</td><td>k cố định không hợp mọi ngữ cảnh: chỗ chắc chắn thì thừa, chỗ mơ hồ thì thiếu</td></tr>
+    <tr><td><code>top-p</code></td><td>Giữ nhóm nhỏ nhất có tổng xác suất vượt p</td><td>Kích thước nhóm tự co giãn theo độ chắc chắn, nên thường tốt hơn top-k</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Thứ tự áp dụng</h4>
+    temperature trước, rồi lọc top-k / top-p, rồi mới lấy mẫu. Đảo thứ tự cho kết quả khác hẳn — temperature cao sau khi đã lọc thì không mở rộng được tập lựa chọn nữa.
+  </div>
+  <p><strong>Vì sao chỉ lấy dòng cuối:</strong> lúc huấn luyện ta dùng cả T dòng logits để tính mất mát ở mọi vị trí. Lúc sinh chữ, T−1 dòng đầu là dự đoán cho những token đã biết rồi, nên bỏ đi.</p>
+</section>
+
+<section id="tfm-s9">
+  <div class="sh"><b>09</b><h2>Lab: tự đếm tham số và bộ nhớ</h2></div>
+  <p>Nhập cấu hình một model rồi xem tham số nằm ở đâu, cache tốn bao nhiêu. Mặc định là LLaMA-2 7B. Chọn sẵn vài cấu hình quen thuộc ở ô đầu tiên.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>preset</label>
+        <select id="preset">
+          <option value="custom">tuỳ chỉnh</option>
+          <option value="gpt2s">GPT-2 small</option>
+          <option value="llama7" selected>LLaMA-2 7B</option>
+          <option value="llama70">LLaMA-2 70B</option>
+        </select>
+      </div>
+      <div><label>d_model</label><input type="number" id="d" value="4096"></div>
+      <div><label>layers</label><input type="number" id="L" value="32"></div>
+      <div><label>q heads</label><input type="number" id="H" value="32"></div>
+      <div><label>kv heads</label><input type="number" id="KH" value="32"></div>
+      <div><label>d_ff</label><input type="number" id="F" value="11008"></div>
+      <div><label>vocab</label><input type="number" id="V" value="32000"></div>
+      <div><label>seq len</label><input type="number" id="S" value="4096"></div>
+      <div><label>bytes/value</label>
+        <select id="B"><option value="2" selected>2 — fp16</option><option value="1">1 — int8</option><option value="4">4 — fp32</option></select>
+      </div>
+    </div>
+    <div id="out"></div>
+  </div>
+</section>
+
+<section id="tfm-s10">
+  <div class="sh"><b>10</b><h2>Encoder, Decoder, hay cả hai</h2></div>
+  <table>
+    <tr><th></th><th>Encoder-only</th><th>Decoder-only</th><th>Encoder–Decoder</th></tr>
+    <tr><td>Đại diện</td><td>BERT</td><td>GPT, LLaMA</td><td>T5, model dịch máy</td></tr>
+    <tr><td>Attention</td><td>Hai chiều, không mask</td><td>Một chiều, causal mask</td><td>Encoder hai chiều, decoder causal, cộng cross-attention</td></tr>
+    <tr><td>Mục tiêu huấn luyện</td><td>Đoán token bị che</td><td>Đoán token kế tiếp</td><td>Sinh chuỗi đích từ chuỗi nguồn</td></tr>
+    <tr><td>Hợp với</td><td>Phân loại, trích xuất, nhúng văn bản</td><td>Sinh văn bản, hội thoại, mọi tác vụ ép về dạng sinh</td><td>Dịch, tóm tắt — khi nguồn và đích tách bạch</td></tr>
+  </table>
+  <p><strong>Cross-attention khác self-attention ở đâu:</strong> Q lấy từ decoder, còn K và V lấy từ đầu ra của encoder. Nghĩa là "câu đang viết" đặt câu hỏi cho "câu nguồn". Công thức không đổi một chữ nào — chỉ đổi nguồn của ba đầu vào.</p>
+  <div class="note">
+    <h4>Vì sao decoder-only thắng thế</h4>
+    Một kiến trúc duy nhất, một mục tiêu huấn luyện duy nhất, dùng được mọi dữ liệu văn bản thô, và mọi tác vụ đều ép được về dạng sinh chữ. Đơn giản hơn nên mở rộng quy mô dễ hơn — và ở quy mô lớn, đơn giản thường thắng.
+  </div>
+</section>
+
+<section id="tfm-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Lỗi hay gặp khi tự code</h2></div>
+
+  <p class="key">Ba lỗi kiến trúc này khó thấy vì model vẫn hội tụ, chỉ là kém hơn đáng lẽ.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Quên positional encoding</h4><p>Model vẫn đạt loss kha khá vì đoán được nhiều thứ từ riêng tần suất từ. Dấu hiệu: đảo trật tự câu mà đầu ra gần như không đổi.</p></div>
+    <div class="card bad"><h4>Đặt LayerNorm sau khối residual</h4><p>Post-LN cần warmup cẩn thận mới không phân kỳ ở mạng sâu. Pre-LN ổn định hơn nhiều và là lựa chọn mặc định hiện nay.</p></div>
+    <div class="card bad"><h4>Không buộc chung trọng số embedding và lớp ra</h4><p>Bỏ lỡ một lượng tham số lớn dùng lại được, và thường làm perplexity tệ hơn ở model nhỏ.</p></div>
+  </div>
+</section>
+
+<section id="tfm-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao Transformer dùng LayerNorm chứ không dùng BatchNorm?</summary>
+  <p>Ba lý do. Một, chuỗi trong batch dài ngắn khác nhau nên thống kê theo batch bị ô đệm làm nhiễu. Hai, LayerNorm không phụ thuộc batch size, rất quan trọng khi phục vụ từng request lẻ. Ba, BatchNorm hoạt động khác nhau giữa train và inference vì phải giữ thống kê trung bình động, còn LayerNorm thì giống hệt ở cả hai chế độ.</p></details>
+
+  <details class="qa"><summary>Không có positional encoding thì sao?</summary>
+  <p>Attention là phép tổng có trọng số trên một tập hợp nên bất biến với hoán vị. Đảo trật tự đầu vào chỉ làm đầu ra đảo theo, giá trị không đổi. Model sẽ không phân biệt được "mèo đuổi chuột" với "chuột đuổi mèo" — nó vẫn học được thống kê từ vựng nên loss không tệ thảm hại, và đó chính là lý do bug này khó phát hiện.</p></details>
+
+  <details class="qa"><summary>Khi nào chọn encoder-only thay vì decoder-only?</summary>
+  <p>Khi cần một biểu diễn của toàn bộ văn bản chứ không cần sinh chữ: phân loại, trích xuất thực thể, tạo vector nhúng cho tìm kiếm. Encoder nhìn được hai chiều nên biểu diễn giàu hơn, model nhỏ hơn nhiều và suy luận rẻ hơn hẳn. Dùng LLM sinh chữ để phân loại nhãn nhị phân là lãng phí cả chi phí lẫn độ trễ.</p></details>
+
+  <details class="qa"><summary>Phần lớn tham số của một Transformer nằm ở đâu?</summary>\n  <p>Ở <b>FFN</b>, không phải attention. Mỗi block có bốn ma trận <code>d×d</code> cho Q/K/V/O, tức <code>4d²</code>; còn FFN mở rộng lên <code>4d</code> rồi thu về, tức <code>8d²</code> — gấp đôi. Cộng thêm embedding <code>V×d</code> vốn rất lớn ở model nhỏ. Điểm đáng nói là chi phí <b>tham số</b> nằm ở FFN, còn chi phí <b>context dài</b> lại nằm ở attention vì nó bậc hai theo độ dài chuỗi.</p></details>
+</section>
+
+<footer>Deep dive · kiến trúc Transformer · phần cơ chế attention nằm ở bài <a href="../self-attention/index.html">Self-attention</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNN &amp; MobileNet — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-cnn" data-title="CNN &amp; MobileNet" data-tag="Computer vision" data-blurb="Công thức shape và chi phí, vì sao depthwise separable rẻ 8–9 lần, inverted residual, linear bottleneck, lượng tử hoá.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · thị giác &amp; thiết bị biên</p>
+  <h1>CNN &amp;<br><em>MobileNet</em></h1>
+  <p class="lede">Từ phép convolution tới kiến trúc chạy được trên vi điều khiển. Bài này chốt <b>công thức tính shape và chi phí</b>, giải thích bằng số vì sao <b>depthwise separable convolution</b> rẻ hơn 8–9 lần, vì sao MobileNetV2 gọi là <b>inverted residual</b>, và vì sao lớp cuối của khối lại <b>không có ReLU</b>.</p>
+</header>
+
+
+<section id="cnn-s1">
+  <div class="sh"><b>01</b><h2>Overview</h2></div>
+<pre><code>Fully connected      mỗi nơ-ron nhìn TOÀN BỘ ảnh      → quá nhiều tham số
+   ↓ chia sẻ trọng số + kết nối cục bộ
+Convolution          bộ lọc nhỏ trượt khắp ảnh         → ít tham số, bắt được cạnh
+   ↓ xếp chồng nhiều lớp
+CNN sâu              receptive field lớn dần           → cạnh → hình → khái niệm
+   ↓ tách phép tính ra hai bước
+Depthwise separable  lọc theo kênh + trộn kênh         → rẻ hơn 8–9 lần
+   ↓ đảo chiều khối residual
+MobileNetV2          nở → lọc → nén, nối ở chỗ HẸP     → tiết kiệm bộ nhớ</code></pre>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    Mọi tiến bộ trong nhóm này đều là một dạng <strong>giảm số phép nhân mà giữ được khả năng biểu diễn</strong>. Hiểu được từng bước đánh đổi gì là hiểu cả dòng kiến trúc — và đó chính là thứ được hỏi khi bạn nói mình làm về model chạy trên thiết bị biên.
+  </div>
+</section>
+
+<section id="cnn-s2">
+  <div class="sh"><b>02</b><h2>Vì sao không dùng fully connected cho ảnh</h2></div>
+<pre><code>Ảnh 224×224×3, lớp fully connected đầu tiên với 1000 nơ-ron:
+
+    224 × 224 × 3 × 1000 = 150.528.000 tham số     ← chỉ MỘT lớp
+
+Một lớp convolution 3×3, 3 kênh vào, 64 kênh ra:
+
+    3 × 3 × 3 × 64 = 1.728 tham số                 ← ít hơn 87.000 lần</code></pre>
+  <p>Convolution đạt được điều đó bằng hai giả định về cấu trúc của ảnh:</p>
+  <ul>
+    <li><strong>Kết nối cục bộ.</strong> Một pixel liên quan tới các pixel lân cận, không liên quan trực tiếp tới pixel ở góc đối diện. Nên mỗi nơ-ron chỉ cần nhìn một vùng nhỏ.</li>
+    <li><strong>Chia sẻ trọng số.</strong> Một bộ dò cạnh dọc hữu ích ở góc trên bên trái cũng hữu ích ở góc dưới bên phải. Nên dùng <em>cùng một</em> bộ lọc ở mọi vị trí thay vì học riêng cho từng vị trí.</li>
+  </ul>
+  <div class="note">
+    <h4>Hệ quả thứ hai của việc chia sẻ trọng số</h4>
+    Nó cho model tính <strong>bất biến với dịch chuyển</strong>: mèo ở góc trái hay góc phải cũng được cùng bộ lọc phát hiện. Fully connected phải học lại từ đầu cho từng vị trí, tức cần nhiều dữ liệu hơn rất nhiều để đạt cùng mức tổng quát hoá. Đây là ví dụ rõ nhất của việc <em>đưa hiểu biết về bài toán vào kiến trúc</em> thay vì để model tự học.
+  </div>
+</section>
+
+<section id="cnn-s3">
+  <div class="sh"><b>03</b><h2>Convolution và công thức shape</h2></div>
+<pre><code>Đầu vào:   H × W × C_in
+Bộ lọc:    k × k × C_in,  có C_out bộ
+Bước:      s (stride)
+Đệm:       p (padding)
+
+           ⌊ (H + 2p - k) / s ⌋ + 1
+H_out  =  ─────────────────────────
+
+Tham số  =  k · k · C_in · C_out  +  C_out        ← số hạng cuối là bias
+MAC      =  H_out · W_out · k · k · C_in · C_out  ← số phép nhân-cộng</code></pre>
+  <table>
+    <tr><th>Tham số</th><th>Tác dụng</th><th>Giá trị thường dùng</th></tr>
+    <tr><td><code>k</code></td><td>Vùng mỗi bộ lọc nhìn thấy</td><td>3 — gần như luôn là 3, xem lý do dưới</td></tr>
+    <tr><td><code>s</code></td><td>Bước trượt; <code>s &gt; 1</code> làm giảm kích thước</td><td>1 để giữ kích thước, 2 để giảm nửa</td></tr>
+    <tr><td><code>p</code></td><td>Đệm viền để giữ kích thước và không bỏ sót rìa</td><td><code>p = (k−1)/2</code> để <code>H_out = H_in</code> khi <code>s = 1</code></td></tr>
+    <tr><td><code>C_out</code></td><td>Số bộ lọc, tức số đặc trưng học được</td><td>Tăng dần theo độ sâu: 64 → 128 → 256</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao gần như luôn là 3×3</h4>
+    Hai lớp 3×3 xếp liên tiếp có receptive field 5×5, nhưng chỉ tốn <code>2 × 9 = 18</code> trọng số mỗi kênh so với <code>25</code> của một lớp 5×5. Ba lớp 3×3 cho receptive field 7×7 với 27 trọng số so với 49. <strong>Rẻ hơn, và còn được thêm hai lớp phi tuyến ở giữa</strong> nên biểu diễn mạnh hơn. Đây là đóng góp chính của VGG, và là lý do 5×5 và 7×7 gần như biến mất khỏi các kiến trúc sau này trừ lớp đầu tiên.
+  </div>
+</section>
+
+<section id="cnn-s4">
+  <div class="sh"><b>04</b><h2>Lab: tính shape và chi phí</h2></div>
+  <p>Nhập cấu hình một lớp và so chi phí giữa convolution thường và depthwise separable.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>H = W đầu vào</label><input type="number" id="cH" value="112" min="1"></div>
+      <div><label>C_in</label><input type="number" id="cCi" value="64" min="1"></div>
+      <div><label>C_out</label><input type="number" id="cCo" value="128" min="1"></div>
+      <div><label>kernel k</label><input type="number" id="cK" value="3" min="1" max="11"></div>
+      <div><label>stride s</label><input type="number" id="cS" value="1" min="1" max="4"></div>
+      <div><label>padding p</label><input type="number" id="cP" value="1" min="0" max="5"></div>
+    </div>
+    <div id="cview3"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Với <code>k = 3</code> và <code>C_out</code> lớn, tỉ lệ tiết kiệm tiến tới <strong>k² = 9 lần</strong>. Đổi <code>k</code> sang 5 để thấy tỉ lệ tiến tới 25. Đổi <code>C_out</code> xuống 8 để thấy tỉ lệ tụt xuống — vì lúc đó phần trộn kênh không còn chiếm ưu thế.
+    </p>
+  </div>
+</section>
+
+<section id="cnn-s5">
+  <div class="sh"><b>05</b><h2>Receptive field</h2></div>
+<pre><code>Vùng ảnh gốc ảnh hưởng tới một nơ-ron ở lớp sâu.
+
+Với các lớp 3×3, stride 1, xếp chồng:
+    lớp 1:  3×3
+    lớp 2:  5×5
+    lớp 3:  7×7
+    → RF = 1 + 2L, tăng TUYẾN TÍNH theo số lớp
+
+Thêm một lớp stride 2 vào giữa:
+    mọi lớp phía sau nó có receptive field tăng GẤP ĐÔI mỗi bước
+    → RF tăng theo hàm mũ
+
+Công thức chung:   RF_l = RF_{l-1} + (k_l - 1) · (tích mọi stride TRƯỚC lớp l)</code></pre>
+  <div class="note">
+    <h4>Vì sao receptive field quan trọng trong thực tế</h4>
+    Nếu vật thể cần nhận diện lớn hơn receptive field của lớp cuối, model <strong>không thể</strong> nhìn thấy nó trọn vẹn — nó chỉ thấy từng phần. Đó là lý do các kiến trúc phát hiện vật thể phải kết hợp nhiều tầng độ phân giải (feature pyramid), và là câu trả lời cho "vì sao model của em nhận diện tốt vật nhỏ mà kém với vật lớn".
+  </div>
+</section>
+
+<section id="cnn-s6">
+  <div class="sh"><b>06</b><h2>Giảm kích thước — pooling hay stride</h2></div>
+  <table>
+    <tr><th></th><th>Max pooling</th><th>Average pooling</th><th>Stride 2 trong conv</th></tr>
+    <tr><td>Cơ chế</td><td>Lấy giá trị lớn nhất trong vùng</td><td>Lấy trung bình</td><td>Bỏ qua vị trí khi trượt</td></tr>
+    <tr><td>Tham số</td><td>Không</td><td>Không</td><td>Có — học được</td></tr>
+    <tr><td>Giữ gì</td><td>Đặc trưng mạnh nhất</td><td>Thông tin trung bình</td><td>Tuỳ model học</td></tr>
+    <tr><td>Xu hướng hiện nay</td><td>Vẫn dùng nhưng ít hơn</td><td>Chủ yếu ở lớp cuối</td><td><strong>Được ưa dùng</strong></td></tr>
+  </table>
+  <p><strong>Vì sao stride dần thay thế pooling:</strong> nó gộp hai việc — lọc đặc trưng và giảm kích thước — vào một phép tính, nên rẻ hơn; và cách giảm kích thước trở thành thứ <em>học được</em> thay vì một quy tắc cố định. MobileNet và ResNet đều dùng stride cho phần lớn các bước giảm kích thước.</p>
+<pre><code>Global average pooling — thay cho lớp fully connected ở cuối:
+
+    7 × 7 × 512  →  average trên chiều không gian  →  1 × 1 × 512  →  lớp phân loại
+
+Thay vì  7·7·512·1000 = 25 triệu tham số của một lớp FC,
+chỉ còn  512·1000 = 512 nghìn.
+Và model chấp nhận được ảnh đầu vào ở nhiều kích thước khác nhau.</code></pre>
+</section>
+
+<section id="cnn-s7">
+  <div class="sh"><b>07</b><h2>Convolution 1×1 — nhỏ mà quan trọng</h2></div>
+<pre><code>Bộ lọc 1×1 chỉ nhìn MỘT pixel. Nghe vô nghĩa — nhưng nó nhìn
+tất cả các KÊNH của pixel đó.
+
+    1 × 1 × C_in × C_out
+
+→ nó là một phép biến đổi tuyến tính trên chiều KÊNH,
+  áp dụng độc lập cho từng vị trí không gian.</code></pre>
+  <table>
+    <tr><th>Công dụng</th><th>Cách dùng</th></tr>
+    <tr><td><strong>Đổi số kênh</strong></td><td>Nén 256 kênh xuống 64 trước một phép conv 3×3 đắt — đây là ý tưởng bottleneck của ResNet</td></tr>
+    <tr><td><strong>Trộn thông tin giữa các kênh</strong></td><td>Phần thứ hai của depthwise separable convolution</td></tr>
+    <tr><td>Thêm phi tuyến rẻ</td><td>Kèm ReLU sau nó, tốn rất ít phép tính</td></tr>
+  </table>
+  <p>Chi phí của 1×1 so với 3×3 trên cùng số kênh là <strong>1/9</strong>. Đó là lý do khối bottleneck của ResNet — 1×1 nén, 3×3 xử lý, 1×1 nở lại — rẻ hơn nhiều so với hai lớp 3×3 trên số kênh đầy đủ, dù có ba lớp thay vì hai.</p>
+</section>
+
+<section id="cnn-s8">
+  <div class="sh"><b>08</b><h2>Residual connection</h2></div>
+<pre><code>y = x + f(x)
+
+Gradient:  ∂y/∂x = 1 + ∂f/∂x
+                   ↑ số hạng này cho gradient một đường đi thẳng về</code></pre>
+  <p>Đã giải thích ở bài <em>Backpropagation từng bước</em>: số hạng <code>1</code> tạo một đường mà gradient chảy qua không bị nhân với gì, nên dù <code>∂f/∂x</code> teo về 0 thì gradient vẫn về được lớp đầu. Đó là điều kiện để huấn luyện mạng sâu hàng trăm lớp.</p>
+  <p>Cách nhìn thứ hai, hữu ích khi trả lời phỏng vấn: khối residual chỉ cần học <strong>phần dư</strong> — thay vì học hàm mục tiêu <code>H(x)</code>, nó học <code>H(x) − x</code>. Nếu ánh xạ tối ưu gần với ánh xạ đồng nhất thì việc học phần dư dễ hơn nhiều, vì chỉ cần đẩy trọng số về gần 0. Nói cách khác, <em>thêm lớp không bao giờ làm model tệ hơn</em> — trong trường hợp xấu nhất nó học ra hàm 0 và khối trở thành đường thẳng.</p>
+  <div class="note warn">
+    <h4>Điều kiện shape</h4>
+    Phép cộng <code>x + f(x)</code> đòi hai bên cùng shape. Khi khối làm giảm kích thước hoặc đổi số kênh, phải chèn một phép chiếu vào nhánh tắt — thường là conv 1×1 với cùng stride. Đây là chi tiết cài đặt hay bị bỏ sót khi tự viết ResNet.
+  </div>
+</section>
+
+<section id="cnn-s9">
+  <div class="sh"><b>09</b><h2>Depthwise separable convolution</h2></div>
+  <p>Ý tưởng: convolution thường làm hai việc cùng lúc — <em>lọc theo không gian</em> và <em>trộn các kênh</em>. Tách hai việc đó ra thì rẻ hơn rất nhiều.</p>
+<pre><code>CONVOLUTION THƯỜNG
+    một phép: k×k×C_in×C_out
+    tham số:  k² · C_in · C_out
+
+DEPTHWISE SEPARABLE — hai bước
+    1. depthwise:  mỗi kênh có MỘT bộ lọc k×k riêng, không trộn kênh
+                   tham số: k² · C_in
+    2. pointwise:  conv 1×1 để trộn kênh
+                   tham số: C_in · C_out
+
+    tổng: k² · C_in  +  C_in · C_out</code></pre>
+<pre><code>TỈ LỆ TIẾT KIỆM
+
+        k² · C_in · C_out                    1
+    ───────────────────────────  =  ─────────────────
+     k² · C_in + C_in · C_out        1/C_out + 1/k²
+
+Với k = 3, C_out = 128:
+    1 / (1/128 + 1/9) = 1 / (0.0078 + 0.1111) = 8.4 lần
+
+Khi C_out lớn, số hạng 1/C_out biến mất → tỉ lệ tiến tới k² = 9.</code></pre>
+  <div class="note key">
+    <h4>Con số cần nhớ</h4>
+    Với kernel 3×3, depthwise separable rẻ hơn khoảng <strong>8–9 lần</strong> về cả tham số và phép tính, đổi lại độ chính xác giảm khoảng 1 điểm phần trăm. Đây là đánh đổi tốt đến mức MobileNet, EfficientNet và gần như mọi kiến trúc cho thiết bị di động đều dùng nó. Nói được con số <em>và</em> cách dẫn ra nó là câu trả lời hoàn chỉnh.
+  </div>
+  <div class="note warn">
+    <h4>Nhưng rẻ về FLOPs không đồng nghĩa với nhanh</h4>
+    Depthwise convolution có tỉ lệ <em>phép tính trên mỗi byte đọc từ bộ nhớ</em> rất thấp — nó đọc nhiều dữ liệu mà làm ít việc. Trên GPU, nơi băng thông bộ nhớ là nút thắt, một lớp depthwise có thể <strong>không nhanh hơn</strong> conv thường dù ít FLOPs hơn 9 lần. Nó thắng rõ trên CPU di động và các bộ tăng tốc chuyên dụng. Đây là chi tiết phân biệt người đã đo thật với người chỉ đọc bài báo.
+  </div>
+</section>
+
+<section id="cnn-s10">
+  <div class="sh"><b>10</b><h2>MobileNetV2 — inverted residual và linear bottleneck</h2></div>
+<pre><code>KHỐI RESIDUAL THƯỜNG (ResNet)          KHỐI INVERTED RESIDUAL (MobileNetV2)
+    rộng                                    hẹp
+      ↓ 1×1 NÉN xuống                         ↓ 1×1 NỞ ra (t = 6 lần)
+    hẹp                                     rộng
+      ↓ 3×3                                   ↓ 3×3 depthwise
+    hẹp                                     rộng
+      ↓ 1×1 NỞ lại                            ↓ 1×1 NÉN lại, KHÔNG có ReLU
+    rộng                                    hẹp
+      ↑ nối tắt ở chỗ RỘNG                    ↑ nối tắt ở chỗ HẸP</code></pre>
+  <p><strong>Vì sao gọi là "inverted":</strong> khối của ResNet nén ở giữa và nối tắt ở hai đầu rộng. MobileNetV2 làm ngược lại — nở ở giữa và nối tắt ở hai đầu hẹp.</p>
+  <h3>Vì sao đảo lại có lợi</h3>
+  <ul>
+    <li><strong>Tiết kiệm bộ nhớ.</strong> Tensor cần giữ lại cho phép cộng residual là tensor ở đầu <em>hẹp</em>, nhỏ hơn nhiều. Trên thiết bị chỉ có vài trăm KB SRAM, đây là khác biệt giữa chạy được và không chạy được.</li>
+    <li><strong>Depthwise cần nhiều kênh mới hiệu quả.</strong> Nó không trộn kênh nên nếu số kênh ít thì khả năng biểu diễn rất hạn chế. Nở ra trước khi lọc là cách cho nó không gian làm việc.</li>
+  </ul>
+  <h3>Linear bottleneck — vì sao bỏ ReLU ở lớp cuối</h3>
+<pre><code>ReLU đặt mọi giá trị âm về 0, tức nó LÀM MẤT thông tin.
+
+Ở không gian nhiều chiều, mất một phần không quá tệ — thông tin còn lưu ở các
+chiều khác. Nhưng ở không gian ÍT chiều (chỗ hẹp của bottleneck), mất một nửa
+số chiều là mất luôn phần lớn thông tin, không có chỗ nào bù lại.
+
+→ lớp 1×1 nén cuối khối dùng hàm KHÔNG phi tuyến (linear).
+→ đây chính là "linear bottleneck" trong tên bài báo.</code></pre>
+  <div class="note key">
+    <h4>Bốn câu về MobileNet nên trả lời được</h4>
+    <p><strong>Vì sao phù hợp thiết bị biên?</strong> Depthwise separable giảm 8–9 lần phép tính; inverted residual giữ tensor trung gian nhỏ nên tiết kiệm bộ nhớ đỉnh.</p>
+    <p><strong>Depthwise separable là gì?</strong> Tách lọc không gian và trộn kênh thành hai bước, giảm chi phí xuống khoảng <code>1/k²</code>.</p>
+    <p><strong>Inverted residual là gì?</strong> Nở kênh ra để depthwise có chỗ làm việc, rồi nén lại, và nối tắt ở hai đầu hẹp thay vì hai đầu rộng.</p>
+    <p><strong>Vì sao lớp cuối không có ReLU?</strong> Vì ReLU phá thông tin, và ở không gian ít chiều thì thiệt hại đó không hồi phục được.</p>
+  </div>
+</section>
+
+<section id="cnn-s11">
+  <div class="sh"><b>11</b><h2>Lượng tử hoá cho thiết bị biên</h2></div>
+<pre><code>float32 → int8:   dung lượng giảm 4 lần, và số nguyên tính nhanh hơn nhiều
+                   trên CPU di động cùng các bộ tăng tốc
+
+Ánh xạ:  giá_trị_thực ≈ scale × (số_nguyên - zero_point)</code></pre>
+  <table>
+    <tr><th>Cách</th><th>Cơ chế</th><th>Mất mát chất lượng</th></tr>
+    <tr><td>Post-training, động</td><td>Lượng tử hoá trọng số; activation tính scale lúc chạy</td><td>Nhỏ; không cần dữ liệu</td></tr>
+    <tr><td>Post-training, tĩnh</td><td>Dùng một tập dữ liệu hiệu chỉnh để chốt scale của activation</td><td>Nhỏ hơn; nhanh hơn bản động</td></tr>
+    <tr><td><strong>QAT</strong> — huấn luyện có mô phỏng lượng tử hoá</td><td>Mô phỏng việc làm tròn ngay trong lúc huấn luyện để model thích nghi</td><td><strong>Nhỏ nhất</strong>; nhưng phải huấn luyện lại</td></tr>
+  </table>
+  <div class="note">
+    <h4>Chi tiết đáng nói: scale theo từng kênh</h4>
+    Dùng <em>một</em> scale cho cả tensor trọng số thì kênh nào có biên độ nhỏ sẽ bị làm tròn về gần 0 và mất hết thông tin. Dùng scale riêng cho <strong>từng kênh đầu ra</strong> giải quyết việc đó với chi phí gần như bằng 0, và nó là mặc định trong mọi công cụ hiện nay. Đây là câu trả lời tốt cho "vì sao model của em tụt điểm nặng sau khi lượng tử hoá".
+  </div>
+  <p>Với MobileNet có một điểm cần chú ý riêng: depthwise convolution rất <em>nhạy</em> với lượng tử hoá, vì mỗi kênh chỉ có <code>k²</code> trọng số nên biên độ giữa các kênh chênh nhau nhiều. Đây là trường hợp mà QAT hoặc scale theo kênh gần như bắt buộc.</p>
+</section>
+
+<section id="cnn-s12">
+  <div class="sh"><b>12</b><h2>Tối ưu suy luận trên thiết bị</h2></div>
+  <h3>Gộp BatchNorm vào convolution</h3>
+<pre><code>Lúc suy luận, BatchNorm là một phép tuyến tính với tham số CỐ ĐỊNH:
+
+    y = γ · (x - μ) / √(σ² + ε) + β
+
+Gộp được vào trọng số của conv ngay trước nó:
+
+    W' = γ · W / √(σ² + ε)
+    b' = β - γ · μ / √(σ² + ε)
+
+→ bỏ hẳn một lớp, giảm số lần đọc bộ nhớ. Kết quả giống hệt, không mất gì.</code></pre>
+  <p>Đây là bước tối ưu đầu tiên mọi công cụ triển khai đều làm, và nó miễn phí. Nêu ra được khi được hỏi về tối ưu suy luận là điểm cộng rõ ràng.</p>
+  <table>
+    <tr><th>Kỹ thuật</th><th>Tác dụng</th><th>Cái giá</th></tr>
+    <tr><td>Gộp BatchNorm</td><td>Bỏ một lớp, giảm truy cập bộ nhớ</td><td>Không có</td></tr>
+    <tr><td>Lượng tử hoá int8</td><td>Nhỏ hơn 4 lần, nhanh hơn 2–3 lần</td><td>Mất khoảng 1 điểm chính xác</td></tr>
+    <tr><td>Cắt tỉa trọng số</td><td>Bỏ trọng số nhỏ</td><td>Chỉ nhanh hơn nếu cắt theo khối; cắt rải rác thì phần cứng không tận dụng được</td></tr>
+    <tr><td>Chưng cất kiến thức</td><td>Model nhỏ học từ model lớn</td><td>Cần huấn luyện lại và cần model lớn sẵn</td></tr>
+    <tr><td>Giảm độ phân giải đầu vào</td><td>Chi phí giảm theo bình phương</td><td>Mất khả năng nhận diện chi tiết nhỏ</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Điều cần đo, không đoán</h4>
+    Trên thiết bị biên, nút thắt thường là <strong>băng thông bộ nhớ</strong> chứ không phải số phép tính. Nên một model ít FLOPs hơn có thể chậm hơn nếu nó đọc nhiều dữ liệu hơn. Luôn đo độ trễ thật trên đúng thiết bị đích, và nói ra điều này khi bàn về tối ưu — nó cho thấy bạn đã làm việc với phần cứng thật.
+  </div>
+</section>
+
+<section id="cnn-s13">
+  <div class="sh"><b>13</b><h2>Bảng chọn kiến trúc</h2></div>
+  <table>
+    <tr><th>Tình huống</th><th>Chọn</th><th>Vì sao</th></tr>
+    <tr><td>Máy chủ có GPU, ưu tiên độ chính xác</td><td>ResNet, ConvNeXt, hoặc Vision Transformer</td><td>Không bị giới hạn tài nguyên</td></tr>
+    <tr><td>Điện thoại</td><td>MobileNetV3, EfficientNet-Lite</td><td>Depthwise separable + tối ưu theo độ trễ thật</td></tr>
+    <tr><td>Vi điều khiển, vài trăm KB RAM</td><td>MobileNet thu nhỏ, hoặc FOMO cho bài phát hiện</td><td>Bộ nhớ đỉnh là ràng buộc cứng</td></tr>
+    <tr><td>Rất ít dữ liệu</td><td>Fine-tune model đã huấn luyện sẵn</td><td>Huấn luyện từ đầu cần hàng chục nghìn ảnh trở lên</td></tr>
+    <tr><td>Cần độ trễ dưới 10ms trên CPU</td><td>Model nhỏ + int8 + gộp BatchNorm</td><td>Mọi kỹ thuật cộng lại</td></tr>
+    <tr><td>Nhiều dữ liệu, quy mô rất lớn</td><td>Vision Transformer</td><td>Vượt CNN khi có đủ dữ liệu; kém hơn khi dữ liệu ít vì thiếu thiên lệch quy nạp về cấu trúc ảnh</td></tr>
+  </table>
+</section>
+
+<section id="cnn-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Chỉ nhìn FLOPs khi tối ưu tốc độ</h4><p>Depthwise ít FLOPs nhưng nặng về băng thông bộ nhớ. Phải đo độ trễ thật trên thiết bị đích.</p></div>
+    <div class="card bad"><h4>Quên phép chiếu ở nhánh tắt</h4><p>Khi khối đổi số kênh hoặc kích thước, phép cộng residual lỗi shape. Cần conv 1×1 ở nhánh tắt.</p></div>
+    <div class="card bad"><h4>Thêm ReLU vào lớp nén cuối khối</h4><p>Phá linear bottleneck. Mất thông tin ở không gian ít chiều, không hồi phục được.</p></div>
+    <div class="card bad"><h4>Dùng một scale cho cả tensor khi lượng tử hoá</h4><p>Kênh biên độ nhỏ bị làm tròn về 0. Dùng scale theo từng kênh.</p></div>
+    <div class="card bad"><h4>Để bias trong conv ngay trước BatchNorm</h4><p>Dư thừa — BatchNorm đã có <code>β</code>. Đặt <code>bias=False</code>.</p></div>
+    <div class="card bad"><h4>Nhận diện kém vật lớn mà không xét receptive field</h4><p>Nếu vật lớn hơn receptive field, model không nhìn thấy nó trọn vẹn.</p></div>
+  </div>
+</section>
+
+<section id="cnn-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao dùng convolution thay vì fully connected cho ảnh?</summary>
+  <p>Vì hai giả định đúng với ảnh: kết nối cục bộ — một pixel liên quan tới pixel lân cận chứ không tới pixel ở góc đối diện; và chia sẻ trọng số — một bộ dò cạnh hữu ích ở mọi vị trí. Kết quả là số tham số giảm hàng chục nghìn lần: một lớp FC đầu tiên cho ảnh 224×224×3 với 1000 nơ-ron cần 150 triệu tham số, còn một lớp conv 3×3 với 64 kênh ra chỉ cần 1.728. Chia sẻ trọng số còn cho tính bất biến với dịch chuyển, nên cần ít dữ liệu hơn để tổng quát hoá.</p></details>
+
+  <details class="qa"><summary>Depthwise separable convolution là gì và tiết kiệm bao nhiêu?</summary>
+  <p>Convolution thường làm hai việc cùng lúc: lọc theo không gian và trộn các kênh. Depthwise separable tách chúng ra — bước depthwise cho mỗi kênh một bộ lọc <code>k×k</code> riêng không trộn kênh, rồi bước pointwise dùng conv 1×1 để trộn. Tham số từ <code>k²·C_in·C_out</code> xuống <code>k²·C_in + C_in·C_out</code>, tỉ lệ tiết kiệm là <code>1/(1/C_out + 1/k²)</code> — với <code>k=3</code> và <code>C_out</code> lớn thì tiến tới 9 lần, đổi lại mất khoảng một điểm phần trăm chính xác. Lưu ý ít FLOPs không đồng nghĩa với nhanh: depthwise có tỉ lệ tính toán trên byte bộ nhớ thấp nên trên GPU có thể không nhanh hơn.</p></details>
+
+  <details class="qa"><summary>Vì sao MobileNetV2 gọi là inverted residual?</summary>
+  <p>Vì nó đảo cấu trúc của khối ResNet. ResNet nén ở giữa và nối tắt ở hai đầu rộng; MobileNetV2 nở kênh ra khoảng 6 lần ở giữa và nối tắt ở hai đầu hẹp. Hai lý do: tensor phải giữ lại cho phép cộng residual là tensor ở đầu hẹp nên nhỏ hơn nhiều, tiết kiệm bộ nhớ đỉnh — quan trọng khi thiết bị chỉ có vài trăm KB SRAM; và depthwise convolution không trộn kênh nên cần nhiều kênh mới đủ khả năng biểu diễn, việc nở ra trước khi lọc là để cho nó không gian làm việc.</p></details>
+
+  <details class="qa"><summary>Vì sao lớp 1×1 cuối khối MobileNetV2 không có ReLU?</summary>
+  <p>Vì ReLU đặt mọi giá trị âm về 0, tức nó làm mất thông tin. Ở không gian nhiều chiều thì mất một phần không quá tệ vì thông tin còn lưu ở các chiều khác. Nhưng lớp đó nén xuống không gian ít chiều — chỗ hẹp của bottleneck — nên mất một nửa số chiều là mất phần lớn thông tin và không có chỗ nào bù lại. Đó là ý nghĩa của cụm "linear bottleneck" trong tên bài báo.</p></details>
+
+  <details class="qa"><summary>Vì sao gần như mọi kiến trúc đều dùng kernel 3×3?</summary>
+  <p>Vì xếp chồng rẻ hơn. Hai lớp 3×3 có receptive field 5×5 nhưng chỉ tốn 18 trọng số mỗi kênh so với 25 của một lớp 5×5; ba lớp 3×3 cho 7×7 với 27 so với 49. Và xếp chồng còn được thêm các lớp phi tuyến ở giữa nên khả năng biểu diễn mạnh hơn. Đây là đóng góp chính của VGG và là lý do kernel lớn gần như biến mất khỏi các kiến trúc sau, trừ lớp đầu tiên nơi cần receptive field lớn nhanh với chi phí thấp.</p></details>
+
+  <details class="qa"><summary>Model của bạn cần chạy trên thiết bị biên — bạn làm gì?</summary>
+  <p>Theo thứ tự chi phí thấp tới cao. Trước tiên là những thứ miễn phí: gộp BatchNorm vào conv trước nó, vì lúc suy luận BatchNorm là phép tuyến tính có tham số cố định nên gộp được mà không mất gì. Rồi lượng tử hoá int8 với scale theo từng kênh — nhỏ hơn 4 lần, mất khoảng một điểm chính xác; nếu tụt nhiều thì dùng QAT. Rồi xét đổi kiến trúc sang MobileNet, hoặc giảm độ phân giải đầu vào vì chi phí giảm theo bình phương. Và quan trọng nhất: đo độ trễ thật trên thiết bị đích, vì nút thắt ở đó thường là băng thông bộ nhớ chứ không phải FLOPs.</p></details>
+</section>
+
+<footer>Deep dive · CNN &amp; MobileNet · số liệu tham số và MAC tính theo công thức trong bài, bỏ qua chi phí của activation và bias khi so tỉ lệ.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

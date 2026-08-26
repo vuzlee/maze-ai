@@ -35,17 +35,19 @@
 
   /* ---------------- trang chủ: dựng kệ ---------------- */
   function card(b, n) {
-    return '<a class="bk" data-slug="' + esc(b.slug) + '" href="' + BASE + b.path + '">' +
+    return '<a class="bk' + (b.skeleton ? " wip" : "") + '" data-slug="' + esc(b.slug) +
+      '" href="' + BASE + b.path + '">' +
       '<span class="ix">' + String(n).padStart(2, "0") + "</span>" +
       '<span class="tt"><b>' + esc(b.title) + "</b><i>" + esc(b.blurb) + "</i></span>" +
-      '<span class="tag">' + esc(b.tag) + " · " + b.n + " mục</span>" +
+      '<span class="tag">' + (b.skeleton ? "khung · " + b.n + " mục" : esc(b.tag) + " · " + b.n + " mục") + "</span>" +
       '<span class="go">→</span></a>';
   }
 
   if (lib) {
     lib.innerHTML = CAT.map(function (c, ci) {
-      var total = 0;
-      c.groups.forEach(function (g) { total += g.books.length; });
+      var total = 0, skel = 0;
+      c.groups.forEach(function (g) { g.books.forEach(function (b) {
+        if (b.skeleton) skel++; else total++; }); });
       /* số bài đánh liên tục trong cả kệ, như mục lục một cuốn sách */
       var n = 0;
       var body = c.groups.map(function (g) {
@@ -61,6 +63,7 @@
           "<div><h2>" + esc(c.name) + "</h2>" +
           '<p class="gnote">' + esc(c.note) + "</p></div>" +
           '<div class="shelfstat" data-shelf="' + ci + '"><b>' + total + " bài</b>" +
+          (skel ? '<i class="sk">+' + skel + " khung</i>" : "") +
           '<span class="track"><i style="width:0%"></i></span></div>' +
         "</header>" + body + "</section>";
     }).join("\n");
@@ -70,7 +73,7 @@
     if (nav) {
       nav.innerHTML = CAT.map(function (c, ci) {
         var n = 0;
-        c.groups.forEach(function (g) { n += g.books.length; });
+        c.groups.forEach(function (g) { g.books.forEach(function (b) { if (!b.skeleton) n++; }); });
         return '<a href="#shelf-' + ci + '"><i>' + String(ci + 1).padStart(2, "0") + "</i>" +
           esc(c.name) + "<em>" + n + "</em></a>";
       }).join("");
@@ -95,7 +98,8 @@
     if (facts) {
       var nb = 0, ns = 0;
       CAT.forEach(function (c) {
-        c.groups.forEach(function (g) { g.books.forEach(function (b) { nb++; ns += b.n || 0; }); });
+        c.groups.forEach(function (g) { g.books.forEach(function (b) {
+          if (b.skeleton) return; nb++; ns += b.n || 0; }); });
       });
       facts.innerHTML =
         "<li><b>" + nb + "</b><span>bài</span></li>" +
@@ -231,8 +235,9 @@
   /* ---------------- trang chủ: tiến độ + lọc bài chưa học ---------------- */
   var lib = document.getElementById("library");
   if (lib) {
-    var all = [];
-    CAT.forEach(function (c) { c.groups.forEach(function (g) { g.books.forEach(function (b) { all.push(b); }); }); });
+    var all = [];       /* chỉ tính bài đã có nội dung — khung bài không vào tiến độ */
+    CAT.forEach(function (c) { c.groups.forEach(function (g) { g.books.forEach(function (b) {
+      if (!b.skeleton) all.push(b); }); }); });
 
     var bar = document.createElement("div");
     bar.className = "libbar";
@@ -263,9 +268,11 @@
         if (!box) return;
         var tot = 0, got = 0;
         c.groups.forEach(function (g) {
-          g.books.forEach(function (b) { tot++; if (done.indexOf(b.slug) >= 0) got++; });
+          g.books.forEach(function (b) { if (b.skeleton) return;
+            tot++; if (done.indexOf(b.slug) >= 0) got++; });
         });
         box.querySelector("b").textContent = got ? got + "/" + tot + " bài" : tot + " bài";
+        var sk = box.querySelector(".sk"); if (sk && got) sk.hidden = true;
         box.querySelector("i").style.width = (tot ? Math.round(100 * got / tot) : 0) + "%";
       });
 

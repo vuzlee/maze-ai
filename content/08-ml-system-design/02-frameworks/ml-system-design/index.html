@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ML system design — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-mlsys" data-title="ML system design" data-tag="Design" data-blurb="Khung bảy bước, vì sao luôn hai tầng, ngân sách độ trễ và số máy, vòng phản hồi, ví dụ phát hiện gian lận.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Hệ thống · phỏng vấn thiết kế</p>
+  <h1>ML system<br><em>design</em></h1>
+  <p class="lede">Vòng phỏng vấn không có đáp án đúng, chỉ có <b>quy trình tốt hoặc kém</b>. Bài này đưa một khung bảy bước dùng được cho mọi đề, giải thích vì sao gần như mọi hệ thống quy mô lớn đều là <b>hai tầng</b>, cách tính <b>ngân sách độ trễ</b> và số máy, và những câu hỏi vặn mà người phỏng vấn luôn hỏi.</p>
+</header>
+
+
+<section id="mlsys-s1">
+  <div class="sh"><b>01</b><h2>Khung bảy bước</h2></div>
+<pre><code>1. LÀM RÕ        mục tiêu nghiệp vụ, quy mô, ràng buộc, phạm vi
+2. ĐÓNG KHUNG    biến thành bài ML — hoặc kết luận không cần ML
+3. METRIC        offline để lặp nhanh, online để quyết định, guardrail để không phá gì
+4. DỮ LIỆU       nhãn từ đâu, độ trễ nhãn, thiên lệch, quy mô
+5. MODEL         baseline trước, rồi kiến trúc; thường là hai tầng
+6. PHỤC VỤ       ngân sách độ trễ, đặc trưng, cache, số máy
+7. GIÁM SÁT      drift, hiệu năng, vòng phản hồi, huấn luyện lại
+
+Phân bổ thời gian cho buổi 45 phút:
+    bước 1–2:  10 phút   ← ĐỪNG rút ngắn phần này
+    bước 3–5:  20 phút
+    bước 6–7:  15 phút</code></pre>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    Người phỏng vấn đánh giá <strong>cách bạn thu hẹp một bài toán mở</strong>, không đánh giá bạn có nhớ kiến trúc nào. Nhảy thẳng vào "em dùng transformer với embedding" ở phút thứ hai là cách trượt nhanh nhất — vì nó cho thấy bạn không kiểm tra mình đang giải bài gì.
+  </div>
+</section>
+
+<section id="mlsys-s2">
+  <div class="sh"><b>02</b><h2>Bước 1 — làm rõ yêu cầu</h2></div>
+  <p>Dành 5–10 phút hỏi trước khi vẽ gì. Đây là phần được tính điểm cao nhất và bị bỏ qua nhiều nhất.</p>
+  <table>
+    <tr><th>Nhóm</th><th>Câu hỏi</th></tr>
+    <tr><td><strong>Mục tiêu</strong></td><td>Thành công đo bằng gì? Doanh thu, mức tương tác, hay giảm chi phí vận hành? Ai là người dùng của hệ thống này?</td></tr>
+    <tr><td><strong>Quy mô</strong></td><td>Bao nhiêu người dùng, bao nhiêu vật phẩm? QPS trung bình và đỉnh? Dữ liệu lịch sử có bao nhiêu?</td></tr>
+    <tr><td><strong>Độ trễ</strong></td><td>Phải trả lời trong bao lâu? Có được tính trước theo lô không, hay bắt buộc thời gian thực?</td></tr>
+    <tr><td><strong>Ràng buộc</strong></td><td>Ngân sách? Bao nhiêu người làm? Có yêu cầu giải thích được quyết định không? Có ràng buộc pháp lý về dữ liệu?</td></tr>
+    <tr><td><strong>Phạm vi</strong></td><td>Cần làm cả hệ thống hay tập trung một phần? Có phần nào coi như đã có sẵn?</td></tr>
+  </table>
+  <div class="note">
+    <h4>Ba câu đáng hỏi nhất nếu chỉ được hỏi ba câu</h4>
+    <p><strong>1. "Chỉ số nghiệp vụ nào chúng ta đang muốn cải thiện?"</strong> — nó định hình toàn bộ phần còn lại.</p>
+    <p><strong>2. "Quy mô và QPS đỉnh khoảng bao nhiêu?"</strong> — quyết định kiến trúc một tầng hay hai tầng, tính trước hay thời gian thực.</p>
+    <p><strong>3. "Ngân sách độ trễ là bao nhiêu?"</strong> — quyết định model được phức tạp tới đâu.</p>
+  </div>
+</section>
+
+<section id="mlsys-s3">
+  <div class="sh"><b>03</b><h2>Bước 2 — đóng khung thành bài ML</h2></div>
+<pre><code>Yêu cầu nghiệp vụ:  "gợi ý video người dùng sẽ thích"
+
+Đóng khung 1: phân loại nhị phân — dự đoán xác suất người dùng bấm vào
+              + đơn giản, nhiều dữ liệu nhãn
+              − tối ưu lượt bấm dẫn tới nội dung giật gân
+
+Đóng khung 2: hồi quy — dự đoán thời lượng xem
+              + gần với giá trị thật hơn
+              − thiên vị video dài
+
+Đóng khung 3: xếp hạng — học thứ tự tương đối giữa các video
+              + đúng với việc thực sự cần làm
+              − phức tạp hơn, cần dữ liệu so sánh
+
+Đóng khung 4: nhiều mục tiêu — dự đoán bấm, thời lượng xem, chia sẻ, và tỉ lệ báo cáo
+              rồi kết hợp có trọng số
+              → đây là cách các hệ thống thật làm</code></pre>
+  <div class="note key">
+    <h4>Nêu nhiều cách đóng khung rồi chọn một, kèm lý do</h4>
+    Đây là chỗ ghi điểm rõ nhất. Nó cho thấy bạn hiểu rằng <em>chọn hàm mục tiêu là quyết định sản phẩm</em>, không phải quyết định kỹ thuật. Và nêu được nhược điểm của đóng khung mình chọn — ví dụ tối ưu lượt bấm dẫn tới nội dung giật gân — là thứ người phỏng vấn tìm.
+  </div>
+  <div class="note warn">
+    <h4>Và luôn hỏi: có cần ML không?</h4>
+    Nhiều bài giải được bằng quy tắc hoặc thống kê đơn giản, rẻ hơn và dễ vận hành hơn hẳn. "Hiển thị video mới nhất trong danh mục người dùng theo dõi" là một baseline không cần ML mà rất khó vượt qua. Nếu bạn nêu được baseline đó rồi giải thích ML thắng ở đâu, câu trả lời mạnh hơn nhiều so với việc mặc định phải dùng ML.
+  </div>
+</section>
+
+<section id="mlsys-s4">
+  <div class="sh"><b>04</b><h2>Bước 3 — metric hai tầng</h2></div>
+  <table>
+    <tr><th>Tầng</th><th>Ví dụ</th><th>Vai trò</th></tr>
+    <tr><td><strong>Offline</strong></td><td>AUC, PR-AUC, NDCG, recall@k</td><td>Lặp nhanh nhiều lần trong ngày, không cần chờ người dùng</td></tr>
+    <tr><td><strong>Online</strong></td><td>Tỉ lệ bấm, thời lượng, doanh thu, tỉ lệ giữ chân</td><td><strong>Thước đo cuối cùng</strong>, đo qua A/B test</td></tr>
+    <tr><td><strong>Guardrail</strong></td><td>Độ trễ p99, tỉ lệ lỗi, tỉ lệ báo cáo nội dung, tỉ lệ huỷ</td><td>Không được xấu đi, dù metric chính có tăng</td></tr>
+  </table>
+  <p><strong>Câu phải nói ra:</strong> metric offline chỉ hữu ích nếu nó <em>tương quan</em> với metric online, và mối tương quan đó phải được kiểm chứng bằng dữ liệu A/B lịch sử — không được giả định. Rất nhiều dự án cải thiện AUC hàng tháng mà không hề tác động tới chỉ số kinh doanh, và nguyên nhân luôn là bước kiểm chứng này chưa từng được làm.</p>
+  <div class="note">
+    <h4>Guardrail là dấu hiệu của người đã vận hành hệ thống thật</h4>
+    Một model tăng lượt bấm 5% nhưng làm p99 tăng từ 100ms lên 400ms là một model <strong>không triển khai được</strong>. Một model tăng tương tác nhưng tăng tỉ lệ báo cáo nội dung xấu là một rủi ro thương hiệu. Nêu danh sách guardrail ngay từ bước metric — chứ không phải khi bị hỏi — là điểm cộng rõ.
+  </div>
+</section>
+
+<section id="mlsys-s5">
+  <div class="sh"><b>05</b><h2>Bước 4 — dữ liệu và nhãn</h2></div>
+  <table>
+    <tr><th>Câu hỏi</th><th>Vì sao quan trọng</th></tr>
+    <tr><td><strong>Nhãn từ đâu?</strong></td><td>Hành vi người dùng (rẻ, nhiều, nhưng thiên lệch) hay người gán nhãn (đắt, ít, chính xác hơn)</td></tr>
+    <tr><td><strong>Nhãn về sau bao lâu?</strong></td><td>Lượt bấm có ngay; "khách có huỷ dịch vụ không" phải chờ 30 ngày. Độ trễ này quyết định tần suất huấn luyện lại</td></tr>
+    <tr><td><strong>Nhãn âm lấy đâu?</strong></td><td>Vật phẩm hiển thị mà không được bấm là âm — nhưng vật phẩm <em>không hiển thị</em> thì không biết. Đây là thiên lệch cốt lõi</td></tr>
+    <tr><td><strong>Có vòng phản hồi không?</strong></td><td>Model chỉ được huấn luyện trên những gì model cũ đã hiển thị → tự củng cố định kiến của chính nó</td></tr>
+    <tr><td><strong>Lệch lớp bao nhiêu?</strong></td><td>Gian lận 0.1% thì mọi thứ đổi: metric, ngưỡng, cách lấy mẫu</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vòng phản hồi — luôn nên nêu, kèm cách xử lý</h4>
+    Nếu model chỉ học từ những gì nó đã hiển thị, nó không bao giờ biết những vật phẩm nó chưa từng cho ai xem có tốt hay không. Cách xử lý chuẩn: <strong>chèn một phần lưu lượng ngẫu nhiên</strong> — ví dụ 1–5% — để thu thập dữ liệu không thiên lệch, và ghi lại <em>xác suất hiển thị</em> của mỗi vật phẩm để có thể hiệu chỉnh lại khi huấn luyện. Nêu được cả vấn đề và cách chữa là một trong những điểm cộng lớn nhất ở vòng này.
+  </div>
+</section>
+
+<section id="mlsys-s6">
+  <div class="sh"><b>06</b><h2>Bước 5 — vì sao gần như luôn là hai tầng</h2></div>
+<pre><code>Bài toán: 100 triệu vật phẩm, phải trả lời trong 200ms.
+
+Một tầng: chấm điểm cả 100 triệu vật phẩm bằng một model tốt
+    → bất khả thi. Dù mỗi vật phẩm chỉ mất 1 micro giây thì cũng là 100 giây.
+
+HAI TẦNG:
+
+    TẦNG 1 — SINH ỨNG VIÊN          100.000.000  →  1.000
+        model RẤT rẻ; thường chỉ là tìm kiếm láng giềng gần trên embedding
+        mục tiêu: RECALL cao (đừng bỏ sót vật phẩm tốt)
+        chấp nhận: precision thấp
+
+    TẦNG 2 — XẾP HẠNG                     1.000  →  10
+        model đắt, nhiều đặc trưng, tương tác phức tạp
+        mục tiêu: PRECISION và thứ tự đúng
+        chi phí chấp nhận được vì chỉ 1.000 vật phẩm
+
+    (tuỳ chọn) TẦNG 3 — SẮP LẠI            10  →  10
+        quy tắc nghiệp vụ: đa dạng hoá, tránh lặp cùng tác giả, chèn nội dung mới</code></pre>
+  <div class="note key">
+    <h4>Vì sao mục tiêu hai tầng khác nhau</h4>
+    Tầng 1 tối ưu <strong>recall</strong> vì sai sót ở đây <em>không sửa được</em> — vật phẩm đã bị loại thì tầng 2 không bao giờ thấy nó. Tầng 2 tối ưu <strong>precision</strong> vì nó chỉ cần chọn tốt trong tập đã có. Nói được sự phân công này, và rằng recall của tầng 1 là <em>trần</em> của cả hệ thống, là câu trả lời cho thấy bạn hiểu kiến trúc chứ không chỉ nhớ nó.
+  </div>
+  <p>Mẫu này xuất hiện ở mọi nơi: gợi ý nội dung, tìm kiếm, quảng cáo, và cả RAG — nơi truy xuất vector là tầng 1 và reranker cross-encoder là tầng 2. Nhận ra nó là cùng một mẫu là một điểm liên kết tốt để nêu.</p>
+</section>
+
+<section id="mlsys-s7">
+  <div class="sh"><b>07</b><h2>Bước 5b — đặc trưng</h2></div>
+  <table>
+    <tr><th>Nhóm</th><th>Ví dụ</th><th>Lưu ý</th></tr>
+    <tr><td>Người dùng</td><td>Tuổi tài khoản, lịch sử tương tác, sở thích suy ra</td><td>Cần xử lý người dùng mới</td></tr>
+    <tr><td>Vật phẩm</td><td>Danh mục, tuổi, mức phổ biến, đặc trưng nội dung</td><td>Mức phổ biến gây vòng phản hồi — cái phổ biến càng được đẩy</td></tr>
+    <tr><td>Tương tác</td><td>Người dùng đã xem bao nhiêu vật phẩm cùng danh mục</td><td>Thường là nhóm đặc trưng <strong>mạnh nhất</strong></td></tr>
+    <tr><td>Ngữ cảnh</td><td>Giờ, thiết bị, vị trí, phiên hiện tại</td><td>Rẻ và thường có tín hiệu tốt</td></tr>
+    <tr><td>Thời gian thực</td><td>Vài hành động vừa xảy ra trong phiên</td><td>Tín hiệu mạnh nhất nhưng khó hạ tầng nhất</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Feature store — vì sao nó tồn tại</h4>
+    Đặc trưng phải tính <strong>hai lần</strong>: một lần trên dữ liệu lịch sử để huấn luyện, một lần trên dữ liệu trực tiếp để phục vụ. Nếu hai đường tính khác nhau — khác cách xử lý giá trị thiếu, khác múi giờ, khác cách làm tròn — thì model bị lệch mà <em>không báo lỗi gì</em>, chỉ kém đi một cách khó hiểu. Đó là training–serving skew, và feature store là một nơi duy nhất định nghĩa đặc trưng cho cả hai đường. Nêu vấn đề này ở vòng system design gần như luôn được ghi nhận.
+  </div>
+  <p>Một chi tiết liên quan: khi tính đặc trưng tổng hợp cho dữ liệu huấn luyện, mọi phép gộp phải <strong>cắt tại mốc thời gian dự đoán</strong>. "Tổng số đơn của khách" tính trên toàn bộ lịch sử là rò rỉ thời gian — xem bài <em>Overfitting &amp; regularization</em>.</p>
+</section>
+
+<section id="mlsys-s8">
+  <div class="sh"><b>08</b><h2>Bước 6 — phục vụ</h2></div>
+<pre><code>Ba lựa chọn, xếp theo chi phí hạ tầng:
+
+TÍNH TRƯỚC THEO LÔ         tính sẵn kết quả cho mọi người dùng, lưu vào cache
+    + đơn giản nhất, độ trễ gần bằng 0, rẻ
+    − không dùng được tín hiệu trong phiên; tốn chỗ nếu số cặp lớn
+    → phù hợp: email gợi ý, danh sách trang chủ cập nhật hằng ngày
+
+THỜI GIAN THỰC             tính khi có request
+    + dùng được ngữ cảnh và hành vi vừa xảy ra
+    − cần hạ tầng phục vụ, phải quản độ trễ
+    → phù hợp: tìm kiếm, feed, phát hiện gian lận
+
+LAI                        tầng 1 tính trước, tầng 2 chấm điểm khi có request
+    → cách phần lớn hệ thống thật làm</code></pre>
+<pre><code>Ngân sách độ trễ — luôn nên chia ra bằng số:
+
+    tổng cho phép                 200 ms
+      ├─ mạng và load balancing      20 ms
+      ├─ lấy đặc trưng             30 ms   ← thường là phần đắt bất ngờ
+      ├─ sinh ứng viên             40 ms
+      ├─ xếp hạng                  60 ms
+      ├─ sắp lại và hậu xử lý      10 ms
+      └─ dự trữ                    40 ms   ← để chịu đỉnh và đuôi p99</code></pre>
+  <p>Chia bảng này ra bằng con số cụ thể là một trong những việc gây ấn tượng nhanh nhất ở vòng system design — nó cho thấy bạn nghĩ về hệ thống như một ngân sách hữu hạn, không phải một chuỗi hộp nối nhau.</p>
+</section>
+
+<section id="mlsys-s9">
+  <div class="sh"><b>09</b><h2>Lab: ngân sách hệ thống</h2></div>
+  <p>Nhập QPS và độ trễ từng tầng để xem tổng độ trễ, số máy cần, và chi phí tháng.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>QPS đỉnh</label><input type="number" id="mqps" value="5000" min="1"></div>
+      <div><label>ngân sách p99 (ms)</label><input type="number" id="mbudget" value="200" min="10"></div>
+      <div><label>lấy đặc trưng (ms)</label><input type="number" id="mfeat" value="30" min="0"></div>
+      <div><label>sinh ứng viên (ms)</label><input type="number" id="mcand" value="40" min="0"></div>
+      <div><label>xếp hạng (ms)</label><input type="number" id="mrank" value="60" min="0"></div>
+      <div><label>số request song song mỗi máy</label><input type="number" id="mconc" value="8" min="1"></div>
+      <div><label>chi phí mỗi máy / giờ (USD)</label><input type="number" id="mcost" value="1.2" step="0.1" min="0"></div>
+      <div><label>tỉ lệ cache hit %</label><input type="number" id="mcache" value="0" min="0" max="95" step="5"></div>
+    </div>
+    <div id="mview4"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Kéo <strong>tỉ lệ cache hit</strong> lên 50%: số máy và chi phí giảm một nửa mà không cần chạm vào model. Đây là lý do câu đầu tiên nên nói khi bàn về chi phí luôn là cache. Rồi thử tăng thời gian xếp hạng lên 150ms để thấy ngân sách vỡ.
+    </p>
+  </div>
+</section>
+
+<section id="mlsys-s10">
+  <div class="sh"><b>10</b><h2>Bước 7 — giám sát</h2></div>
+  <table>
+    <tr><th>Theo dõi</th><th>Cảnh báo khi</th></tr>
+    <tr><td><strong>Phân phối đặc trưng</strong></td><td>Lệch so với lúc huấn luyện — đây là tín hiệu sớm nhất, đến trước khi metric tụt</td></tr>
+    <tr><td><strong>Phân phối dự đoán</strong></td><td>Điểm trung bình trôi dạt, hoặc tỉ lệ vượt ngưỡng đổi bất thường</td></tr>
+    <tr><td>Hiệu năng theo nhãn thật</td><td>Chỉ có được sau độ trễ nhãn — nên không thể là tín hiệu duy nhất</td></tr>
+    <tr><td>Metric nghiệp vụ</td><td>Thước đo cuối cùng, nhưng bị nhiễu bởi nhiều yếu tố ngoài model</td></tr>
+    <tr><td>Chỉ số hệ thống</td><td>Độ trễ p99, tỉ lệ lỗi, tỉ lệ timeout khi lấy đặc trưng</td></tr>
+    <tr><td>Tỉ lệ giá trị thiếu</td><td>Một nguồn đặc trưng chết âm thầm là lỗi rất thường gặp và rất khó phát hiện</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao theo dõi phân phối đặc trưng là quan trọng nhất</h4>
+    Vì nhãn thật đến muộn — có thể 30 ngày sau. Nếu chỉ dựa vào hiệu năng theo nhãn, bạn phát hiện sự cố sau một tháng. Phân phối đặc trưng thì có <strong>ngay lập tức</strong>, và nó bắt được cả lớp sự cố hạ tầng: một trường bị đổi tên ở nguồn, một API trả về giá trị rỗng, một job ETL chết. Đây là hệ thống báo động sớm duy nhất bạn có.
+  </div>
+  <p>Về <strong>huấn luyện lại</strong>: tần suất quyết định bởi tốc độ drift, không bởi thói quen. Bài toán gian lận có kẻ tấn công thích ứng liên tục nên có thể cần hằng ngày; bài phân loại ảnh sản phẩm có thể để hàng tháng. Và luôn cần một đường <em>quay lại phiên bản cũ</em> — model mới có thể tệ hơn.</p>
+</section>
+
+<section id="mlsys-s11">
+  <div class="sh"><b>11</b><h2>Ba vấn đề luôn được hỏi tới</h2></div>
+  <h3>1. Cold start</h3>
+  <table>
+    <tr><th>Loại</th><th>Cách xử lý</th></tr>
+    <tr><td>Người dùng mới</td><td>Dùng đặc trưng ngữ cảnh (thiết bị, vị trí, nguồn vào); hỏi sở thích lúc đăng ký; hiển thị nội dung phổ biến rồi thích ứng dần trong phiên</td></tr>
+    <tr><td>Vật phẩm mới</td><td>Dùng đặc trưng nội dung thay cho đặc trưng học từ tương tác; dành một phần lưu lượng để khám phá</td></tr>
+    <tr><td>Cả hai đều mới</td><td>Chỉ còn đặc trưng nội dung và ngữ cảnh — đây là lý do model chỉ dựa vào id không đủ</td></tr>
+  </table>
+  <h3>2. Lệch lớp cực đoan</h3>
+  <p>Gian lận 0.1%: dùng PR-AUC thay accuracy, chọn ngưỡng theo chi phí kỳ vọng, và <strong>lấy mẫu lại chỉ trên tập train của từng fold</strong> — không bao giờ trước khi chia. Xem hai bài trong kệ Machine learning.</p>
+  <h3>3. Yêu cầu giải thích được</h3>
+  <p>Trong tài chính và y tế thường có ràng buộc pháp lý phải giải thích quyết định. Lúc đó model tuyến tính hoặc cây nông có thể là lựa chọn <em>bắt buộc</em> dù kém hơn về độ chính xác — hoặc dùng model mạnh kèm SHAP, nhưng phải kiểm tra xem mức giải thích đó có đáp ứng yêu cầu pháp lý hay không.</p>
+</section>
+
+<section id="mlsys-s12">
+  <div class="sh"><b>12</b><h2>Ví dụ đi hết — phát hiện gian lận thẻ</h2></div>
+<pre><code>1. LÀM RÕ
+   - Chặn giao dịch gian lận, giảm thiệt hại. 10.000 giao dịch/giây đỉnh.
+   - Phải quyết định trong 100ms (đồng bộ, trong luồng thanh toán).
+   - Tỉ lệ gian lận khoảng 0.1%. Chặn oan khách thật là rất tốn kém.
+
+2. ĐÓNG KHUNG
+   - Phân loại nhị phân cho ra XÁC SUẤT, không phải quyết định.
+   - Ngưỡng là tham số cấu hình, đặt theo chi phí. Ba mức hành động:
+     cho qua / yêu cầu xác thực thêm / chặn.
+
+3. METRIC
+   - offline: PR-AUC (không dùng ROC-AUC vì lớp dương quá hiếm)
+   - online: thiệt hại bằng tiền, tỉ lệ chặn oan
+   - guardrail: p99 dưới 100ms, tỉ lệ khách khiếu nại
+
+4. DỮ LIỆU
+   - Nhãn từ khiếu nại của chủ thẻ → về sau tới 60 ngày. Đây là ràng buộc lớn.
+   - Nhãn âm dồi dào; nhãn dương rất hiếm → cần lấy mẫu cẩn thận.
+   - Vòng phản hồi: giao dịch đã bị chặn thì KHÔNG BAO GIỜ biết nó có gian lận thật không.
+     → giữ một phần rất nhỏ cho qua để thu dữ liệu không thiên lệch.
+
+5. MODEL
+   - Baseline: quy tắc do chuyên gia rủi ro viết. Vẫn giữ song song làm lưới an toàn.
+   - Chính: gradient boosting trên đặc trưng dạng bảng — nhanh, chính xác, giải thích được.
+   - Đặc trưng: số tiền so với thói quen của thẻ, khoảng cách địa lý so với giao dịch trước,
+     tần suất trong 1 phút / 1 giờ / 1 ngày, thiết bị lạ, loại cửa hàng.
+
+6. PHỤC VỤ
+   - Thời gian thực, bắt buộc — không tính trước được.
+   - Đặc trưng đếm theo cửa sổ thời gian giữ trong bộ nhớ nhanh (Redis), cập nhật khi có sự kiện.
+   - Ngân sách: 15ms lấy đặc trưng, 20ms model, 65ms dự trữ.
+   - Nếu quá hạn thì rơi về quy tắc, KHÔNG chặn cả luồng thanh toán.
+
+7. GIÁM SÁT
+   - Phân phối đặc trưng và phân phối điểm theo giờ.
+   - Tỉ lệ chặn theo phân khúc — bắt trường hợp model đột nhiên chặn oan một nhóm.
+   - Huấn luyện lại hằng tuần vì kẻ gian thích ứng nhanh.</code></pre>
+  <div class="note key">
+    <h4>Ba chi tiết trong ví dụ trên đáng chú ý nhất</h4>
+    <p><strong>Model trả về xác suất, ngưỡng là cấu hình.</strong> Đổi mức chấp nhận rủi ro không cần huấn luyện lại.</p>
+    <p><strong>Rơi về quy tắc khi quá hạn.</strong> Model là thứ có thể chậm hoặc chết; luồng thanh toán thì không được chết.</p>
+    <p><strong>Giao dịch đã chặn không bao giờ có nhãn thật.</strong> Đây là vòng phản hồi kinh điển, và việc nêu nó ra cùng cách xử lý là điểm mạnh nhất của cả câu trả lời.</p>
+  </div>
+</section>
+
+<section id="mlsys-s13">
+  <div class="sh"><b>13</b><h2>Câu hỏi vặn hay gặp</h2></div>
+  <table>
+    <tr><th>Câu hỏi</th><th>Hướng trả lời</th></tr>
+    <tr><td>"Nếu QPS tăng gấp 100 thì sao?"</td><td>Xác định nút thắt trước — thường là tầng lấy đặc trưng hoặc xếp hạng. Rồi: cache, giảm số ứng viên, model xếp hạng nhẹ hơn, tính trước phần tính được, và scale ngang.</td></tr>
+    <tr><td>"Model chết thì sao?"</td><td>Rơi về model cũ, rồi rơi về quy tắc, rồi rơi về nội dung phổ biến. Không bao giờ để cả tính năng chết theo model.</td></tr>
+    <tr><td>"Làm sao biết model tệ đi?"</td><td>Phân phối đặc trưng và phân phối điểm — có ngay lập tức. Nhãn thật đến muộn nên không thể là tín hiệu duy nhất.</td></tr>
+    <tr><td>"Offline tốt online tệ thì sao?"</td><td>Kiểm rò rỉ, kiểm training–serving skew, kiểm cách chia dữ liệu, rồi kiểm xem metric offline có thật tương quan với online không.</td></tr>
+    <tr><td>"Giảm chi phí một nửa?"</td><td>Cache, giảm số ứng viên vào tầng xếp hạng, chưng cất model xuống nhỏ hơn, giảm tần suất tính lại phần ít đổi.</td></tr>
+    <tr><td>"Không có nhãn thì sao?"</td><td>Nhãn yếu từ hành vi, gán nhãn thủ công một tập nhỏ để đánh giá, học tự giám sát, hoặc dùng quy tắc để khởi động rồi thu nhãn dần.</td></tr>
+    <tr><td>"Vì sao không dùng deep learning?"</td><td>Trên dữ liệu bảng, boosting thường thắng và dễ vận hành hơn. Deep learning thắng khi có biến phân loại nhiều giá trị cần embedding, hoặc có text và ảnh.</td></tr>
+  </table>
+</section>
+
+<section id="mlsys-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Nhảy vào model ở phút thứ hai</h4><p>Bỏ qua phần được tính điểm cao nhất. Dành 5–10 phút làm rõ yêu cầu.</p></div>
+    <div class="card bad"><h4>Không hỏi quy mô</h4><p>Không có QPS và số vật phẩm thì không thể quyết định một tầng hay hai tầng.</p></div>
+    <div class="card bad"><h4>Không nêu baseline</h4><p>Không có mốc thì không ai biết ML đóng góp bao nhiêu.</p></div>
+    <div class="card bad"><h4>Bỏ qua nguồn nhãn và độ trễ nhãn</h4><p>Nó quyết định tần suất huấn luyện lại và cách giám sát.</p></div>
+    <div class="card bad"><h4>Không nói tới vòng phản hồi</h4><p>Hệ thống tự củng cố định kiến của chính nó. Cần một phần lưu lượng khám phá.</p></div>
+    <div class="card bad"><h4>Không có phương án khi model chết</h4><p>Mọi hệ thống thật cần đường rơi về nhiều tầng.</p></div>
+  </div>
+</section>
+
+<section id="mlsys-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Cách bạn tiếp cận một bài ML system design?</summary>
+  <p>Bảy bước. Làm rõ yêu cầu — mục tiêu nghiệp vụ, quy mô, QPS, ngân sách độ trễ, ràng buộc; tôi dành 5–10 phút ở đây và không rút ngắn. Đóng khung thành bài ML, nêu vài cách đóng khung khác nhau rồi chọn một kèm lý do, và luôn hỏi liệu có cần ML không. Metric hai tầng cộng guardrail. Dữ liệu và nhãn — nhãn từ đâu, về sau bao lâu, có vòng phản hồi không. Model, bắt đầu từ baseline. Phục vụ, với ngân sách độ trễ chia ra bằng số. Giám sát và huấn luyện lại. Người phỏng vấn đánh giá cách thu hẹp bài toán mở, không đánh giá tôi nhớ kiến trúc nào.</p></details>
+
+  <details class="qa"><summary>Vì sao hệ thống gợi ý quy mô lớn luôn có hai tầng?</summary>
+  <p>Vì không thể chấm điểm 100 triệu vật phẩm bằng một model tốt trong 200ms. Tầng một sinh ứng viên bằng một model rất rẻ — thường là tìm láng giềng gần trên embedding — thu từ 100 triệu xuống khoảng nghìn, và nó tối ưu <b>recall</b> vì vật phẩm đã bị loại thì tầng hai không bao giờ thấy. Tầng hai xếp hạng bằng model đắt với nhiều đặc trưng, tối ưu <b>precision</b> và thứ tự, chi phí chấp nhận được vì chỉ còn nghìn vật phẩm. Thường có thêm tầng ba cho quy tắc nghiệp vụ như đa dạng hoá. Recall của tầng một là trần của cả hệ thống. Đây cũng chính là mẫu của RAG: truy xuất vector rồi rerank.</p></details>
+
+  <details class="qa"><summary>Vòng phản hồi trong hệ gợi ý là gì và xử lý thế nào?</summary>
+  <p>Model chỉ được huấn luyện trên những gì model cũ đã hiển thị, nên nó không bao giờ biết các vật phẩm chưa từng được hiển thị có tốt hay không — và nó tự củng cố định kiến của chính mình, đẩy mạnh những thứ vốn đã phổ biến. Cách xử lý: dành một phần lưu lượng, thường 1–5%, cho hiển thị ngẫu nhiên để thu dữ liệu không thiên lệch; và ghi lại xác suất hiển thị của mỗi vật phẩm để hiệu chỉnh lại khi huấn luyện. Trong bài phát hiện gian lận, dạng cực đoan của vấn đề này là giao dịch đã bị chặn thì không bao giờ có nhãn thật.</p></details>
+
+  <details class="qa"><summary>Bạn giám sát một model đã triển khai thế nào?</summary>
+  <p>Ưu tiên cao nhất là <b>phân phối đặc trưng</b>, vì nhãn thật có thể đến muộn hàng tháng nên nó là hệ thống báo động sớm duy nhất — và nó bắt được cả lớp sự cố hạ tầng: trường bị đổi tên, API trả rỗng, job ETL chết. Rồi phân phối điểm dự đoán, tỉ lệ giá trị thiếu, và các chỉ số hệ thống như p99 và tỉ lệ timeout khi lấy đặc trưng. Hiệu năng theo nhãn thật và metric nghiệp vụ là thước đo cuối cùng nhưng đến muộn và bị nhiễu. Tần suất huấn luyện lại quyết định bởi tốc độ drift — gian lận có thể cần hằng tuần, phân loại ảnh sản phẩm có thể hàng tháng — và luôn phải có đường quay lại phiên bản cũ.</p></details>
+
+  <details class="qa"><summary>Cold start — bạn xử lý thế nào?</summary>
+  <p>Với người dùng mới, tôi dựa vào đặc trưng ngữ cảnh có sẵn ngay: thiết bị, vị trí, nguồn vào; có thể hỏi sở thích lúc đăng ký; hiển thị nội dung phổ biến rồi thích ứng dần theo hành vi trong chính phiên đó. Với vật phẩm mới, dùng đặc trưng nội dung thay cho đặc trưng học từ tương tác, và dành một phần lưu lượng để khám phá. Điểm quan trọng về thiết kế: nếu model chỉ dựa vào embedding của id thì nó bất lực với cả hai trường hợp — nên phải luôn có nhánh đặc trưng nội dung và ngữ cảnh, không chỉ id.</p></details>
+
+  <details class="qa"><summary>QPS tăng gấp 100 thì bạn làm gì?</summary>
+  <p>Trước tiên xác định nút thắt bằng số liệu, thường là tầng lấy đặc trưng hoặc tầng xếp hạng. Rồi theo thứ tự lãi: cache kết quả cho những request lặp lại — đây gần như luôn là bước rẻ nhất và hiệu quả nhất; giảm số ứng viên đi vào tầng xếp hạng, vì chi phí tỉ lệ trực tiếp với nó; dùng model xếp hạng nhẹ hơn, có thể chưng cất từ model hiện tại; tính trước những phần không phụ thuộc ngữ cảnh tức thời; và cuối cùng là scale ngang, kèm việc kiểm tra tầng lấy đặc trưng có scale theo được hay không, vì nó thường là chỗ vỡ trước.</p></details>
+</section>
+
+<footer>Deep dive · ML system design · khung bảy bước áp dụng được cho mọi đề; con số trong ví dụ là minh hoạ.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

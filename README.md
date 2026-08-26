@@ -1,196 +1,89 @@
 # MazeAI
 
-Kho deep dive chuẩn bị phỏng vấn Big Tech. Site tĩnh thuần, **không cần build, không cần server** —
-mở thẳng `index.html` bằng trình duyệt là chạy.
+Kho deep dive để chuẩn bị phỏng vấn Big Tech — AI/ML và CS nền tảng, viết bằng tiếng Việt.
 
-## Cây thư mục = đúng những gì nhìn thấy trên giao diện
+**44 bài đã viết · 83 khung bài đã chốt dàn ý · 9 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
 
-Ba tầng: **kệ → nhóm → bài**, xếp theo syllabus ôn tập.
+Phỏng vấn Big Tech không kiểm tra trí nhớ — nó đào cho tới khi lộ ra bạn có thật sự hiểu hay
+không. Nên mỗi bài ở đây đi từ **cơ chế bên dưới** tới **hệ quả thực tế**: code chạy được, sơ đồ,
+lab bấm được, các bẫy hay gặp, và phần hỏi đáp trả lời theo cách một interviewer muốn nghe.
 
-```
-index.html                       ← trang thư viện
-assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự động)
-content/
-  01-dsa/
-    category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
-    01-foundations/big-o-complexity/{index.html, lab.js}
-    02-data-structures/{stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, union-find}
-    03-algorithms/{two-pointers-sliding-window, binary-search, graph-bfs-dfs-topo, backtracking, dynamic-programming}
-  02-cs-fundamentals/
-    01-python-internals/{memory-model-mutability, iterator-generator-decorator, dict-hash-table, gil-thread-process-async}
-    02-sql/{sql-index-query-plan, sql-window-functions, transaction-isolation}
-    03-os-networking/{http-tcp-caching}
-  03-machine-learning/
-    01-classical-ml/{linear-logistic-regression, tree-ensemble-boosting}
-    02-statistics/{statistics-ab-testing}
-    03-model-evaluation/{metrics-confusion-matrix}
-    04-ml-theory/{overfitting-regularization}
-  04-deep-learning/
-    01-neural-network/{backpropagation, normalization-initialization}
-    02-cnn/{cnn-mobilenet}
-  05-llm/
-    01-transformer/{self-attention-transformer}
-    02-llm/{fine-tuning-sft-rlhf-dpo-lora}
-    03-rag/{rag-end-to-end}
-    04-llm-system/{inference-optimization}
-  06-ml-system-design/01-frameworks/{ml-system-design}
-  07-mlops/01-serving/{mlops-serving}
-tools/build.py                   ← quét content/ sinh lại catalog.js + search-index.js
-archive/mazeai-single-file.html  ← bản gốc gộp 1 file, giữ để đối chiếu
-```
+## Mở lên đọc
 
-Số thứ tự ở tên thư mục quyết định thứ tự hiển thị. Thứ tự bài trong một nhóm nằm ở `books`
-trong `category.json`. Kệ chỉ có đúng một nhóm thì trang chủ không hiện tiêu đề nhóm.
-
-## Thêm một bài mới
-
-1. Chép một thư mục bài có sẵn sang đúng nhóm, đổi tên thư mục.
-2. Sửa `index.html` của nó:
-   - `<article class="doc" id="art-SLUG" data-title="…" data-tag="…" data-blurb="…">`
-     — `id` phải duy nhất trong cả kho; `data-*` chính là nội dung thẻ card ngoài trang chủ;
-   - mỗi mục là một `<section id="SLUG-sN">` mở đầu bằng
-     `<div class="sh"><b>01</b><h2>Tên mục</h2></div>` — mục lục bên trái và breadcrumb tự dựng
-     từ đây, không phải khai báo ở đâu khác.
-3. Thêm tên thư mục vào `books` của đúng nhóm trong `category.json`.
-4. Chạy `python3 tools/build.py`.
-
-Thêm nhóm mới: tạo thư mục `NN-ten-nhom/` rồi thêm `{"dir", "name", "books"}` vào `groups`.
-Thêm kệ mới: tạo `content/NN-ten-ke/category.json` với `{"name", "note", "groups": []}`.
-
-## Sau mỗi lần sửa nội dung
+Không cần cài gì, không cần mạng, không cần server:
 
 ```bash
-python3 tools/build.py
+git clone <repo> && cd mazeai
+xdg-open index.html      # macOS: open index.html
 ```
 
-Sinh lại `assets/catalog.js` và `assets/search-index.js`, đồng thời báo các chỗ lệch: thư mục bài
-chưa được liệt kê, khai báo trỏ tới thư mục không tồn tại, thiếu `index.html`. Không chạy lại thì
-bài mới không hiện ở trang chủ và không tìm được.
+Chỉ là mở một file HTML bằng trình duyệt. Tiến độ học lưu ngay trong trình duyệt của bạn
+(`localStorage`) — không có tài khoản, không có gì gửi đi đâu cả.
 
-## Đọc & học
+> Xoá dữ liệu duyệt web của trang này thì mất hết đánh dấu *đã học*.
+> Đổi máy hay đổi trình duyệt cũng không mang theo được.
 
-Trang bài được bố trí để học chứ không chỉ để đọc:
+## Trong kho có gì
 
-- **dòng ngắn ~72 ký tự** cho phần chữ, còn code / bảng / sơ đồ / lab vẫn để rộng;
-- **mỗi mục là một khối** có số thứ tự dạng huy hiệu và đường kẻ ngăn, lướt là thấy ranh giới;
+| # | Kệ | Đã viết | Khung | Nội dung |
+|---|---|---|---|---|
+| 01 | DSA — data structures & algorithms | 11 | 10 | Big-O · array/string, linked list, hash map, stack, heap, tree/BST, trie, union-find · two pointers, sliding window, binary search, sorting, greedy, interval, graph, shortest path, dynamic programming |
+| 02 | Python | 6 | 4 | Language core & data model · built-in types · thread/GIL & asyncio · LeetCode toolkit |
+| 03 | CS fundamentals | 2 | 7 | Operating system (process, virtual memory, lock) · networking (DNS/TLS, TCP/HTTP, caching, REST, load balancing) |
+| 04 | Database & SQL | 3 | 12 | Relational model, constraints, normalization, schema design · SQL basics (JOIN, GROUP BY, CTE) · index, transaction, query tuning · NoSQL, sharding |
+| 05 | Machine learning | 10 | 18 | Math foundations · bias–variance & cross-validation · regression, SVM, KNN, Naive Bayes · tree models · clustering, PCA · evaluation & calibration · statistics, A/B testing |
+| 06 | Deep learning | 4 | 9 | Perceptron, activation, backpropagation, initialization, normalization, optimizer, dropout · convolution · RNN/LSTM · training recipe & debugging |
+| 07 | Transformer · LLM · GenAI | 6 | 11 | Tokenization, embedding, positional encoding, attention, architecture · pretraining, SFT, PEFT · decoding, quantization, inference optimization · RAG & agent |
+| 08 | ML system design | 1 | 4 | Framework · recommendation system, search & ranking, LLM/RAG system |
+| 09 | MLOps & engineering | 1 | 8 | Git, Docker, Linux, serving API · experiment tracking, CI/CD, model serving · GPU & inference |
+
+Kho vẫn đang mở rộng — các mảng còn thiếu bài liệt kê ở cuối
+[CLAUDE.md](CLAUDE.md#chỗ-trống-theo-syllabus).
+
+## Học thế nào
+
+**Trang thư viện** là mục lục: mỗi kệ một chương, mỗi bài một hàng có tóm tắt một dòng và số
+mục bên phải. Thanh kệ dính ở trên cho nhảy thẳng tới chương cần, mỗi chương có tiến độ riêng.
+
+**Trang bài** bố trí để học chứ không chỉ để đọc:
+
+- **dòng ngắn ~70 ký tự** cho phần chữ, còn code / bảng / sơ đồ / lab vẫn để rộng;
+- **mỗi mục là một khối** có số thứ tự và đường kẻ ngăn, lướt là thấy ranh giới;
 - **thanh tiến độ đọc** ở đỉnh trang, mục lục đếm `06 / 15` và tô xanh những mục đã đi qua;
-- **đánh dấu đã học** ở cuối mỗi bài — lưu trong `localStorage`, trang chủ hiện tổng tiến độ
-  và có nút lọc *chỉ bài chưa học*;
-- **mở/đóng toàn bộ phần hỏi đáp** bằng một nút trên tiêu đề mục, để tự kiểm tra trước khi xem đáp án.
+- **lab bấm được** — chỉnh tham số, chạy từng bước, xem code sáng đúng dòng đang chạy;
+- **hỏi đáp gập lại** — có nút mở/đóng cả mục để tự kiểm tra trước khi xem đáp án;
+- **đánh dấu đã học** ở cuối mỗi bài, trang chủ hiện tổng tiến độ và có nút lọc *chỉ bài chưa học*.
 
-Phím tắt: `j` mục sau · `k` mục trước · `m` đánh dấu đã học · `/` tìm toàn kho · `Esc` thoát tìm.
+### Tìm
 
-Trang thư viện: **trang bìa** kiểu ấn phẩm — dateline, tiêu đề serif khổ lớn, ba con số quy mô kho;
-**thanh kệ dính** dưới thanh tìm kiếm để nhảy chương mà không phải cuộn; mỗi chương có thanh
-tiến độ riêng cạnh tên. Gõ `/` là ô tìm kiếm chiếm luôn màn hình, kết quả nằm ngay đầu trang.
+Gõ `/` ở bất kỳ đâu là nhảy vào ô tìm kiếm. Nó tìm trong **toàn bộ 464 mục của cả kho**, không
+chỉ tên bài — gõ `tombstone`, `KV cache`, `probe sequence` là ra thẳng mục chứa nó, kèm đoạn
+trích có tô vàng từ khoá. Mở sẵn một truy vấn cũng được: `index.html?q=softmax`.
 
-## Khuôn bài DSA
+### Phím tắt
 
-Mười bài trong `01-dsa` dùng chung một khuôn: **lõi đọc 1,5 phút, phần còn lại để tra**.
-
-```
-01  Ý tưởng               1 hình + 1 câu chốt + 2 gạch đầu dòng
-02  Mẫu code cần thuộc    1-2 khối 6-8 dòng
-03  Ba bẫy                3 thẻ ngắn
-04  Lab                   chạy từng bước
-─────────────────────────  hết phần đọc
-05+ Mỗi pattern một mục   dấu hiệu nhận đề (.sig) → sửa gì trong mẫu →
-                          danh sách bài LeetCode có link (.probs)
-cuối Hỏi đáp              4 câu, mỗi câu trả lời 1-2 dòng
-```
-
-160 bài LeetCode chia theo 48 pattern, mỗi bài ghi rõ luyện cái gì, cuối mỗi bài có
-thứ tự luyện gợi ý 10 bài phủ hết pattern của chủ đề đó.
-
-## Ngôn ngữ thiết kế
-
-Chất riêng của kho: **nền mực ám nâu, nhấn cam đất, tiêu đề serif** — gần với một cuốn sách
-chuyên khảo hơn là một dashboard. Toàn bộ nằm trong `assets/style.css`; sửa token ở `:root`
-là đổi cả kho. Đừng viết màu thẳng vào bài, luôn dùng `var(--…)` hoặc `rgba(var(--blue-a),…)`.
-
-**Bề mặt & chữ** — phân tầng bằng độ sáng, không bằng viền dày:
-
-| Token | Giá trị | Dùng cho |
-|---|---|---|
-| `--bg` | `#14110E` | nền trang, mực ám nâu |
-| `--panel` | `#1C1815` | thẻ, khối, bảng |
-| `--raise` | `#241F1A` | ô nổi lên trên panel |
-| `--sunk` | `#0E0C0A` | ô lõm: nền code, track tiến độ |
-| `--rule` · `--rule-hi` | `#2E2822` · `#3D352C` | hai mức đường kẻ |
-| `--text` → `--faint` | `#EDE7DE` → `#7A6F63` | bốn mức chữ |
-
-**Cam đất `--clay` `#E0855C`** là màu thương hiệu: logo, chữ nghiêng trong tiêu đề, nút chính,
-link trong bài, viền mục đang đọc, vạch hover ở đầu mỗi hàng. **Nó không mang nghĩa nội dung —
-tuyệt đối không dùng trong hình.**
-
-**Bốn màu ngữ nghĩa** — nghĩa cố định cho mọi hình, mỗi màu kèm một biến `rgb` để pha nền mờ:
-
-| Token | Giá trị | Nghĩa |
-|---|---|---|
-| `--filled` / `--blue-a` | `#8CA9F2` | dữ liệu, thứ đang xét |
-| `--probe` / `--amber-a` | `#EDB44A` | con trỏ, điểm nhấn, đáp án |
-| `--tomb` / `--red-a` | `#F2718A` | sai, bị loại, chưa thoả |
-| `--ok` / `--green-a` | `#5BCFA0` | đúng, kết quả, đã thoả |
-
-**Chữ** — cả ba font đều có bộ dấu tiếng Việt đầy đủ, đã kiểm bằng subset `vietnamese` của
-Google Fonts (Instrument Serif *không* có, đừng dùng):
-
-| Biến | Font | Dùng cho |
-|---|---|---|
-| `--display` | Newsreader | tiêu đề, tên bài, câu chốt (nghiêng), tên hàng |
-| `--body` | Be Vietnam Pro | phần đọc, nút, nhãn |
-| `--mono` | JetBrains Mono | code, số thứ tự, nhãn nhỏ chữ hoa |
-
-**Bố cục** — trang thư viện dựng như **mục lục một cuốn sách**: mỗi kệ là một chương có số treo
-ở lề trái, mỗi bài là **một hàng** (số · tên serif · tóm tắt · nhãn · mũi tên) chứ không phải thẻ —
-34 mục quét bằng mắt nhanh hơn hẳn. Trục dọc của số chương và số bài trùng nhau ở mốc `78px`;
-đổi `grid-template-columns` của `.shelfhead` hoặc `.bk` thì phải chỉnh cả hai cho khớp lại.
-
-## Trực quan — bộ khuôn hình
-
-Hình là thứ giúp học nhanh nhất, nên vẽ hình phải rẻ. **[kit.html](kit.html)** là trang tra khuôn:
-mở ra, chép đoạn HTML dưới mỗi hình, thay chữ. Không phải tính toạ độ, tự co giãn theo màn hình,
-tự đúng bảng màu.
-
-| Khuôn | Dùng cho |
+| Phím | Việc |
 |---|---|
-| `.strip` | mảng, miền đáp án, ô nhớ, dãy FALSE→TRUE |
-| `.flow` | quy trình 2–4 bước, ba nhánh của một quyết định |
-| `.cmp` | đối chiếu hai cột: hai quy ước, hai cách làm |
-| `.stack` | pipeline dọc: RAG, vòng đời request, lượt forward |
-| `.mtx` | ma trận 2×2: confusion matrix, bias–variance |
-| `.axis` | thứ có thứ tự: mức cô lập, mức nén, độ trễ |
-| `.seq` | trình tự qua lại: bắt tay TCP, giao thức hai bên |
-| `.bars` | so sánh đại lượng chênh nhau nhiều lần |
+| `j` / `k` | mục sau / mục trước |
+| `m` | đánh dấu bài này đã học |
+| `/` | tìm trong toàn kho |
+| `Esc` | thoát tìm kiếm |
 
-Quy ước màu dùng chung cho **mọi** hình trong kho — đừng đổi nghĩa giữa các bài:
-xanh dương = dữ liệu / thứ đang xét · vàng = con trỏ, điểm nhấn, đáp án ·
-đỏ = sai, bị loại, chưa thoả · xanh lá = đúng, kết quả, đã thoả.
+## Đọc một bài DSA cho đúng cách
 
-Ba quy tắc khi soạn: mỗi mục **một** hình (cần hai hình thường là dấu hiệu mục đó nên tách đôi);
-hình phải **thay được** đoạn văn chứ không minh hoạ thêm cho nó; chữ trong hình càng ít càng tốt.
+Mười bài trong kệ `01-dsa` cố tình xếp theo kiểu **lõi ngắn, đuôi dài để tra** — đừng đọc tuần tự
+từ đầu tới cuối:
 
-Chỉ dùng SVG khi hình có đường cong, đường chéo hoặc trục toạ độ thật — mẫu ở
-[mục mảng xoay](content/01-dsa/03-algorithms/binary-search/index.html#binsearch-s9):
-`viewBox="0 0 560 200"`, cột rộng 60, cách nhau 12, đáy y=158. Giữ nguyên khung này thì mọi
-biểu đồ cột trong kho nhìn như một bộ.
+- **Mục 01–04 là phần đọc**, hết khoảng 1,5 phút: ý tưởng, mẫu code cần thuộc, ba bẫy, một lab.
+- **Từ mục 05 trở đi là phần tra.** Mỗi pattern một mục, mở đầu bằng *dấu hiệu nhận đề* — gặp đề
+  lạ thì lướt các dấu hiệu này để biết nó thuộc pattern nào, rồi xem cần sửa gì trong mẫu code.
+- Mỗi pattern kèm danh sách bài LeetCode có link, ghi rõ bài đó luyện cái gì. Cuối mỗi bài có
+  **thứ tự luyện gợi ý 10 bài** phủ hết pattern của chủ đề đó — làm theo đúng thứ tự ấy.
 
-## Chỗ trống theo syllabus
+Đích không phải số bài đã giải. Đích là: gặp pattern → nhận ra → giải trong 15–30 phút →
+nói được complexity.
 
-Khung thư mục đã dựng sẵn cho các mảng còn thiếu bài:
+## Muốn sửa hoặc thêm bài?
 
-| Kệ / nhóm | Chưa có bài |
-|---|---|
-| `01-dsa/03-algorithms` | prefix sum · greedy · intervals · shortest path (Dijkstra) |
-| `01-dsa/02-data-structures` | linked list · trie |
-| `01-dsa` | bộ công cụ Python cho LeetCode: `bisect`, `Counter`, `defaultdict`, `deque`, comprehension |
-| `02-cs-fundamentals/02-sql` | SQL nền: JOIN · GROUP BY / HAVING · subquery · CTE · normalization |
-| `02-cs-fundamentals/03-os-networking` | process vs thread ở tầng OS · CPU scheduling · REST API · load balancing · connection pool |
-| `03-machine-learning/01-classical-ml` | SVM · KNN · Naive Bayes · K-means · PCA |
-| `03-machine-learning` | nền toán: probability · expectation/variance · Bayes · gradient · matrix · eigenvector · MLE/MAP |
-| `04-deep-learning/01-neural-network` | activation function · dropout (đang nằm rải trong bài chuẩn hoá & overfitting) |
-| `05-llm/01-transformer` | tokenization · embedding · positional encoding (bài hiện tại chỉ chạm qua) |
-| `05-llm/02-llm` | pretraining · decoding: temperature / top-k / top-p · quantization (QLoRA) |
-| `05-llm/03-rag` | vector database · chiến lược chunking · reranking chuyên sâu |
-| `06-ml-system-design` | recommendation system · LLM/RAG system (hai ví dụ thiết kế đầu–cuối) |
-| `07-mlops` | Git · Docker · Linux · FastAPI · CI/CD · experiment tracking · GPU inference |
+Cấu trúc thư mục, cách thêm bài, bảng màu, bộ khuôn hình và quy tắc soạn nằm ở
+**[CLAUDE.md](CLAUDE.md)**.

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decorator & context manager — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-deco" data-title="Decorator & context manager" data-tag="Python" data-blurb="Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Python internals</p>
+  <h1>Decorator <em>&amp; context manager</em></h1>
+  <p class="lede"><code>@deco</code> chỉ là cách viết gọn của <code>f = deco(f)</code> — hiểu đúng một câu đó là hiểu hết. Bài này dựng lại từ closure, giải thích vì sao decorator có tham số cần <b>ba tầng lồng nhau</b>, và vì sao thiếu <code>functools.wraps</code> làm hỏng FastAPI và pytest.</p>
+</header>
+
+<section id="deco-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vì sao phải hiểu closure trước</h2></div>
+
+  <p class="key">Decorator không phải cú pháp đặc biệt. Nó là <em>một hàm nhận hàm, trả về hàm</em> — và thứ giữ trạng thái cho hàm trả về chính là closure.</p>
+
+  <ul class="why">
+    <li><code>@deco</code> đặt trên <code>def f</code> chỉ là cách viết gọn của <code>f = deco(f)</code>. Không có gì hơn thế.</li>
+    <li>Hàm bọc bên trong <b>nhớ được biến của hàm ngoài</b> kể cả sau khi hàm ngoài đã trả về — đó là closure, và là lý do decorator giữ được cấu hình.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần iterator protocol, generator, <code>yield from</code> và <code>itertools</code> nằm ở bài
+    <a href="../iterator-generator/index.html">Iterator &amp; generator</a>.
+  </div>
+</section>
+
+<section id="deco-s2">
+  <div class="sh"><b>02</b><h2>Closure — nền của decorator</h2></div>
+<pre><code><span class="kw">def</span> make_counter():
+    count = <span class="st">0</span>                  <span class="cm"># biến của phạm vi ngoài</span>
+    <span class="kw">def</span> inc():
+        <span class="kw">nonlocal</span> count         <span class="cm">← bắt buộc, nếu không sẽ tạo biến cục bộ mới</span>
+        count += <span class="st">1</span>
+        <span class="kw">return</span> count
+    <span class="kw">return</span> inc                 <span class="cm"># hàm trong "nhớ" được count</span>
+
+c = make_counter()
+c(); c(); c()                  <span class="cm"># 1, 2, 3</span></code></pre>
+  <p>Hàm trong giữ một tham chiếu tới biến của phạm vi bao ngoài, và biến đó <strong>sống sót</strong> dù hàm ngoài đã trả về. Đó là closure.</p>
+  <div class="note warn">
+    <h4>Vì sao cần <code>nonlocal</code></h4>
+    Trong Python, <em>gán</em> vào một tên bên trong hàm sẽ tự động khai báo nó là biến cục bộ. Không có <code>nonlocal</code> thì <code>count += 1</code> báo <code>UnboundLocalError</code> vì nó đọc một biến cục bộ chưa được khởi tạo. Chỉ <em>đọc</em> thì không cần <code>nonlocal</code> — đây là chỗ hay gây bối rối.
+  </div>
+</section>
+
+<section id="deco-s3">
+  <div class="sh"><b>03</b><h2>Decorator</h2></div>
+<pre><code><span class="kw">import</span> functools, time
+
+<span class="kw">def</span> timed(fn):
+    @functools.wraps(fn)                    <span class="cm">← giữ __name__, __doc__, chữ ký</span>
+    <span class="kw">def</span> wrapper(*args, **kwargs):        <span class="cm"># nhận mọi kiểu đối số</span>
+        t0 = time.perf_counter()
+        <span class="kw">try</span>:
+            <span class="kw">return</span> fn(*args, **kwargs)
+        <span class="kw">finally</span>:                            <span class="cm"># đo cả khi hàm ném lỗi</span>
+            <span class="kw">print</span>(<span class="st">f"{fn.__name__}: {time.perf_counter()-t0:.3f}s"</span>)
+    <span class="kw">return</span> wrapper
+
+@timed
+<span class="kw">def</span> slow(): time.sleep(<span class="st">1</span>)
+
+<span class="cm"># @timed chỉ là cách viết ngắn của:</span>
+<span class="cm"># slow = timed(slow)</span></code></pre>
+  <p>Dòng cuối là chìa khoá để hiểu toàn bộ: decorator <strong>không có gì huyền bí</strong>, nó chỉ là phép gán lại tên hàm bằng kết quả của một hàm nhận hàm.</p>
+  <div class="note key">
+    <h4>Vì sao bắt buộc dùng functools.wraps</h4>
+    Không có nó, hàm sau khi bọc mang tên <code>wrapper</code>: <code>help()</code> vô dụng, docstring biến mất, log ghi sai tên, và các thư viện dựa vào chữ ký hàm sẽ hỏng — FastAPI đọc annotation để sinh schema, pytest đọc tên để đặt tên test. Thiếu một dòng này gây ra những bug rất khó truy.
+  </div>
+  <p>Ba dùng thực tế đáng biết: <code>functools.lru_cache</code> để ghi nhớ kết quả, <code>property</code> để biến phương thức thành thuộc tính, và <code>staticmethod</code>/<code>classmethod</code> — tất cả đều là decorator có sẵn.</p>
+</section>
+
+<section id="deco-s4">
+  <div class="sh"><b>04</b><h2>Decorator có tham số — ba tầng</h2></div>
+<pre><code><span class="kw">def</span> retry(times=<span class="st">3</span>, delay=<span class="st">1.0</span>):          <span class="cm"># TẦNG 1: nhận tham số</span>
+    <span class="kw">def</span> decorator(fn):                   <span class="cm"># TẦNG 2: nhận hàm</span>
+        @functools.wraps(fn)
+        <span class="kw">def</span> wrapper(*a, **kw):           <span class="cm"># TẦNG 3: nhận đối số lúc gọi</span>
+            <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(times):
+                <span class="kw">try</span>:
+                    <span class="kw">return</span> fn(*a, **kw)
+                <span class="kw">except</span> Exception:
+                    <span class="kw">if</span> i == times - <span class="st">1</span>: <span class="kw">raise</span>   <span class="cm"># lần cuối thì ném ra</span>
+                    time.sleep(delay * <span class="st">2</span>**i)   <span class="cm"># chờ tăng dần</span>
+        <span class="kw">return</span> wrapper
+    <span class="kw">return</span> decorator
+
+@retry(times=<span class="st">5</span>, delay=<span class="st">0.5</span>)
+<span class="kw">def</span> call_api(): ...
+
+<span class="cm"># tương đương: call_api = retry(times=5, delay=0.5)(call_api)</span>
+<span class="cm">#                          └─ tầng 1 ─┘└──── tầng 2 ────┘</span></code></pre>
+  <p>Ba tầng vì có ba nhóm thông tin đến ở ba thời điểm khác nhau: tham số cấu hình lúc trang trí, hàm lúc định nghĩa, và đối số lúc gọi. Nhìn theo dòng "tương đương" ở cuối là hiểu ngay.</p>
+  <p><strong>Thứ tự khi xếp nhiều decorator</strong> — hay bị hỏi:</p>
+<pre><code>@a
+@b
+<span class="kw">def</span> f(): ...
+
+<span class="cm"># f = a(b(f))  →  b bọc trước (gần hàm nhất), a bọc ngoài</span>
+<span class="cm"># khi GỌI: a chạy trước, rồi tới b, rồi tới f</span></code></pre>
+</section>
+
+<section id="deco-s5">
+  <div class="sh"><b>05</b><h2>Context manager</h2></div>
+  <p>Cùng họ tư duy: đảm bảo phần dọn dẹp <strong>luôn chạy</strong>, kể cả khi có lỗi.</p>
+<pre><code><span class="cm"># cách 1: cài hai phương thức</span>
+<span class="kw">class</span> Timer:
+    <span class="kw">def</span> __enter__(self):
+        self.t0 = time.perf_counter(); <span class="kw">return</span> self
+    <span class="kw">def</span> __exit__(self, exc_type, exc, tb):
+        <span class="kw">print</span>(time.perf_counter() - self.t0)
+        <span class="kw">return</span> <span class="kw">False</span>          <span class="cm">← False: không nuốt exception. True là NUỐT nó</span>
+
+<span class="cm"># cách 2: generator + contextmanager — ngắn hơn nhiều</span>
+<span class="kw">from</span> contextlib <span class="kw">import</span> contextmanager
+
+@contextmanager
+<span class="kw">def</span> timer():
+    t0 = time.perf_counter()
+    <span class="kw">try</span>:
+        <span class="kw">yield</span>                     <span class="cm"># phần thân khối with chạy ở đây</span>
+    <span class="kw">finally</span>:
+        <span class="kw">print</span>(time.perf_counter() - t0)   <span class="cm"># finally: chạy dù có lỗi</span>
+
+<span class="kw">with</span> timer():
+    heavy()</code></pre>
+  <p>Chú ý <code>try/finally</code> bao quanh <code>yield</code>: nếu thiếu, một exception trong khối <code>with</code> sẽ làm phần dọn dẹp không bao giờ chạy. Đây là điểm hay sai nhất khi tự viết context manager bằng generator.</p>
+  <p>Cách này ghép trực tiếp hai chủ đề của bài: <code>@contextmanager</code> là một <em>decorator</em> biến một <em>generator</em> thành context manager.</p>
+</section>
+
+<section id="deco-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Hai lỗi này không báo gì lúc viết, chỉ nổ ở nơi khác trong hệ thống.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Quên functools.wraps</h4><p>Mất tên, docstring và chữ ký hàm. Gây hỏng ở FastAPI, pytest, log.</p></div>
+    <div class="card bad"><h4>Thiếu try/finally trong @contextmanager</h4><p>Exception làm phần dọn dẹp không chạy — file không đóng, khoá không nhả.</p></div>
+  </div>
+</section>
+
+<section id="deco-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao decorator cần functools.wraps?</summary>
+  <p>Vì hàm bọc thay thế hàm gốc, nên nếu không copy metadata thì hàm mang tên <code>wrapper</code>: <code>__name__</code>, docstring, annotation và chữ ký đều mất. Hậu quả thật là log ghi sai tên, <code>help()</code> vô dụng, và những thư viện đọc chữ ký hàm bị hỏng — FastAPI dùng annotation để sinh schema, pytest dùng tên để nhận diện test. Một dòng <code>@functools.wraps(fn)</code> giải quyết hết.</p></details>
+
+  <details class="qa"><summary>Viết một decorator nhận tham số.</summary>
+  <p>Cần ba tầng lồng nhau vì có ba nhóm thông tin đến ở ba thời điểm: tầng ngoài nhận tham số cấu hình, tầng giữa nhận hàm, tầng trong nhận đối số lúc gọi. Cách nhớ là viết lại dạng tương đương: <code>@retry(times=5)</code> nghĩa là <code>f = retry(times=5)(f)</code> — hai lần gọi liên tiếp, nên phải có hai tầng trả về hàm, cộng tầng wrapper thật sự. Nhớ <code>functools.wraps</code> ở tầng trong cùng.</p></details>
+
+  <details class="qa"><summary>Vì sao <code>[lambda: i for i in range(3)]</code> cho ra [2,2,2]?</summary>
+  <p>Vì closure giữ tham chiếu tới <em>biến</em> chứ không phải giá trị lúc tạo. Khi các lambda được gọi, vòng lặp đã kết thúc và <code>i</code> đang là 2, nên cả ba đều trả về 2. Cách chữa phổ biến là chốt giá trị bằng đối số mặc định: <code>lambda i=i: i</code>, vì đối số mặc định được lượng giá ngay lúc định nghĩa. Đây cũng chính là cơ chế gây ra bẫy đối số mặc định khả biến.</p></details>
+</section>
+
+<footer>Deep dive · decorator &amp; context manager · phần iterator protocol và generator nằm ở bài <a href="../iterator-generator/index.html">Iterator &amp; generator</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

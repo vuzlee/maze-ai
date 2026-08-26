@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caching — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-cache" data-title="Caching" data-tag="Networking" data-blurb="Cache HTTP, năm tầng cache, ba chiến lược vô hiệu hoá, thundering herd, và khác biệt giữa no-cache với no-store.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Networking · nền tảng</p>
+  <h1>Cach<em>ing</em></h1>
+  <p class="lede">Cache là cách duy nhất đưa số vòng khứ hồi về <b>0</b>. Đổi lại là bài toán khó nhất: biết khi nào dữ liệu đã cũ. Bài này đi qua năm tầng cache, ba chiến lược vô hiệu hoá, và cách chặn <b>thundering herd</b> khi một khoá nóng hết hạn.</p>
+</header>
+
+<section id="cache-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vì sao cache là câu trả lời mặc định</h2></div>
+
+  <p class="key">Mọi thứ ở bài trước đều tốn <em>ít nhất một vòng khứ hồi</em>. Cache là cách duy nhất đưa con số đó về 0.</p>
+
+  <ul class="why">
+    <li>Tối ưu TCP và HTTP chỉ <b>giảm số RTT</b> — từ bốn xuống một. Cache <b>bỏ hẳn</b> chuyến đi.</li>
+    <li>Đổi lại là bài toán khó nhất của cache: <b>biết khi nào dữ liệu đã cũ</b>. Phần lớn bug cache là bug vô hiệu hoá, không phải bug lưu trữ.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần đếm vòng khứ hồi, TCP, các phiên bản HTTP, thử lại và timeout nằm ở bài
+    <a href="../tcp-http/index.html">TCP &amp; HTTP</a>.
+  </div>
+</section>
+
+<section id="cache-s2">
+  <div class="sh"><b>02</b><h2>Cache HTTP</h2></div>
+<pre><code>Cache-Control: max-age=3600            client cache 1 giờ, không hỏi lại
+Cache-Control: s-maxage=86400          dành riêng cho cache dùng chung (CDN)
+Cache-Control: no-cache                được cache nhưng PHẢI xác nhận lại mỗi lần
+Cache-Control: no-store                KHÔNG được lưu ở đâu cả
+Cache-Control: private                 chỉ browser được cache, CDN thì không
+Cache-Control: stale-while-revalidate=60   trả bản cũ ngay, làm mới ở nền</code></pre>
+  <div class="note warn">
+    <h4><code>no-cache</code> không có nghĩa là không cache</h4>
+    Nó có nghĩa là "được lưu, nhưng phải <strong>xác nhận lại</strong> với server trước khi dùng". Thứ có nghĩa là không lưu gì cả là <code>no-store</code>. Đây là cặp tên gây nhầm lẫn nhiều nhất trong HTTP, và dùng sai <code>no-cache</code> cho dữ liệu nhạy cảm là một lỗi bảo mật thật.
+  </div>
+<pre><code>XÁC NHẬN LẠI BẰNG ETAG — tiết kiệm băng thông
+
+    lần đầu:   GET /data
+               200 OK, ETag: "abc123", body 500 KB
+
+    lần sau:   GET /data
+               If-None-Match: "abc123"
+               → 304 Not Modified, body RỖNG
+
+    → vẫn tốn 1 RTT, nhưng không tốn 500 KB.</code></pre>
+  <p><code>stale-while-revalidate</code> đáng biết vì nó phá được đánh đổi giữa độ mới và độ trễ: khi cache vừa hết hạn, trả ngay bản cũ cho người dùng <em>rồi</em> làm mới ở nền. Người dùng không bao giờ phải chờ, và dữ liệu vẫn được cập nhật. Nó cũng là một phần lời giải cho thundering herd ở mục 12.</p>
+</section>
+
+<section id="cache-s3">
+  <div class="sh"><b>03</b><h2>Năm tầng cache</h2></div>
+<pre><code>1. BROWSER          nhanh nhất, nhưng không kiểm soát được sau khi đã gửi header
+2. CDN              gần người dùng về địa lý → cắt RTT rất nhiều
+3. REVERSE PROXY    nginx, Varnish — trước ứng dụng, chặn tải trước khi vào app
+4. ỨNG DỤNG         Redis hoặc cache trong tiến trình — kết quả đã tính
+5. CƠ SỞ DỮ LIỆU    buffer pool, query cache — tự động, ít kiểm soát
+
+Nguyên tắc: cache CÀNG GẦN người dùng CÀNG RẺ,
+nhưng CÀNG KHÓ vô hiệu hoá khi dữ liệu đổi.</code></pre>
+  <table>
+    <tr><th>Tầng</th><th>Cache gì</th><th>Vô hiệu hoá</th></tr>
+    <tr><td>CDN</td><td>Tài nguyên tĩnh, ảnh, API công khai</td><td>Purge chủ động, hoặc đặt phiên bản vào URL</td></tr>
+    <tr><td>Reverse proxy</td><td>Trang và phản hồi API</td><td>TTL ngắn, hoặc purge theo khoá</td></tr>
+    <tr><td>Ứng dụng</td><td>Kết quả tính toán, dữ liệu tra cứu, phiên</td><td>Xoá khoá khi ghi — kiểm soát tốt nhất</td></tr>
+    <tr><td>Trong tiến trình</td><td>Dữ liệu cấu hình rất nóng</td><td>Khó nhất — mỗi máy một bản, phải phát tín hiệu cho tất cả</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Kỹ thuật đặt phiên bản vào URL</h4>
+    Với tài nguyên tĩnh, đặt <code>max-age</code> rất dài — một năm — và nhúng mã băm nội dung vào tên file: <code>app.7f3a2c.js</code>. Khi nội dung đổi thì <em>tên file đổi</em>, nên đó là một URL mới và cache cũ không còn liên quan. Không cần vô hiệu hoá gì cả. Đây là cách giải bài toán cache invalidation bằng cách <strong>tránh nó hoàn toàn</strong>, và là mẫu đáng nêu.
+  </div>
+</section>
+
+<section id="cache-s4">
+  <div class="sh"><b>04</b><h2>Vô hiệu hoá cache — ba chiến lược</h2></div>
+  <table>
+    <tr><th>Chiến lược</th><th>Cách làm</th><th>Đánh đổi</th></tr>
+    <tr><td><strong>TTL</strong></td><td>Đặt thời hạn, hết hạn thì lấy lại</td><td>Đơn giản nhất; dữ liệu cũ trong tối đa một TTL</td></tr>
+    <tr><td><strong>Xoá khi ghi</strong></td><td>Khi cập nhật dữ liệu thì xoá khoá cache tương ứng</td><td>Dữ liệu luôn mới; nhưng phải nhớ mọi chỗ ghi, và dễ bỏ sót</td></tr>
+    <tr><td><strong>Khoá có phiên bản</strong></td><td>Đưa số phiên bản hoặc mã băm vào khoá cache</td><td>Không cần xoá gì; bản cũ tự bị bỏ rơi và hết hạn dần</td></tr>
+  </table>
+<pre><code>Ba mẫu ghi, cần phân biệt:
+
+CACHE-ASIDE (phổ biến nhất)
+    đọc:  thử cache → miss thì đọc DB → ghi vào cache
+    ghi:  ghi DB → XOÁ khoá cache
+
+WRITE-THROUGH
+    ghi:  ghi cache VÀ ghi DB cùng lúc
+    → cache luôn mới, nhưng mọi lần ghi đều chậm hơn
+
+WRITE-BEHIND
+    ghi:  ghi cache ngay, đẩy xuống DB sau
+    → ghi rất nhanh, nhưng CÓ THỂ MẤT dữ liệu nếu cache chết</code></pre>
+  <div class="note warn">
+    <h4>Trong cache-aside, phải XOÁ chứ không phải CẬP NHẬT</h4>
+    Nếu khi ghi bạn cập nhật cache bằng giá trị mới, hai request ghi đồng thời có thể ghi vào cache theo thứ tự ngược với thứ tự ghi vào cơ sở dữ liệu — và cache giữ giá trị cũ mãi mãi. Xoá khoá thì lần đọc sau buộc phải lấy lại từ nguồn, nên luôn đúng. Đây là chi tiết tinh vi và là câu hỏi vặn hay gặp.
+  </div>
+</section>
+
+<section id="cache-s5">
+  <div class="sh"><b>05</b><h2>Thundering herd</h2></div>
+<pre><code>Một khoá cache rất nóng hết hạn tại t = 0.
+
+    1.000 request đang chờ đều thấy cache miss
+    → cả 1.000 cùng đi xuống cơ sở dữ liệu
+    → cùng một truy vấn, chạy 1.000 lần đồng thời
+    → cơ sở dữ liệu quá tải, càng chậm, càng nhiều request dồn vào
+    → sập</code></pre>
+  <table>
+    <tr><th>Cách chữa</th><th>Cơ chế</th></tr>
+    <tr><td><strong>Single-flight</strong></td><td>Chỉ cho <em>một</em> request đi lấy dữ liệu; những request khác chờ và dùng chung kết quả đó</td></tr>
+    <tr><td><strong>stale-while-revalidate</strong></td><td>Trả bản cũ ngay cho mọi người, một tiến trình nền làm mới</td></tr>
+    <tr><td>TTL có jitter</td><td>Thêm ngẫu nhiên vào TTL để các khoá không hết hạn cùng lúc</td></tr>
+    <tr><td>Làm mới sớm chủ động</td><td>Làm mới khi còn 10% thời hạn, trước khi thật sự hết</td></tr>
+    <tr><td>Khoá phân tán</td><td>Một khoá trong Redis quyết định ai được đi lấy dữ liệu</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao đây là câu hỏi phỏng vấn hay gặp</h4>
+    Vì nó là một sự cố <strong>do chính cache gây ra</strong> — hệ thống chạy hoàn hảo trong 99.9% thời gian rồi sập đúng lúc cache hết hạn. Nó kiểm tra bạn có nghĩ tới hành vi của hệ thống ở <em>ranh giới</em> hay chỉ ở trạng thái bình thường. Câu trả lời tốt nhất là single-flight kết hợp stale-while-revalidate: một request đi lấy, mọi người khác được trả bản cũ ngay chứ không phải chờ.
+  </div>
+</section>
+
+<section id="cache-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Hai lỗi kinh điển: một cái để lại dữ liệu cũ vĩnh viễn, một cái tưởng đã tắt cache mà chưa.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Cập nhật cache thay vì xoá khoá</h4><p>Hai lần ghi đồng thời có thể để lại giá trị cũ trong cache mãi mãi.</p></div>
+    <div class="card bad"><h4>Dùng <code>no-cache</code> khi ý là không lưu</h4><p><code>no-cache</code> vẫn cho lưu, chỉ buộc xác nhận lại. Cần <code>no-store</code>.</p></div>
+  </div>
+</section>
+
+<section id="cache-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Thundering herd là gì và chữa thế nào?</summary>
+  <p>Khi một khoá cache rất nóng hết hạn, hàng nghìn request đồng thời đều thấy miss và cùng đi xuống cơ sở dữ liệu với cùng một truy vấn — nó quá tải, càng chậm thì càng nhiều request dồn vào, rồi sập. Cách chữa tốt nhất là <b>single-flight</b> kết hợp <b>stale-while-revalidate</b>: chỉ một request được đi lấy dữ liệu, còn mọi request khác được trả bản cũ ngay chứ không phải chờ. Bổ trợ: thêm jitter vào TTL để các khoá không hết hạn cùng lúc, và làm mới chủ động khi còn khoảng 10% thời hạn.</p></details>
+
+  <details class="qa"><summary>Cache-aside, write-through và write-behind khác nhau thế nào?</summary>
+  <p><b>Cache-aside</b> là mặc định: ứng dụng đọc cache, miss thì đọc DB rồi tự ghi vào cache — đơn giản, cache hỏng thì hệ thống vẫn chạy. <b>Write-through</b> ghi DB và cache cùng lúc nên không bao giờ cũ, đổi lại mọi lần ghi đều chậm hơn và cache đầy dữ liệu không ai đọc. <b>Write-behind</b> ghi cache trước rồi đẩy xuống DB sau — nhanh nhất nhưng mất dữ liệu nếu cache chết trước khi đẩy, nên chỉ dùng khi chấp nhận được mất mát.</p></details>
+
+  <details class="qa"><summary>Vì sao nên xoá khoá thay vì cập nhật giá trị trong cache?</summary>
+  <p>Vì <b>hai lần ghi đồng thời có thể lệch thứ tự</b>: request A đọc giá trị cũ, request B ghi giá trị mới vào cả DB lẫn cache, rồi A mới ghi đè giá trị cũ của nó vào cache — và giá trị cũ đó nằm lại vĩnh viễn. Xoá khoá thì lần đọc kế tiếp buộc phải lấy lại từ nguồn thật, nên trạng thái xấu nhất chỉ là một lần miss chứ không phải dữ liệu sai mãi.</p></details>
+
+  <details class="qa"><summary>Chọn TTL thế nào?</summary>
+  <p>TTL là <b>mức chấp nhận dữ liệu cũ</b>, quy ra giây — nên hỏi nghiệp vụ chứ không đoán. Bảng giá thì vài giây, hồ sơ người dùng thì vài phút, dữ liệu tham chiếu thì vài giờ. Hai chi tiết luôn kèm theo: <b>thêm nhiễu ngẫu nhiên vào TTL</b> để các khoá không cùng hết hạn một lúc, và với khoá nóng thì kết hợp xoá khoá chủ động khi có thay đổi thay vì chỉ trông vào TTL.</p></details>
+</section>
+
+<footer>Deep dive · caching · phần tầng vận chuyển và giao thức nằm ở bài <a href="../tcp-http/index.html">TCP &amp; HTTP</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

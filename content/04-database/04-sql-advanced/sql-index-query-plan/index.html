@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL — index &amp; query plan — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-sqlindex" data-title="SQL — index &amp; query plan" data-tag="PostgreSQL" data-blurb="Đọc EXPLAIN, vì sao planner bỏ qua index, leftmost prefix, ba thuật toán join, và bài toán N+1.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · SQL · PostgreSQL</p>
+  <h1>Index &amp;<br><em>query plan</em></h1>
+  <p class="lede">Vì sao thêm index làm <code>SELECT</code> nhanh lên và <code>INSERT</code> chậm đi, vì sao index có mà <b>planner vẫn bỏ qua</b>, quy tắc <b>leftmost prefix</b> của index tổ hợp, ba thuật toán join và lúc nào cái nào được chọn — kèm lab tính điểm giao nhau nơi quét toàn bảng thắng.</p>
+</header>
+
+
+<section id="sqlindex-s1">
+  <div class="sh"><b>01</b><h2>Overview</h2></div>
+<pre><code>Câu truy vấn
+   │  parser → rewriter
+   ▼
+Cây truy vấn
+   │  PLANNER: sinh nhiều phương án, ước lượng chi phí, chọn cái rẻ nhất
+   │           dựa vào THỐNG KÊ về dữ liệu, không phải dữ liệu thật
+   ▼
+Kế hoạch thực thi        ← đây là thứ EXPLAIN cho bạn xem
+   │
+   ▼
+Kết quả</code></pre>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    Bạn <strong>không ra lệnh</strong> cho cơ sở dữ liệu cách lấy dữ liệu — bạn khai báo <em>muốn gì</em>, còn planner tự chọn cách. Nên tối ưu SQL thực chất là hai việc: <strong>cho planner thêm lựa chọn tốt</strong> (index), và <strong>cho nó thông tin đúng</strong> (thống kê).
+  </div>
+</section>
+
+<section id="sqlindex-s2">
+  <div class="sh"><b>02</b><h2>Index là gì</h2></div>
+  <p>Một cấu trúc dữ liệu phụ, sắp xếp theo giá trị cột, trỏ tới vị trí dòng trong bảng. Mặc định là <strong>B-tree</strong> — cây cân bằng, nút rộng, thấp.</p>
+<pre><code>Bảng users (1 triệu dòng, không index):
+  SELECT * FROM users WHERE email = 'a@b.com'
+  → quét cả 1.000.000 dòng, so từng dòng          O(n)
+
+Có index B-tree trên email:
+  → đi từ gốc xuống lá, mỗi nút chứa hàng trăm khoá
+  → khoảng 3 lần đọc trang là tới đích              O(log n)</code></pre>
+  <h3>Vì sao B-tree mà không phải hash</h3>
+  <table>
+    <tr><th></th><th>B-tree</th><th>Hash</th></tr>
+    <tr><td><code>=</code></td><td>Được</td><td>Được, nhanh hơn chút</td></tr>
+    <tr><td><code>&lt;</code>, <code>&gt;</code>, <code>BETWEEN</code></td><td><strong>Được</strong></td><td>Không</td></tr>
+    <tr><td><code>ORDER BY</code></td><td><strong>Được</strong> — đọc lá theo thứ tự là đã sắp xếp</td><td>Không</td></tr>
+    <tr><td><code>LIKE 'abc%'</code></td><td><strong>Được</strong> — tiền tố là một khoảng</td><td>Không</td></tr>
+    <tr><td>Nút rộng, ít lần đọc đĩa</td><td>Có — mỗi nút là một trang</td><td>—</td></tr>
+  </table>
+  <p>B-tree làm được gần như mọi thứ với chi phí gần bằng, nên nó là mặc định. Hash index chỉ đáng dùng khi chắc chắn chỉ so bằng và bảng rất lớn.</p>
+</section>
+
+<section id="sqlindex-s3">
+  <div class="sh"><b>03</b><h2>Cái giá phải trả</h2></div>
+  <table>
+    <tr><th>Thao tác</th><th>Ảnh hưởng của index</th></tr>
+    <tr><td><code>SELECT</code> có lọc</td><td>Nhanh hơn rất nhiều — đây là lý do tạo index</td></tr>
+    <tr><td><code>INSERT</code></td><td>Chậm hơn: phải chèn khoá vào <strong>mọi</strong> index của bảng, có thể gây tách nút</td></tr>
+    <tr><td><code>UPDATE</code> cột được index</td><td>Chậm hơn: phải xoá khoá cũ và chèn khoá mới</td></tr>
+    <tr><td><code>DELETE</code></td><td>Chậm hơn: phải cập nhật mọi index</td></tr>
+    <tr><td>Dung lượng</td><td>Mỗi index chiếm thêm chỗ, có khi bằng 20–50% kích thước bảng</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Vì sao "cứ index hết cho chắc" là sai</h4>
+    Một bảng ghi nhiều với 10 index thì mỗi <code>INSERT</code> thành 11 lần ghi. Index không dùng tới vẫn phải bảo trì đủ, vẫn tốn chỗ, vẫn làm chậm ghi — chỉ có phần lợi là không có. Trong PostgreSQL, xem <code>pg_stat_user_indexes.idx_scan</code> để tìm index có số lần dùng bằng 0 rồi xoá đi.
+  </div>
+</section>
+
+<section id="sqlindex-s4">
+  <div class="sh"><b>04</b><h2>Đọc EXPLAIN</h2></div>
+<pre><code>EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 42;
+
+Index Scan using idx_orders_user on orders
+  (cost=0.42..8.44 rows=1 width=64)
+  (actual time=0.021..0.023 rows=3 loops=1)
+  Index Cond: (user_id = 42)</code></pre>
+  <table>
+    <tr><th>Phần</th><th>Nghĩa</th></tr>
+    <tr><td><code>cost=0.42..8.44</code></td><td>Chi phí <em>ước lượng</em>: tới dòng đầu tiên, và tới dòng cuối. Đơn vị tương đối, không phải giây</td></tr>
+    <tr><td><code>rows=1</code></td><td>Số dòng planner <strong>đoán</strong></td></tr>
+    <tr><td><code>actual ... rows=3</code></td><td>Số dòng <strong>thực tế</strong> — chỉ có với <code>ANALYZE</code></td></tr>
+    <tr><td><code>loops=1</code></td><td>Nút này chạy bao nhiêu lần. Nhân với <code>actual time</code> mới ra tổng thời gian thật</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Điều đầu tiên phải nhìn</h4>
+    So <code>rows</code> ước lượng với <code>rows</code> thực tế. Lệch một bậc độ lớn trở lên nghĩa là <strong>thống kê sai</strong>, và mọi quyết định phía sau của planner đều dựa trên con số sai đó. Chạy <code>ANALYZE tablename</code> rồi xem lại — rất nhiều "plan xấu" biến mất sau bước này.
+  </div>
+  <h3>Các loại nút quét, xếp theo mức mong muốn</h3>
+  <table>
+    <tr><th>Nút</th><th>Nghĩa</th><th>Đánh giá</th></tr>
+    <tr><td>Index Only Scan</td><td>Trả lời hoàn toàn từ index, không chạm bảng</td><td>Tốt nhất</td></tr>
+    <tr><td>Index Scan</td><td>Dùng index tìm vị trí rồi đọc dòng trong bảng</td><td>Tốt khi ít dòng</td></tr>
+    <tr><td>Bitmap Heap Scan</td><td>Gom vị trí trước, rồi đọc bảng theo thứ tự trang</td><td>Tốt khi nhiều dòng nhưng chưa phải hầu hết</td></tr>
+    <tr><td>Seq Scan</td><td>Quét toàn bảng</td><td><strong>Không phải luôn xấu</strong> — xem mục 05</td></tr>
+    <tr><td>Nested Loop + Seq Scan bên trong</td><td>Quét lại bảng cho từng dòng bên ngoài</td><td>Dấu hiệu thiếu index cho join</td></tr>
+  </table>
+</section>
+
+<section id="sqlindex-s5">
+  <div class="sh"><b>05</b><h2>Lab: điểm giao nhau</h2></div>
+  <p>Kéo tỉ lệ dòng khớp điều kiện và xem planner nên chọn gì. Chi phí tính theo số <strong>trang</strong> phải đọc, vì đó mới là đơn vị thật của I/O.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>số dòng của bảng</label><input type="number" id="qrows" value="1000000" min="100"></div>
+      <div><label>% dòng khớp điều kiện</label><input type="number" id="qsel" value="0.1" step="0.1" min="0.001" max="100"></div>
+      <div><label>dòng mỗi trang</label><input type="number" id="qppp" value="100" min="1"></div>
+      <div><label>đọc ngẫu nhiên đắt hơn tuần tự</label><input type="number" id="qrnd" value="4" min="1" max="20"></div>
+    </div>
+    <div id="qview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Tăng dần tỉ lệ khớp: quanh mức <strong>vài phần trăm</strong>, quét toàn bảng bắt đầu thắng. Lý do là index scan đọc <em>ngẫu nhiên</em> từng trang, còn seq scan đọc <em>tuần tự</em> nên rẻ hơn mỗi trang và được đọc trước. Đây là toàn bộ câu trả lời cho câu hỏi "vì sao có index mà nó không dùng".
+    </p>
+  </div>
+</section>
+
+<section id="sqlindex-s6">
+  <div class="sh"><b>06</b><h2>Selectivity — chỉ số quyết định</h2></div>
+<pre><code>selectivity = số dòng khớp / tổng số dòng
+
+email = 'a@b.com'      → 1 / 1.000.000 = 0.000001   rất chọn lọc → index rất hiệu quả
+status = 'active'      → 800.000 / 1.000.000 = 0.8  kém chọn lọc → index vô dụng
+is_deleted = false     → 0.99                       vô dụng hoàn toàn</code></pre>
+  <p><strong>Cardinality</strong> là số giá trị khác nhau của cột. Cardinality cao thì selectivity thấp, tức index tốt. Cột boolean có cardinality bằng 2 — index gần như không bao giờ được dùng.</p>
+  <div class="note">
+    <h4>Ngoại lệ đáng biết: partial index</h4>
+    Nếu chỉ 1% dòng có <code>status = 'pending'</code> và bạn luôn truy vấn đúng nhóm đó, hãy tạo index chỉ cho phần đó:
+<pre style="margin:8px 0 0"><code>CREATE INDEX idx_pending ON orders (created_at)
+  WHERE status = <span class="st">'pending'</span>;</code></pre>
+    Index nhỏ hơn nhiều, ghi rẻ hơn, và vẫn phục vụ đúng truy vấn cần thiết. Đây là kỹ thuật nêu ra trong phỏng vấn thường gây ấn tượng tốt vì nó cho thấy bạn nghĩ theo mẫu truy vấn thật.
+  </div>
+</section>
+
+<section id="sqlindex-s7">
+  <div class="sh"><b>07</b><h2>Index tổ hợp và quy tắc leftmost prefix</h2></div>
+<pre><code>CREATE INDEX idx ON orders (user_id, status, created_at);</code></pre>
+  <p>Index này được sắp theo <code>user_id</code> trước, trong mỗi <code>user_id</code> thì sắp theo <code>status</code>, rồi tới <code>created_at</code>. Giống danh bạ sắp theo họ rồi tên.</p>
+  <table>
+    <tr><th>Truy vấn lọc theo</th><th>Dùng được index?</th></tr>
+    <tr><td><code>user_id</code></td><td>Có — tiền tố đầu</td></tr>
+    <tr><td><code>user_id</code> + <code>status</code></td><td>Có</td></tr>
+    <tr><td><code>user_id</code> + <code>status</code> + <code>created_at</code></td><td>Có — trọn vẹn</td></tr>
+    <tr><td><code>status</code> một mình</td><td><strong>Không</strong> — bỏ mất cột đầu</td></tr>
+    <tr><td><code>user_id</code> + <code>created_at</code></td><td>Chỉ dùng được phần <code>user_id</code>, phần sau phải lọc lại</td></tr>
+    <tr><td><code>user_id = 5</code> AND <code>status &gt; 'a'</code></td><td>Có, nhưng cột sau khoảng thì không dùng được nữa</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Hai quy tắc xếp thứ tự cột</h4>
+    <p><strong>1. Cột so bằng trước, cột so khoảng sau.</strong> Vì sau một điều kiện khoảng, các cột tiếp theo trong index không còn được sắp liên tục nên không dùng để tìm được nữa.</p>
+    <p><strong>2. Cột chọn lọc hơn đặt trước</strong> — trong các cột đều so bằng. Nó thu hẹp không gian tìm kiếm nhanh hơn.</p>
+  </div>
+  <p>Một index tổ hợp <code>(a, b)</code> thay được index đơn <code>(a)</code>, nên đừng tạo cả hai — index đơn trên <code>a</code> là dư thừa và chỉ tốn thêm chi phí ghi.</p>
+</section>
+
+<section id="sqlindex-s8">
+  <div class="sh"><b>08</b><h2>Index bao phủ và index-only scan</h2></div>
+<pre><code><span class="cm">-- truy vấn chỉ cần user_id và total</span>
+SELECT user_id, total FROM orders WHERE user_id = <span class="st">42</span>;
+
+<span class="cm">-- index chỉ có user_id: phải quay lại bảng lấy total</span>
+CREATE INDEX i1 ON orders (user_id);              <span class="cm">→ Index Scan</span>
+
+<span class="cm">-- index chứa cả total: trả lời xong ngay trong index</span>
+CREATE INDEX i2 ON orders (user_id) INCLUDE (total);   <span class="cm">→ Index Only Scan</span></code></pre>
+  <p>Khi mọi cột mà truy vấn cần đều nằm trong index, cơ sở dữ liệu <strong>không phải chạm vào bảng</strong>. Đó là Index Only Scan, và nó thường nhanh hơn vài lần vì bỏ được toàn bộ phần đọc ngẫu nhiên.</p>
+  <p><code>INCLUDE</code> khác với việc thêm cột vào khoá: cột trong <code>INCLUDE</code> chỉ được <em>chở theo</em>, không tham gia sắp xếp — nên index không phình lên nhiều và không đổi thứ tự.</p>
+  <div class="note warn">
+    <h4>Trong PostgreSQL, index-only scan có điều kiện</h4>
+    Nó chỉ hoạt động khi trang dữ liệu đã được đánh dấu là "toàn bộ đều thấy được" trong visibility map — do cơ chế MVCC. Nếu bảng vừa bị ghi nhiều mà chưa <code>VACUUM</code> thì plan tụt về Index Scan thường. Đây là chi tiết đặc thù PostgreSQL, nêu ra được là điểm cộng rõ ràng.
+  </div>
+</section>
+
+<section id="sqlindex-s9">
+  <div class="sh"><b>09</b><h2>Khi index có mà vẫn bị bỏ qua</h2></div>
+  <table>
+    <tr><th>Nguyên nhân</th><th>Ví dụ</th><th>Cách chữa</th></tr>
+    <tr><td>Hàm bọc quanh cột</td><td><code>WHERE lower(email) = 'a@b.com'</code></td><td>Index biểu thức: <code>CREATE INDEX ON t (lower(email))</code></td></tr>
+    <tr><td>Tính toán trên cột</td><td><code>WHERE created_at + interval '1 day' &gt; now()</code></td><td>Chuyển phép tính sang phía hằng số</td></tr>
+    <tr><td>Ký tự thay thế ở đầu</td><td><code>WHERE name LIKE '%son'</code></td><td>Full-text search, trigram index, hoặc lưu thêm cột đảo ngược</td></tr>
+    <tr><td>Lệch kiểu dữ liệu</td><td>Cột <code>varchar</code> so với số nguyên</td><td>Ép kiểu đúng ở phía tham số</td></tr>
+    <tr><td>Selectivity quá thấp</td><td><code>WHERE is_active = true</code> với 90% dòng active</td><td>Không cần index; hoặc partial index cho nhóm nhỏ</td></tr>
+    <tr><td><code>OR</code> trên nhiều cột</td><td><code>WHERE a = 1 OR b = 2</code></td><td>Hai index riêng để planner dùng Bitmap Or, hoặc viết thành <code>UNION</code></td></tr>
+    <tr><td>Thống kê đã cũ</td><td>Vừa nạp thêm hàng triệu dòng</td><td><code>ANALYZE tablename</code></td></tr>
+    <tr><td>Bảng quá nhỏ</td><td>Vài trăm dòng, vừa một vài trang</td><td>Không cần chữa — seq scan đúng là rẻ hơn</td></tr>
+  </table>
+  <div class="note">
+    <h4>Nguyên tắc chung phía sau bảng này</h4>
+    Index sắp theo <strong>giá trị nguyên bản của cột</strong>. Bất cứ thứ gì làm biến đổi giá trị đó trước khi so sánh đều phá thứ tự sắp xếp, và index thành vô dụng. Nên quy tắc là: <strong>giữ cột trần một bên dấu bằng</strong>, mọi phép tính đẩy sang bên kia.
+  </div>
+</section>
+
+<section id="sqlindex-s10">
+  <div class="sh"><b>10</b><h2>Ba thuật toán JOIN</h2></div>
+  <table>
+    <tr><th>Thuật toán</th><th>Cách làm</th><th>Chi phí</th><th>Planner chọn khi</th></tr>
+    <tr><td>Nested Loop</td><td>Với mỗi dòng bảng ngoài, tìm dòng khớp ở bảng trong</td><td>O(n · chi phí tìm)</td><td>Bảng ngoài nhỏ <strong>và</strong> bảng trong có index trên cột join</td></tr>
+    <tr><td>Hash Join</td><td>Dựng bảng băm từ bảng nhỏ, quét bảng lớn và tra</td><td>O(n + m)</td><td>Join so bằng, hai bảng lớn, không có index sẵn</td></tr>
+    <tr><td>Merge Join</td><td>Sắp cả hai theo cột join rồi đi song song</td><td>O(n log n + m log m), hoặc O(n+m) nếu đã sắp</td><td>Hai bên đã sắp sẵn — thường vì đọc theo index</td></tr>
+  </table>
+<pre><code><span class="cm">-- dấu hiệu xấu trong EXPLAIN: Nested Loop với Seq Scan bên trong</span>
+Nested Loop  (rows=10000)
+  -&gt;  Seq Scan on users      (rows=10000)
+  -&gt;  Seq Scan on orders     (rows=500)     loops=10000
+      Filter: (user_id = users.id)
+
+<span class="cm">-- quét bảng orders 10.000 lần → thiếu index trên orders(user_id)</span></code></pre>
+  <p>Chú ý <code>loops=10000</code>: nó cho biết nút bên trong chạy mười nghìn lần. Đây là chi tiết hay bị bỏ qua khi đọc plan — thời gian thật của một nút là <code>actual time × loops</code>, không phải chỉ <code>actual time</code>.</p>
+  <div class="note key">
+    <h4>Hash Join không xấu</h4>
+    Nhiều người thấy Hash Join là tưởng thiếu index. Với hai bảng lớn cần ghép toàn bộ, hash join <em>là</em> lựa chọn tối ưu — nó quét tuần tự cả hai bảng, không đọc ngẫu nhiên. Chỉ khi bảng ngoài nhỏ mà bảng trong lớn thì nested loop kèm index mới thắng.
+  </div>
+</section>
+
+<section id="sqlindex-s11">
+  <div class="sh"><b>11</b><h2>Thống kê và plan xấu</h2></div>
+  <p>Planner không xem dữ liệu thật — nó xem <strong>thống kê</strong>: số dòng ước lượng, biểu đồ phân phối giá trị, danh sách giá trị hay gặp nhất, số giá trị khác nhau.</p>
+<pre><code>ANALYZE orders;                    <span class="cm">-- cập nhật thống kê thủ công</span>
+
+<span class="cm">-- xem PostgreSQL đang nghĩ gì về một cột</span>
+SELECT n_distinct, most_common_vals, correlation
+FROM pg_stats WHERE tablename = <span class="st">'orders'</span> AND attname = <span class="st">'status'</span>;</code></pre>
+  <p>Ba tình huống làm thống kê sai và sinh plan tệ:</p>
+  <ul>
+    <li><strong>Vừa nạp dữ liệu lớn.</strong> Autovacuum chưa kịp chạy, planner vẫn tưởng bảng còn nhỏ và chọn nested loop cho một bảng vài triệu dòng.</li>
+    <li><strong>Phân phối lệch.</strong> Cột <code>country</code> có 90% giá trị là <code>VN</code>: ước lượng trung bình cho mọi giá trị sẽ sai nặng cho cả trường hợp phổ biến và trường hợp hiếm. Chữa bằng cách tăng <code>statistics target</code> cho cột đó.</li>
+    <li><strong>Tương quan giữa hai cột.</strong> <code>city</code> và <code>country</code> phụ thuộc nhau, nhưng planner mặc định giả định độc lập nên nhân hai selectivity với nhau và ra con số quá nhỏ. Chữa bằng <code>CREATE STATISTICS</code> cho nhóm cột.</li>
+  </ul>
+  <div class="note warn">
+    <h4>Trước khi kết luận "planner bị lỗi"</h4>
+    Chạy <code>EXPLAIN ANALYZE</code> và so <code>rows</code> ước lượng với thực tế. Nếu lệch nhiều thì vấn đề là thống kê, không phải thuật toán chọn plan. Chạy <code>ANALYZE</code> trước khi nghĩ tới việc can thiệp sâu hơn.
+  </div>
+</section>
+
+<section id="sqlindex-s12">
+  <div class="sh"><b>12</b><h2>Bài toán N+1</h2></div>
+  <p>Không phải lỗi của cơ sở dữ liệu mà của tầng ứng dụng — nhưng đây là nguyên nhân chậm phổ biến nhất trong hệ thống thật.</p>
+<pre><code><span class="cm"># 1 truy vấn lấy danh sách, rồi N truy vấn cho từng phần tử</span>
+users = db.query(<span class="st">"SELECT * FROM users LIMIT 100"</span>)     <span class="cm"># 1</span>
+<span class="kw">for</span> u <span class="kw">in</span> users:
+    orders = db.query(<span class="st">"SELECT * FROM orders WHERE user_id = ?"</span>, u.id)   <span class="cm"># × 100</span>
+<span class="cm"># tổng 101 lần đi vòng tới database</span></code></pre>
+<pre><code><span class="cm"># cách 1: một truy vấn với IN</span>
+SELECT * FROM orders WHERE user_id IN (...);
+
+<span class="cm"># cách 2: JOIN, lấy hết trong một lần</span>
+SELECT u.*, o.* FROM users u LEFT JOIN orders o ON o.user_id = u.id;
+
+<span class="cm"># cách 3: với ORM — nạp sẵn quan hệ</span>
+session.query(User).options(selectinload(User.orders))</code></pre>
+  <p>Mỗi truy vấn tốn một lần đi vòng qua mạng — thường 0.5 tới 2 ms. 101 truy vấn nhanh cũng thành hàng trăm ms, trong khi bản thân dữ liệu chỉ cần vài ms để lấy. Đây là lý do nên đếm <em>số lượng truy vấn</em>, không chỉ tối ưu từng truy vấn.</p>
+</section>
+
+<section id="sqlindex-s13">
+  <div class="sh"><b>13</b><h2>Checklist tối ưu một truy vấn chậm</h2></div>
+  <ol>
+    <li><strong>Chạy <code>EXPLAIN ANALYZE</code>.</strong> Đừng đoán.</li>
+    <li><strong>So <code>rows</code> ước lượng với thực tế.</strong> Lệch nhiều → chạy <code>ANALYZE</code> rồi xem lại.</li>
+    <li><strong>Tìm nút tốn nhất.</strong> Nhớ nhân <code>actual time</code> với <code>loops</code>.</li>
+    <li><strong>Xem có Seq Scan trên bảng lớn kèm điều kiện chọn lọc không.</strong> Đó là chỗ thiếu index.</li>
+    <li><strong>Kiểm tra điều kiện có làm index vô hiệu không</strong> — hàm bọc cột, lệch kiểu, ký tự thay thế ở đầu.</li>
+    <li><strong>Xem cột join có index không.</strong> Nested loop với seq scan bên trong là dấu hiệu rõ.</li>
+    <li><strong>Kiểm tra có lấy thừa dữ liệu không.</strong> <code>SELECT *</code> khi chỉ cần hai cột làm mất cơ hội index-only scan.</li>
+    <li><strong>Đếm số truy vấn mà ứng dụng phát ra.</strong> N+1 thường là vấn đề lớn hơn cả một truy vấn chậm.</li>
+  </ol>
+</section>
+
+<section id="sqlindex-s14">
+  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Index trên mọi cột "cho chắc"</h4><p>Ghi chậm gấp nhiều lần, tốn dung lượng, và phần lớn index không bao giờ được dùng.</p></div>
+    <div class="card bad"><h4>Bọc hàm quanh cột trong WHERE</h4><p><code>lower(email) = ...</code> làm index vô hiệu. Dùng index biểu thức.</p></div>
+    <div class="card bad"><h4>Tin rằng Seq Scan luôn xấu</h4><p>Với bảng nhỏ hoặc điều kiện khớp nhiều dòng, quét tuần tự đúng là rẻ hơn.</p></div>
+    <div class="card bad"><h4>Sai thứ tự cột trong index tổ hợp</h4><p>Lọc theo cột thứ hai một mình thì index không dùng được. Cột so bằng đặt trước cột so khoảng.</p></div>
+    <div class="card bad"><h4>Quên nhân với loops khi đọc plan</h4><p>Một nút 0.02ms nhưng chạy 10.000 lần là 200ms — thường chính là chỗ nghẽn.</p></div>
+    <div class="card bad"><h4>Tối ưu từng truy vấn mà bỏ qua số lượng truy vấn</h4><p>101 truy vấn nhanh vẫn chậm hơn 1 truy vấn hơi chậm.</p></div>
+  </div>
+</section>
+
+<section id="sqlindex-s15">
+  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Vì sao thêm index làm SELECT nhanh lên nhưng INSERT chậm đi?</summary>
+  <p>Index là một cấu trúc B-tree phụ được sắp theo giá trị cột, nên tìm kiếm chỉ mất O(log n) thay vì quét toàn bảng O(n). Nhưng nó phải luôn đồng bộ với bảng: mỗi <code>INSERT</code> phải chèn khoá vào <b>mọi</b> index của bảng, có thể gây tách nút; <code>UPDATE</code> cột được index thì phải xoá khoá cũ và chèn khoá mới. Bảng có 10 index thì một lần insert thành 11 lần ghi. Cộng thêm dung lượng, có khi bằng 20–50% kích thước bảng.</p></details>
+
+  <details class="qa"><summary>Có index rồi mà truy vấn vẫn chậm — bạn kiểm tra gì?</summary>
+  <p>Chạy <code>EXPLAIN ANALYZE</code> trước. Nếu plan không dùng index thì thường vì một trong các lý do: có hàm bọc quanh cột nên phá thứ tự sắp xếp, lệch kiểu dữ liệu gây ép kiểu ngầm, <code>LIKE</code> có ký tự thay thế ở đầu, selectivity quá thấp nên planner thấy seq scan rẻ hơn, hoặc thống kê đã cũ. Nếu plan <em>có</em> dùng index mà vẫn chậm thì nhìn <code>loops</code> — một nút rẻ chạy mười nghìn lần vẫn là nút nghẽn.</p></details>
+
+  <details class="qa"><summary>Giải thích quy tắc leftmost prefix của index tổ hợp.</summary>
+  <p>Index <code>(a, b, c)</code> được sắp theo <code>a</code> trước, trong mỗi <code>a</code> mới sắp theo <code>b</code>, rồi <code>c</code> — giống danh bạ sắp theo họ rồi tên. Nên nó dùng được cho truy vấn lọc theo <code>a</code>, hoặc <code>a+b</code>, hoặc cả ba, nhưng <b>không</b> dùng được nếu chỉ lọc theo <code>b</code>. Hai quy tắc xếp cột: cột so bằng đặt trước cột so khoảng, vì sau một điều kiện khoảng thì các cột sau không còn sắp liên tục; và trong các cột so bằng thì cột chọn lọc hơn đặt trước.</p></details>
+
+  <details class="qa"><summary>Khi nào Seq Scan tốt hơn Index Scan?</summary>
+  <p>Khi tỉ lệ dòng khớp điều kiện đủ lớn — thực tế khoảng vài phần trăm trở lên. Lý do là index scan đọc <em>ngẫu nhiên</em> từng trang chứa dòng cần lấy, còn seq scan đọc <em>tuần tự</em> nên mỗi trang rẻ hơn và hệ thống đọc trước được. Khi phải chạm hầu hết các trang thì đọc tuần tự cả bảng rẻ hơn nhảy ngẫu nhiên. Bảng rất nhỏ cũng vậy: cả bảng chỉ vài trang thì index chỉ thêm việc.</p></details>
+
+  <details class="qa"><summary>Hash join, merge join, nested loop — planner chọn thế nào?</summary>
+  <p>Nested loop khi bảng ngoài nhỏ <b>và</b> bảng trong có index trên cột join — mỗi dòng ngoài chỉ mất một lần tra. Hash join khi join so bằng và hai bảng đều lớn không có index: dựng bảng băm từ bên nhỏ rồi quét bên lớn, tất cả đọc tuần tự. Merge join khi hai bên đã sắp theo cột join, thường vì đọc theo index. Hash join xuất hiện <b>không</b> có nghĩa là thiếu index — với hai bảng lớn cần ghép toàn bộ thì nó chính là lựa chọn tối ưu.</p></details>
+
+  <details class="qa"><summary>Bài toán N+1 là gì và chữa thế nào?</summary>
+  <p>Là khi ứng dụng phát một truy vấn lấy danh sách N phần tử, rồi phát thêm N truy vấn cho từng phần tử — tổng N+1 lần đi vòng tới database. Mỗi lần đi vòng tốn khoảng nửa tới hai ms nên 100 phần tử thành hàng trăm ms dù bản thân dữ liệu chỉ cần vài ms. Chữa bằng một truy vấn <code>IN</code>, một <code>JOIN</code>, hoặc bật nạp sẵn quan hệ nếu dùng ORM. Bài học chung là phải đếm số lượng truy vấn, không chỉ tối ưu từng truy vấn.</p></details>
+</section>
+
+<footer>Deep dive · index &amp; query plan · cú pháp và tên nút theo PostgreSQL; nguyên lý áp dụng chung cho MySQL và các hệ quan hệ khác.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

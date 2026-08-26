@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Async / asyncio — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-async" data-title="Async / asyncio" data-tag="Python" data-blurb="Vì sao 1000 kết nối thì async chứ không thread, ba lỗi async kinh điển, chi phí thật của từng mô hình, và bảng chọn.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Python internals</p>
+  <h1>Async <em>/ asyncio</em></h1>
+  <p class="lede">Async đổi đơn vị chờ từ một luồng 8 MB sang một object vài trăm byte — đó là toàn bộ lý do nó tồn tại. Đổi lại, <b>một lệnh chặn duy nhất treo cả event loop</b>. Bài này đi qua ba lỗi async kinh điển, chi phí thật của từng mô hình, và bảng chọn cuối cùng.</p>
+</header>
+
+<section id="async-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Async giải quyết chuyện gì mà thread không</h2></div>
+
+  <p class="key">Cùng là để chờ I/O, nhưng async đổi <em>đơn vị chờ</em> từ luồng hệ điều hành sang một object vài trăm byte.</p>
+
+  <ul class="why">
+    <li>Một luồng tốn khoảng <b>8 MB stack</b> và mỗi lần chuyển luồng phải đi qua nhân. 1000 kết nối đồng thời là 1000 luồng — không kham nổi.</li>
+    <li>Một coroutine đang chờ chỉ là một object trong event loop. Đổi lại: <b>chỉ cần một lệnh chặn là treo cả vòng lặp</b>, ảnh hưởng mọi request khác.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần GIL, thread, process và race condition nằm ở bài
+    <a href="../thread-process-gil/index.html">Thread, process &amp; GIL</a>.
+  </div>
+</section>
+
+<section id="async-s2">
+  <div class="sh"><b>02</b><h2>async/await</h2></div>
+  <p>Đồng thời <em>hợp tác</em> trên một luồng duy nhất: mỗi tác vụ tự nguyện nhường quyền tại điểm <code>await</code>.</p>
+<pre><code><span class="kw">import</span> asyncio
+
+<span class="kw">async def</span> fetch(session, url):
+    <span class="kw">async with</span> session.get(url) <span class="kw">as</span> r:
+        <span class="kw">return</span> <span class="kw">await</span> r.text()          <span class="cm">← nhường quyền tại đây</span>
+
+<span class="kw">async def</span> main(urls):
+    <span class="kw">async with</span> aiohttp.ClientSession() <span class="kw">as</span> s:
+        <span class="kw">return</span> <span class="kw">await</span> asyncio.gather(*[fetch(s, u) <span class="kw">for</span> u <span class="kw">in</span> urls])
+
+asyncio.run(main(urls))                <span class="cm"># 1000 request đồng thời trên MỘT luồng</span></code></pre>
+  <table>
+    <tr><th>Khái niệm</th><th>Là gì</th></tr>
+    <tr><td><code>coroutine</code></td><td>Hàm khai báo <code>async def</code>. Gọi nó <strong>không chạy gì cả</strong> — chỉ tạo một object chờ được await</td></tr>
+    <tr><td><code>await</code></td><td>Điểm nhường quyền: "tôi chờ ở đây, event loop cứ chạy việc khác"</td></tr>
+    <tr><td><code>event loop</code></td><td>Bộ điều phối: giữ danh sách tác vụ, chạy cái nào đã sẵn sàng</td></tr>
+    <tr><td><code>Task</code></td><td>Coroutine đã được giao cho event loop, chạy nền độc lập</td></tr>
+    <tr><td><code>gather</code></td><td>Chạy nhiều thứ đồng thời và chờ tất cả xong</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao async nhẹ hơn thread nhiều lần</h4>
+    Một luồng hệ điều hành tốn khoảng vài MB ngăn xếp và mỗi lần chuyển luồng phải đi qua kernel. Một task async chỉ là một object Python vài KB, và chuyển đổi chỉ là một lần gọi hàm trong không gian người dùng. Đó là lý do 10.000 kết nối đồng thời khả thi với async nhưng vô vọng với thread.
+  </div>
+</section>
+
+<section id="async-s3">
+  <div class="sh"><b>03</b><h2>Ba lỗi async kinh điển</h2></div>
+  <h3>1. Gọi hàm chặn trong event loop</h3>
+<pre><code><span class="kw">async def</span> handler():
+    time.sleep(<span class="st">2</span>)              <span class="cm">← ĐÓNG BĂNG TOÀN BỘ event loop 2 giây</span>
+    data = requests.get(url)   <span class="cm">← cũng vậy: thư viện đồng bộ</span>
+    row = cursor.execute(sql)  <span class="cm">← driver DB đồng bộ cũng vậy</span>
+
+<span class="cm"># đúng:</span>
+<span class="kw">async def</span> handler():
+    <span class="kw">await</span> asyncio.sleep(<span class="st">2</span>)
+    data = <span class="kw">await</span> client.get(url)                     <span class="cm"># thư viện async</span>
+    row = <span class="kw">await</span> asyncio.to_thread(cursor.execute, sql) <span class="cm"># đẩy hàm chặn sang thread</span></code></pre>
+  <p>Đây là lỗi nghiêm trọng nhất vì hậu quả không nằm ở một request — nó làm <em>mọi</em> request đang chờ bị treo theo. Triệu chứng: server chậm bất thường dưới tải mà CPU vẫn thấp.</p>
+  <h3>2. Quên await</h3>
+<pre><code>result = fetch(url)          <span class="cm">← không chạy gì, result là một coroutine object</span>
+result = <span class="kw">await</span> fetch(url)    <span class="cm"># đúng</span></code></pre>
+  <p>Python cảnh báo <code>coroutine was never awaited</code> — nhưng chỉ khi bộ thu gom rác dọn tới nó, nên cảnh báo hiện muộn và ở chỗ khác hẳn nơi gây lỗi.</p>
+  <h3>3. Tuần tự hoá vô tình</h3>
+<pre><code><span class="cm"># SAI: chờ xong từng cái → không nhanh hơn tuần tự</span>
+<span class="kw">for</span> url <span class="kw">in</span> urls:
+    results.append(<span class="kw">await</span> fetch(url))
+
+<span class="cm"># ĐÚNG: phát hết ra rồi chờ chung</span>
+results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="kw">for</span> u <span class="kw">in</span> urls])</code></pre>
+  <div class="note warn">
+    <h4>Chi tiết ít người biết</h4>
+    Nếu một tác vụ trong <code>gather</code> ném lỗi, các tác vụ khác <strong>vẫn tiếp tục chạy</strong> và lỗi được ném lên ngay. Dùng <code>return_exceptions=True</code> để nhận lỗi như một giá trị kết quả thay vì làm sập cả nhóm. Đây là điều bắt buộc phải xử lý trong code thật.
+  </div>
+</section>
+
+<section id="async-s4">
+  <div class="sh"><b>04</b><h2>Chi phí thật của từng mô hình</h2></div>
+  <table>
+    <tr><th></th><th>Bộ nhớ mỗi đơn vị</th><th>Chi phí tạo</th><th>Chi phí chuyển đổi</th><th>Số lượng khả thi</th></tr>
+    <tr><td>Process</td><td>~30 MB trở lên</td><td>Hàng chục–trăm ms</td><td>Qua kernel, đắt</td><td>Bằng số lõi</td></tr>
+    <tr><td>Thread</td><td>~8 MB ngăn xếp</td><td>Dưới ms</td><td>Qua kernel</td><td>Hàng trăm</td></tr>
+    <tr><td>Async task</td><td>Vài KB</td><td>Micro giây</td><td>Gọi hàm, rất rẻ</td><td><strong>Hàng chục nghìn</strong></td></tr>
+  </table>
+  <p>Bảng này giải thích tại sao câu hỏi "tại sao async chứ không thread" có câu trả lời định lượng: cùng phục vụ 10.000 kết nối đồng thời, thread cần khoảng 80 GB RAM, async cần vài chục MB.</p>
+</section>
+
+<section id="async-s5">
+  <div class="sh"><b>05</b><h2>Bảng chọn mô hình</h2></div>
+  <table>
+    <tr><th>Tình huống</th><th>Chọn</th><th>Vì sao</th></tr>
+    <tr><td>Gọi nhiều API, có thư viện async</td><td><strong>asyncio</strong></td><td>Nhẹ nhất, chồng lấn tối đa</td></tr>
+    <tr><td>Gọi nhiều API nhưng chỉ có SDK đồng bộ</td><td>ThreadPoolExecutor</td><td>Không phải viết lại; thư viện chặn vẫn nhả GIL khi chờ mạng</td></tr>
+    <tr><td>Tính toán nặng bằng Python thuần</td><td><strong>multiprocessing</strong></td><td>Cách duy nhất thoát GIL</td></tr>
+    <tr><td>Tính toán nặng bằng NumPy/PyTorch</td><td>Một luồng là đủ</td><td>Thư viện đã nhả GIL và tự song song trong C</td></tr>
+    <tr><td>Web server nhiều kết nối chờ</td><td>asyncio, hoặc nhiều tiến trình mỗi cái một event loop</td><td>Mô hình chuẩn của uvicorn với nhiều worker</td></tr>
+    <tr><td>Tiền xử lý dữ liệu cho huấn luyện</td><td>multiprocessing</td><td>Chính là <code>num_workers</code> của DataLoader</td></tr>
+    <tr><td>Vừa chờ nhiều vừa tính nhiều</td><td>asyncio + <code>to_thread</code> hoặc process pool</td><td>Tầng async lo chờ, tầng process lo tính</td></tr>
+  </table>
+</section>
+
+<section id="async-s6">
+  <div class="sh"><b>06</b><h2>Trong hệ thống thật</h2></div>
+<pre><code>Một API phục vụ model LLM:
+
+  uvicorn --workers 4          ← 4 TIẾN TRÌNH, thoát GIL, dùng 4 lõi
+    └── mỗi tiến trình: 1 event loop
+          ├── async: nhận request, gọi vector DB, gọi LLM API, stream về client
+          └── to_thread: gọi driver DB đồng bộ, đọc file, xử lý ảnh</code></pre>
+  <p>Đây là kiến trúc gặp ở gần như mọi service Python hiện đại, và nó dùng <em>cả ba</em> mô hình đúng chỗ: process để dùng nhiều lõi, async để chồng lấn hàng nghìn lần chờ, thread để chứa những thư viện chưa có bản async.</p>
+  <div class="note">
+    <h4>Câu hỏi hay gặp ở vòng system design</h4>
+    <em>Service của em xử lý được bao nhiêu request đồng thời?</em> Câu trả lời tốt bắt đầu bằng việc phân loại: nếu chủ yếu là chờ, giới hạn nằm ở kết nối và bộ nhớ nên async cho phép hàng nghìn; nếu chủ yếu là tính, giới hạn nằm ở số lõi và không mô hình nào vượt qua được — phải scale ngang.
+  </div>
+</section>
+
+<section id="async-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Ba lỗi này làm code async chạy đúng nhưng <em>chậm như tuần tự</em>, hoặc mất task im lặng.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Gọi hàm chặn trong coroutine</h4><p>Treo cả event loop, ảnh hưởng mọi request khác. Bọc bằng <code>asyncio.to_thread</code>.</p></div>
+    <div class="card bad"><h4>await trong vòng lặp</h4><p>Thành tuần tự. Dùng <code>gather</code> để phát hết rồi chờ chung.</p></div>
+    <div class="card bad"><h4>Tạo task rồi không giữ tham chiếu</h4><p><code>asyncio.create_task</code> mà không lưu lại thì task có thể bị thu gom giữa đường. Giữ trong một set, hoặc dùng TaskGroup.</p></div>
+  </div>
+</section>
+
+<section id="async-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Thread, process, async — bạn chọn thế nào?</summary>
+  <p>Tôi phân loại tác vụ trước bằng cách so thời gian CPU với thời gian thực tế. Nếu chờ nhiều thì async, vì mỗi task chỉ vài KB nên chồng lấn được hàng nghìn kết nối; nếu thư viện chỉ có bản đồng bộ thì thread, vì không phải viết lại code. Nếu tính nhiều thì process, đó là cách duy nhất dùng nhiều lõi — nhưng phải chia thành khối lớn để bù chi phí pickle. Trong service thật thì thường dùng cả ba: nhiều tiến trình, mỗi tiến trình một event loop, và thread pool cho các thư viện chặn.</p></details>
+
+  <details class="qa"><summary>Vì sao 1000 kết nối đồng thời thì async chứ không thread?</summary>
+  <p>Vì chi phí mỗi đơn vị. Một luồng hệ điều hành tốn khoảng 8MB ngăn xếp và mỗi lần chuyển luồng phải đi qua kernel; 1000 luồng là gần 8GB RAM và rất nhiều context switch. Một task async chỉ là object Python vài KB, chuyển đổi là một lần gọi hàm trong không gian người dùng. Cùng mức đồng thời, async tốn ít hơn hai bậc độ lớn. Đánh đổi là toàn bộ chuỗi hàm phải viết theo kiểu async và không được có lệnh chặn nào.</p></details>
+
+  <details class="qa"><summary>Trong FastAPI, khi nào bạn dùng def và khi nào async def?</summary>
+  <p>Dùng <code>async def</code> khi mọi lệnh I/O bên trong đều có bản async — client HTTP async, driver DB async. Dùng <code>def</code> thường khi hàm có lệnh chặn: framework sẽ tự chạy nó trong một thread pool nên không treo event loop. Lỗi tệ nhất là khai báo <code>async def</code> rồi gọi thư viện đồng bộ bên trong — lúc đó event loop bị đóng băng và mọi request khác chờ theo. Nếu buộc phải gọi lệnh chặn trong coroutine thì bọc bằng <code>asyncio.to_thread</code>.</p></details>
+</section>
+
+<footer>Deep dive · async / asyncio · phần GIL, thread và process nằm ở bài <a href="../thread-process-gil/index.html">Thread, process &amp; GIL</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

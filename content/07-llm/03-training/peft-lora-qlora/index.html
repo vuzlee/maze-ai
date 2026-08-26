@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEFT — LoRA & QLoRA — MazeAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-lora" data-title="PEFT — LoRA & QLoRA" data-tag="LLM" data-blurb="Vì sao ma trận hạng thấp đủ dùng, chọn r và alpha thế nào, QLoRA nén 4-bit ra sao, và LoRA giảm quên kiến thức cũ tới đâu.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · fine-tuning</p>
+  <h1>PEFT — <em>LoRA &amp; QLoRA</em></h1>
+  <p class="lede">Fine-tune đầy đủ một model 7B cần <b>60–80 GB VRAM</b>; LoRA đưa con số đó về mức một GPU tiêu dùng. Bài này giải thích vì sao học một ma trận <b>hạng thấp</b> lại đủ, cách chọn <code>r</code> và <code>alpha</code>, và QLoRA nén trọng số gốc xuống 4-bit mà vẫn huấn luyện được bằng cách nào.</p>
+</header>
+
+<section id="lora-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vì sao không fine-tune toàn bộ trọng số</h2></div>
+
+  <p class="key">Fine-tune đầy đủ một model 7B cần khoảng <em>60–80 GB VRAM</em> chỉ riêng cho trọng số, gradient và trạng thái optimizer.</p>
+
+  <ul class="why">
+    <li>Mỗi tham số phải giữ <b>bốn bản</b>: trọng số, gradient, và hai moment của Adam. Đó là chỗ bộ nhớ bốc hơi, không phải ở forward pass.</li>
+    <li>Thêm nữa mỗi tác vụ lại ra <b>một bản model đầy đủ</b> — mười tác vụ là mười lần 14 GB phải lưu và phải nạp.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần có nên fine-tune không, SFT, che mất mát trên prompt, RLHF và DPO nằm ở bài
+    <a href="../sft-alignment/index.html">SFT &amp; alignment</a>.
+  </div>
+</section>
+
+<section id="lora-s2">
+  <div class="sh"><b>02</b><h2>LoRA — Low-Rank Adaptation</h2></div>
+<pre><code>Ý tưởng: phần CẬP NHẬT của một ma trận trọng số thường có hạng thấp,
+nên biểu diễn được bằng tích của hai ma trận nhỏ.
+
+    W_mới = W_gốc + ΔW
+    ΔW    = B · A        với A: (r, d_in),  B: (d_out, r),  r rất nhỏ
+
+    W_gốc  ĐÓNG BĂNG, không cập nhật
+    A, B   là phần duy nhất được huấn luyện
+
+Số tham số: từ d_in × d_out  →  r × (d_in + d_out)
+Với d = 4096, r = 16:  16.7 triệu  →  131 nghìn  (0.8%)</code></pre>
+<pre><code>Lúc suy luận:
+    h = W_gốc·x + (α/r) · B·A·x
+
+α/r là hệ số tỉ lệ, cho phép đổi r mà không phải dò lại learning rate.
+Có thể GỘP B·A vào W_gốc sau khi huấn luyện → suy luận không tốn thêm gì.</code></pre>
+  <div class="note key">
+    <h4>Vì sao B khởi tạo bằng 0 và A khởi tạo ngẫu nhiên</h4>
+    Vì <code>ΔW = B·A = 0</code> lúc bắt đầu, nên model khởi đầu <strong>giống hệt model gốc</strong> — không có cú sốc nào ở bước đầu tiên. Nếu cả hai đều ngẫu nhiên thì <code>ΔW</code> là nhiễu ngẫu nhiên cộng vào trọng số đã huấn luyện tốt, phá chất lượng ngay. Nếu cả hai đều bằng 0 thì gradient của cả hai bằng 0 mãi mãi — không học được gì. Một cái 0, một cái ngẫu nhiên là lựa chọn duy nhất đúng.
+  </div>
+  <table>
+    <tr><th>Tham số</th><th>Khoảng dùng</th><th>Ghi chú</th></tr>
+    <tr><td><code>r</code> — hạng</td><td>8–64</td><td>16 là điểm khởi đầu tốt. Tác vụ càng khác model gốc thì cần <code>r</code> càng lớn</td></tr>
+    <tr><td><code>alpha</code></td><td>Thường bằng <code>r</code> hoặc <code>2r</code></td><td>Chỉ là hệ số tỉ lệ; đổi nó tương đương đổi learning rate</td></tr>
+    <tr><td><code>target_modules</code></td><td><strong>Mọi lớp tuyến tính</strong></td><td>Bài báo gốc chỉ dùng <code>q, v</code>; thực nghiệm sau cho thấy áp lên cả MLP tốt hơn rõ</td></tr>
+    <tr><td><code>dropout</code></td><td>0.05–0.1</td><td>Áp lên nhánh LoRA</td></tr>
+  </table>
+  <p><strong>Lợi ích ít được nhắc:</strong> vì trọng số gốc không đổi, bạn có thể huấn luyện <em>nhiều bộ adapter</em> cho nhiều tác vụ và hoán đổi chúng trên cùng một model nền đang nằm trong VRAM. Một GPU phục vụ mười khách hàng với mười adapter riêng — điều không làm được với full fine-tune.</p>
+</section>
+
+<section id="lora-s3">
+  <div class="sh"><b>03</b><h2>Lab: tham số và bộ nhớ</h2></div>
+  <div class="lab">
+    <div class="bar">
+      <div><label>preset</label>
+        <select id="fpreset">
+          <option value="7b" selected>7B — d 4096, L 32</option>
+          <option value="13b">13B — d 5120, L 40</option>
+          <option value="70b">70B — d 8192, L 80</option>
+        </select>
+      </div>
+      <div><label>d_model</label><input type="number" id="fd" value="4096" min="64"></div>
+      <div><label>số lớp</label><input type="number" id="fL" value="32" min="1"></div>
+      <div><label>d_ff</label><input type="number" id="fff" value="11008" min="64"></div>
+      <div><label>rank r</label><input type="number" id="fr" value="16" min="1" max="256"></div>
+      <div><label>áp LoRA lên</label>
+        <select id="ftgt">
+          <option value="attn">chỉ attention (q,k,v,o)</option>
+          <option value="all" selected>mọi lớp tuyến tính (+ MLP)</option>
+        </select>
+      </div>
+    </div>
+    <div id="fview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Con số đáng chú ý nhất là cột bộ nhớ: full fine-tune một model 7B cần khoảng 100+ GB nên phải nhiều GPU, còn QLoRA đưa nó xuống mức <strong>một GPU 24GB</strong> — và đó chính là lý do QLoRA thay đổi cục diện.
+    </p>
+  </div>
+</section>
+
+<section id="lora-s4">
+  <div class="sh"><b>04</b><h2>QLoRA</h2></div>
+<pre><code>Model nền được lượng tử hoá xuống 4-bit và ĐÓNG BĂNG.
+Adapter LoRA giữ ở bf16 và được huấn luyện.
+
+Ba đóng góp kỹ thuật:
+
+1. NF4 — NormalFloat 4-bit
+   Các mức lượng tử hoá được chọn theo phân phối CHUẨN, không cách đều.
+   Vì trọng số mạng nơ-ron xấp xỉ phân phối chuẩn, cách này mất ít thông tin hơn.
+
+2. Double quantization
+   Lượng tử hoá luôn cả các hằng số scale của bước lượng tử hoá.
+   Tiết kiệm thêm khoảng 0.4 bit mỗi tham số.
+
+3. Paged optimizer
+   Đẩy trạng thái optimizer sang RAM khi VRAM đầy, tránh lỗi hết bộ nhớ
+   ở những đợt đột biến.</code></pre>
+  <table>
+    <tr><th></th><th>Full fine-tune</th><th>LoRA</th><th>QLoRA</th></tr>
+    <tr><td>Bộ nhớ cho model 7B</td><td>~100 GB</td><td>~20 GB</td><td><strong>~6 GB</strong></td></tr>
+    <tr><td>Chất lượng</td><td>Chuẩn tham chiếu</td><td>Gần bằng</td><td>Gần bằng LoRA</td></tr>
+    <tr><td>Tốc độ huấn luyện</td><td>Nhanh nhất mỗi bước</td><td>Nhanh</td><td>Chậm hơn ~30% do phải giải nén</td></tr>
+    <tr><td>Gộp adapter vào model</td><td>—</td><td>Được</td><td>Phải giải nén model nền trước</td></tr>
+  </table>
+  <div class="note">
+    <h4>Đánh đổi thực tế của QLoRA</h4>
+    Nó đổi <strong>thời gian lấy bộ nhớ</strong>: mỗi lượt forward phải giải nén trọng số 4-bit về bf16 để tính, nên chậm hơn LoRA khoảng 30%. Đáng khi bạn bị chặn bởi VRAM — mà đó là tình huống của gần như mọi người không có cụm GPU. Nếu có đủ VRAM thì LoRA thường là lựa chọn tốt hơn.
+  </div>
+</section>
+
+<section id="lora-s5">
+  <div class="sh"><b>05</b><h2>Quên kiến thức cũ</h2></div>
+<pre><code>Fine-tune trên dữ liệu miền hẹp → model giỏi việc đó, nhưng:
+    - mất khả năng làm theo chỉ dẫn chung
+    - quên kiến thức không liên quan
+    - mất tính an toàn đã được huấn luyện
+
+Gọi là catastrophic forgetting.</code></pre>
+  <table>
+    <tr><th>Cách giảm</th><th>Cơ chế</th></tr>
+    <tr><td><strong>Dùng LoRA</strong></td><td>Trọng số gốc không đổi nên phần lớn năng lực cũ được bảo toàn — và có thể tắt adapter để về model gốc</td></tr>
+    <tr><td>Learning rate nhỏ, ít epoch</td><td>Đi ít khỏi điểm khởi đầu thì mất ít</td></tr>
+    <tr><td><strong>Trộn dữ liệu chung</strong></td><td>Thêm 10–30% dữ liệu chỉ dẫn tổng quát vào tập fine-tune</td></tr>
+    <tr><td>Đóng băng các lớp đầu</td><td>Lớp đầu học đặc trưng chung; lớp cuối mới chuyên biệt hoá</td></tr>
+    <tr><td>Kiểm tra hồi quy</td><td>Không chống được nhưng <em>phát hiện</em> được — bộ test cố định chạy trước và sau</td></tr>
+  </table>
+  <p>Dòng cuối quan trọng về mặt quy trình: bạn không thể sửa thứ mình không đo được. Một bộ 100–200 câu hỏi cố định, chạy trước và sau fine-tune, phát hiện được ngay việc model vừa mất một khả năng nào đó.</p>
+</section>
+
+<section id="lora-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">LoRA dễ chạy nhưng bốn chỗ này quyết định nó có học được gì không.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>LoRA chỉ áp lên q và v</h4><p>Theo bài báo gốc, nhưng thực nghiệm sau cho thấy áp lên mọi lớp tuyến tính tốt hơn rõ.</p></div>
+    <div class="card bad"><h4>Đặt <code>r</code> quá nhỏ cho tác vụ khó</h4><p><code>r = 4</code> đủ cho đổi giọng văn, không đủ cho học một miền mới. Thấy loss chững sớm thì tăng <code>r</code> trước khi tăng số epoch.</p></div>
+    <div class="card bad"><h4>Đổi <code>r</code> mà quên <code>alpha</code></h4><p>Độ mạnh thực tế là <code>alpha / r</code>. Tăng <code>r</code> mà giữ nguyên <code>alpha</code> là vô tình làm yếu adapter đi.</p></div>
+    <div class="card bad"><h4>Gộp adapter rồi mới lượng tử hoá</h4><p>Với QLoRA, trọng số gốc đã ở 4-bit. Gộp vào rồi nén lại lần nữa làm mất phần lớn thứ vừa học.</p></div>
+  </div>
+</section>
+
+<section id="lora-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>LoRA hoạt động thế nào, vì sao tiết kiệm được nhiều?</summary>
+  <p>Nó đóng băng trọng số gốc và học thêm <code>ΔW = B·A</code> với <code>A</code> và <code>B</code> là hai ma trận hạng thấp. Số tham số huấn luyện từ <code>d_in × d_out</code> xuống <code>r × (d_in + d_out)</code> — với <code>d = 4096</code> và <code>r = 16</code> thì từ 16.7 triệu xuống 131 nghìn. Tiết kiệm bộ nhớ chủ yếu không nằm ở trọng số mà ở <b>trạng thái optimizer và gradient</b>, vì chúng chỉ tồn tại cho phần tham số huấn luyện. <code>B</code> khởi tạo bằng 0 để <code>ΔW = 0</code> lúc bắt đầu, nên model khởi đầu giống hệt model gốc. Sau khi huấn luyện có thể gộp <code>B·A</code> vào trọng số gốc nên suy luận không tốn thêm gì.</p></details>
+
+  <details class="qa"><summary>Chọn <code>r</code> và <code>alpha</code> thế nào?</summary>\n  <p>Thứ quyết định độ mạnh là <b>tỉ số <code>alpha / r</code></b>, không phải từng con số riêng lẻ — quy ước phổ biến là đặt <code>alpha = 2r</code> rồi chỉ chỉnh <code>r</code>. Bắt đầu ở <code>r = 8</code> hoặc 16 cho tác vụ đổi giọng văn và định dạng đầu ra; lên 32 tới 64 khi cần học một miền kiến thức mới. Dấu hiệu <code>r</code> quá nhỏ là loss chững lại rất sớm — lúc đó tăng <code>r</code> chứ đừng tăng số epoch, vì thêm epoch chỉ làm nó học thuộc.</p></details>
+
+  <details class="qa"><summary>QLoRA nén 4-bit mà sao vẫn huấn luyện được?</summary>\n  <p>Vì phần bị nén là <b>trọng số gốc đã đóng băng</b>, không phải thứ đang học. Trọng số nền giữ ở NF4 chỉ để chạy forward; khi cần tính thì giải nén từng khối về bf16. Còn <b>adapter LoRA vẫn ở độ chính xác đầy đủ</b> — gradient chỉ chảy vào đó. Hai mẹo kèm theo là lượng tử hoá kép để nén luôn các hằng số lượng tử hoá, và paged optimizer để tràn sang RAM thay vì hết VRAM.</p></details>
+
+  <details class="qa"><summary>Vì sao LoRA ít quên kiến thức cũ hơn fine-tune đầy đủ?</summary>\n  <p>Vì trọng số gốc <b>không hề bị sửa</b> — toàn bộ thứ học được nằm trong một ma trận hạng thấp cộng thêm bên cạnh. Fine-tune đầy đủ ghi đè trực tiếp lên tham số đang mang kiến thức cũ, nên mất mát là vĩnh viễn. Với LoRA, muốn trả model về nguyên trạng thì chỉ cần tháo adapter ra, và một model nền có thể phục vụ nhiều tác vụ bằng cách đổi adapter lúc chạy.</p></details>
+</section>
+
+<footer>Deep dive · PEFT — LoRA &amp; QLoRA · phần SFT, RLHF và DPO nằm ở bài <a href="../sft-alignment/index.html">SFT &amp; alignment</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -60,6 +60,7 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list):
         "blurb": attr(tag, "data-blurb"),
         "n": len(secs),
         "path": rel,
+        "skeleton": bool(attr(tag, "data-skeleton")),
     }
 
 
