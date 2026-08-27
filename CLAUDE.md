@@ -14,55 +14,62 @@ index.html                       ← trang thư viện
 kit.html                         ← trang tra khuôn hình (tài liệu nội bộ)
 assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự động)
 content/                         ← thứ tự dưới đây = đúng thứ tự hiện trên giao diện
-  01-dsa/                        11 bài · 10 khung
+  01-dsa/                        11 bài · 12 khung
     category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
     01-overview/{dsa-overview*}
     02-foundations/{big-o-complexity}
-    03-data-structures/{array-string*, linked-list*, hash-map*, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie*, union-find}
-    04-algorithms/{sorting*, two-pointers, sliding-window, prefix-sum*, binary-search, greedy*, intervals*, backtracking, graph-bfs-dfs-topo, shortest-path*, dynamic-programming}
-  02-python/                        6 bài · 4 khung
+    03-data-structures/{data-structures-overview*, array-string*, linked-list*, hash-map*, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie*, union-find}
+    04-algorithms/{algorithms-overview*, sorting*, two-pointers, sliding-window, prefix-sum*, binary-search, greedy*, intervals*, backtracking, graph-bfs-dfs-topo, shortest-path*, dynamic-programming}
+  02-python/                        6 bài · 5 khung
     01-overview/{python-overview*}
-    02-language-core/{memory-model-mutability, data-model-dunder*, iterator-generator, decorator-context-manager}
+    02-language-core/{language-core-overview*, memory-model-mutability, data-model-dunder*, iterator-generator, decorator-context-manager}
     03-builtin-structures/{list-tuple-set*, dict-hash-table}
     04-concurrency/{thread-process-gil, asyncio}
     05-toolkit/{leetcode-toolkit*}
-  03-cs-fundamentals/                        2 bài · 7 khung
+  03-cs-fundamentals/                        2 bài · 9 khung
     01-overview/{cs-overview*}
-    02-os/{process-thread-scheduling*, memory-virtual-paging*, lock-deadlock-race*}
-    03-networking/{dns-tls*, tcp-http, caching, rest-api-design*, load-balancing*}
-  04-database/                        3 bài · 12 khung
+    02-os/{os-overview*, process-thread-scheduling*, memory-virtual-paging*, lock-deadlock-race*}
+    03-networking/{networking-overview*, dns-tls*, tcp-http, caching, rest-api-design*, load-balancing*}
+  04-database/                        3 bài · 15 khung
     01-overview/{db-overview*}
-    02-relational-basics/{relational-model*, constraints-integrity*, db-normalization*, er-modeling*}
-    03-sql-basics/{sql-select-filter*, sql-join*, sql-group-aggregate*, sql-subquery-cte*}
-    04-sql-advanced/{sql-window-functions, sql-index-query-plan, transaction-isolation, query-tuning*}
+    02-relational-basics/{relational-overview*, relational-model*, constraints-integrity*, db-normalization*, er-modeling*}
+    03-sql-basics/{sql-basics-overview*, sql-select-filter*, sql-join*, sql-group-aggregate*, sql-subquery-cte*}
+    04-sql-advanced/{sql-advanced-overview*, sql-window-functions, sql-index-query-plan, transaction-isolation, query-tuning*}
     05-beyond-sql/{nosql-landscape*, sharding-replication*}
-  05-machine-learning/                        10 bài · 18 khung
+  05-machine-learning/                        10 bài · 28 khung
     01-overview/{ml-overview*}
-    02-math-foundations/{probability-basics*, expectation-variance*, bayes-theorem*, linear-algebra-ml*, gradient-optimization*, mle-map*}
-    03-core-concepts/{supervised-unsupervised*, bias-variance-tradeoff*, train-val-test-cv*, overfitting-regularization, feature-engineering*}
-    04-classical-ml/{linear-regression, logistic-regression, svm*, knn*, naive-bayes*}
-    05-tree-models/{tree-family-overview, decision-tree, random-forest, gradient-boosting}
-    06-unsupervised/{kmeans-clustering*, pca-dimensionality*}
-    07-evaluation/{metrics-confusion-matrix, roc-auc-pr*, calibration*}
-    08-statistics/{statistics, ab-testing}
-  06-deep-learning/                        4 bài · 9 khung
+    02-math-foundations/{math-foundations-overview*, probability-basics*, expectation-variance*, bayes-theorem*, linear-algebra-ml*, gradient-optimization*, mle-map*}
+    03-core-concepts/{core-concepts-overview*, supervised-unsupervised*, bias-variance-tradeoff*, train-val-test-cv*, overfitting-regularization, feature-engineering*}
+    04-classical-ml/{classical-models-overview*, linear-regression, logistic-regression, ridge-lasso-elasticnet*, svm*, knn*, naive-bayes*}
+    05-tree-models/{tree-family-overview, decision-tree, random-forest, gradient-boosting, xgboost*, lightgbm*}
+    06-clustering/{clustering-overview*, kmeans-clustering*, dbscan*, hdbscan*}
+    07-dimensionality/{pca-dimensionality*}
+    08-evaluation/{evaluation-overview*, metrics-confusion-matrix, roc-auc-pr*, calibration*}
+    09-statistics/{statistics, ab-testing}
+  06-deep-learning/                        4 bài · 11 khung
     01-overview/{dl-overview*}
-    02-neural-network/{perceptron-mlp*, activation-functions*, backpropagation, weight-initialization, normalization, optimizer-sgd-adam*, dropout-regularization*}
+    02-neural-network/{neural-network-overview*, perceptron-mlp*, activation-functions*, backpropagation, weight-initialization, normalization, optimizer-sgd-adam*, dropout-regularization*}
     03-cnn/{convolution-basics*, cnn-mobilenet}
-    04-sequence/{rnn-lstm-gru*}
+    04-sequence/{rnn*, lstm-gru*}
     05-training/{training-recipe*, debug-training*}
-  07-llm/                        6 bài · 11 khung
+  07-transformer/                        2 bài · 13 khung
+    01-overview/{architecture-overview*}
+    02-transformer-core/{transformer-core-overview*, tokenization*, embedding*, positional-encoding*, self-attention, transformer-architecture}
+    03-model-families/{families-overview*, bert*, gpt*, encoder-decoder*}
+    04-beyond-transformer/{beyond-overview*, ssm*, mamba*, hybrid-hymba*}
+  08-llm/                        4 bài · 22 khung
     01-overview/{llm-overview*}
-    02-transformer/{tokenization*, embedding*, positional-encoding*, self-attention, transformer-architecture}
-    03-training/{pretraining*, sft-alignment, peft-lora-qlora}
-    04-inference/{decoding-strategies*, quantization*, inference-optimization}
-    05-rag/{rag-end-to-end, chunking-strategy*, vector-database*, reranking*}
+    02-training/{training-overview*, pretraining*, scaling-law*, sft-alignment, peft-lora-qlora}
+    03-techniques/{techniques-overview*, moe*, long-context*, chain-of-thought*}
+    04-inference/{inference-overview*, decoding-strategies*, quantization*, inference-optimization}
+    05-rag/{rag-overview*, rag-end-to-end, chunking-strategy*, vector-database*, reranking*}
     06-agents/{agent-tool-use*}
-  08-ml-system-design/                        1 bài · 4 khung
+    07-model-labs/{model-labs-overview*, llama*, qwen*, deepseek*, mixtral*, closed-models*}
+  09-ml-system-design/                        1 bài · 4 khung
     01-overview/{mlsd-overview*}
     02-frameworks/{ml-system-design}
     03-case-studies/{recommendation-system*, search-ranking*, llm-rag-system*}
-  09-mlops/                        1 bài · 8 khung
+  10-mlops/                        1 bài · 8 khung
     01-overview/{mlops-overview*}
     02-engineering/{git-workflow*, docker-container*, linux-shell*, fastapi-service*}
     03-lifecycle/{experiment-tracking*, ci-cd-ml*, mlops-serving}
@@ -113,6 +120,37 @@ Tên kệ, tên nhóm, tên bài và đầu mục **dùng thuật ngữ tiếng 
 Phần văn xuôi vẫn là tiếng Việt. Chỉ những **cụm danh từ chuyên ngành** mới giữ tiếng Anh —
 từ tiếng Việt thông thường như *sắp xếp, ràng buộc, chuẩn hoá, khởi tạo, suy luận* thì để nguyên,
 thay hết sẽ thành thứ tiếng lai đọc không xuôi.
+
+## Kiến trúc một nhóm — ba loại bài
+
+Mọi nhóm dựng theo cùng một khuôn, để càng học càng dễ nối:
+
+**Bài overview** — nhóm nào có **≥3 bài là biến thể / đối thủ của nhau** thì có một bài overview
+đứng đầu. Nó kể chuyện chứ không phải mục lục: `Vấn đề · Ý tưởng đầu tiên · Vì sao chưa đủ ·
+Dòng thời gian · Các nhánh · **Bảng so sánh** · Học theo thứ tự nào · Từ điển bỏ túi`.
+Mọi so sánh ngang hàng (bagging vs boosting, k-means vs DBSCAN, RNN vs Transformer) nằm ở đây,
+**không** nằm trong bài kỹ thuật. Nhóm gồm các công cụ rời rạc (Git, Docker, Linux) thì không cần.
+
+**Bài kỹ thuật** — `Vấn đề nó giải · Ý tưởng cốt lõi · Cơ chế · **Hàm mục tiêu** · Đánh đổi ·
+**Dùng ở model nào** · Lỗi hay gặp · Hỏi đáp`.
+
+**Bài model** — `Bối cảnh · **Kỹ thuật dùng lại** · Điểm mới của riêng nó · Dữ liệu & huấn luyện ·
+Kết quả & giới hạn · Bài học · Hỏi đáp`.
+
+Hai mục in đậm là thứ tạo liên kết: bài MoE nói nó chạy ở Mixtral và DeepSeek; bài DeepSeek nói
+nó ghép MoE + MLA + GRPO, ba thứ đã học. Đọc tới bài model là **ráp lại**, không phải học mới.
+
+## Ba kệ nối nhau: Deep learning → Transformer → LLM
+
+Transformer *là* deep learning — tách kệ chỉ để **điều hướng và chia buổi ôn**, không phải tuyên bố
+ba ngành khác nhau. Sự liên tục giữ bằng nội dung, không bằng ranh giới thư mục:
+
+- **một dòng thời gian duy nhất** (perceptron → MLP → CNN → RNN/LSTM → attention → Transformer →
+  scale → MoE → SSM/Mamba) vẽ lại trong overview của **cả ba kệ**, mỗi kệ tô sáng đoạn của mình,
+  làm mờ phần trước và phần sau;
+- đầu mỗi overview có một dòng nối ngược về kệ trước.
+
+Ranh giới đặt ở **chỗ attention xuất hiện** — mốc lịch sử sạch nhất.
 
 ## Khung bài (`data-skeleton="1"`)
 
@@ -258,17 +296,18 @@ khi bật kết quả tìm kiếm, và màu hardcode trong SVG/lab lệch khỏi
 
 ## Việc còn lại
 
-Khung thư mục đã dựng đủ cho cả syllabus — **83 khung bài** chờ viết nội dung. Mở bài ra là thấy
+Khung thư mục đã dựng đủ cho cả syllabus — **127 khung bài** chờ viết nội dung. Mở bài ra là thấy
 dàn ý đã chốt; viết xong thì xoá `data-skeleton="1"` rồi chạy `tools/build.py`.
 
 | Kệ | Khung bài chờ viết |
 |---|---|
-| DSA — data structures & algorithms | DSA overview · Array & string · Linked list · Hash map & set · Trie · Sorting · Prefix sum & difference array · Greedy · Interval · Shortest path |
-| Python | Python overview · Data model & dunder · List, tuple & set · LeetCode toolkit |
-| CS fundamentals | CS fundamentals overview · Process, thread & scheduling · Virtual memory & paging · Lock, deadlock & race condition · DNS & TLS · REST API design · Load balancing & scaling |
-| Database & SQL | Database overview · Relational model · Constraints & integrity · Normalization & denormalization · Schema design · SELECT, WHERE & ORDER BY · JOIN · GROUP BY & aggregate · Subquery & CTE · Query tuning · NoSQL — four families · Replication & sharding |
-| Machine learning | Machine learning overview · Probability · Expectation & variance · Bayes' theorem · Linear algebra for ML · Gradient & optimization · MLE & MAP · Supervised, unsupervised & reinforcement · Bias–variance tradeoff · Train/val/test & cross-validation · Feature engineering · SVM · KNN · Naive Bayes · K-means & clustering · PCA & dimensionality reduction · ROC-AUC & PR curve · Probability calibration |
-| Deep learning | Deep learning overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN, LSTM & GRU · Training recipe · Debugging training |
-| Transformer · LLM · GenAI | LLM overview · Tokenization · Embedding · Positional encoding · Pretraining · Decoding strategies · Quantization · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use |
+| DSA — data structures & algorithms | DSA overview · Data structures overview · Array & string · Linked list · Hash map & set · Trie · Algorithms overview · Sorting · Prefix sum & difference array · Greedy · Interval · Shortest path |
+| Python | Python overview · Language core overview · Data model & dunder · List, tuple & set · LeetCode toolkit |
+| CS fundamentals | CS fundamentals overview · Operating system overview · Process, thread & scheduling · Virtual memory & paging · Lock, deadlock & race condition · Networking overview · DNS & TLS · REST API design · Load balancing & scaling |
+| Database & SQL | Database overview · Relational foundations overview · Relational model · Constraints & integrity · Normalization & denormalization · Schema design · SQL basics overview · SELECT, WHERE & ORDER BY · JOIN · GROUP BY & aggregate · Subquery & CTE · SQL advanced overview · Query tuning · NoSQL — four families · Replication & sharding |
+| Machine learning | Machine learning overview · Math foundations overview · Probability · Expectation & variance · Bayes' theorem · Linear algebra for ML · Gradient & optimization · MLE & MAP · Core concepts overview · Supervised, unsupervised & reinforcement · Bias–variance tradeoff · Train/val/test & cross-validation · Feature engineering · Classical models overview · Ridge, Lasso & Elastic Net · SVM · KNN · Naive Bayes · XGBoost · LightGBM · Clustering overview · K-means & clustering · DBSCAN · HDBSCAN · PCA & dimensionality reduction · Model evaluation overview · ROC-AUC & PR curve · Probability calibration |
+| Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe · Debugging training |
+| Transformer & architectures | Architecture overview · Transformer core overview · Tokenization · Embedding · Positional encoding · Encoder, decoder & both · BERT — encoder-only · GPT — decoder-only · T5 — encoder-decoder · Beyond Transformer overview · State space models · Mamba · Hybrid — Hymba |
+| LLM & GenAI | LLM overview · LLM training overview · Pretraining · Scaling law · LLM techniques overview · Mixture of Experts · Long context · Chain-of-Thought · Inference overview · Decoding strategies · Quantization · RAG overview · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use · Model labs overview · LLaMA · Qwen · DeepSeek · Mistral & Mixtral · GPT, Claude & Gemini |
 | ML system design | ML system design overview · Recommendation system · Search & ranking · LLM/RAG system |
 | MLOps & engineering | MLOps overview · Git · Docker · Linux & shell · Model serving API · Experiment tracking & versioning · CI/CD cho ML · GPU & inference |

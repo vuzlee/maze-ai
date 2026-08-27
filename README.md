@@ -2,7 +2,7 @@
 
 Kho deep dive để chuẩn bị phỏng vấn Big Tech — AI/ML và CS nền tảng, viết bằng tiếng Việt.
 
-**44 bài đã viết · 83 khung bài đã chốt dàn ý · 9 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
+**44 bài đã viết · 127 khung bài đã chốt dàn ý · 10 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
 
 Phỏng vấn Big Tech không kiểm tra trí nhớ — nó đào cho tới khi lộ ra bạn có thật sự hiểu hay
 không. Nên mỗi bài ở đây đi từ **cơ chế bên dưới** tới **hệ quả thực tế**: code chạy được, sơ đồ,
@@ -27,15 +27,16 @@ Chỉ là mở một file HTML bằng trình duyệt. Tiến độ học lưu ng
 
 | # | Kệ | Đã viết | Khung | Nội dung |
 |---|---|---|---|---|
-| 01 | DSA — data structures & algorithms | 11 | 10 | Big-O · array/string, linked list, hash map, stack, heap, tree/BST, trie, union-find · two pointers, sliding window, binary search, sorting, greedy, interval, graph, shortest path, dynamic programming |
-| 02 | Python | 6 | 4 | Language core & data model · built-in types · thread/GIL & asyncio · LeetCode toolkit |
-| 03 | CS fundamentals | 2 | 7 | Operating system (process, virtual memory, lock) · networking (DNS/TLS, TCP/HTTP, caching, REST, load balancing) |
-| 04 | Database & SQL | 3 | 12 | Relational model, constraints, normalization, schema design · SQL basics (JOIN, GROUP BY, CTE) · index, transaction, query tuning · NoSQL, sharding |
-| 05 | Machine learning | 10 | 18 | Math foundations · bias–variance & cross-validation · regression, SVM, KNN, Naive Bayes · tree models · clustering, PCA · evaluation & calibration · statistics, A/B testing |
-| 06 | Deep learning | 4 | 9 | Perceptron, activation, backpropagation, initialization, normalization, optimizer, dropout · convolution · RNN/LSTM · training recipe & debugging |
-| 07 | Transformer · LLM · GenAI | 6 | 11 | Tokenization, embedding, positional encoding, attention, architecture · pretraining, SFT, PEFT · decoding, quantization, inference optimization · RAG & agent |
-| 08 | ML system design | 1 | 4 | Framework · recommendation system, search & ranking, LLM/RAG system |
-| 09 | MLOps & engineering | 1 | 8 | Git, Docker, Linux, serving API · experiment tracking, CI/CD, model serving · GPU & inference |
+| 01 | DSA — data structures & algorithms | 11 | 12 | Big-O · array/string, linked list, hash map, stack, heap, tree/BST, trie, union-find · sorting, two pointers, sliding window, binary search, greedy, interval, graph, shortest path, dynamic programming |
+| 02 | Python | 6 | 5 | Language core & data model · built-in types · thread/GIL & asyncio · LeetCode toolkit |
+| 03 | CS fundamentals | 2 | 9 | Operating system (process, virtual memory, lock) · networking (DNS/TLS, TCP/HTTP, caching, REST, load balancing) |
+| 04 | Database & SQL | 3 | 15 | Relational model, constraints, normalization, schema design · SQL basics · index, transaction, query tuning · NoSQL, sharding |
+| 05 | Machine learning | 10 | 28 | Math foundations · bias–variance, cross-validation · linear/logistic, Ridge–Lasso, SVM, KNN, Naive Bayes · decision tree → random forest → gradient boosting → XGBoost → LightGBM · k-means, DBSCAN, HDBSCAN · PCA · evaluation & calibration · statistics, A/B testing |
+| 06 | Deep learning | 4 | 11 | Perceptron & MLP, activation, backpropagation, initialization, normalization, optimizer, dropout · convolution & CNN · RNN, LSTM & GRU · training recipe & debugging |
+| 07 | Transformer & architectures | 2 | 13 | Tokenization, embedding, positional encoding, self-attention, Transformer block · BERT, GPT, T5 · SSM, Mamba, Hymba |
+| 08 | LLM & GenAI | 4 | 22 | Pretraining & scaling law · SFT, alignment, PEFT · MoE, long context, chain-of-thought · decoding, quantization, serving · RAG · agents · model labs: LLaMA, Qwen, DeepSeek, Mixtral, model đóng |
+| 09 | ML system design | 1 | 4 | Framework · recommendation system, search & ranking, LLM/RAG system |
+| 10 | MLOps & engineering | 1 | 8 | Git, Docker, Linux, serving API · experiment tracking, CI/CD, model serving · GPU & inference |
 
 Kho vẫn đang mở rộng — các mảng còn thiếu bài liệt kê ở cuối
 [CLAUDE.md](CLAUDE.md#chỗ-trống-theo-syllabus).
