@@ -12,7 +12,9 @@ Ba tầng: **kệ → nhóm → bài**, xếp theo syllabus ôn tập.
 ```
 index.html                       ← trang thư viện
 kit.html                         ← trang tra khuôn hình (tài liệu nội bộ)
+404.html                         ← chỉ dùng khi đã deploy; đường dẫn assets là tuyệt đối /… nên mở bằng file:// sẽ trơ
 site.webmanifest                 ← tên + màu + icon khi cài site lên màn hình chính
+sitemap.xml* · robots.txt*       ← sinh từ SITE_URL trong tools/build.py
 assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự động)
 assets/favicon.svg               ← nguồn hình của logo; .ico + .png bên dưới sinh từ nó
 assets/favicon.ico · icon-192.png · icon-512.png · apple-touch-icon.png   (sinh tự động)
@@ -105,6 +107,20 @@ theo** — đừng viết tay mấy dòng đó. `<title>` thì vẫn viết tay,
 
 Đổi logo thì sửa `assets/favicon.svg` **và** `tools/make-icons.py` cho khớp, rồi chạy
 `python3 tools/make-icons.py` (cần `Pillow`) để vẽ lại `.ico` và các `.png`.
+
+## Deploy
+
+Site chạy ở **<https://maze-ai-lemon.vercel.app/>** (Vercel, phục vụ thẳng cây thư mục, không cấu hình gì).
+
+Địa chỉ đó khai đúng **một chỗ**: hằng số `SITE_URL` đầu `tools/build.py`. Từ đó build sinh ra
+`canonical`, `og:url`, `og:image` tuyệt đối, `sitemap.xml` và `robots.txt`. **Đổi domain thì sửa
+đúng dòng đó rồi chạy lại build**, đừng sửa tay mấy file kia.
+
+Canonical cần vì Vercel trả 200 cho cả ba dạng `/x`, `/x/` và `/x/index.html` — dạng chuẩn đã chọn
+là thư mục có `/` ở cuối. `kit.html` là tài liệu nội bộ nên không nằm trong sitemap.
+
+Để `SITE_URL = ""` thì build bỏ qua toàn bộ phần trên và xoá `sitemap.xml`/`robots.txt` — kho quay
+về thuần file://, vẫn chạy bình thường.
 
 ## Thêm một bài mới
 

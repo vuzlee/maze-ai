@@ -2,6 +2,8 @@
 
 Kiến thức nền cho kỹ sư data, machine learning và AI, viết bằng tiếng Việt.
 
+**→ [maze-ai-lemon.vercel.app](https://maze-ai-lemon.vercel.app/)**
+
 **44 bài đã viết · 127 khung bài đã chốt dàn ý · 10 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
 
 Mười kệ xếp theo thứ tự học được, từ cấu trúc dữ liệu và SQL tới Transformer, LLM và MLOps.
@@ -10,18 +12,24 @@ chạy được, sơ đồ, lab bấm được và phần hỏi đáp.
 
 ## Mở lên đọc
 
-Không cần cài gì, không cần mạng, không cần server:
+Bản online ở **[maze-ai-lemon.vercel.app](https://maze-ai-lemon.vercel.app/)** — không cần cài gì,
+mở là đọc.
+
+Muốn đọc offline hoặc muốn sửa thì clone về. Site là HTML tĩnh thuần, không build step, không
+server, không dependency:
 
 ```bash
-git clone <repo> && cd mazeai
+git clone git@github.com:vuzlee/maze-ai.git && cd maze-ai
 xdg-open index.html      # macOS: open index.html
 ```
 
-Chỉ là mở một file HTML bằng trình duyệt. Tiến độ học lưu ngay trong trình duyệt của bạn
-(`localStorage`) — không có tài khoản, không có gì gửi đi đâu cả.
+Mở thẳng file bằng trình duyệt là chạy — y hệt bản online, trừ mỗi phần chia sẻ link.
+
+Tiến độ học lưu ngay trong trình duyệt của bạn (`localStorage`) — không có tài khoản, không có gì
+gửi đi đâu cả.
 
 > Xoá dữ liệu duyệt web của trang này thì mất hết đánh dấu *đã học*.
-> Đổi máy hay đổi trình duyệt cũng không mang theo được.
+> Đổi máy, đổi trình duyệt, hay đổi giữa bản online và bản offline đều không mang theo được.
 
 ## Trong kho có gì
 

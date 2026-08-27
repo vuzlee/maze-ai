@@ -22,6 +22,9 @@ CONTENT = ROOT / "content"
 
 
 SITE = "MazeAI"
+# Địa chỉ site đã deploy, có dấu / ở cuối. Để rỗng thì bỏ qua canonical,
+# og:url, sitemap.xml và robots.txt — kho vẫn chạy được bằng file://.
+SITE_URL = "https://maze-ai-lemon.vercel.app/"
 THEME = "#14110E"          # --bg, để thanh trình duyệt trên mobile không lệch màu trang
 
 HOME_DESC = ("Kiến thức nền cho kỹ sư data, machine learning và AI, viết bằng tiếng Việt: "
@@ -36,9 +39,16 @@ HEAD_SLOT = re.compile(
     r'(</title>\n).*?(<link rel="preconnect" href="https://fonts\.googleapis\.com">)', re.S)
 
 
-def head_meta(base: str, title: str, desc: str, og_type: str, manifest: bool) -> str:
-    """Khối meta chuẩn của một trang. `base` là số cấp ../ để về gốc kho."""
+def head_meta(base: str, canon: str, title: str, desc: str, og_type: str, manifest: bool) -> str:
+    """Khối meta chuẩn của một trang.
+
+    `base`  số cấp ../ để về gốc kho — dùng cho link favicon, để mở bằng file:// vẫn thấy icon.
+    `canon` đường dẫn của trang tính từ gốc site, dùng cho canonical và og:url.
+    """
     e = lambda v: html.escape(v, quote=True)
+    # Vercel trả 200 cho cả /x, /x/ và /x/index.html — canonical gộp ba về một.
+    url = SITE_URL + canon if SITE_URL else ""
+    img = (SITE_URL + "assets/icon-512.png") if SITE_URL else (base + "assets/icon-512.png")
     lines = [
         f'<meta name="description" content="{e(desc)}">',
         '<meta name="color-scheme" content="dark">',
@@ -47,12 +57,15 @@ def head_meta(base: str, title: str, desc: str, og_type: str, manifest: bool) ->
         f'<meta property="og:site_name" content="{SITE}">',
         f'<meta property="og:title" content="{e(title)}">',
         f'<meta property="og:description" content="{e(desc)}">',
-        f'<meta property="og:image" content="{base}assets/icon-512.png">',
+        f'<meta property="og:image" content="{img}">',
         '<meta name="twitter:card" content="summary">',
         f'<link rel="icon" href="{base}assets/favicon.svg" type="image/svg+xml">',
         f'<link rel="alternate icon" href="{base}assets/favicon.ico" sizes="any">',
         f'<link rel="apple-touch-icon" href="{base}assets/apple-touch-icon.png">',
     ]
+    if url:
+        lines[3:3] = [f'<meta property="og:url" content="{url}">']
+        lines.append(f'<link rel="canonical" href="{url}">')
     if manifest:
         # chỉ trang chủ mới khai báo manifest: mở bằng file:// thì trình duyệt
         # không nạp được manifest và sẽ kêu ở console, không cần lặp ở 171 trang bài.
@@ -60,14 +73,14 @@ def head_meta(base: str, title: str, desc: str, og_type: str, manifest: bool) ->
     return "\n".join(lines)
 
 
-def sync_head(page: pathlib.Path, src: str, base: str, title: str, desc: str,
+def sync_head(page: pathlib.Path, src: str, base: str, canon: str, title: str, desc: str,
               og_type: str, manifest: bool, problems: list) -> bool:
     """Ghi lại khối meta cho một trang. Chạy lại nhiều lần vẫn ra đúng một kết quả."""
     if not HEAD_SLOT.search(src):
         problems.append(f"{page}: <head> không theo khuôn (thiếu </title> hoặc dòng preconnect) — bỏ qua meta")
         return False
     out = HEAD_SLOT.sub(
-        lambda m: m.group(1) + head_meta(base, title, desc, og_type, manifest) + "\n" + m.group(2),
+        lambda m: m.group(1) + head_meta(base, canon, title, desc, og_type, manifest) + "\n" + m.group(2),
         src, count=1)
     if out == src:
         return False
@@ -86,7 +99,8 @@ def attr(tag: str, name: str) -> str:
     return html.unescape(m.group(1)) if m else ""
 
 
-def read_book(page: pathlib.Path, rel: str, index: list, problems: list, touched: list):
+def read_book(page: pathlib.Path, rel: str, index: list, problems: list,
+              touched: list, urls: list):
     """Đọc một bài: trả về metadata cho catalog, đồng thời nạp các mục vào chỉ mục tìm kiếm."""
     src = page.read_text(encoding="utf-8")
     m = re.search(r"<article class=\"doc\"[^>]*>", src)
@@ -103,8 +117,10 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list, touched
     got = attr(re.search(r"<html[^>]*>", src).group(0), "data-base")
     if got != want:
         problems.append(f'{rel}: data-base="{got}" — phải là "{want}"')
-    if sync_head(page, src, want, title, blurb or title, "article", False, problems):
+    canon = rel[: -len("index.html")]
+    if sync_head(page, src, want, canon, title, blurb or title, "article", False, problems):
         touched.append(rel)
+    urls.append(canon)
 
     secs = re.findall(r'<section id="([^"]+)"[^>]*>(.*?)</section>', src[m.end():], re.S)
     for sec_id, body in secs:
@@ -132,7 +148,7 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list, touched
 
 
 def main() -> int:
-    catalog, index, problems, touched = [], [], [], []
+    catalog, index, problems, touched, urls = [], [], [], [], []
 
     for cat_dir in sorted(p for p in CONTENT.iterdir() if p.is_dir()):
         meta_file = cat_dir / "category.json"
@@ -169,7 +185,7 @@ def main() -> int:
                     problems.append(f"{cat_dir.name}/{g['dir']}/{name}/: thiếu index.html — bỏ qua")
                     continue
                 book = read_book(page, f"content/{cat_dir.name}/{g['dir']}/{name}/index.html",
-                                 index, problems, touched)
+                                 index, problems, touched, urls)
                 if book:
                     books.append(book)
             groups.append({"dir": g["dir"], "name": g["name"], "books": books})
@@ -181,15 +197,17 @@ def main() -> int:
             "groups": groups,
         })
 
-    for name, desc, manifest in (("index.html", HOME_DESC, True), ("kit.html", KIT_DESC, False)):
+    for name, canon, desc, manifest in (("index.html", "", HOME_DESC, True),
+                                        ("kit.html", "kit.html", KIT_DESC, False)):
         f = ROOT / name
         if not f.exists():
             problems.append(f"{name}: không có file")
             continue
         src = f.read_text(encoding="utf-8")
         title = re.search(r"<title>(.*?)</title>", src, re.S).group(1)
-        if sync_head(f, src, "", html.unescape(title), desc, "website", manifest, problems):
+        if sync_head(f, src, "", canon, html.unescape(title), desc, "website", manifest, problems):
             touched.append(name)
+    urls.insert(0, "")            # trang chủ đứng đầu sitemap; kit.html là tài liệu nội bộ nên không liệt kê
 
     banner = "/* SINH TỰ ĐỘNG bởi tools/build.py — đừng sửa tay. */\n"
     (ROOT / "assets" / "catalog.js").write_text(
@@ -198,6 +216,21 @@ def main() -> int:
     (ROOT / "assets" / "search-index.js").write_text(
         banner + "window.SEARCH_INDEX = " + json.dumps(index, ensure_ascii=False, separators=(",", ":")) + ";\n",
         encoding="utf-8")
+
+    if SITE_URL:
+        locs = "\n".join(f"  <url><loc>{html.escape(SITE_URL + u, quote=True)}</loc></url>" for u in urls)
+        (ROOT / "sitemap.xml").write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            f"{locs}\n</urlset>\n", encoding="utf-8")
+        (ROOT / "robots.txt").write_text(
+            "User-agent: *\nAllow: /\n\n"
+            f"Sitemap: {SITE_URL}sitemap.xml\n", encoding="utf-8")
+        print(f"sitemap.xml     : {len(urls)} URL · robots.txt trỏ về sitemap")
+    else:
+        for f in ("sitemap.xml", "robots.txt"):
+            (ROOT / f).unlink(missing_ok=True)
+        print("sitemap.xml     : bỏ qua (SITE_URL để rỗng)")
 
     ngroups = sum(len(c["groups"]) for c in catalog)
     nbooks = sum(len(g["books"]) for c in catalog for g in c["groups"])
