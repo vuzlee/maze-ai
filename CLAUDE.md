@@ -12,7 +12,10 @@ Ba tầng: **kệ → nhóm → bài**, xếp theo syllabus ôn tập.
 ```
 index.html                       ← trang thư viện
 kit.html                         ← trang tra khuôn hình (tài liệu nội bộ)
+site.webmanifest                 ← tên + màu + icon khi cài site lên màn hình chính
 assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự động)
+assets/favicon.svg               ← nguồn hình của logo; .ico + .png bên dưới sinh từ nó
+assets/favicon.ico · icon-192.png · icon-512.png · apple-touch-icon.png   (sinh tự động)
 content/                         ← thứ tự dưới đây = đúng thứ tự hiện trên giao diện
   01-dsa/                        11 bài · 12 khung
     category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
@@ -74,7 +77,8 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     02-engineering/{git-workflow*, docker-container*, linux-shell*, fastapi-service*}
     03-lifecycle/{experiment-tracking*, ci-cd-ml*, mlops-serving}
     04-infra/{gpu-inference*}
-tools/build.py                   ← quét content/ sinh lại catalog.js + search-index.js
+tools/build.py                   ← quét content/ sinh lại catalog.js + search-index.js, và ghi lại meta trong <head>
+tools/make-icons.py              ← vẽ lại bộ icon từ dấu ◆ thương hiệu (chỉ chạy khi đổi logo)
 archive/mazeai-single-file.html  ← bản gốc gộp 1 file, KHÔNG đụng vào, giữ để đối chiếu
 
 * = khung bài: dàn ý đã chốt, nội dung chưa viết (data-skeleton="1")
@@ -90,9 +94,17 @@ python3 tools/build.py
 ```
 
 Sinh lại `assets/catalog.js` và `assets/search-index.js`, đồng thời báo các chỗ lệch: thư mục bài
-chưa được liệt kê, khai báo trỏ tới thư mục không tồn tại, thiếu `index.html`. **Không chạy lại thì
-bài mới không hiện ở trang chủ và không tìm được.** Hai file `assets/*.js` có gắn dấu sinh tự động
-— đừng sửa tay, lần build sau sẽ ghi đè.
+chưa được liệt kê, khai báo trỏ tới thư mục không tồn tại, thiếu `index.html`, `data-base` sai số
+cấp `../`. **Không chạy lại thì bài mới không hiện ở trang chủ và không tìm được.** Hai file
+`assets/*.js` có gắn dấu sinh tự động — đừng sửa tay, lần build sau sẽ ghi đè.
+
+Nó còn **ghi lại khối meta trong `<head>` của cả 173 trang** — phần nằm giữa `</title>` và dòng
+`preconnect`: mô tả trang, `color-scheme`, `theme-color`, thẻ Open Graph, và các link favicon.
+Mô tả lấy thẳng từ `data-blurb`, tiêu đề chia sẻ lấy từ `data-title`, nên **sửa bài là meta tự khớp
+theo** — đừng viết tay mấy dòng đó. `<title>` thì vẫn viết tay, build không đụng vào.
+
+Đổi logo thì sửa `assets/favicon.svg` **và** `tools/make-icons.py` cho khớp, rồi chạy
+`python3 tools/make-icons.py` (cần `Pillow`) để vẽ lại `.ico` và các `.png`.
 
 ## Thêm một bài mới
 

@@ -1,12 +1,12 @@
 # MazeAI
 
-Kho deep dive để chuẩn bị phỏng vấn Big Tech — AI/ML và CS nền tảng, viết bằng tiếng Việt.
+Kiến thức nền cho kỹ sư data, machine learning và AI, viết bằng tiếng Việt.
 
 **44 bài đã viết · 127 khung bài đã chốt dàn ý · 10 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
 
-Phỏng vấn Big Tech không kiểm tra trí nhớ — nó đào cho tới khi lộ ra bạn có thật sự hiểu hay
-không. Nên mỗi bài ở đây đi từ **cơ chế bên dưới** tới **hệ quả thực tế**: code chạy được, sơ đồ,
-lab bấm được, các bẫy hay gặp, và phần hỏi đáp trả lời theo cách một interviewer muốn nghe.
+Mười kệ xếp theo thứ tự học được, từ cấu trúc dữ liệu và SQL tới Transformer, LLM và MLOps.
+Mỗi bài đi từ **vấn đề nó sinh ra để giải**, qua **cơ chế bên dưới**, tới chỗ nó gãy — kèm code
+chạy được, sơ đồ, lab bấm được và phần hỏi đáp.
 
 ## Mở lên đọc
 
