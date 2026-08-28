@@ -4,7 +4,7 @@ Kiến thức nền cho kỹ sư data, machine learning và AI, viết bằng ti
 
 **→ [maze-ai-lemon.vercel.app](https://maze-ai-lemon.vercel.app/)**
 
-**44 bài đã viết · 127 khung bài đã chốt dàn ý · 10 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
+**44 bài đã viết · 152 khung bài đã chốt dàn ý · 10 kệ · 490 mục tra cứu · 151 bài LeetCode có link.**
 
 Mười kệ xếp theo thứ tự học được, từ cấu trúc dữ liệu và SQL tới Transformer, LLM và MLOps.
 Mỗi bài đi từ **vấn đề nó sinh ra để giải**, qua **cơ chế bên dưới**, tới chỗ nó gãy — kèm code

@@ -25,22 +25,28 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     02-foundations/{big-o-complexity}
     03-data-structures/{data-structures-overview*, array-string*, linked-list*, hash-map*, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie*, union-find}
     04-algorithms/{algorithms-overview*, sorting*, two-pointers, sliding-window, prefix-sum*, binary-search, greedy*, intervals*, backtracking, graph-bfs-dfs-topo, shortest-path*, dynamic-programming}
-  02-python/                        6 bài · 5 khung
+  02-python/                        6 bài · 8 khung
     01-overview/{python-overview*}
     02-language-core/{language-core-overview*, memory-model-mutability, data-model-dunder*, iterator-generator, decorator-context-manager}
     03-builtin-structures/{list-tuple-set*, dict-hash-table}
     04-concurrency/{thread-process-gil, asyncio}
     05-toolkit/{leetcode-toolkit*}
-  03-cs-fundamentals/                        2 bài · 9 khung
+    06-oop/{oop-python*}
+    07-typing/{typing-dataclass*}
+    08-performance/{performance-profiling*}
+  03-cs-fundamentals/                        2 bài · 12 khung
     01-overview/{cs-overview*}
     02-os/{os-overview*, process-thread-scheduling*, memory-virtual-paging*, lock-deadlock-race*}
     03-networking/{networking-overview*, dns-tls*, tcp-http, caching, rest-api-design*, load-balancing*}
-  04-database/                        3 bài · 15 khung
+    04-distributed/{cap-theorem-consistency*, consensus-leader-election*}
+    05-messaging/{messaging-queue-pubsub*}
+  04-database/                        3 bài · 20 khung
     01-overview/{db-overview*}
     02-relational-basics/{relational-overview*, relational-model*, constraints-integrity*, db-normalization*, er-modeling*}
     03-sql-basics/{sql-basics-overview*, sql-select-filter*, sql-join*, sql-group-aggregate*, sql-subquery-cte*}
     04-sql-advanced/{sql-advanced-overview*, sql-window-functions, sql-index-query-plan, transaction-isolation, query-tuning*}
     05-beyond-sql/{nosql-landscape*, sharding-replication*}
+    06-data-systems/{oltp-vs-olap*, data-warehouse-lake*, etl-elt*, batch-stream-processing*, data-quality*}
   05-machine-learning/                        10 bài · 28 khung
     01-overview/{ml-overview*}
     02-math-foundations/{math-foundations-overview*, probability-basics*, expectation-variance*, bayes-theorem*, linear-algebra-ml*, gradient-optimization*, mle-map*}
@@ -51,18 +57,20 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     07-dimensionality/{pca-dimensionality*}
     08-evaluation/{evaluation-overview*, metrics-confusion-matrix, roc-auc-pr*, calibration*}
     09-statistics/{statistics, ab-testing}
-  06-deep-learning/                        4 bài · 11 khung
+  06-deep-learning/                        4 bài · 14 khung
     01-overview/{dl-overview*}
     02-neural-network/{neural-network-overview*, perceptron-mlp*, activation-functions*, backpropagation, weight-initialization, normalization, optimizer-sgd-adam*, dropout-regularization*}
     03-cnn/{convolution-basics*, cnn-mobilenet}
     04-sequence/{rnn*, lstm-gru*}
     05-training/{training-recipe*, debug-training*}
-  07-transformer/                        2 bài · 13 khung
+    06-generative/{autoencoder*, vae*, gan*}
+  07-transformer/                        2 bài · 14 khung
     01-overview/{architecture-overview*}
     02-transformer-core/{transformer-core-overview*, tokenization*, embedding*, positional-encoding*, self-attention, transformer-architecture}
     03-model-families/{families-overview*, bert*, gpt*, encoder-decoder*}
     04-beyond-transformer/{beyond-overview*, ssm*, mamba*, hybrid-hymba*}
-  08-llm/                        4 bài · 22 khung
+    05-efficient/{efficient-attention*}
+  08-llm/                        4 bài · 27 khung
     01-overview/{llm-overview*}
     02-training/{training-overview*, pretraining*, scaling-law*, sft-alignment, peft-lora-qlora}
     03-techniques/{techniques-overview*, moe*, long-context*, chain-of-thought*}
@@ -70,15 +78,20 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     05-rag/{rag-overview*, rag-end-to-end, chunking-strategy*, vector-database*, reranking*}
     06-agents/{agent-tool-use*}
     07-model-labs/{model-labs-overview*, llama*, qwen*, deepseek*, mixtral*, closed-models*}
+    08-rag-evaluation/{rag-evaluation*}
+    09-multimodal/{clip*, vlm*, diffusion-models*, audio-models*}
   09-ml-system-design/                        1 bài · 4 khung
     01-overview/{mlsd-overview*}
     02-frameworks/{ml-system-design}
     03-case-studies/{recommendation-system*, search-ranking*, llm-rag-system*}
-  10-mlops/                        1 bài · 8 khung
+  10-mlops/                        1 bài · 13 khung
     01-overview/{mlops-overview*}
     02-engineering/{git-workflow*, docker-container*, linux-shell*, fastapi-service*}
     03-lifecycle/{experiment-tracking*, ci-cd-ml*, mlops-serving}
     04-infra/{gpu-inference*}
+    05-serving-engines/{serving-engines-comparison*}
+    06-ai-reliability/{hallucination*, guardrails-reliability*}
+    07-ai-security/{prompt-injection*, ai-security-threats*}
 tools/build.py                   ← quét content/ sinh lại catalog.js + search-index.js, và ghi lại meta trong <head>
 tools/make-icons.py              ← vẽ lại bộ icon từ dấu ◆ thương hiệu (chỉ chạy khi đổi logo)
 archive/mazeai-single-file.html  ← bản gốc gộp 1 file, KHÔNG đụng vào, giữ để đối chiếu
@@ -100,7 +113,8 @@ chưa được liệt kê, khai báo trỏ tới thư mục không tồn tại, 
 cấp `../`. **Không chạy lại thì bài mới không hiện ở trang chủ và không tìm được.** Hai file
 `assets/*.js` có gắn dấu sinh tự động — đừng sửa tay, lần build sau sẽ ghi đè.
 
-Nó còn **ghi lại khối meta trong `<head>` của cả 173 trang** — phần nằm giữa `</title>` và dòng
+Nó còn **ghi lại khối meta trong `<head>` của mọi trang** (số trang tăng theo số bài, đừng chép số
+cứng ở đây — xem log của `python3 tools/build.py`) — phần nằm giữa `</title>` và dòng
 `preconnect`: mô tả trang, `color-scheme`, `theme-color`, thẻ Open Graph, và các link favicon.
 Mô tả lấy thẳng từ `data-blurb`, tiêu đề chia sẻ lấy từ `data-title`, nên **sửa bài là meta tự khớp
 theo** — đừng viết tay mấy dòng đó. `<title>` thì vẫn viết tay, build không đụng vào.
@@ -216,6 +230,36 @@ Khi tách, giữ nguyên câu chữ gốc thay vì viết lại:
 5. Sửa `books` trong `category.json`, xoá thư mục cũ, chạy `tools/build.py`.
 6. **Quét lại link chéo toàn kho** — bài khác có thể đang trỏ vào bài vừa xoá.
 
+## Một khái niệm, một chủ — không viết hai bài cho cùng một thứ
+
+Khái niệm nào cũng chỉ có **đúng một bài sở hữu** — chọn kệ mà nó đạt độ sâu tự nhiên nhất (nhiều
+ví dụ, nhiều đánh đổi thật, không phải kệ nào "nghe hợp" hơn). Đừng viết bản "khái quát" ở một kệ
+và bản "áp dụng" ở kệ khác cho cùng một khái niệm — tưởng là hai góc nhìn nhưng thật ra là một bài
+bị chia đôi, và sẽ phải sửa hai nơi mỗi lần cập nhật.
+
+Ở **mọi kệ khác** cần nhắc tới nó, chỉ được nhắc bằng đúng cơ chế đã có sẵn — field in đậm kiểu
+**"Dùng ở model nào"** / **"Kỹ thuật dùng lại"** trong khuôn *Bài kỹ thuật* / *Bài model*: một câu
+trỏ tới bài chủ, không giảng lại. Test để biết có cần mục riêng hay chỉ cần một câu trong văn xuôi:
+
+> Bỏ nó đi, người đọc có hụt một từ khoá **chắc sẽ gặp** ở kệ này không?
+> Có → một mục ngắn 2–4 câu + link tới bài chủ. Không → một câu trong văn xuôi là đủ, không cần mục.
+
+**Mục ngắn đó không phải định nghĩa từ điển** — viết theo đúng bốn nhịp sau, luôn theo thứ tự này:
+
+1. **Vấn đề** (1 câu) — vì sao khái niệm này tồn tại, khớp style "vào từ vấn đề" của toàn kho.
+2. **Định nghĩa + tên các nhánh/chiến lược chính** (1–2 câu) — gọi thẳng tên, không cần giảng từng
+   cái. Bắt buộc phải gọi tên: `search-index.js` đọc chữ trong mục để tìm — thiếu tên thì ai gõ tìm
+   đúng từ đó sẽ không thấy mục này, mất tác dụng "nhận ra" mà mục ngắn này tồn tại để làm.
+3. **Một câu đánh đổi** — cái giá phải trả khi dùng, không phải liệt kê ưu điểm.
+4. **Link tới bài chủ** để xem đầy đủ.
+
+Vẫn chỉ 3–4 câu, không phình thành bài — nếu thấy cần thêm ví dụ hay đào sâu hơn nữa, đó là dấu
+hiệu khái niệm này đáng một bài riêng thật (xem đoạn dưới), không phải mục ngắn nữa.
+
+Nếu viết thử mà thấy phần "khái quát" ở kệ khác đã dài hơn một mục — đó là dấu hiệu khái niệm này
+đáng một bài riêng thật, nhưng vẫn chỉ có **một** bài, và bài đang định viết ở kệ kia phải xoá,
+chuyển link sang bài mới đó.
+
 ## Ngôn ngữ thiết kế
 
 Chất riêng của kho: **nền mực ám nâu, nhấn cam đất, tiêu đề serif** — gần với một cuốn sách
@@ -324,18 +368,20 @@ khi bật kết quả tìm kiếm, và màu hardcode trong SVG/lab lệch khỏi
 
 ## Việc còn lại
 
-Khung thư mục đã dựng đủ cho cả syllabus — **127 khung bài** chờ viết nội dung. Mở bài ra là thấy
-dàn ý đã chốt; viết xong thì xoá `data-skeleton="1"` rồi chạy `tools/build.py`.
+Khung thư mục đã dựng đủ cho cả syllabus — **152 khung bài** chờ viết nội dung (127 khung gốc +
+25 khung thêm theo `TAXONOMY.md`, xem tài liệu đó để biết lý do từng khung mới tồn tại và bài nào
+là chủ duy nhất khi một khái niệm chạm nhiều kệ). Mở bài ra là thấy dàn ý đã chốt; viết xong thì
+xoá `data-skeleton="1"` rồi chạy `tools/build.py`.
 
 | Kệ | Khung bài chờ viết |
 |---|---|
 | DSA — data structures & algorithms | DSA overview · Data structures overview · Array & string · Linked list · Hash map & set · Trie · Algorithms overview · Sorting · Prefix sum & difference array · Greedy · Interval · Shortest path |
-| Python | Python overview · Language core overview · Data model & dunder · List, tuple & set · LeetCode toolkit |
-| CS fundamentals | CS fundamentals overview · Operating system overview · Process, thread & scheduling · Virtual memory & paging · Lock, deadlock & race condition · Networking overview · DNS & TLS · REST API design · Load balancing & scaling |
-| Database & SQL | Database overview · Relational foundations overview · Relational model · Constraints & integrity · Normalization & denormalization · Schema design · SQL basics overview · SELECT, WHERE & ORDER BY · JOIN · GROUP BY & aggregate · Subquery & CTE · SQL advanced overview · Query tuning · NoSQL — four families · Replication & sharding |
+| Python | Python overview · Language core overview · Data model & dunder · List, tuple & set · LeetCode toolkit · **OOP · Type hints & dataclass · Profiling & performance** |
+| CS fundamentals | CS fundamentals overview · Operating system overview · Process, thread & scheduling · Virtual memory & paging · Lock, deadlock & race condition · Networking overview · DNS & TLS · REST API design · Load balancing & scaling · **CAP & consistency · Consensus & leader election · Message queue & Pub/Sub** |
+| Database & SQL | Database overview · Relational foundations overview · Relational model · Constraints & integrity · Normalization & denormalization · Schema design · SQL basics overview · SELECT, WHERE & ORDER BY · JOIN · GROUP BY & aggregate · Subquery & CTE · SQL advanced overview · Query tuning · NoSQL — four families · Replication & sharding · **OLTP vs OLAP · Data warehouse & data lake · ETL & ELT · Batch vs stream processing · Data quality** |
 | Machine learning | Machine learning overview · Math foundations overview · Probability · Expectation & variance · Bayes' theorem · Linear algebra for ML · Gradient & optimization · MLE & MAP · Core concepts overview · Supervised, unsupervised & reinforcement · Bias–variance tradeoff · Train/val/test & cross-validation · Feature engineering · Classical models overview · Ridge, Lasso & Elastic Net · SVM · KNN · Naive Bayes · XGBoost · LightGBM · Clustering overview · K-means & clustering · DBSCAN · HDBSCAN · PCA & dimensionality reduction · Model evaluation overview · ROC-AUC & PR curve · Probability calibration |
-| Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe · Debugging training |
-| Transformer & architectures | Architecture overview · Transformer core overview · Tokenization · Embedding · Positional encoding · Encoder, decoder & both · BERT — encoder-only · GPT — decoder-only · T5 — encoder-decoder · Beyond Transformer overview · State space models · Mamba · Hybrid — Hymba |
-| LLM & GenAI | LLM overview · LLM training overview · Pretraining · Scaling law · LLM techniques overview · Mixture of Experts · Long context · Chain-of-Thought · Inference overview · Decoding strategies · Quantization · RAG overview · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use · Model labs overview · LLaMA · Qwen · DeepSeek · Mistral & Mixtral · GPT, Claude & Gemini |
+| Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe · Debugging training · **Autoencoder · VAE · GAN** |
+| Transformer & architectures | Architecture overview · Transformer core overview · Tokenization · Embedding · Positional encoding · Encoder, decoder & both · BERT — encoder-only · GPT — decoder-only · T5 — encoder-decoder · Beyond Transformer overview · State space models · Mamba · Hybrid — Hymba · **Efficient attention** |
+| LLM & GenAI | LLM overview · LLM training overview · Pretraining · Scaling law · LLM techniques overview · Mixture of Experts · Long context · Chain-of-Thought · Inference overview · Decoding strategies · Quantization · RAG overview · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use · Model labs overview · LLaMA · Qwen · DeepSeek · Mistral & Mixtral · GPT, Claude & Gemini · **RAG evaluation · CLIP · Vision-language model · Diffusion models · Audio models** |
 | ML system design | ML system design overview · Recommendation system · Search & ranking · LLM/RAG system |
-| MLOps & engineering | MLOps overview · Git · Docker · Linux & shell · Model serving API · Experiment tracking & versioning · CI/CD cho ML · GPU & inference |
+| MLOps & engineering | MLOps overview · Git · Docker · Linux & shell · Model serving API · Experiment tracking & versioning · CI/CD cho ML · GPU & inference · **vLLM/SGLang/TensorRT-LLM · Hallucination · Guardrails & reliability · Prompt injection & jailbreak · Data poisoning/model extraction/access control** |

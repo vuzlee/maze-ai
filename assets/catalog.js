@@ -405,6 +405,54 @@ window.CATALOG = [
       "skeleton": true
      }
     ]
+   },
+   {
+    "dir": "06-oop",
+    "name": "OOP",
+    "books": [
+     {
+      "dir": "oop-python",
+      "slug": "oop",
+      "title": "OOP trong Python",
+      "tag": "OOP",
+      "blurb": "Class, inheritance, composition và MRO — cách Python giải quyết đa kế thừa, và khi nào nên chọn composition thay vì kế thừa.",
+      "n": 7,
+      "path": "content/02-python/06-oop/oop-python/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "07-typing",
+    "name": "Typing",
+    "books": [
+     {
+      "dir": "typing-dataclass",
+      "slug": "typing",
+      "title": "Type hints & dataclass",
+      "tag": "Typing",
+      "blurb": "Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.",
+      "n": 7,
+      "path": "content/02-python/07-typing/typing-dataclass/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "08-performance",
+    "name": "Performance",
+    "books": [
+     {
+      "dir": "performance-profiling",
+      "slug": "perf",
+      "title": "Profiling & performance",
+      "tag": "Performance",
+      "blurb": "Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.",
+      "n": 5,
+      "path": "content/02-python/08-performance/performance-profiling/index.html",
+      "skeleton": true
+     }
+    ]
    }
   ]
  },
@@ -537,6 +585,48 @@ window.CATALOG = [
       "blurb": "Bốn thuật toán phân phối, sticky session, health check, và tầng 4 khác tầng 7 ở đâu.",
       "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/load-balancing/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "04-distributed",
+    "name": "Distributed systems",
+    "books": [
+     {
+      "dir": "cap-theorem-consistency",
+      "slug": "cap",
+      "title": "CAP & consistency",
+      "tag": "Distributed",
+      "blurb": "Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.",
+      "n": 7,
+      "path": "content/03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "consensus-leader-election",
+      "slug": "consensus",
+      "title": "Consensus & leader election",
+      "tag": "Distributed",
+      "blurb": "Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.",
+      "n": 4,
+      "path": "content/03-cs-fundamentals/04-distributed/consensus-leader-election/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "05-messaging",
+    "name": "Messaging",
+    "books": [
+     {
+      "dir": "messaging-queue-pubsub",
+      "slug": "mq",
+      "title": "Message queue & Pub/Sub",
+      "tag": "Messaging",
+      "blurb": "Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.",
+      "n": 7,
+      "path": "content/03-cs-fundamentals/05-messaging/messaging-queue-pubsub/index.html",
       "skeleton": true
      }
     ]
@@ -754,6 +844,62 @@ window.CATALOG = [
       "blurb": "Bản sao đọc, chọn khoá phân mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.",
       "n": 5,
       "path": "content/04-database/05-beyond-sql/sharding-replication/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "06-data-systems",
+    "name": "Data systems",
+    "books": [
+     {
+      "dir": "oltp-vs-olap",
+      "slug": "oltp",
+      "title": "OLTP vs OLAP",
+      "tag": "Data systems",
+      "blurb": "Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.",
+      "n": 5,
+      "path": "content/04-database/06-data-systems/oltp-vs-olap/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "data-warehouse-lake",
+      "slug": "dwlake",
+      "title": "Data warehouse & data lake",
+      "tag": "Data systems",
+      "blurb": "Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.",
+      "n": 5,
+      "path": "content/04-database/06-data-systems/data-warehouse-lake/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "etl-elt",
+      "slug": "etl",
+      "title": "ETL & ELT",
+      "tag": "Data systems",
+      "blurb": "Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.",
+      "n": 5,
+      "path": "content/04-database/06-data-systems/etl-elt/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "batch-stream-processing",
+      "slug": "batch",
+      "title": "Batch vs stream processing",
+      "tag": "Data systems",
+      "blurb": "Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.",
+      "n": 5,
+      "path": "content/04-database/06-data-systems/batch-stream-processing/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "data-quality",
+      "slug": "dq",
+      "title": "Data quality",
+      "tag": "Data systems",
+      "blurb": "Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.",
+      "n": 5,
+      "path": "content/04-database/06-data-systems/data-quality/index.html",
       "skeleton": true
      }
     ]
@@ -1385,6 +1531,42 @@ window.CATALOG = [
       "skeleton": true
      }
     ]
+   },
+   {
+    "dir": "06-generative",
+    "name": "Generative models",
+    "books": [
+     {
+      "dir": "autoencoder",
+      "slug": "ae",
+      "title": "Autoencoder",
+      "tag": "DL",
+      "blurb": "Nén rồi khôi phục để học representation — bước đệm dẫn tới VAE, không phải mô hình sinh thật sự.",
+      "n": 5,
+      "path": "content/06-deep-learning/06-generative/autoencoder/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "vae",
+      "slug": "vae",
+      "title": "VAE — Variational autoencoder",
+      "tag": "DL",
+      "blurb": "Ép latent space có phân phối biết trước để sinh được mẫu mới — và vì sao ảnh VAE sinh ra thường mờ hơn diffusion.",
+      "n": 6,
+      "path": "content/06-deep-learning/06-generative/vae/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "gan",
+      "slug": "gan",
+      "title": "GAN",
+      "tag": "DL",
+      "blurb": "Hai mạng đấu nhau tới khi generator giả không phân biệt được — nhận diện ý tưởng, không đào sâu vì diffusion đã thay thế ở hầu hết ứng dụng.",
+      "n": 4,
+      "path": "content/06-deep-learning/06-generative/gan/index.html",
+      "skeleton": true
+     }
+    ]
    }
   ]
  },
@@ -1563,6 +1745,22 @@ window.CATALOG = [
       "blurb": "Ghép head attention và head SSM song song trong cùng một lớp, cộng meta token.",
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/hybrid-hymba/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "05-efficient",
+    "name": "Efficient architectures",
+    "books": [
+     {
+      "dir": "efficient-attention",
+      "slug": "effattn",
+      "title": "Efficient attention",
+      "tag": "Transformer",
+      "blurb": "Attention chuẩn tốn O(n²) bộ nhớ — FlashAttention không đổi kết quả, chỉ đổi cách tính; sparse/linear attention đổi cả công thức.",
+      "n": 6,
+      "path": "content/07-transformer/05-efficient/efficient-attention/index.html",
       "skeleton": true
      }
     ]
@@ -1875,6 +2073,68 @@ window.CATALOG = [
       "skeleton": true
      }
     ]
+   },
+   {
+    "dir": "08-rag-evaluation",
+    "name": "RAG evaluation",
+    "books": [
+     {
+      "dir": "rag-evaluation",
+      "slug": "rageval",
+      "title": "Đo một hệ RAG",
+      "tag": "Retrieval",
+      "blurb": "Retrieval đúng không có nghĩa câu trả lời đúng — Recall@K đo retrieval, faithfulness đo answer, hai lớp đo khác nhau hoàn toàn.",
+      "n": 6,
+      "path": "content/08-llm/08-rag-evaluation/rag-evaluation/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "09-multimodal",
+    "name": "Multimodal",
+    "books": [
+     {
+      "dir": "clip",
+      "slug": "clip",
+      "title": "CLIP",
+      "tag": "Multimodal",
+      "blurb": "Học chung một không gian embedding cho ảnh và chữ bằng contrastive loss — nền cho hầu hết mô hình multimodal sau này.",
+      "n": 5,
+      "path": "content/08-llm/09-multimodal/clip/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "vlm",
+      "slug": "vlm",
+      "title": "Vision-language model",
+      "tag": "Multimodal",
+      "blurb": "Ghép vision encoder vào LLM để mô hình đọc được ảnh — điểm ghép ở đâu quyết định model mạnh hay yếu.",
+      "n": 5,
+      "path": "content/08-llm/09-multimodal/vlm/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "diffusion-models",
+      "slug": "diffusion",
+      "title": "Diffusion models",
+      "tag": "Multimodal",
+      "blurb": "Học cách khử nhiễu từng bước nhỏ thay vì sinh trực tiếp — vì sao cách này ổn định và sinh ảnh nét hơn GAN, VAE.",
+      "n": 6,
+      "path": "content/08-llm/09-multimodal/diffusion-models/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "audio-models",
+      "slug": "audio",
+      "title": "Audio models",
+      "tag": "Multimodal",
+      "blurb": "Speech-to-text, text-to-speech và audio embedding — cùng chung một câu hỏi: âm thanh liên tục biến thành token rời rạc thế nào.",
+      "n": 5,
+      "path": "content/08-llm/09-multimodal/audio-models/index.html",
+      "skeleton": true
+     }
+    ]
    }
   ]
  },
@@ -2068,6 +2328,74 @@ window.CATALOG = [
       "blurb": "Bộ nhớ GPU đi đâu, giới hạn băng thông hay tính toán, gộp lô, và chọn phần cứng.",
       "n": 5,
       "path": "content/10-mlops/04-infra/gpu-inference/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "05-serving-engines",
+    "name": "Serving engines",
+    "books": [
+     {
+      "dir": "serving-engines-comparison",
+      "slug": "serving",
+      "title": "vLLM, SGLang & TensorRT-LLM",
+      "tag": "MLOps",
+      "blurb": "Ba serving engine cùng giải bài toán serve LLM nhanh — khác nhau ở đâu, và tên nào hay bị hỏi thẳng trong phỏng vấn hạ tầng.",
+      "n": 6,
+      "path": "content/10-mlops/05-serving-engines/serving-engines-comparison/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "06-ai-reliability",
+    "name": "AI reliability",
+    "books": [
+     {
+      "dir": "hallucination",
+      "slug": "halluc",
+      "title": "Hallucination",
+      "tag": "AI reliability",
+      "blurb": "Model không biết nó không biết — vì sao hallucination là hệ quả tự nhiên của next-token prediction, không phải lỗi cần vá.",
+      "n": 5,
+      "path": "content/10-mlops/06-ai-reliability/hallucination/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "guardrails-reliability",
+      "slug": "guardrails",
+      "title": "Guardrails & production reliability",
+      "tag": "AI reliability",
+      "blurb": "Guardrail chặn input/output xấu, fallback chặn khi model down, human-in-the-loop chặn khi guardrail không chắc — ba lớp phòng thủ khác nhau.",
+      "n": 6,
+      "path": "content/10-mlops/06-ai-reliability/guardrails-reliability/index.html",
+      "skeleton": true
+     }
+    ]
+   },
+   {
+    "dir": "07-ai-security",
+    "name": "AI security",
+    "books": [
+     {
+      "dir": "prompt-injection",
+      "slug": "injection",
+      "title": "Prompt injection & jailbreak",
+      "tag": "AI security",
+      "blurb": "Injection nhắm vào dữ liệu model đọc, jailbreak nhắm vào chính chỉ dẫn hệ thống — hai cách khác nhau để lái model đi khỏi ý định gốc.",
+      "n": 5,
+      "path": "content/10-mlops/07-ai-security/prompt-injection/index.html",
+      "skeleton": true
+     },
+     {
+      "dir": "ai-security-threats",
+      "slug": "aisec",
+      "title": "Data poisoning, model extraction & access control",
+      "tag": "AI security",
+      "blurb": "Ba mối đe doạ nhắm vào ba giai đoạn khác nhau của vòng đời model — dữ liệu train, model đã deploy, và quyền truy cập.",
+      "n": 4,
+      "path": "content/10-mlops/07-ai-security/ai-security-threats/index.html",
       "skeleton": true
      }
     ]
