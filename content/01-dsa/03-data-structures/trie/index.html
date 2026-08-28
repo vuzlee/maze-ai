@@ -39,45 +39,159 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-trie" data-skeleton="1" data-title="Trie" data-tag="DSA" data-blurb="Cây tiền tố: tra theo tiền tố trong O(độ dài), đánh đổi bộ nhớ, và khi nào nó thắng hash map.">
+      <article class="doc" id="art-trie" data-title="Trie" data-tag="Data structure" data-blurb="Cây tiền tố: tra theo tiền tố trong O(độ dài), đánh đổi bộ nhớ, và khi nào nó thắng hash map.">
         <header class="hero">
-  <p class="eyebrow">DSA · nền tảng</p>
-  <h1><em>Trie</em></h1>
-  <p class="lede">Chỉ ra đề khi bài nhắc tới <b>tiền tố</b> — nhưng lúc đó thì gần như luôn là nó.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="eyebrow">DSA · 2 phút + luyện tập</p>
+  <h1><em>Trie</em> — cây tiền tố</h1>
+  <p class="lede">Cấu trúc chuyên dụng: chỉ thắng hash map ở <b>một việc</b>, nhưng ở việc đó thì không có đối thủ.</p>
 </header>
 
 <section id="trie-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Ý tưởng</h2></div>
-  <p class="plan">Chia sẻ tiền tố chung, tra không phụ thuộc số từ.</p>
+
+  <p class="key">Các từ có <em>chung tiền tố thì dùng chung đường đi</em>. Tra một từ tốn O(độ dài), không phụ thuộc kho có bao nhiêu từ.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="Trie chứa các từ car, card, care, cat">
+      <line x1="450" y1="42" x2="450" y2="76"  stroke="#2E2822"></line>
+      <line x1="450" y1="106" x2="450" y2="140" stroke="#2E2822"></line>
+      <line x1="450" y1="170" x2="330" y2="196" stroke="#2E2822"></line>
+      <line x1="450" y1="170" x2="570" y2="196" stroke="#2E2822"></line>
+      <line x1="330" y1="140" x2="330" y2="170" stroke="#2E2822"></line>
+      <line x1="450" y1="106" x2="620" y2="140" stroke="#2E2822"></line>
+
+      <circle cx="450" cy="28"  r="16" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <text class="sv-l" x="450" y="33" text-anchor="middle" fill="#EDB44A">·</text>
+      <text class="sv-l" x="450" y="12" text-anchor="middle" fill="#EDB44A">gốc</text>
+
+      <circle cx="450" cy="92"  r="16" fill="#241F1A" stroke="#3D352C"></circle>
+      <text class="sv-t" x="450" y="97" text-anchor="middle">c</text>
+
+      <circle cx="450" cy="156" r="16" fill="#241F1A" stroke="#3D352C"></circle>
+      <text class="sv-t" x="450" y="161" text-anchor="middle">a</text>
+
+      <circle cx="330" cy="196" r="16" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></circle>
+      <text class="sv-t" x="330" y="201" text-anchor="middle" fill="#5BCFA0">r</text>
+      <circle cx="570" cy="196" r="16" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></circle>
+      <text class="sv-t" x="570" y="201" text-anchor="middle" fill="#5BCFA0">t</text>
+
+      <line x1="330" y1="196" x2="230" y2="196" stroke="#2E2822"></line>
+      <circle cx="214" cy="196" r="16" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></circle>
+      <text class="sv-t" x="214" y="201" text-anchor="middle" fill="#5BCFA0">d</text>
+      <line x1="330" y1="180" x2="410" y2="150" stroke="#2E2822"></line>
+      <circle cx="426" cy="142" r="16" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></circle>
+
+      <text class="sv-l" x="700" y="96"  fill="#7A6F63">bốn từ: car · card · care · cat</text>
+      <text class="sv-l" x="700" y="118" fill="#5BCFA0">viền xanh = nút kết thúc một từ</text>
+      <text class="sv-l" x="700" y="140" fill="#7A6F63">"ca" lưu một lần, dùng chung cho cả bốn</text>
+    </svg>
+  </figure>
+
+  <ul class="why">
+    <li>Tra <b>tiền tố</b> chỉ là đi xuống theo từng ký tự rồi dừng — hash map không làm được việc này.</li>
+    <li>Chi phí <b>O(L)</b> với L là độ dài khoá: kho một triệu từ cũng tra nhanh như kho mười từ.</li>
+  </ul>
 </section>
 
 <section id="trie-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Mẫu code cần thuộc</h2></div>
-  <p class="plan">Chèn, tìm, tìm theo tiền tố.</p>
+
+  <p class="key">Một <code>dict</code> lồng nhau là đủ. Chỉ cần thêm <em>một khoá đánh dấu hết từ</em>.</p>
+
+<pre class="core"><code>END = <span class="st">"#"</span>
+
+<span class="kw">def</span> insert(root, word):
+    node = root
+    <span class="kw">for</span> ch <span class="kw">in</span> word:
+        node = node.setdefault(ch, {})   <span class="cm"># chưa có thì tạo nhánh</span>
+    node[END] = <span class="kw">True</span>                   <span class="cm"># đánh dấu kết thúc từ</span>
+
+<span class="kw">def</span> walk(root, s):                       <span class="cm"># đi theo chuỗi s, trả về nút cuối</span>
+    node = root
+    <span class="kw">for</span> ch <span class="kw">in</span> s:
+        <span class="kw">if</span> ch <span class="kw">not</span> <span class="kw">in</span> node: <span class="kw">return</span> <span class="kw">None</span>
+        node = node[ch]
+    <span class="kw">return</span> node
+
+search      = <span class="kw">lambda</span> r, w: (walk(r, w) <span class="kw">or</span> {}).get(END, <span class="kw">False</span>)
+starts_with = <span class="kw">lambda</span> r, p: walk(r, p) <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span></code></pre>
+
+  <p class="stripnote"><span>khác biệt duy nhất giữa <em>search</em> và <em>startsWith</em></span><span><em>là có kiểm tra khoá END hay không</em></span></p>
 </section>
 
 <section id="trie-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Trie so với hash map</h2></div>
-  <p class="plan">Cái nào cho tra tiền tố, cái nào cho tra chính xác.</p>
+
+  <p class="key">Tra <em>chính xác</em> thì hash map thắng. Tra <em>theo tiền tố</em> thì chỉ trie làm được.</p>
+
+  <table>
+    <tr><th>Việc cần làm</th><th>Hash map</th><th>Trie</th></tr>
+    <tr><td>"từ này có trong kho không"</td><td><b>O(1)*</b> — nhanh hơn</td><td>O(L)</td></tr>
+    <tr><td>"có từ nào bắt đầu bằng <code>ca</code> không"</td><td><b>không làm được</b> — phải quét hết</td><td><b>O(L)</b></td></tr>
+    <tr><td>"liệt kê mọi từ bắt đầu bằng <code>ca</code>"</td><td>O(số từ)</td><td><b>O(số kết quả)</b></td></tr>
+    <tr><td>Bộ nhớ</td><td>gọn hơn</td><td>tốn hơn — mỗi nút một dict</td></tr>
+    <tr><td>Thứ tự từ điển</td><td>không có</td><td><b>duyệt DFS là ra ngay</b></td></tr>
+  </table>
+
+  <p class="stripnote"><span>* băm một chuỗi cũng tốn O(L)</span><span><em>nên khoảng cách thực tế nhỏ hơn nhiều so với vẻ ngoài của ký hiệu</em></span></p>
 </section>
 
 <section id="trie-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Tốn bộ nhớ, quên đánh dấu kết thúc từ, bảng chữ cái lớn.</p>
+
+  <p class="key">Bẫy đầu tiên làm <code>search("ca")</code> trả về <em>đúng</em> trong khi kho chỉ có "car".</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Quên đánh dấu kết thúc từ</h4><p>Không có khoá <code>END</code> thì mọi tiền tố đều bị coi là một từ hoàn chỉnh.</p></div>
+    <div class="card bad"><h4>Tưởng trie tiết kiệm bộ nhớ</h4><p>Nó chỉ tiết kiệm khi <b>tiền tố trùng nhiều</b>. Từ ngẫu nhiên thì tốn hơn hẳn một set.</p></div>
+    <div class="card bad"><h4>Bảng chữ cái lớn</h4><p>Mảng 26 ô mỗi nút hỏng ngay với Unicode. Dùng <code>dict</code> để chỉ tốn chỗ cho ký tự thật sự xuất hiện.</p></div>
+  </div>
 </section>
 
 <section id="trie-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Pattern + LeetCode</h2></div>
-  <p class="plan">Nhận đề và danh sách bài luyện.</p>
+
+  <p class="sig">Dấu hiệu: "tiền tố" · gợi ý khi gõ · tra <b>rất nhiều</b> từ trên cùng một kho · ghép trie vào backtracking</p>
+
+  <div class="stack">
+    <div class="s"><b>Tra và gợi ý theo tiền tố</b><span>dựng trie một lần, mỗi truy vấn O(L)</span></div>
+    <div class="s"><b>Tỉa nhánh cho backtracking</b><span>đang đi trên lưới mà tiền tố hiện tại không có trong trie → <b>quay lại ngay</b></span></div>
+    <div class="s ok"><b>Trie nhị phân cho số</b><span>coi số như chuỗi 32 bit → giải bài XOR lớn nhất</span></div>
+  </div>
+
+  <div class="probs">
+    <a href="https://leetcode.com/problems/implement-trie-prefix-tree/" target="_blank" rel="noopener"><i>208</i><b>Implement Trie <em>— dựng từ đầu, làm trước tiên</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/design-add-and-search-words-data-structure/" target="_blank" rel="noopener"><i>211</i><b>Add and Search Word <em>— thêm ký tự <code>.</code>, phải DFS</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/replace-words/" target="_blank" rel="noopener"><i>648</i><b>Replace Words <em>— dừng ở tiền tố ngắn nhất</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/word-search-ii/" target="_blank" rel="noopener"><i>212</i><b>Word Search II <em>— trie tỉa nhánh cho backtracking</em></b><u class="h">hard</u></a>
+    <a href="https://leetcode.com/problems/maximum-xor-of-two-numbers-in-an-array/" target="_blank" rel="noopener"><i>421</i><b>Maximum XOR of Two Numbers <em>— trie nhị phân</em></b><u class="m">medium</u></a>
+  </div>
+
+  <div class="note">
+    <h4>Thứ tự luyện gợi ý</h4>
+    <b>208</b> → 648 → 211 → 212 → 421.
+  </div>
 </section>
 
 <section id="trie-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Trie hơn hash map ở chỗ nào?</summary>
+  <p>Tra <b>theo tiền tố</b>. Hash map chỉ trả lời khoá đúng hay sai, muốn tìm mọi từ bắt đầu bằng "ca" thì phải quét cả kho.</p></details>
+
+  <details class="qa"><summary>Chi phí tra một từ là bao nhiêu?</summary>
+  <p><b>O(L)</b> với L là độ dài từ — <b>không phụ thuộc số từ đã lưu</b>. Đó là điểm mạnh thật sự của trie.</p></details>
+
+  <details class="qa"><summary>Vì sao cần khoá đánh dấu kết thúc từ?</summary>
+  <p>Để phân biệt <b>"car" là một từ</b> với <b>"ca" chỉ là đường đi</b>. Thiếu nó thì mọi tiền tố đều được coi là từ.</p></details>
+
+  <details class="qa"><summary>Trie giúp gì cho Word Search II?</summary>
+  <p>Đi trên lưới mà tiền tố hiện tại <b>không có trong trie</b> thì quay lại ngay, thay vì thử hết mọi từ trong danh sách.</p></details>
 </section>
 
-<footer>DSA · nền tảng · Trie</footer>
+<footer>DSA · trie · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

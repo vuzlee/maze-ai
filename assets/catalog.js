@@ -13,11 +13,11 @@ window.CATALOG = [
       "dir": "dsa-overview",
       "slug": "dsaov",
       "title": "DSA overview",
-      "tag": "DSA",
-      "blurb": "Toàn cảnh nhánh DSA: từ mảng tới dynamic programming, học theo thứ tự nào, và mỗi thứ sinh ra để chữa giới hạn gì.",
+      "tag": "Overview",
+      "blurb": "Toàn cảnh nhánh DSA: từ mảng tới dynamic programming, học theo thứ tự nào, và mỗi thứ sinh ra để chữa giới hạn nào.",
       "n": 8,
       "path": "content/01-dsa/01-overview/dsa-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -45,41 +45,41 @@ window.CATALOG = [
       "dir": "data-structures-overview",
       "slug": "dsov",
       "title": "Data structures overview",
-      "tag": "DSA",
+      "tag": "Overview",
       "blurb": "Mỗi cấu trúc đổi thứ gì lấy thứ gì: bảng chi phí chung, và cây quyết định chọn cấu trúc theo đề.",
       "n": 8,
       "path": "content/01-dsa/03-data-structures/data-structures-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "array-string",
       "slug": "arrstr",
       "title": "Array & string",
-      "tag": "DSA",
+      "tag": "Data structure",
       "blurb": "Bộ nhớ liên tục, chi phí thật của chèn/xoá, chuỗi bất biến, và vì sao nối chuỗi trong vòng lặp là O(n²).",
       "n": 7,
       "path": "content/01-dsa/03-data-structures/array-string/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "linked-list",
       "slug": "llist",
       "title": "Linked list",
-      "tag": "DSA",
+      "tag": "Data structure",
       "blurb": "Khi nào con trỏ thắng mảng, khuôn đảo danh sách, con trỏ giả, và ba dạng đề hay ra.",
       "n": 6,
       "path": "content/01-dsa/03-data-structures/linked-list/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "hash-map",
       "slug": "hmap",
       "title": "Hash map & set",
-      "tag": "DSA",
-      "blurb": "Vì sao O(1) trung bình, va chạm xử lý thế nào, khi nào tụt về O(n), và ba pattern dùng hash để đổi thời gian lấy bộ nhớ.",
+      "tag": "Data structure",
+      "blurb": "Vì sao O(1) trung bình, va chạm xử lý thế nào, khi nào tụt về O(n), và ba pattern đổi thời gian lấy bộ nhớ.",
       "n": 7,
       "path": "content/01-dsa/03-data-structures/hash-map/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "stack-monotonic-queue",
@@ -115,11 +115,11 @@ window.CATALOG = [
       "dir": "trie",
       "slug": "trie",
       "title": "Trie",
-      "tag": "DSA",
+      "tag": "Data structure",
       "blurb": "Cây tiền tố: tra theo tiền tố trong O(độ dài), đánh đổi bộ nhớ, và khi nào nó thắng hash map.",
       "n": 6,
       "path": "content/01-dsa/03-data-structures/trie/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "union-find",
@@ -141,21 +141,21 @@ window.CATALOG = [
       "dir": "algorithms-overview",
       "slug": "alov",
       "title": "Algorithms overview",
-      "tag": "DSA",
+      "tag": "Overview",
       "blurb": "Bốn họ kỹ thuật, dấu hiệu nhận đề của từng họ, và bảng tra từ ràng buộc n ra kỹ thuật được phép.",
       "n": 8,
       "path": "content/01-dsa/04-algorithms/algorithms-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sorting",
       "slug": "sort",
       "title": "Sorting",
-      "tag": "DSA",
+      "tag": "Technique",
       "blurb": "Ba thuật toán cần biết, vì sao O(n log n) là chặn dưới khi so sánh, tính ổn định, và sắp xếp theo khoá tuỳ biến.",
       "n": 7,
       "path": "content/01-dsa/04-algorithms/sorting/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "two-pointers",
@@ -181,11 +181,11 @@ window.CATALOG = [
       "dir": "prefix-sum",
       "slug": "prefix",
       "title": "Prefix sum & difference array",
-      "tag": "DSA",
+      "tag": "Technique",
       "blurb": "Tiền xử lý một lần để trả lời truy vấn đoạn trong O(1), mẹo hash cho tổng bằng k, và mảng hiệu cho cập nhật đoạn.",
       "n": 6,
       "path": "content/01-dsa/04-algorithms/prefix-sum/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "binary-search",
@@ -201,21 +201,21 @@ window.CATALOG = [
       "dir": "greedy",
       "slug": "greedy",
       "title": "Greedy",
-      "tag": "DSA",
+      "tag": "Technique",
       "blurb": "Cách chứng minh một lựa chọn tham lam là đúng, ba dạng đề kinh điển, và vì sao greedy sai lại khó phát hiện.",
       "n": 6,
       "path": "content/01-dsa/04-algorithms/greedy/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "intervals",
       "slug": "itv",
       "title": "Interval",
-      "tag": "DSA",
+      "tag": "Technique",
       "blurb": "Sắp xếp theo đầu hay theo cuối, gộp đoạn, đếm đoạn chồng nhau bằng đường quét, và lịch phòng họp.",
       "n": 6,
       "path": "content/01-dsa/04-algorithms/intervals/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "backtracking",
@@ -241,11 +241,11 @@ window.CATALOG = [
       "dir": "shortest-path",
       "slug": "sp",
       "title": "Shortest path",
-      "tag": "DSA",
+      "tag": "Technique",
       "blurb": "Dijkstra là BFS đổi hàng đợi thành heap, khi nào cần Bellman-Ford, và Floyd-Warshall cho mọi cặp.",
       "n": 7,
       "path": "content/01-dsa/04-algorithms/shortest-path/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "dynamic-programming",

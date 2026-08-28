@@ -39,50 +39,165 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-sp" data-skeleton="1" data-title="Shortest path" data-tag="DSA" data-blurb="Dijkstra là BFS đổi hàng đợi thành heap, khi nào cần Bellman-Ford, và Floyd-Warshall cho mọi cặp.">
+      <article class="doc" id="art-sp" data-title="Shortest path" data-tag="Technique" data-blurb="Dijkstra là BFS đổi hàng đợi thành heap, khi nào cần Bellman-Ford, và Floyd-Warshall cho mọi cặp.">
         <header class="hero">
-  <p class="eyebrow">DSA · nền tảng</p>
+  <p class="eyebrow">DSA · 2 phút + luyện tập</p>
   <h1>Shortest <em>path</em></h1>
-  <p class="lede">Ba thuật toán, chọn theo đúng một câu hỏi: <b>trọng số có âm không</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Ba thuật toán, ba tình huống. Chọn đúng cái là <b>đọc ràng buộc đề</b>, không phải nhớ code.</p>
 </header>
 
 <section id="sp-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Ý tưởng</h2></div>
-  <p class="plan">BFS chỉ đúng khi mọi cạnh bằng nhau — bỏ giả định đó là ra Dijkstra.</p>
+
+  <p class="key">BFS đúng vì nó đi theo <em>số bước</em>. Cạnh có chi phí khác nhau thì "ít bước nhất" ≠ "rẻ nhất".</p>
+
+  <figure>
+    <svg viewBox="0 0 900 180" role="img" aria-label="Đường ít cạnh nhất không phải đường rẻ nhất">
+      <line x1="150" y1="60" x2="450" y2="60"  stroke="#EDB44A" stroke-width="2"></line>
+      <line x1="450" y1="60" x2="750" y2="60"  stroke="#EDB44A" stroke-width="2"></line>
+      <line x1="150" y1="60" x2="750" y2="130" stroke="#5BCFA0" stroke-width="2"></line>
+
+      <circle cx="150" cy="60" r="20" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <circle cx="450" cy="60" r="20" fill="#241F1A" stroke="#3D352C"></circle>
+      <circle cx="750" cy="60" r="20" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></circle>
+      <text class="sv-t" x="150" y="66" text-anchor="middle" fill="#EDB44A">A</text>
+      <text class="sv-t" x="450" y="66" text-anchor="middle">B</text>
+      <text class="sv-t" x="750" y="66" text-anchor="middle" fill="#5BCFA0">C</text>
+
+      <text class="sv-l" x="300" y="48"  text-anchor="middle" fill="#EDB44A">1</text>
+      <text class="sv-l" x="600" y="48"  text-anchor="middle" fill="#EDB44A">1</text>
+      <text class="sv-l" x="450" y="112" text-anchor="middle" fill="#5BCFA0">9</text>
+
+      <text class="sv-l" x="150" y="150" fill="#7A6F63">BFS chọn đường A→C (1 cạnh, chi phí 9) · Dijkstra chọn A→B→C (2 cạnh, chi phí 2)</text>
+    </svg>
+  </figure>
+
+  <ul class="why">
+    <li>Đổi <b>hàng đợi thành heap</b> — luôn lấy đỉnh rẻ nhất ra trước — là ra Dijkstra.</li>
+    <li>Mọi cạnh <b>bằng nhau</b> thì đừng dùng Dijkstra: BFS đơn giản hơn và nhanh hơn.</li>
+  </ul>
 </section>
 
 <section id="sp-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Dijkstra</h2></div>
-  <p class="plan">Mẫu code, vì sao cần heap, vì sao chết với cạnh âm.</p>
+
+  <p class="key">Lấy đỉnh <em>rẻ nhất chưa xử lý</em> ra trước. Lấy ra rồi thì khoảng cách của nó đã là cuối cùng.</p>
+
+<pre class="core"><code><span class="kw">import</span> heapq
+dist = {start: <span class="st">0</span>}
+pq = [(<span class="st">0</span>, start)]
+<span class="kw">while</span> pq:
+    d, u = heapq.heappop(pq)
+    <span class="kw">if</span> d &gt; dist.get(u, INF): <span class="kw">continue</span>      <span class="cm"># bản cũ đã lỗi thời, bỏ</span>
+    <span class="kw">for</span> v, w <span class="kw">in</span> adj[u]:
+        <span class="kw">if</span> d + w &lt; dist.get(v, INF):
+            dist[v] = d + w
+            heapq.heappush(pq, (dist[v], v))</code></pre>
+
+  <ul class="why">
+    <li>Chi phí <code>O((V + E) log V)</code>. Không xoá phần tử cũ khỏi heap — <b>bỏ qua khi lấy ra</b> là đủ.</li>
+    <li><b>Chết với cạnh âm</b>: giả định "lấy ra là chốt" hỏng, vì một cạnh âm phía sau có thể làm đường rẻ đi.</li>
+    <li>Trọng số chỉ có 0 và 1 → dùng <b>0-1 BFS</b> với deque, rẻ hơn heap.</li>
+  </ul>
 </section>
 
 <section id="sp-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Bellman-Ford</h2></div>
-  <p class="plan">Khi có cạnh âm, và cách bắt chu trình âm.</p>
+
+  <p class="key">Không dùng heap. <em>Nới lỏng mọi cạnh, lặp V−1 lần</em> — chậm hơn nhưng chịu được cạnh âm.</p>
+
+<pre class="core"><code><span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(V - <span class="st">1</span>):                  <span class="cm"># đường ngắn nhất tối đa V-1 cạnh</span>
+    <span class="kw">for</span> u, v, w <span class="kw">in</span> edges:
+        <span class="kw">if</span> dist[u] + w &lt; dist[v]: dist[v] = dist[u] + w
+
+<span class="kw">for</span> u, v, w <span class="kw">in</span> edges:                  <span class="cm"># lượt thứ V: còn cải thiện được</span>
+    <span class="kw">if</span> dist[u] + w &lt; dist[v]: <span class="kw">return</span> <span class="st">"có chu trình âm"</span></code></pre>
+
+  <ul class="why">
+    <li>Chi phí <code>O(V · E)</code> — chậm hơn Dijkstra nhiều, chỉ dùng khi <b>bắt buộc</b>.</li>
+    <li>Lượt thứ V là mẹo <b>phát hiện chu trình âm</b>: còn cải thiện được nghĩa là đi vòng mãi để rẻ hơn.</li>
+    <li>Giới hạn <b>số cạnh tối đa k</b> thì chạy đúng k lượt — đó là lời giải bài Cheapest Flights.</li>
+  </ul>
 </section>
 
 <section id="sp-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Floyd-Warshall</h2></div>
-  <p class="plan">Mọi cặp, ba vòng lặp, khi nào đáng dùng.</p>
+
+  <p class="key">Ba vòng lặp lồng nhau cho <em>mọi cặp đỉnh</em>. Chỉ đáng dùng khi đồ thị nhỏ.</p>
+
+<pre class="core"><code><span class="kw">for</span> k <span class="kw">in</span> <span class="kw">range</span>(V):              <span class="cm"># k PHẢI ở vòng ngoài cùng</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(V):
+        <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(V):
+            d[i][j] = <span class="kw">min</span>(d[i][j], d[i][k] + d[k][j])</code></pre>
+
+  <p class="stripnote"><span><code>O(V³)</code> — với <em>V ≤ 400</em> là chạy được</span><span><em>k ở vòng ngoài: "chỉ được đi qua các đỉnh 0..k"</em></span></p>
+
+  <ul class="why">
+    <li>Code ngắn nhất trong ba thuật toán, và <b>chịu được cạnh âm</b> (miễn không có chu trình âm).</li>
+    <li>Đảo thứ tự vòng lặp là sai — <b>lỗi kinh điển</b> của thuật toán này.</li>
+  </ul>
 </section>
 
 <section id="sp-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Bảng chọn</h2></div>
-  <p class="plan">Ba thuật toán, chọn theo ràng buộc đề.</p>
+
+  <p class="key">Đọc <em>ba thứ</em> trong đề: có cạnh âm không, hỏi một nguồn hay mọi cặp, V lớn cỡ nào.</p>
+
+  <table>
+    <tr><th></th><th>BFS</th><th>Dijkstra</th><th>Bellman-Ford</th><th>Floyd-Warshall</th></tr>
+    <tr><td>Trọng số</td><td>mọi cạnh bằng nhau</td><td>dương</td><td><b>âm được</b></td><td><b>âm được</b></td></tr>
+    <tr><td>Nguồn</td><td>một</td><td>một</td><td>một</td><td><b>mọi cặp</b></td></tr>
+    <tr><td>Chi phí</td><td><b>O(V + E)</b></td><td>O((V+E) log V)</td><td>O(V·E)</td><td>O(V³)</td></tr>
+    <tr><td>Bắt chu trình âm</td><td>—</td><td>không</td><td><b>có</b></td><td>có — đường chéo âm</td></tr>
+    <tr><td>Dùng khi</td><td>lưới, số bước</td><td><b>mặc định</b></td><td>có cạnh âm, hoặc giới hạn số chặng</td><td>V ≤ 400</td></tr>
+  </table>
 </section>
 
 <section id="sp-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Pattern + LeetCode</h2></div>
-  <p class="plan">Nhận đề và danh sách bài luyện.</p>
+
+  <p class="sig">Dấu hiệu: "chi phí nhỏ nhất" · "thời gian ngắn nhất" · mỗi cạnh có trọng số khác nhau</p>
+
+  <div class="stack">
+    <div class="s"><b>Dijkstra thẳng</b><span>đồ thị cho sẵn dạng danh sách cạnh có trọng số</span></div>
+    <div class="s"><b>Dijkstra trên lưới</b><span>mỗi ô là một đỉnh, chi phí đi vào ô là trọng số cạnh</span></div>
+    <div class="s ok"><b>Dijkstra đổi hàm chi phí</b><span>thay "cộng dồn" bằng "max dọc đường" hoặc "nhân xác suất" — khung vẫn chạy</span></div>
+  </div>
+
+  <div class="probs">
+    <a href="https://leetcode.com/problems/network-delay-time/" target="_blank" rel="noopener"><i>743</i><b>Network Delay Time <em>— Dijkstra bản gốc, làm đầu tiên</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/path-with-minimum-effort/" target="_blank" rel="noopener"><i>1631</i><b>Path With Minimum Effort <em>— chi phí là max dọc đường</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/path-with-maximum-probability/" target="_blank" rel="noopener"><i>1514</i><b>Path with Maximum Probability <em>— nhân xác suất, dùng max-heap</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/cheapest-flights-within-k-stops/" target="_blank" rel="noopener"><i>787</i><b>Cheapest Flights Within K Stops <em>— Bellman-Ford chạy đúng k+1 lượt</em></b><u class="m">medium</u></a>
+    <a href="https://leetcode.com/problems/swim-in-rising-water/" target="_blank" rel="noopener"><i>778</i><b>Swim in Rising Water <em>— Dijkstra hoặc binary search + BFS</em></b><u class="h">hard</u></a>
+    <a href="https://leetcode.com/problems/find-the-city-with-the-smallest-number-of-neighbors-at-a-threshold-distance/" target="_blank" rel="noopener"><i>1334</i><b>Find the City… <em>— Floyd-Warshall, V nhỏ</em></b><u class="m">medium</u></a>
+  </div>
+
+  <div class="note">
+    <h4>Thứ tự luyện gợi ý</h4>
+    <b>743</b> → 1631 → 1514 → 787 → 1334 → 778. Nền BFS/DFS ở bài <a href="../graph-bfs-dfs-topo/index.html">Đồ thị</a>.
+  </div>
 </section>
 
 <section id="sp-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao Dijkstra sai với cạnh âm?</summary>
+  <p>Nó giả định <b>lấy đỉnh ra khỏi heap là chốt xong</b>. Một cạnh âm phía sau có thể làm đường tới đỉnh đó rẻ đi, nhưng đã quá muộn.</p></details>
+
+  <details class="qa"><summary>Dijkstra khác BFS ở đâu?</summary>
+  <p>Đúng <b>một chỗ</b>: hàng đợi đổi thành heap để luôn lấy đỉnh rẻ nhất. Mọi cạnh bằng nhau thì hai cái cho cùng kết quả.</p></details>
+
+  <details class="qa"><summary>Bellman-Ford phát hiện chu trình âm thế nào?</summary>
+  <p>Chạy thêm <b>lượt thứ V</b>. Còn cải thiện được khoảng cách nghĩa là có vòng đi mãi để rẻ hơn.</p></details>
+
+  <details class="qa"><summary>Khi nào dùng Floyd-Warshall?</summary>
+  <p>Khi cần <b>mọi cặp</b> và <code>V</code> nhỏ (khoảng ≤ 400), vì nó là <code>O(V³)</code>. Code ngắn và chịu được cạnh âm.</p></details>
 </section>
 
-<footer>DSA · nền tảng · Shortest path</footer>
+<footer>DSA · shortest path · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>
