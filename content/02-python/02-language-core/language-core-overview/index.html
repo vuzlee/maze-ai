@@ -39,55 +39,175 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-lcov" data-skeleton="1" data-title="Language core overview" data-tag="Python" data-blurb="Bốn quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.">
+      <article class="doc" id="art-lcov" data-title="Language core overview" data-tag="Overview" data-blurb="Bốn quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.">
         <header class="hero">
-  <p class="eyebrow">Python · internals</p>
-  <h1>Language core <em>overview</em></h1>
-  <p class="lede">Nắm bốn quy tắc này thì phần lớn hành vi lạ của Python tự giải thích được.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="eyebrow">Python · mở đầu nhóm language core</p>
+  <h1>Language core — <em>bản đồ</em></h1>
+  <p class="lede">Bốn bài trong nhóm này đều mọc ra từ <b>một quy tắc duy nhất</b>. Bài này chỉ ra quy tắc đó và cách nó lan ra.</p>
 </header>
 
 <section id="lcov-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Viết nhanh mà vẫn đoán được máy đang làm gì.</p>
+
+  <p class="key">Cú pháp Python rất ít. Nhưng <em>mỗi cú pháp đó chạy gì bên dưới</em> mới là thứ bị hỏi.</p>
+
+  <table>
+    <tr><th>Bạn viết</th><th>Python thật ra gọi</th><th>Bài</th></tr>
+    <tr><td><code>len(x)</code></td><td><code>x.__len__()</code></td><td><a href="../data-model-dunder/index.html">data model</a></td></tr>
+    <tr><td><code>for i in x</code></td><td><code>iter(x)</code> rồi <code>__next__()</code> tới khi hết</td><td><a href="../iterator-generator/index.html">iterator</a></td></tr>
+    <tr><td><code>a = b</code></td><td>dán thêm một nhãn lên cùng object</td><td><a href="../memory-model-mutability/index.html">memory model</a></td></tr>
+    <tr><td><code>@log</code></td><td><code>f = log(f)</code></td><td><a href="../decorator-context-manager/index.html">decorator</a></td></tr>
+    <tr><td><code>with open(...)</code></td><td><code>__enter__()</code> … <code>__exit__()</code></td><td><a href="../decorator-context-manager/index.html">context manager</a></td></tr>
+  </table>
 </section>
 
 <section id="lcov-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Ý tưởng đầu tiên</h2></div>
-  <p class="plan">Mọi thứ là object, biến chỉ là cái nhãn dán lên object.</p>
+
+  <p class="key">Mọi thứ là object. Biến là <em>cái nhãn</em>, không phải ô nhớ chứa giá trị.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 150" role="img" aria-label="Hai biến cùng trỏ tới một object list">
+      <rect x="60"  y="40" width="120" height="40" rx="7" class="sv-b"></rect>
+      <rect x="60"  y="92" width="120" height="40" rx="7" class="sv-b"></rect>
+      <text class="sv-t" x="120" y="65"  text-anchor="middle">a</text>
+      <text class="sv-t" x="120" y="117" text-anchor="middle">b</text>
+      <text class="sv-l" x="120" y="28"  text-anchor="middle" fill="#7A6F63">tên</text>
+
+      <path d="M185 60 L420 78" stroke="#EDB44A" stroke-width="2" marker-end="url(#pa)"></path>
+      <path d="M185 112 L420 88" stroke="#EDB44A" stroke-width="2" marker-end="url(#pa)"></path>
+      <defs><marker id="pa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 z" fill="#EDB44A"></path></marker></defs>
+
+      <rect x="440" y="52" width="260" height="62" rx="8" fill="rgba(237,180,74,.12)" stroke="#EDB44A"></rect>
+      <text class="sv-t" x="570" y="78"  text-anchor="middle" fill="#EDB44A">[1, 2, 3]</text>
+      <text class="sv-l" x="570" y="98"  text-anchor="middle">một object duy nhất trong bộ nhớ</text>
+      <text class="sv-l" x="750" y="70"  fill="#7A6F63">b.append(4)</text>
+      <text class="sv-l" x="750" y="90"  fill="#E9909B">→ a cũng thấy 4</text>
+    </svg>
+  </figure>
+
+  <ul class="why">
+    <li><code>id(x)</code> là địa chỉ object; <code>is</code> so <b>danh tính</b>, <code>==</code> so <b>giá trị</b>.</li>
+    <li>Gán không sao chép bao giờ. Muốn bản riêng thì phải <b>nói rõ</b>: <code>a[:]</code>, <code>copy()</code>, <code>deepcopy()</code>.</li>
+  </ul>
 </section>
 
 <section id="lcov-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Vì sao nó chưa đủ</h2></div>
-  <p class="plan">Từ đó sinh ra mutability, closure, và cú pháp gọi vào dunder.</p>
+
+  <p class="key">Từ một quy tắc đó mọc ra <em>ba câu hỏi</em> mà bốn bài trong nhóm này trả lời.</p>
+
+  <div class="stack">
+    <div class="s"><b>Sửa được hay không sửa được?</b><span>Nhiều nhãn cùng trỏ một object → sửa qua nhãn này là nhãn kia thấy. Sinh ra <b>mutability</b> và ba mức sao chép.</span></div>
+    <div class="s"><b>Cú pháp gọi vào đâu?</b><span>Object tự khai báo hành vi qua các phương thức dunder → sinh ra <b>data model</b>.</span></div>
+    <div class="s"><b>Hàm nhớ được gì?</b><span>Hàm cũng là object và nhớ được phạm vi bao ngoài → sinh ra <b>closure</b>, nền của <b>decorator</b>.</span></div>
+  </div>
 </section>
 
 <section id="lcov-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Dòng thời gian</h2></div>
-  <p class="plan">Mốc nào, năm nào, gỡ được giới hạn nào của mốc trước — một hình.</p>
+
+  <p class="key">Bốn mốc, mỗi mốc <em>thêm một cách diễn đạt</em> trên cùng mô hình object.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="Dòng thời gian các tính năng lõi của Python">
+      <line x1="40" y1="120" x2="866" y2="120" stroke="#2E2822" stroke-width="2"></line>
+      <path d="M866 120 L858 116 L858 124 z" fill="#2E2822"></path>
+
+      <line x1="90"  y1="120" x2="90"  y2="104" stroke="#2E2822"></line>
+      <line x1="330" y1="120" x2="330" y2="136" stroke="#2E2822"></line>
+      <line x1="570" y1="120" x2="570" y2="104" stroke="#2E2822"></line>
+      <line x1="820" y1="120" x2="820" y2="136" stroke="#2E2822"></line>
+
+      <circle cx="90"  cy="120" r="6" fill="#8CA9F2"></circle>
+      <circle cx="330" cy="120" r="6" fill="#8CA9F2"></circle>
+      <circle cx="570" cy="120" r="6" fill="#EDB44A"></circle>
+      <circle cx="820" cy="120" r="6" fill="#5BCFA0"></circle>
+
+      <text class="sv-l" x="90"  y="66"  text-anchor="middle">1991</text>
+      <text class="sv-t" x="90"  y="86"  text-anchor="middle" fill="#8CA9F2">Mô hình object</text>
+      <text class="sv-l" x="90"  y="100" text-anchor="middle">biến là cái nhãn</text>
+
+      <text class="sv-l" x="330" y="144" text-anchor="middle">1997</text>
+      <text class="sv-t" x="330" y="164" text-anchor="middle" fill="#8CA9F2">Giao thức dunder</text>
+      <text class="sv-l" x="330" y="178" text-anchor="middle">cú pháp gọi vào phương thức</text>
+
+      <text class="sv-l" x="570" y="66"  text-anchor="middle">2001</text>
+      <text class="sv-t" x="570" y="86"  text-anchor="middle" fill="#EDB44A">Generator</text>
+      <text class="sv-l" x="570" y="100" text-anchor="middle">tính tới đâu trả tới đó</text>
+
+      <text class="sv-l" x="820" y="144" text-anchor="middle">2005</text>
+      <text class="sv-t" x="820" y="164" text-anchor="middle" fill="#5BCFA0">Decorator</text>
+      <text class="sv-l" x="820" y="178" text-anchor="middle">bọc hàm mà không sửa hàm</text>
+
+      <text class="sv-l" x="450" y="202" text-anchor="middle" fill="#7A6F63">không mốc nào thay quy tắc nền — chúng chỉ thêm cách diễn đạt</text>
+    </svg>
+  </figure>
 </section>
 
 <section id="lcov-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Các nhánh</h2></div>
-  <p class="plan">Mô hình bộ nhớ · data model · iterator · decorator.</p>
+
+  <p class="key">Bốn bài, bốn câu hỏi khác nhau về <em>cùng một mô hình object</em>.</p>
+
+  <div class="grid2">
+    <div class="card ok"><h4><a href="../memory-model-mutability/index.html">Memory model</a></h4><p>Object nằm ở đâu, ai đang trỏ tới nó, sửa qua nhãn này thì nhãn kia thấy gì.</p></div>
+    <div class="card ok"><h4><a href="../data-model-dunder/index.html">Data model</a></h4><p>Object khai báo hành vi thế nào để <code>len()</code>, <code>[]</code>, <code>for</code>, <code>with</code> chạy được trên nó.</p></div>
+    <div class="card ok"><h4><a href="../iterator-generator/index.html">Iterator &amp; generator</a></h4><p>Duyệt mà không giữ cả dãy trong bộ nhớ — O(n) xuống O(1).</p></div>
+    <div class="card ok"><h4><a href="../decorator-context-manager/index.html">Decorator</a></h4><p>Hàm là object nên bọc được. Cùng ý đó áp cho tài nguyên là ra context manager.</p></div>
+  </div>
 </section>
 
 <section id="lcov-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Bảng so sánh</h2></div>
-  <p class="plan">Mọi bài trong nhóm trên một bảng: ý tưởng · chi phí · khi nào chọn.</p>
+
+  <p class="key">Cả nhóm trên một bảng: <em>bài nào trả lời câu hỏi nào</em>.</p>
+
+  <table>
+    <tr><th>Bài</th><th>Ý tưởng cốt lõi</th><th>Câu hỏi phỏng vấn hay gặp</th></tr>
+    <tr><td><a href="../memory-model-mutability/index.html">Memory model</a></td><td>biến là nhãn, gán không sao chép</td><td>"Gán list có sao chép không?" · "shallow khác deep ở đâu?"</td></tr>
+    <tr><td><a href="../data-model-dunder/index.html">Data model</a></td><td>cú pháp → phương thức dunder</td><td>"Vì sao <code>len(x)</code> chứ không phải <code>x.len()</code>?"</td></tr>
+    <tr><td><a href="../iterator-generator/index.html">Iterator</a></td><td>lười tính, dùng một lần</td><td>"Generator khác list comprehension thế nào?"</td></tr>
+    <tr><td><a href="../decorator-context-manager/index.html">Decorator</a></td><td>hàm là object → bọc được</td><td>"Viết một decorator đo thời gian chạy."</td></tr>
+  </table>
 </section>
 
 <section id="lcov-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Học theo thứ tự nào</h2></div>
-  <p class="plan">Memory model → data model → iterator & generator → decorator.</p>
+
+  <p class="key">Bốn bài, mỗi bài <em>dựa lên bài trước</em>.</p>
+
+  <div class="stack">
+    <div class="s"><b>1 · <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a></b><span>Nền tuyệt đối. Không nắm cái này thì mọi thứ sau đều là học thuộc.</span></div>
+    <div class="s"><b>2 · <a href="../data-model-dunder/index.html">Data model &amp; dunder</a></b><span>Ý mới: mọi cú pháp là đường tắt gọi vào một phương thức có tên cố định.</span></div>
+    <div class="s"><b>3 · <a href="../iterator-generator/index.html">Iterator &amp; generator</a></b><span>Ý mới: <code>__iter__</code> và <code>__next__</code> là một giao thức cụ thể — dùng chính data model để tiết kiệm bộ nhớ.</span></div>
+    <div class="s ok"><b>4 · <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a></b><span>Ý mới: hàm cũng là object, nên gán được và bọc được. Cần closure từ bài 1.</span></div>
+  </div>
 </section>
 
 <section id="lcov-s8" class="lesson">
   <div class="sh"><b>08</b><h2>Từ điển bỏ túi</h2></div>
-  <p class="plan">Thuật ngữ sẽ gặp suốt nhóm này, mỗi từ một dòng.</p>
+
+  <p class="key">Sáu từ sẽ gặp suốt nhóm này.</p>
+
+  <table>
+    <tr><th>Từ</th><th>Nghĩa trong một câu</th></tr>
+    <tr><td><b>Danh tính</b></td><td>Object nào, xét bằng <code>is</code> và <code>id()</code> — khác với giá trị, xét bằng <code>==</code>.</td></tr>
+    <tr><td><b>Shallow copy</b></td><td>Chép lớp ngoài, các phần tử bên trong vẫn dùng chung.</td></tr>
+    <tr><td><b>Dunder</b></td><td>Phương thức tên <code>__x__</code> — nơi cú pháp Python thật sự chạy tới.</td></tr>
+    <tr><td><b>Giao thức</b></td><td>Bộ dunder cần có để một object "nhập vai" được: iterable, context manager, sequence.</td></tr>
+    <tr><td><b>Lười tính</b></td><td>Chỉ tính khi bị hỏi tới — generator chỉ giữ <em>cách tính</em>, không giữ dữ liệu.</td></tr>
+    <tr><td><b>Closure</b></td><td>Hàm nhớ biến của phạm vi bao ngoài kể cả khi phạm vi đó đã kết thúc.</td></tr>
+  </table>
+
+  <div class="note key">
+    <h4>Bắt đầu ngay</h4>
+    Bài tiếp theo: <a href="../memory-model-mutability/index.html"><strong>Memory model &amp; mutability</strong></a>.
+  </div>
 </section>
 
-<footer>Python · internals · Language core overview</footer>
+<footer>Python · language core · overview của nhóm.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

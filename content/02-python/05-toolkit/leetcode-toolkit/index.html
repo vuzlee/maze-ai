@@ -39,45 +39,146 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-kit" data-skeleton="1" data-title="LeetCode toolkit" data-tag="Python" data-blurb="bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.">
+      <article class="doc" id="art-kit" data-title="LeetCode toolkit" data-tag="Toolkit" data-blurb="bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.">
         <header class="hero">
-  <p class="eyebrow">Python · internals</p>
+  <p class="eyebrow">Python · toolkit</p>
   <h1>LeetCode <em>toolkit</em></h1>
-  <p class="lede">Không phải kiến thức sâu, nhưng <b>tiết kiệm được nhiều phút</b> trong phòng phỏng vấn.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Sáu thứ trong thư viện chuẩn thay được hàng chục dòng tự viết. <b>Bảng tra ở mục 06</b> là thứ nên xem lại trước buổi phỏng vấn.</p>
 </header>
 
 <section id="kit-s1" class="lesson">
   <div class="sh"><b>01</b><h2>bisect</h2></div>
-  <p class="plan">Binary search có sẵn, thay cho tự viết.</p>
+
+  <p class="key">Binary search có sẵn. <code>bisect_left</code> là <em>lower_bound</em>, <code>bisect_right</code> là <em>upper_bound</em>.</p>
+
+<pre class="core"><code><span class="kw">from</span> bisect <span class="kw">import</span> bisect_left, bisect_right, insort
+
+a = [<span class="st">1</span>, <span class="st">3</span>, <span class="st">4</span>, <span class="st">4</span>, <span class="st">4</span>, <span class="st">7</span>]
+bisect_left(a, <span class="st">4</span>)              <span class="cm"># 2 — mép trái nhóm trùng</span>
+bisect_right(a, <span class="st">4</span>)             <span class="cm"># 5 — mép phải</span>
+bisect_right(a,<span class="st">4</span>) - bisect_left(a,<span class="st">4</span>)   <span class="cm"># 3 lần xuất hiện</span>
+insort(a, <span class="st">5</span>)                    <span class="cm"># chèn giữ thứ tự — nhưng O(n)!</span>
+bisect_left(items, x, key=<span class="kw">lambda</span> it: it.score)   <span class="cm"># Python 3.10+</span></code></pre>
+
+  <ul class="why">
+    <li>Nếu binary search <b>là</b> nội dung bài kiểm tra thì tự viết; nếu chỉ là một bước phụ thì dùng <code>bisect</code> và <b>nói rõ đó là lower_bound</b>.</li>
+    <li><code>insort</code> tìm chỗ nhanh nhưng vẫn phải <b>dịch phần tử</b> — đừng dùng trong vòng lặp lớn.</li>
+    <li>Chi tiết cơ chế ở bài <a href="../../../01-dsa/04-algorithms/binary-search/index.html">Binary search</a>.</li>
+  </ul>
 </section>
 
 <section id="kit-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Counter & defaultdict</h2></div>
-  <p class="plan">Đếm và gom nhóm không cần kiểm tra khoá.</p>
+  <div class="sh"><b>02</b><h2>Counter &amp; defaultdict</h2></div>
+
+  <p class="key">Đếm và gom nhóm <em>mà không phải kiểm tra khoá đã tồn tại chưa</em>.</p>
+
+<pre class="core"><code><span class="kw">from</span> collections <span class="kw">import</span> Counter, defaultdict
+
+c = Counter(<span class="st">"abracadabra"</span>)
+c.most_common(<span class="st">2</span>)          <span class="cm"># [('a', 5), ('b', 2)]</span>
+c1 - c2                    <span class="cm"># hiệu hai bộ đếm, bỏ số âm</span>
+Counter(s) == Counter(t)   <span class="cm"># kiểm tra anagram, một dòng</span>
+
+g = defaultdict(<span class="kw">list</span>)
+<span class="kw">for</span> w <span class="kw">in</span> words:
+    g[<span class="kw">tuple</span>(<span class="kw">sorted</span>(w))].append(w)   <span class="cm"># gom nhóm, không cần if khoá</span></code></pre>
+
+  <ul class="why">
+    <li><code>defaultdict(int)</code> để đếm, <code>defaultdict(list)</code> để gom, <code>defaultdict(set)</code> để gom không trùng.</li>
+    <li>Cẩn thận: <b>chỉ đọc</b> <code>g[k]</code> trên defaultdict cũng <b>tạo luôn khoá đó</b>. Muốn tránh thì dùng <code>g.get(k)</code>.</li>
+    <li><code>Counter</code> là <code>dict</code> con nên mọi thao tác dict đều dùng được.</li>
+  </ul>
 </section>
 
 <section id="kit-s3" class="lesson">
   <div class="sh"><b>03</b><h2>deque</h2></div>
-  <p class="plan">Hàng đợi hai đầu O(1), dùng cho BFS và cửa sổ.</p>
+
+  <p class="key">Thêm/bớt ở <em>cả hai đầu đều O(1)</em>. Đây là thứ thay <code>list.pop(0)</code> — thao tác O(n) hay bị bỏ sót.</p>
+
+<pre class="core"><code><span class="kw">from</span> collections <span class="kw">import</span> deque
+
+q = deque([start])
+q.popleft()                <span class="cm"># O(1) — list.pop(0) là O(n)</span>
+q.appendleft(x)            <span class="cm"># O(1)</span>
+deque(maxlen=<span class="st">3</span>)            <span class="cm"># tự đẩy phần tử cũ ra khi đầy</span></code></pre>
+
+  <ul class="why">
+    <li>Bắt buộc cho <b>BFS</b> — dùng list là biến O(V+E) thành O(V²).</li>
+    <li>Cũng là nền của <b>deque đơn điệu</b> cho bài max cửa sổ trượt.</li>
+    <li>Đổi lại: <b>không truy cập ngẫu nhiên nhanh</b> — <code>q[i]</code> ở giữa là O(n).</li>
+  </ul>
 </section>
 
 <section id="kit-s4" class="lesson">
   <div class="sh"><b>04</b><h2>heapq</h2></div>
-  <p class="plan">Heap nhỏ nhất, mẹo đảo dấu để có heap lớn nhất.</p>
+
+  <p class="key">Chỉ có <em>min-heap</em>. Cần max-heap thì <em>đẩy số âm</em>.</p>
+
+<pre class="core"><code><span class="kw">import</span> heapq
+
+heapq.heappush(h, x)              <span class="cm"># O(log n)</span>
+heapq.heappop(h)                  <span class="cm"># lấy nhỏ nhất</span>
+heapq.heapify(a)                  <span class="cm"># list → heap tại chỗ, O(n)</span>
+heapq.heappushpop(h, x)           <span class="cm"># đẩy vào rồi lấy ra, rẻ hơn hai lệnh</span>
+heapq.nlargest(k, a)              <span class="cm"># top-k, không cần sắp cả mảng</span>
+
+heapq.heappush(h, (-val, x))              <span class="cm"># MAX-heap</span>
+heapq.heappush(h, (ưu_tiên, thứ_tự, obj)) <span class="cm"># tránh so sánh obj khi trùng ưu tiên</span></code></pre>
+
+  <ul class="why">
+    <li>Giữ <b>K phần tử lớn nhất</b>: min-heap kích thước K + <code>heappushpop</code> → O(n log K).</li>
+    <li>Đẩy object trần vào heap là <b>lỗi runtime</b> khi trùng ưu tiên — luôn chèn một số thứ tự vào giữa.</li>
+    <li>Chi tiết ở bài <a href="../../../01-dsa/03-data-structures/heap-priority-queue/index.html">Heap &amp; priority queue</a>.</li>
+  </ul>
 </section>
 
 <section id="kit-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Comprehension</h2></div>
-  <p class="plan">Viết gọn mà vẫn đọc được, và lúc nào thì đừng.</p>
+
+  <p class="key">Viết gọn <em>và</em> nhanh hơn vòng lặp thường. Nhưng chỉ tới <em>một mức lồng nhau</em>.</p>
+
+<pre class="core"><code>[x*x <span class="kw">for</span> x <span class="kw">in</span> a <span class="kw">if</span> x % <span class="st">2</span>]                  <span class="cm"># list</span>
+{k: v <span class="kw">for</span> k, v <span class="kw">in</span> pairs}                   <span class="cm"># dict</span>
+{w <span class="kw">for</span> w <span class="kw">in</span> words}                          <span class="cm"># set</span>
+(x*x <span class="kw">for</span> x <span class="kw">in</span> a)                            <span class="cm"># generator — không dựng list</span>
+
+<span class="kw">sum</span>(<span class="st">1</span> <span class="kw">for</span> x <span class="kw">in</span> a <span class="kw">if</span> ok(x))                  <span class="cm"># đếm mà không tốn bộ nhớ</span>
+grid = [[<span class="st">0</span>] * m <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(n)]           <span class="cm"># đúng cách tạo lưới</span></code></pre>
+
+  <ul class="why">
+    <li>Dùng <b>generator</b> khi chỉ duyệt một lần: <code>sum()</code>, <code>any()</code>, <code>max()</code> — bộ nhớ O(1).</li>
+    <li>Lồng <b>từ hai mức trở lên</b> thì viết vòng lặp thường — người đọc sau sẽ cảm ơn.</li>
+    <li>Comprehension nhanh hơn <code>for + append</code> vì vòng lặp chạy trong C.</li>
+  </ul>
 </section>
 
 <section id="kit-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Bảng tra nhanh</h2></div>
-  <p class="plan">Một bảng chép được vào đầu trước buổi phỏng vấn.</p>
+
+  <p class="key">Chép vào đầu trước buổi phỏng vấn. <em>Gặp tình huống bên trái thì gõ ngay thứ bên phải.</em></p>
+
+  <table>
+    <tr><th>Cần gì</th><th>Gõ gì</th></tr>
+    <tr><td>đếm tần suất</td><td><code>Counter(a)</code> · <code>c.most_common(k)</code></td></tr>
+    <tr><td>gom nhóm theo khoá</td><td><code>defaultdict(list)</code></td></tr>
+    <tr><td>hàng đợi cho BFS</td><td><code>deque([start])</code> · <code>q.popleft()</code></td></tr>
+    <tr><td>lấy nhỏ nhất liên tục</td><td><code>heapq.heappush/heappop</code></td></tr>
+    <tr><td>k phần tử lớn nhất</td><td><code>heapq.nlargest(k, a)</code></td></tr>
+    <tr><td>vị trí chèn giữ thứ tự</td><td><code>bisect_left(a, x)</code></td></tr>
+    <tr><td>lọc trùng, giữ thứ tự</td><td><code>list(dict.fromkeys(a))</code></td></tr>
+    <tr><td>sắp theo nhiều khoá</td><td><code>a.sort(key=lambda x: (-x.score, x.name))</code></td></tr>
+    <tr><td>duyệt kèm chỉ số</td><td><code>for i, x in enumerate(a)</code></td></tr>
+    <tr><td>ghép hai dãy</td><td><code>for x, y in zip(a, b)</code></td></tr>
+    <tr><td>chia lấy phần nguyên và dư</td><td><code>q, r = divmod(a, b)</code></td></tr>
+    <tr><td>ghi nhớ kết quả hàm</td><td><code>@cache</code> từ <code>functools</code></td></tr>
+    <tr><td>vô cực</td><td><code>float("inf")</code> · <code>math.inf</code></td></tr>
+    <tr><td>ma trận n×m toàn 0</td><td><code>[[0]*m for _ in range(n)]</code></td></tr>
+  </table>
+
+  <p class="stripnote"><span>mười bốn dòng này thay được phần lớn code lặt vặt</span><span><em>và tránh luôn mấy bẫy O(n) hay gặp</em></span></p>
 </section>
 
-<footer>Python · internals · Bộ công cụ cho LeetCode</footer>
+<footer>Python · LeetCode toolkit · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

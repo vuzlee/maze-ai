@@ -39,40 +39,108 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-dunder" data-skeleton="1" data-title="Data model & dunder" data-tag="Python" data-blurb="Vì sao len(x) chứ không phải x.len(), giao thức phía sau toán tử, và cách một object tự nhập vai list hay dict.">
+      <article class="doc" id="art-dunder" data-title="Data model &amp; dunder" data-tag="Language core" data-blurb="Vì sao len(x) chứ không phải x.len(), giao thức phía sau toán tử, và cách một object tự nhập vai list hay dict.">
         <header class="hero">
-  <p class="eyebrow">Python · internals</p>
-  <h1>Data model & <em>dunder</em></h1>
-  <p class="lede">Quy tắc nhất quán nhất của Python: <b>cú pháp gọi vào giao thức</b>, không phải phép màu.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="eyebrow">Python · language core</p>
+  <h1>Data model &amp; <em>dunder</em></h1>
+  <p class="lede">Mọi cú pháp của Python đều là <b>đường tắt</b> gọi vào một phương thức có tên cố định. Biết bảng tên đó là đọc được mọi thư viện.</p>
 </header>
 
 <section id="dunder-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Ý tưởng</h2></div>
-  <p class="plan">Mọi cú pháp đều quy về một phương thức dunder.</p>
+
+  <p class="key">Python không hỏi object <em>thuộc kiểu gì</em>. Nó hỏi object <em>có phương thức nào</em>.</p>
+
+<pre class="core"><code><span class="kw">len</span>(x)        <span class="cm"># → x.__len__()</span>
+x[<span class="st">0</span>]         <span class="cm"># → x.__getitem__(0)</span>
+a + b        <span class="cm"># → a.__add__(b)</span>
+<span class="kw">for</span> i <span class="kw">in</span> x   <span class="cm"># → iter(x) rồi __next__() tới khi StopIteration</span>
+<span class="kw">with</span> x       <span class="cm"># → x.__enter__() … x.__exit__()</span>
+x()          <span class="cm"># → x.__call__()</span></code></pre>
+
+  <ul class="why">
+    <li>Vì sao <code>len(x)</code> chứ không phải <code>x.len()</code>: hàm dựng sẵn cho phép <b>một cú pháp chung cho mọi kiểu</b>, kể cả kiểu do bạn viết.</li>
+    <li>Tự cài đúng vài dunder là object của bạn <b>nhập vai</b> được list, dict, hay số — thư viện khác dùng nó như hàng thật.</li>
+    <li>Đây chính là <b>duck typing</b>: có <code>__len__</code> thì <code>len()</code> chạy, không cần kế thừa từ ai.</li>
+  </ul>
 </section>
 
 <section id="dunder-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Bảng giao thức</h2></div>
-  <p class="plan">len, iter, getitem, eq/hash, call, enter/exit.</p>
+
+  <p class="key">Sáu giao thức phủ gần hết. Mỗi giao thức là <em>một nhóm dunder đi cùng nhau</em>.</p>
+
+  <table>
+    <tr><th>Muốn object làm được gì</th><th>Cài dunder</th><th>Ví dụ thật</th></tr>
+    <tr><td>đo độ dài, kiểm tra rỗng</td><td><code>__len__</code></td><td><code>if not queue:</code> chạy được ngay</td></tr>
+    <tr><td>duyệt bằng <code>for</code></td><td><code>__iter__</code> (+ <code>__next__</code>)</td><td>xem <a href="../iterator-generator/index.html">iterator</a></td></tr>
+    <tr><td>lấy phần tử bằng <code>[]</code></td><td><code>__getitem__</code> · <code>__setitem__</code></td><td>object nhập vai list hoặc dict</td></tr>
+    <tr><td>so sánh và làm khoá dict</td><td><code>__eq__</code> + <code>__hash__</code></td><td>mục 03</td></tr>
+    <tr><td>gọi như hàm</td><td><code>__call__</code></td><td>decorator viết bằng class</td></tr>
+    <tr><td>dùng với <code>with</code></td><td><code>__enter__</code> · <code>__exit__</code></td><td>xem <a href="../decorator-context-manager/index.html">context manager</a></td></tr>
+    <tr><td>in ra để đọc / để debug</td><td><code>__str__</code> · <code>__repr__</code></td><td>mục 04</td></tr>
+  </table>
+
+  <p class="stripnote"><span>không cần thuộc hết</span><span><em>cần nhớ: gặp cú pháp lạ thì đi tìm dunder tương ứng</em></span></p>
 </section>
 
 <section id="dunder-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>eq và hash đi cùng nhau</h2></div>
-  <p class="plan">Sửa một cái mà quên cái kia thì hỏng dict và set.</p>
+  <div class="sh"><b>03</b><h2>__eq__ và __hash__ đi cùng nhau</h2></div>
+
+  <p class="key">Hai object <em>bằng nhau thì bắt buộc phải cùng hash</em>. Phá luật này là dict và set hỏng im lặng.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Chuyện gì xảy ra</h5>
+      <p>Định nghĩa <code>__eq__</code> mà không định nghĩa <code>__hash__</code>.</p>
+      <p>Python đặt <code>__hash__ = None</code> → object <b>hết hashable</b>, cho vào set là lỗi ngay.</p>
+      <p>Tệ hơn: hash dựa trên trường <b>sửa được</b> → sửa xong tra không thấy nữa.</p>
+    </div>
+    <div>
+      <h5>Cách viết đúng</h5>
+<pre class="core" style="margin:6px 0"><code><span class="kw">class</span> P:
+    <span class="kw">def</span> __eq__(self, o):
+        <span class="kw">return</span> (self.x, self.y) == (o.x, o.y)
+    <span class="kw">def</span> __hash__(self):
+        <span class="kw">return</span> <span class="kw">hash</span>((self.x, self.y))   <span class="cm"># cùng bộ trường</span></code></pre>
+      <p>Hoặc dùng <code>@dataclass(frozen=True)</code> — nó sinh cả hai cho bạn.</p>
+    </div>
+  </div>
+
+  <p class="stripnote"><span>quy tắc: <em>hash lấy từ đúng những trường mà eq dùng</em></span><span>và những trường đó <em>không được sửa</em></span></p>
 </section>
 
 <section id="dunder-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Định nghĩa eq mà bỏ hash, repr với str, mutable làm khoá.</p>
+
+  <p class="key">Bẫy thứ hai làm phần tử <em>biến mất khỏi set</em> mà không báo gì.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Định nghĩa <code>__eq__</code> mà bỏ <code>__hash__</code></h4><p>Object thành không hashable. Cho vào <code>set</code> hoặc làm khoá <code>dict</code> là <code>TypeError</code> ngay.</p></div>
+    <div class="card bad"><h4>Hash dựa trên trường sửa được</h4><p>Chèn xong sửa trường đó → object nằm sai ô → <b>tra mãi không thấy</b>. Không lỗi, không cảnh báo.</p></div>
+    <div class="card bad"><h4>Nhầm <code>__str__</code> với <code>__repr__</code></h4><p><code>__str__</code> cho người đọc, <code>__repr__</code> cho lập trình viên debug. Chỉ cài một cái thì <b>cài <code>__repr__</code></b> — <code>str()</code> sẽ tự dùng nó.</p></div>
+  </div>
 </section>
 
 <section id="dunder-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao <code>len(x)</code> chứ không phải <code>x.len()</code>?</summary>
+  <p>Hàm dựng sẵn cho <b>một cú pháp chung cho mọi kiểu</b>, kể cả kiểu tự viết. Bên dưới nó vẫn gọi <code>x.__len__()</code>.</p></details>
+
+  <details class="qa"><summary>Định nghĩa <code>__eq__</code> thì phải làm gì nữa?</summary>
+  <p>Định nghĩa <b><code>__hash__</code> lấy từ đúng những trường mà <code>__eq__</code> dùng</b>. Bỏ qua thì object hết hashable.</p></details>
+
+  <details class="qa"><summary><code>__str__</code> khác <code>__repr__</code> thế nào?</summary>
+  <p><code>__str__</code> cho người dùng đọc, <code>__repr__</code> cho lập trình viên — nên rõ ràng, lý tưởng là dựng lại được object. Chỉ cài một thì cài <code>__repr__</code>.</p></details>
+
+  <details class="qa"><summary>Làm sao để object của mình dùng được với <code>for</code>?</summary>
+  <p>Cài <code>__iter__</code> trả về một iterator, hoặc để nó là <code>generator</code>. Có <code>__getitem__</code> nhận chỉ số từ 0 cũng chạy được.</p></details>
 </section>
 
-<footer>Python · internals · Data model & dunder</footer>
+<footer>Python · data model &amp; dunder · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

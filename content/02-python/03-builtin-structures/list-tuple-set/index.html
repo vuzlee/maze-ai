@@ -39,45 +39,122 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-listset" data-skeleton="1" data-title="List, tuple & set" data-tag="Python" data-blurb="Chi phí thật của từng thao tác, vì sao tuple làm khoá được mà list thì không, và set là hash table không giá trị.">
+      <article class="doc" id="art-listset" data-title="List, tuple &amp; set" data-tag="Built-in types" data-blurb="Chi phí thật của từng thao tác, vì sao tuple làm khoá được mà list thì không, và set là hash table không giá trị.">
         <header class="hero">
-  <p class="eyebrow">Python · internals</p>
-  <h1>List, tuple & <em>set</em></h1>
-  <p class="lede">Bảng chi phí này quyết định lời giải của bạn là O(n) hay O(n²).</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="eyebrow">Python · built-in types</p>
+  <h1>List, tuple &amp; <em>set</em></h1>
+  <p class="lede">Ba kiểu dùng hằng ngày. Bài này chỉ trả lời hai câu: <b>thao tác nào tốn bao nhiêu</b>, và <b>khi nào chọn cái nào</b>.</p>
 </header>
 
 <section id="listset-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Bảng chi phí</h2></div>
-  <p class="plan">Mọi thao tác hay dùng, một bảng.</p>
+
+  <p class="key">Cột <code>list</code> có <em>hai dòng O(n)</em> mà người ta hay tưởng là O(1).</p>
+
+  <table>
+    <tr><th>Thao tác</th><th>list</th><th>tuple</th><th>set</th></tr>
+    <tr><td><code>x[i]</code></td><td><b>O(1)</b></td><td><b>O(1)</b></td><td>—</td></tr>
+    <tr><td><code>x in s</code></td><td><b>O(n)</b> ← bẫy</td><td>O(n)</td><td><b>O(1)</b></td></tr>
+    <tr><td><code>append</code> / <code>add</code></td><td>O(1)*</td><td>—</td><td>O(1)*</td></tr>
+    <tr><td><code>insert(0, x)</code> · <code>pop(0)</code></td><td><b>O(n)</b> ← bẫy</td><td>—</td><td>—</td></tr>
+    <tr><td><code>pop()</code> cuối</td><td>O(1)</td><td>—</td><td>O(1)</td></tr>
+    <tr><td>xoá theo giá trị</td><td>O(n)</td><td>—</td><td><b>O(1)</b></td></tr>
+    <tr><td>làm khoá dict</td><td><b>không</b></td><td><b>được</b></td><td>không (dùng <code>frozenset</code>)</td></tr>
+    <tr><td>giữ thứ tự</td><td>có</td><td>có</td><td><b>không</b></td></tr>
+  </table>
+
+  <p class="stripnote"><span>* amortized — xem <a href="../../../01-dsa/02-foundations/big-o-complexity/index.html">Big-O</a></span><span><em>cần chèn/xoá ở đầu → dùng <code>deque</code></em></span></p>
 </section>
 
 <section id="listset-s2" class="lesson">
   <div class="sh"><b>02</b><h2>List cấp phát thế nào</h2></div>
-  <p class="plan">Tăng gấp bội, khấu hao, khi nào thật sự copy.</p>
+
+  <p class="key">Hết chỗ thì xin vùng <em>lớn hơn khoảng 1,125 lần</em> rồi chép sang. Chia đều, mỗi <code>append</code> vẫn O(1).</p>
+
+  <div class="bars">
+    <div class="b"><i>append thường</i><u style="width:3%"></u><b>ghi một ô</b></div>
+    <div class="b bad"><i>lần phải nới</i><u style="width:100%"></u><b>chép toàn bộ — O(n)</b></div>
+    <div class="b hi"><i>trung bình</i><u style="width:6%"></u><b>O(1) amortized</b></div>
+  </div>
+
+  <ul class="why">
+    <li>Biết trước kích thước thì <b>cấp phát sẵn</b> <code>[None] * n</code> — bỏ hẳn các lần chép.</li>
+    <li><code>list.copy()</code> và <code>a[:]</code> là <b>shallow copy</b>: chép lớp ngoài, phần tử bên trong vẫn dùng chung.</li>
+    <li>Xoá bớt phần tử <b>không trả bộ nhớ về ngay</b> — vùng đã cấp giữ nguyên cho lần append sau.</li>
+  </ul>
 </section>
 
 <section id="listset-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Vì sao tuple hashable</h2></div>
-  <p class="plan">Bất biến kéo theo hash ổn định.</p>
+
+  <p class="key">Hash phải <em>không đổi suốt đời object</em>. Sửa được thì không đảm bảo được điều đó.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>tuple — làm khoá được</h5>
+      <p>Bất biến → hash tính một lần là xong.</p>
+      <p><code>d[(2, 3)] = "ô"</code> — khoá toạ độ, rất hay dùng cho bài lưới.</p>
+    </div>
+    <div>
+      <h5>list — không</h5>
+      <p>Sửa được → hash sẽ đổi → object nằm sai ô, tra không thấy.</p>
+      <p>Python chặn thẳng: <code>TypeError: unhashable type</code>.</p>
+    </div>
+  </div>
+
+  <p class="stripnote"><span>tuple chứa list thì <em>cũng hết hashable</em></span><span><em><code>hash((1, [2]))</code> → lỗi</em></span></p>
 </section>
 
 <section id="listset-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Set và frozenset</h2></div>
-  <p class="plan">Hash table bỏ phần giá trị.</p>
+
+  <p class="key">Set là <em>hash table bỏ phần giá trị</em>. Cùng cơ chế với dict, cùng chi phí.</p>
+
+<pre class="core"><code>a &amp; b     <span class="cm"># giao — O(min(len(a), len(b)))</span>
+a | b     <span class="cm"># hợp</span>
+a - b     <span class="cm"># hiệu</span>
+a ^ b     <span class="cm"># đối xứng: có ở đúng một bên</span>
+
+frozenset({<span class="st">1</span>, <span class="st">2</span>})     <span class="cm"># bản bất biến → làm khoá dict được</span></code></pre>
+
+  <ul class="why">
+    <li>Đổi <code>x in list</code> thành <code>x in set</code> là <b>O(n) → O(1)</b> — cách tối ưu rẻ nhất trong Python.</li>
+    <li>Set <b>không giữ thứ tự</b>; cần cả hai thì dùng <code>dict.fromkeys()</code> để lọc trùng mà vẫn giữ thứ tự chèn.</li>
+    <li>Bốn phép toán tập hợp thay được cả vòng lặp — code ngắn hơn và chạy trong C.</li>
+  </ul>
 </section>
 
 <section id="listset-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">in trên list là O(n), nhân list lồng nhau, set không giữ thứ tự.</p>
+
+  <p class="key">Bẫy đầu tiên là <em>nguyên nhân số một</em> khiến lời giải đúng bị timeout.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4><code>in</code> trên list là O(n)</h4><p>Trong vòng lặp thì thành O(n²). Đổi sang <code>set</code> là xong — nhớ kiểm tra chỗ này đầu tiên khi code chậm.</p></div>
+    <div class="card bad"><h4><code>[[0]*m]*n</code></h4><p>Tạo <b>n tham chiếu tới cùng một hàng</b>. Sửa một ô là cả cột đổi theo. Dùng list comprehension.</p></div>
+    <div class="card bad"><h4>Dựa vào thứ tự của set</h4><p><code>dict</code> giữ thứ tự chèn từ Python 3.7, <code>set</code> thì <b>không</b>. Đừng viết code phụ thuộc thứ tự lặp của set.</p></div>
+  </div>
 </section>
 
 <section id="listset-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao tuple làm khoá dict được mà list thì không?</summary>
+  <p>Khoá phải có <b>hash không đổi suốt đời</b>. Tuple bất biến nên đảm bảo được; list sửa được nên Python chặn thẳng.</p></details>
+
+  <details class="qa"><summary><code>x in list</code> và <code>x in set</code> khác nhau thế nào?</summary>
+  <p>List phải <b>quét tuần tự — O(n)</b>. Set tính hash ra thẳng ô — <b>O(1) trung bình</b>. Đây là chỗ tối ưu rẻ nhất.</p></details>
+
+  <details class="qa"><summary>List cấp phát bộ nhớ ra sao?</summary>
+  <p>Hết chỗ thì xin vùng lớn hơn rồi chép sang, nên <code>append</code> là <b>O(1) amortized</b> — một lần lẻ có thể O(n).</p></details>
+
+  <details class="qa"><summary>Lọc trùng mà vẫn giữ thứ tự, làm sao?</summary>
+  <p><code>list(dict.fromkeys(a))</code>. Set lọc trùng nhanh nhưng <b>không giữ thứ tự</b>.</p></details>
 </section>
 
-<footer>Python · internals · List, tuple & set</footer>
+<footer>Python · list, tuple &amp; set · mọi đoạn code chạy được nguyên trạng trên Python 3.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

@@ -39,40 +39,113 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-perf" data-skeleton="1" data-title="Profiling & performance" data-tag="Performance" data-blurb="Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.">
+      <article class="doc" id="art-perf" data-title="Profiling &amp; performance" data-tag="Performance" data-blurb="Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.">
         <header class="hero">
-  <p class="eyebrow">Python · Performance</p>
+  <p class="eyebrow">Python · performance</p>
   <h1>Profiling &amp; <em>performance</em></h1>
-  <p class="lede">Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Quy tắc duy nhất: <b>đo trước, sửa sau</b>. Chỗ bạn đoán là chậm gần như luôn không phải chỗ chậm thật.</p>
 </header>
 
 <section id="performance-profiling-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Đo trước, đoán sau</h2></div>
-  <p class="plan">cProfile, line_profiler — tìm đúng chỗ chậm trước khi sửa.</p>
+
+  <p class="key">Tối ưu mà không đo là <em>sửa mò</em>. Ba công cụ, ba mức chi tiết.</p>
+
+<pre class="core"><code><span class="cm"># 1 — nhanh nhất: đo một đoạn</span>
+<span class="kw">import</span> time; t = time.perf_counter(); ...; <span class="kw">print</span>(time.perf_counter() - t)
+
+<span class="cm"># 2 — cProfile: hàm nào tốn bao nhiêu</span>
+python -m cProfile -s cumtime script.py | head -<span class="st">20</span>
+
+<span class="cm"># 3 — line_profiler: từng DÒNG trong một hàm</span>
+<span class="kw">@profile</span>
+<span class="kw">def</span> hàm_chậm(): ...     <span class="cm"># rồi chạy: kernprof -l -v script.py</span></code></pre>
+
+  <ul class="why">
+    <li>Đọc cột <b><code>cumtime</code></b> trước — tổng thời gian gồm cả hàm con. Nó chỉ thẳng ra nhánh đắt.</li>
+    <li><code>tottime</code> là thời gian <b>trong thân hàm</b>, không tính hàm con — dùng để tìm hàm tự nó chậm.</li>
+    <li>Đo trên <b>dữ liệu thật</b>. Dữ liệu nhỏ thường cho kết luận ngược.</li>
+  </ul>
 </section>
 
 <section id="performance-profiling-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Memory</h2></div>
-  <p class="plan">Object overhead, memory_profiler, khi nào dùng __slots__.</p>
+  <div class="sh"><b>02</b><h2>Bộ nhớ</h2></div>
+
+  <p class="key">Mỗi object Python có <em>phần thừa cố định</em>. Nhiều object nhỏ tốn hơn bạn tưởng rất nhiều.</p>
+
+  <div class="bars">
+    <div class="b"><i>một số nguyên</i><u style="width:10%"></u><b>~28 byte</b></div>
+    <div class="b"><i>list rỗng</i><u style="width:20%"></u><b>~56 byte</b></div>
+    <div class="b bad"><i>object thường</i><u style="width:56%"></u><b>~152 byte (có <code>__dict__</code>)</b></div>
+    <div class="b hi"><i>object có <code>__slots__</code></i><u style="width:20%"></u><b>~56 byte</b></div>
+  </div>
+  <p class="stripnote"><span>số ước lượng trên CPython 64-bit</span><span><em>triệu object nhỏ → chênh nhau cả trăm MB</em></span></p>
+
+  <ul class="why">
+    <li><code>__slots__</code> bỏ <code>__dict__</code> của instance → <b>gọn hơn và truy cập nhanh hơn</b>, đổi lại không thêm thuộc tính mới lúc chạy được.</li>
+    <li>Đo bằng <code>tracemalloc</code> (thư viện chuẩn) hoặc <code>memory_profiler</code>.</li>
+    <li>Đọc file lớn thì <b>duyệt theo dòng</b> hoặc dùng generator — đừng <code>read().split()</code> cả file.</li>
+  </ul>
 </section>
 
 <section id="performance-profiling-s3" class="lesson">
   <div class="sh"><b>03</b><h2>NumPy vectorization</h2></div>
-  <p class="plan">Vì sao vòng lặp Python chậm, broadcast thay cho loop.</p>
+
+  <p class="key">Vòng lặp Python chậm vì <em>mỗi phép tính đi qua tầng thông dịch</em>. NumPy đẩy cả vòng lặp xuống C.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Vòng lặp Python</h5>
+      <p>Mỗi bước: kiểm kiểu, cấp phát object, tăng bộ đếm tham chiếu.</p>
+      <p>Dữ liệu <b>rải rác</b> trong bộ nhớ.</p>
+    </div>
+    <div>
+      <h5>NumPy</h5>
+      <p>Một lệnh gọi xuống C, lặp bên trong không qua thông dịch.</p>
+      <p>Dữ liệu <b>liền khối</b> → tận dụng cache và lệnh SIMD.</p>
+    </div>
+  </div>
+
+<pre class="core"><code><span class="cm"># chậm</span>
+out = [x * <span class="st">2</span> + <span class="st">1</span> <span class="kw">for</span> x <span class="kw">in</span> data]
+
+<span class="cm"># nhanh hơn hàng chục lần trên mảng lớn</span>
+out = data * <span class="st">2</span> + <span class="st">1</span>          <span class="cm"># data là np.ndarray</span></code></pre>
+
+  <ul class="why">
+    <li>Chỉ đáng khi mảng <b>đủ lớn</b>: mảng vài chục phần tử thì chi phí gọi NumPy còn lớn hơn phần tiết kiệm.</li>
+    <li>Đừng <b>lặp Python trên ndarray</b> — vừa mất lợi thế vừa chậm hơn cả list thường.</li>
+  </ul>
 </section>
 
 <section id="performance-profiling-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Lỗi hay gặp</h2></div>
-  <p class="plan">Tối ưu chỗ không phải bottleneck.</p>
+  <div class="sh"><b>04</b><h2>Ba lỗi hay gặp</h2></div>
+
+  <p class="key">Lỗi đầu tiên tốn nhiều thời gian nhất mà <em>không đổi được gì</em>.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Tối ưu chỗ không phải bottleneck</h4><p>Hàm chiếm 2% tổng thời gian, tối ưu nhanh gấp đôi cũng chỉ tiết kiệm 1%. <b>Đo trước.</b></p></div>
+    <div class="card bad"><h4>Bỏ qua thao tác O(n) bị giấu</h4><p><code>x in list</code>, <code>list.pop(0)</code>, <code>s += "a"</code> trong vòng lặp. Sửa mấy dòng này thường ăn đứt mọi tối ưu vi mô.</p></div>
+    <div class="card bad"><h4>Đo trên dữ liệu đồ chơi</h4><p>Với n nhỏ thì cache và hằng số quyết định, kết luận có thể ngược hẳn khi n lớn.</p></div>
+  </div>
 </section>
 
 <section id="performance-profiling-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Ba câu thường gặp về performance Python.</p>
+  <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Code Python chậm, bạn làm gì đầu tiên?</summary>
+  <p><b>Đo bằng cProfile</b> trên dữ liệu thật, đọc <code>cumtime</code> để tìm nhánh đắt nhất. Chưa đo thì chưa sửa.</p></details>
+
+  <details class="qa"><summary>Vì sao vòng lặp Python chậm hơn NumPy?</summary>
+  <p>Mỗi phép tính phải qua <b>tầng thông dịch</b> và tạo object mới. NumPy chạy vòng lặp trong C trên vùng nhớ liền khối.</p></details>
+
+  <details class="qa"><summary><code>__slots__</code> để làm gì?</summary>
+  <p>Bỏ <code>__dict__</code> của instance → <b>tốn ít bộ nhớ hơn và truy cập nhanh hơn</b>, đổi lại không thêm thuộc tính mới lúc chạy được.</p></details>
 </section>
 
-<footer>Python · Performance</footer>
+<footer>Python · profiling &amp; performance · số liệu bộ nhớ ước lượng trên CPython 64-bit.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

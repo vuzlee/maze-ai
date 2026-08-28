@@ -39,50 +39,148 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-typing" data-skeleton="1" data-title="Type hints & dataclass" data-tag="Typing" data-blurb="Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.">
+      <article class="doc" id="art-typing" data-title="Type hints &amp; dataclass" data-tag="Typing" data-blurb="Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.">
         <header class="hero">
-  <p class="eyebrow">Python · Typing</p>
+  <p class="eyebrow">Python · typing</p>
   <h1>Type hints &amp; <em>dataclass</em></h1>
-  <p class="lede">Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Python <b>không kiểm tra</b> type hint lúc chạy. Chúng viết cho <b>người đọc và công cụ</b> — hiểu đúng điều này là dùng đúng.</p>
 </header>
 
 <section id="typing-dataclass-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vì sao có type hints</h2></div>
-  <p class="plan">Static checker đọc, không phải runtime enforcement.</p>
+
+  <p class="key">Chúng là <em>chú thích</em>, không phải ràng buộc. Chạy vẫn chạy dù truyền sai kiểu.</p>
+
+<pre class="core"><code><span class="kw">def</span> chia(a: <span class="kw">int</span>, b: <span class="kw">int</span>) -&gt; <span class="kw">float</span>:
+    <span class="kw">return</span> a / b
+
+chia(<span class="st">"x"</span>, <span class="st">"y"</span>)      <span class="cm"># Python KHÔNG chặn — lỗi chỉ nổ ở phép chia</span>
+                     <span class="cm"># mypy / pyright thì báo ngay lúc kiểm tra</span></code></pre>
+
+  <ul class="why">
+    <li>Ai đọc: <b>static checker</b> (mypy, pyright), <b>IDE</b> để gợi ý, và <b>người bảo trì</b> sau bạn.</li>
+    <li>Muốn kiểm tra thật lúc chạy thì phải dùng thư viện như <b>pydantic</b> — nó đọc hint rồi tự sinh code kiểm tra.</li>
+    <li>Lợi ích lớn nhất không phải bắt lỗi mà là <b>hàm tự mô tả nó nhận gì trả gì</b>, khỏi phải đọc thân hàm.</li>
+  </ul>
 </section>
 
 <section id="typing-dataclass-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Cú pháp cơ bản</h2></div>
-  <p class="plan">Biến, hàm, Optional, Union.</p>
+
+  <p class="key">Bốn thứ phủ 90% nhu cầu: <em>kiểu cơ bản · container · Optional · Union</em>.</p>
+
+<pre class="core"><code>tên: <span class="kw">str</span> = <span class="st">"Mai"</span>
+điểm: <span class="kw">list</span>[<span class="kw">float</span>] = []                <span class="cm"># Python 3.9+: dùng list, không phải List</span>
+bảng: <span class="kw">dict</span>[<span class="kw">str</span>, <span class="kw">int</span>] = {}
+
+<span class="kw">def</span> tìm(id: <span class="kw">int</span>) -&gt; User | <span class="kw">None</span>:        <span class="cm"># 3.10+: | thay cho Optional[User]</span>
+    ...
+
+<span class="kw">def</span> xử_lý(x: <span class="kw">int</span> | <span class="kw">str</span>) -&gt; <span class="kw">None</span>:         <span class="cm"># nhận một trong hai kiểu</span>
+    ...</code></pre>
+
+  <p class="stripnote"><span>trả về <code>None</code> thì ghi <code>-&gt; None</code></span><span><em>bỏ trống nghĩa là "chưa chú thích", checker sẽ không kiểm tra hàm đó</em></span></p>
 </section>
 
 <section id="typing-dataclass-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Generic</h2></div>
-  <p class="plan">TypeVar, viết hàm generic đúng cách.</p>
+
+  <p class="key">Dùng khi kiểu trả về <em>phụ thuộc kiểu đầu vào</em>. Không có nó thì phải trả về <code>Any</code> và mất hết thông tin.</p>
+
+<pre class="core"><code><span class="kw">def</span> đầu_tiên(xs: <span class="kw">list</span>[T]) -&gt; T | <span class="kw">None</span>:      <span class="cm"># Python 3.12+: def đầu_tiên[T](...)</span>
+    <span class="kw">return</span> xs[<span class="st">0</span>] <span class="kw">if</span> xs <span class="kw">else</span> <span class="kw">None</span>
+
+<span class="cm"># checker biết: đầu_tiên([1,2]) là int | None</span>
+<span class="cm">#              đầu_tiên(["a"]) là str | None</span></code></pre>
+
+  <ul class="why">
+    <li>Trước 3.12 thì khai báo <code>T = TypeVar("T")</code> ở đầu file; từ 3.12 viết thẳng <code>def f[T](...)</code>.</li>
+    <li>Dùng generic khi <b>quan hệ giữa vào và ra</b> mới là thứ đáng ghi. Không có quan hệ đó thì đừng.</li>
+  </ul>
 </section>
 
 <section id="typing-dataclass-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Protocol</h2></div>
-  <p class="plan">Structural typing, khác Interface ở ngôn ngữ khác thế nào.</p>
+
+  <p class="key">Ghi rõ <em>cần object có phương thức gì</em>, mà object đó <em>không phải kế thừa từ đâu cả</em>.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Interface kiểu Java</h5>
+      <p>Lớp phải <b>khai báo</b> mình implement interface.</p>
+      <p>Không sửa được thư viện của người khác cho hợp interface của bạn.</p>
+    </div>
+    <div>
+      <h5>Protocol trong Python</h5>
+      <p>Chỉ cần <b>có đúng phương thức</b> là hợp lệ — duck typing nhưng checker hiểu được.</p>
+      <p>Áp được lên cả class có sẵn mà bạn không sửa được.</p>
+    </div>
+  </div>
+
+<pre class="core"><code><span class="kw">from</span> typing <span class="kw">import</span> Protocol
+
+<span class="kw">class</span> CóDiệnTích(Protocol):
+    <span class="kw">def</span> diện_tích(self) -&gt; <span class="kw">float</span>: ...
+
+<span class="kw">def</span> tổng(xs: <span class="kw">list</span>[CóDiệnTích]) -&gt; <span class="kw">float</span>:    <span class="cm"># nhận mọi object có .diện_tích()</span>
+    <span class="kw">return</span> <span class="kw">sum</span>(x.diện_tích() <span class="kw">for</span> x <span class="kw">in</span> xs)</code></pre>
 </section>
 
 <section id="typing-dataclass-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Dataclass</h2></div>
-  <p class="plan">Sinh __init__/__repr__/__eq__ tự động, frozen, so với NamedTuple.</p>
+
+  <p class="key">Một dòng decorator thay cho <em><code>__init__</code>, <code>__repr__</code>, <code>__eq__</code></em> viết tay.</p>
+
+<pre class="core"><code><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, field
+
+<span class="kw">@dataclass</span>(frozen=<span class="kw">True</span>)          <span class="cm"># frozen → bất biến VÀ hashable</span>
+<span class="kw">class</span> Điểm:
+    x: <span class="kw">int</span>
+    y: <span class="kw">int</span> = <span class="st">0</span>
+    nhãn: <span class="kw">list</span>[<span class="kw">str</span>] = field(default_factory=<span class="kw">list</span>)   <span class="cm"># KHÔNG viết = []</span>
+
+Điểm(<span class="st">1</span>, <span class="st">2</span>) == Điểm(<span class="st">1</span>, <span class="st">2</span>)     <span class="cm"># True — __eq__ được sinh sẵn</span></code></pre>
+
+  <table>
+    <tr><th></th><th>dataclass</th><th>NamedTuple</th><th>dict</th></tr>
+    <tr><td>Sửa được</td><td>có (trừ <code>frozen</code>)</td><td>không</td><td>có</td></tr>
+    <tr><td>Truy cập</td><td><code>p.x</code></td><td><code>p.x</code> và <code>p[0]</code></td><td><code>p["x"]</code></td></tr>
+    <tr><td>Làm khoá dict</td><td>chỉ khi <code>frozen=True</code></td><td><b>được</b></td><td>không</td></tr>
+    <tr><td>Chọn khi</td><td><b>mặc định</b> — có phương thức, có mặc định</td><td>bản ghi nhỏ, bất biến</td><td>khoá không biết trước</td></tr>
+  </table>
 </section>
 
 <section id="typing-dataclass-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
-  <p class="plan">Tin type hint là runtime check, generic quá phức tạp không ai đọc được.</p>
+  <div class="sh"><b>06</b><h2>Ba lỗi hay gặp</h2></div>
+
+  <p class="key">Lỗi đầu tiên đến từ hiểu sai <em>bản chất</em> của type hint.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Tưởng hint là kiểm tra runtime</h4><p>Python <b>không chặn gì cả</b>. Cần chặn thật thì dùng pydantic hoặc tự kiểm tra.</p></div>
+    <div class="card bad"><h4><code>= []</code> trong dataclass</h4><p>Python báo lỗi ngay vì mutable default. Dùng <code>field(default_factory=list)</code>.</p></div>
+    <div class="card bad"><h4>Generic phức tạp không ai đọc nổi</h4><p>Hint tồn tại để <b>dễ đọc hơn</b>. Chú thích dài hơn thân hàm là đã đi quá xa — dùng alias hoặc đơn giản hoá.</p></div>
+  </div>
 </section>
 
 <section id="typing-dataclass-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Bốn câu thường gặp về typing.</p>
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Type hints có ảnh hưởng runtime không?</summary>
+  <p><b>Không.</b> Python bỏ qua chúng khi chạy. Chúng dành cho static checker, IDE và người đọc.</p></details>
+
+  <details class="qa"><summary>Protocol khác abstract base class ở đâu?</summary>
+  <p>Protocol là <b>structural</b>: có đúng phương thức là hợp lệ, không cần kế thừa. ABC là <b>nominal</b>: phải kế thừa mới tính.</p></details>
+
+  <details class="qa"><summary>Dataclass hay NamedTuple?</summary>
+  <p><b>NamedTuple</b> cho bản ghi nhỏ, bất biến, cần dùng như tuple. <b>Dataclass</b> cho mọi trường hợp còn lại — sửa được và có phương thức.</p></details>
+
+  <details class="qa"><summary>Vì sao <code>field(default_factory=list)</code>?</summary>
+  <p>Vì <code>= []</code> tạo <b>một list dùng chung cho mọi instance</b>. Factory tạo list mới mỗi lần khởi tạo.</p></details>
 </section>
 
-<footer>Python · Typing</footer>
+<footer>Python · type hints &amp; dataclass · mọi đoạn code chạy được nguyên trạng trên Python 3.10+.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

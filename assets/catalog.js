@@ -274,11 +274,11 @@ window.CATALOG = [
       "dir": "python-overview",
       "slug": "pyov",
       "title": "Python overview",
-      "tag": "Python",
+      "tag": "Overview",
       "blurb": "Python được thiết kế quanh vài quy tắc nhất quán — nắm chúng thì phần còn lại tự suy ra được.",
       "n": 8,
       "path": "content/02-python/01-overview/python-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -290,11 +290,11 @@ window.CATALOG = [
       "dir": "language-core-overview",
       "slug": "lcov",
       "title": "Language core overview",
-      "tag": "Python",
+      "tag": "Overview",
       "blurb": "Bốn quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.",
       "n": 8,
       "path": "content/02-python/02-language-core/language-core-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "memory-model-mutability",
@@ -310,11 +310,11 @@ window.CATALOG = [
       "dir": "data-model-dunder",
       "slug": "dunder",
       "title": "Data model & dunder",
-      "tag": "Python",
+      "tag": "Language core",
       "blurb": "Vì sao len(x) chứ không phải x.len(), giao thức phía sau toán tử, và cách một object tự nhập vai list hay dict.",
       "n": 5,
       "path": "content/02-python/02-language-core/data-model-dunder/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "iterator-generator",
@@ -346,11 +346,11 @@ window.CATALOG = [
       "dir": "list-tuple-set",
       "slug": "listset",
       "title": "List, tuple & set",
-      "tag": "Python",
+      "tag": "Built-in types",
       "blurb": "Chi phí thật của từng thao tác, vì sao tuple làm khoá được mà list thì không, và set là hash table không giá trị.",
       "n": 6,
       "path": "content/02-python/03-builtin-structures/list-tuple-set/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "dict-hash-table",
@@ -398,11 +398,11 @@ window.CATALOG = [
       "dir": "leetcode-toolkit",
       "slug": "kit",
       "title": "LeetCode toolkit",
-      "tag": "Python",
+      "tag": "Toolkit",
       "blurb": "bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.",
       "n": 6,
       "path": "content/02-python/05-toolkit/leetcode-toolkit/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -415,10 +415,10 @@ window.CATALOG = [
       "slug": "oop",
       "title": "OOP trong Python",
       "tag": "OOP",
-      "blurb": "Class, inheritance, composition và MRO — cách Python giải quyết đa kế thừa, và khi nào nên chọn composition thay vì kế thừa.",
+      "blurb": "Class, inheritance, composition và MRO — cách Python giải quyết đa kế thừa, và khi nào nên chọn composition.",
       "n": 7,
       "path": "content/02-python/06-oop/oop-python/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -434,7 +434,7 @@ window.CATALOG = [
       "blurb": "Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.",
       "n": 7,
       "path": "content/02-python/07-typing/typing-dataclass/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -450,7 +450,7 @@ window.CATALOG = [
       "blurb": "Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.",
       "n": 5,
       "path": "content/02-python/08-performance/performance-profiling/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    }
