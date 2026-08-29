@@ -473,7 +473,7 @@ window.CATALOG = [
       "blurb": "Từ một lệnh gọi hàm tới một request đi qua nửa vòng trái đất — các tầng trừu tượng và tầng nào hỏng thì thấy gì.",
       "n": 8,
       "path": "content/03-cs-fundamentals/01-overview/cs-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -489,7 +489,7 @@ window.CATALOG = [
       "blurb": "Hệ điều hành chia một máy cho nhiều việc thế nào: tiến trình, bộ nhớ, và đồng bộ.",
       "n": 8,
       "path": "content/03-cs-fundamentals/02-os/os-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "process-thread-scheduling",
@@ -499,7 +499,7 @@ window.CATALOG = [
       "blurb": "Ranh giới cô lập, chi phí context switch, và bộ lập lịch quyết định ai chạy tiếp.",
       "n": 6,
       "path": "content/03-cs-fundamentals/02-os/process-thread-scheduling/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "memory-virtual-paging",
@@ -650,7 +650,7 @@ window.CATALOG = [
       "blurb": "Từ file phẳng tới mô hình quan hệ tới NoSQL — mỗi bước sinh ra để chữa giới hạn gì của bước trước.",
       "n": 8,
       "path": "content/04-database/01-overview/db-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },

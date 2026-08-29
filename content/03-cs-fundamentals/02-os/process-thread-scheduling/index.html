@@ -39,45 +39,110 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-osproc" data-skeleton="1" data-title="Process, thread &amp; scheduling" data-tag="CS" data-blurb="Ranh giới cô lập, chi phí context switch, và bộ lập lịch quyết định ai chạy tiếp.">
+      <article class="doc" id="art-osproc" data-title="Process, thread &amp; scheduling" data-tag="CS" data-blurb="Ranh giới cô lập, chi phí context switch, và bộ lập lịch quyết định ai chạy tiếp.">
         <header class="hero">
-  <p class="eyebrow">CS fundamentals</p>
+  <p class="eyebrow">CS fundamentals · Operating system</p>
   <h1>Process, thread &amp; <em>scheduling</em></h1>
   <p class="lede">Tầng dưới của mọi câu hỏi đồng thời — kể cả câu về GIL của Python.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
-<section id="osproc-s1" class="lesson">
+<section id="osproc-s1">
   <div class="sh"><b>01</b><h2>Process so với thread</h2></div>
-  <p class="plan">Cái gì chia sẻ, cái gì riêng — một hình.</p>
+  <p>Một <strong>process</strong> là một chương trình đang chạy, cấp phát cho nó một không gian địa chỉ (address space) riêng — bộ nhớ của process này process khác không nhìn thấy, trừ khi đi qua cơ chế liên lạc rõ ràng (IPC). Đó là ranh giới cô lập mạnh nhất hệ điều hành cung cấp: một process crash không kéo process khác chết theo.</p>
+  <p>Một <strong>thread</strong> là một luồng thực thi <em>bên trong</em> một process. Nhiều thread trong cùng process <strong>chia sẻ</strong> cùng một không gian địa chỉ — cùng heap, cùng biến global, cùng file descriptor đang mở — nhưng mỗi thread vẫn giữ <strong>riêng</strong> stack, tập thanh ghi (register) và program counter của nó, vì mỗi thread cần biết nó đang thực thi dòng lệnh nào, độc lập với các thread khác.</p>
+  <div class="cmp two">
+    <div><h5>Process</h5>
+      <p><b>Không gian địa chỉ</b> riêng, cô lập</p>
+      <p><b>Chia sẻ với process khác</b> không có gì, trừ IPC</p>
+      <p><b>Tạo mới</b> đắt — nhân bản bộ nhớ, bảng trang</p></div>
+    <div><h5>Thread</h5>
+      <p><b>Không gian địa chỉ</b> dùng chung với các thread cùng process</p>
+      <p><b>Riêng</b> stack, register, program counter</p>
+      <p><b>Tạo mới</b> rẻ hơn nhiều — chỉ cấp thêm stack</p></div>
+  </div>
+  <div class="note key">
+    <h4>Vì sao thread cần khoá còn process thì không</h4>
+    Chính vì thread <strong>chia sẻ heap và biến global</strong> mà hai thread cùng đọc/ghi một vùng nhớ có thể đụng nhau — đây là nguồn gốc của race condition và lý do cần lock. Hai process không chia sẻ bộ nhớ nên không có kiểu đụng độ này; muốn trao đổi dữ liệu, chúng phải đi qua kênh tường minh như pipe, socket hoặc shared memory được cấp phát riêng.
+  </div>
 </section>
 
-<section id="osproc-s2" class="lesson">
+<section id="osproc-s2">
   <div class="sh"><b>02</b><h2>Context switch</h2></div>
-  <p class="plan">Chi phí thật, và vì sao nhiều thread không nhanh hơn.</p>
+  <p>Context switch là lúc CPU dừng thực thi một luồng để chạy luồng khác. Chi phí không chỉ là "chuyển sự chú ý" — CPU phải <strong>lưu lại toàn bộ trạng thái register</strong> của luồng đang chạy (để lát nữa khôi phục đúng chỗ đã dừng), rồi nạp trạng thái register của luồng sắp chạy.</p>
+  <p>Chuyển giữa hai <strong>thread cùng process</strong> tương đối rẻ vì không gian địa chỉ giữ nguyên. Chuyển giữa hai <strong>process khác nhau</strong> đắt hơn hẳn vì phải đổi cả không gian địa chỉ — CPU có thể phải <strong>flush TLB</strong> (bảng dịch địa chỉ ảo → vật lý đang cache), và những lần truy cập bộ nhớ ngay sau đó chậm lại vì phải dịch địa chỉ lại từ đầu.</p>
+  <div class="bars">
+    <div class="b"><i>gọi hàm thường</i><u style="width:2%"></u><b>~vài ns</b></div>
+    <div class="b hi"><i>thread switch (cùng process)</i><u style="width:15%"></u><b>~1–4 µs</b></div>
+    <div class="b bad"><i>process switch (đổi address space)</i><u style="width:100%"></u><b>~5–15 µs, đôi khi hơn</b></div>
+  </div>
+  <div class="note warn">
+    <h4>Vì sao "thêm nhiều thread" không tự động nhanh hơn</h4>
+    Số thread hữu ích bị chặn bởi số core thật. Tạo nhiều thread hơn số core cho tác vụ CPU-bound không làm việc song song hơn — hệ điều hành phải luân phiên chúng qua cùng vài core, tức là <strong>context switch liên tục</strong>. Tới một ngưỡng, CPU tốn nhiều thời gian lưu/khôi phục trạng thái hơn là làm việc thật — gọi là <em>thrashing</em>, và chương trình có thể chạy <strong>chậm hơn</strong> so với ít thread hơn.
+  </div>
 </section>
 
-<section id="osproc-s3" class="lesson">
+<section id="osproc-s3">
   <div class="sh"><b>03</b><h2>Lập lịch</h2></div>
-  <p class="plan">Preemptive, time slice, ưu tiên.</p>
+  <p>Hai triết lý cho bộ lập lịch (scheduler): <strong>preemptive</strong> — hệ điều hành có quyền ngắt ngang một tiến trình đang chạy để nhường CPU cho tiến trình khác, không cần tiến trình đó đồng ý; và <strong>cooperative</strong> — tiến trình phải tự chủ động nhường lại quyền chạy, hệ điều hành không ép được. Hầu hết hệ điều hành hiện đại (Linux, Windows) dùng preemptive cho tiến trình ở tầng OS, vì cooperative có rủi ro rõ: một tiến trình treo hoặc cố tình không nhường thì cả hệ thống bị khoá.</p>
+  <div class="flow">
+    <div class="n"><h5>1 · Chạy</h5><p>tiến trình được cấp một <b>time slice</b> (quantum) — một khoảng CPU cố định</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Hết giờ</h5><p>hệ điều hành <b>ngắt ngang</b> (preempt) dù tiến trình chưa xong việc</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>3 · Xếp lại hàng</h5><p>chọn tiến trình kế tiếp theo <b>độ ưu tiên</b>, quay lại bước 1</p></div>
+  </div>
+  <div class="note">
+    <h4>Priority scheduling và priority inversion</h4>
+    Lập lịch theo độ ưu tiên cho tiến trình quan trọng chạy trước, nhưng có một bẫy kinh điển gọi là <strong>priority inversion</strong>: tiến trình ưu tiên thấp đang giữ một lock mà tiến trình ưu tiên cao cần, nên tiến trình ưu tiên cao buộc phải chờ — hiệu lực ưu tiên bị đảo ngược. Đây là một câu hỏi vặn hay gặp khi bàn về scheduling thực chiến.
+  </div>
 </section>
 
-<section id="osproc-s4" class="lesson">
+<section id="osproc-s4">
   <div class="sh"><b>04</b><h2>Trạng thái tiến trình</h2></div>
-  <p class="plan">Sẵn sàng, chạy, chờ — vòng đời.</p>
+  <p>Một tiến trình đi qua vài trạng thái cố định trong vòng đời của nó, và bộ lập lịch chỉ là thứ quyết định khi nào nó chuyển từ trạng thái này sang trạng thái khác.</p>
+  <div class="flow">
+    <div class="n"><h5>New</h5><p>vừa được tạo</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Ready</h5><p>chờ tới lượt, sẵn sàng chạy</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>Running</h5><p>đang chiếm CPU</p></div>
+    <div class="a">→</div>
+    <div class="n no"><h5>Terminated</h5><p>chạy xong hoặc bị kết thúc</p></div>
+  </div>
+  <p>Hai đường rẽ đáng nhớ ngoài dòng chính: từ <strong>Running</strong> có thể quay lại <strong>Ready</strong> khi hết time slice mà chưa xong việc — bị preempt chứ không phải lỗi; và từ <strong>Running</strong> có thể rẽ sang <strong>Waiting/Blocked</strong> khi tiến trình phải chờ một sự kiện bên ngoài (thường là I/O — đọc file, chờ mạng), rồi quay lại <strong>Ready</strong> khi sự kiện đó xong chứ không được chạy ngay lập tức.</p>
 </section>
 
 <section id="osproc-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Tạo thread vô tội vạ, tưởng thread rẻ, bỏ qua chi phí đồng bộ.</p>
+
+  <p class="key">Cả ba đều bắt nguồn từ một ngộ nhận: coi thread là thứ gần như miễn phí.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Tạo thread vô tội vạ cho mỗi tác vụ nhỏ</h4><p>Chi phí tạo/huỷ thread và context switch có thể lớn hơn chính công việc cần làm — lợi bất cập hại với tác vụ nhỏ, ngắn.</p></div>
+    <div class="card bad"><h4>Tưởng thread rẻ như một lời gọi hàm</h4><p>Mỗi thread giữ một stack riêng, thường từ vài trăm KB tới vài MB, cộng chi phí CPU để bộ lập lịch theo dõi và luân phiên nó — càng nhiều thread càng tốn cả bộ nhớ lẫn CPU cho việc quản lý.</p></div>
+    <div class="card bad"><h4>Bỏ qua chi phí đồng bộ</h4><p>Nhiều thread cùng đọc/ghi dữ liệu chung cần lock để tránh race condition; khi lock bị tranh chấp nhiều (contention), các thread xếp hàng chờ nhau và chương trình đa luồng có thể <strong>chậm hơn</strong> một chương trình đơn luồng tương đương.</p></div>
+  </div>
 </section>
 
 <section id="osproc-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Process khác thread thế nào?</summary>
+  <p>Process có <b>không gian địa chỉ riêng</b>, cô lập hoàn toàn với process khác; muốn trao đổi dữ liệu phải qua IPC tường minh. Thread là một luồng thực thi bên trong một process, và nhiều thread cùng process <b>chia sẻ</b> heap, biến global và file descriptor, nhưng mỗi thread vẫn giữ riêng stack, register và program counter — vì mỗi thread cần theo dõi độc lập nó đang chạy tới đâu. Chính việc chia sẻ bộ nhớ đó vừa là lợi thế của thread (dễ trao đổi dữ liệu, tạo rẻ hơn process) vừa là nguồn gốc của race condition.</p></details>
+
+  <details class="qa"><summary>Context switch tốn chi phí gì, và vì sao thread switch thường rẻ hơn process switch?</summary>
+  <p>Context switch phải <b>lưu toàn bộ trạng thái register</b> của luồng đang chạy rồi nạp lại trạng thái của luồng kế tiếp. Chuyển giữa hai thread cùng process rẻ vì không gian địa chỉ không đổi. Chuyển giữa hai process đắt hơn vì phải đổi cả address space, có thể phải <b>flush TLB</b> — bảng dịch địa chỉ ảo sang vật lý đang cache — khiến các lần truy cập bộ nhớ ngay sau đó chậm lại. Hệ quả thực tế: thêm nhiều thread hơn số core cho tác vụ CPU-bound có thể gây context switch liên tục và làm chương trình chậm đi thay vì nhanh lên.</p></details>
+
+  <details class="qa"><summary>Preemptive scheduling khác cooperative ở đâu?</summary>
+  <p>Ở <b>ai giữ quyền quyết định khi nào nhường CPU</b>. Preemptive: hệ điều hành có quyền ngắt ngang một tiến trình đang chạy — thường khi hết <b>time slice</b> — để nhường cho tiến trình khác, không cần hỏi ý kiến nó. Cooperative: tiến trình phải tự chủ động nhường lại, hệ điều hành không ép được, nên một tiến trình treo hoặc không chịu nhường có thể khoá cả hệ thống. Vì rủi ro đó, hệ điều hành hiện đại như Linux hay Windows lập lịch tiến trình theo preemptive là chính.</p></details>
+
+  <details class="qa"><summary>Vì sao Python có GIL và nó ảnh hưởng gì tới threading?</summary>
+  <p>GIL (Global Interpreter Lock) là một lock toàn cục trong CPython đảm bảo chỉ <b>một thread chạy Python bytecode tại một thời điểm</b>, dù chương trình có bao nhiêu thread. Hệ quả trực tiếp: threading trong Python <b>không tăng tốc tác vụ CPU-bound</b> — các thread vẫn phải xếp hàng nhường nhau GIL, đúng cái mà mục context switch ở trên đã nói tới, chỉ khác là bị siết chặt hơn bởi chính interpreter. Threading vẫn có ích cho tác vụ I/O-bound vì GIL được nhả ra trong lúc chờ I/O. Chi tiết đầy đủ — vì sao GIL tồn tại, khi nào dùng multiprocessing thay vì threading — nằm ở bài <a href="../../../02-python/04-concurrency/thread-process-gil/index.html">Thread, process &amp; GIL</a>.</p></details>
 </section>
 
-<footer>CS fundamentals · Process, thread & lập lịch</footer>
+<footer>CS fundamentals · Process, thread &amp; lập lịch · phần bộ nhớ ảo nằm ở bài <a href="../memory-virtual-paging/index.html">Virtual memory &amp; paging</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>
