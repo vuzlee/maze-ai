@@ -39,40 +39,73 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-dwlake" data-skeleton="1" data-title="Data warehouse & data lake" data-tag="Data systems" data-blurb="Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.">
+      <article class="doc" id="art-dwlake" data-title="Data warehouse & data lake" data-tag="Data systems" data-blurb="Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.">
         <header class="hero">
   <p class="eyebrow">Database · Data systems</p>
   <h1>Data warehouse &amp; <em>data lake</em></h1>
   <p class="lede">Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="data-warehouse-lake-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Dữ liệu từ nhiều nguồn, lưu ở đâu để dùng lại được.</p>
+  <p>Bài trước (<a href="../oltp-vs-olap/index.html">OLTP vs OLAP</a>) kết luận: đừng chạy báo cáo trên database giao dịch, hãy sao chép dữ liệu sang một hệ riêng cho phân tích. Nhưng dữ liệu công ty không chỉ đến từ một database OLTP — còn có log sự kiện, file CSV từ đối tác, dữ liệu từ API bên thứ ba, ảnh, văn bản. Câu hỏi trở thành: <b>lưu tất cả những thứ đó ở đâu, dưới hình dạng nào, để sau này dùng lại được</b>?</p>
+  <p class="key">Hai câu trả lời khác nhau về triết lý: ép cấu trúc <em>trước</em> khi lưu, hay lưu nguyên trạng rồi tính cấu trúc <em>lúc</em> đọc.</p>
 </section>
 
 <section id="data-warehouse-lake-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Data warehouse</h2></div>
-  <p class="plan">Schema-on-write, structured, cho BI/báo cáo.</p>
+  <div class="sh"><b>02</b><h2>Data warehouse — schema-on-write</h2></div>
+  <p class="key">Chỉ nhận dữ liệu đã được làm sạch và ép vào một schema định sẵn <em>trước khi</em> ghi vào.</p>
+  <ul class="why">
+    <li>Dữ liệu có cấu trúc (structured), thường tổ chức theo <b>star schema</b>: một bảng <em>fact</em> ở giữa (mỗi dòng là một sự kiện đo lường được — một đơn hàng, một lượt xem) nối tới các bảng <em>dimension</em> xung quanh (khách hàng, sản phẩm, thời gian, cửa hàng) qua khoá ngoại.</li>
+    <li>Vì đã ép schema và làm sạch từ trước, truy vấn SQL trên warehouse nhanh và đáng tin cậy cho BI/dashboard/báo cáo định kỳ.</li>
+    <li>Cái giá: phải biết trước câu hỏi sẽ hỏi gì để thiết kế schema đúng, và pipeline nạp dữ liệu (transform trước khi load) tốn công hơn.</li>
+    <li>Ví dụ: Snowflake, BigQuery, Redshift — engine column-oriented, đúng như OLAP đã học ở bài trước.</li>
+  </ul>
+  <div class="stack">
+    <div class="s"><b>Fact table</b><span>orders: order_id, customer_id, product_id, date_id, revenue</span></div>
+    <div class="s ok"><b>Dimension tables</b><span>customers, products, dates — mỗi bảng mô tả một "trục" để cắt lát fact table</span></div>
+  </div>
 </section>
 
 <section id="data-warehouse-lake-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Data lake</h2></div>
-  <p class="plan">Schema-on-read, raw, cho ML/exploratory.</p>
+  <div class="sh"><b>03</b><h2>Data lake — schema-on-read</h2></div>
+  <p class="key">Cứ đổ nguyên trạng mọi loại dữ liệu vào một kho lưu trữ rẻ — chưa cần biết cấu trúc lúc lưu, chỉ tính khi có ai đọc.</p>
+  <ul class="why">
+    <li>Lưu dữ liệu thô (raw), mọi định dạng: log JSON, CSV, ảnh, Parquet — không cần làm sạch hay ép schema trước.</li>
+    <li>Điển hình: object storage giá rẻ (S3, GCS) chứa file định dạng cột như Parquet, đọc bằng engine truy vấn riêng (Spark, Athena, DuckDB) khi cần.</li>
+    <li>Linh hoạt, rẻ, phù hợp cho việc chưa biết trước sẽ hỏi gì — điển hình cho khai thác dữ liệu ML: cần dữ liệu thô để trích feature theo nhiều cách khác nhau, không cái nào cố định.</li>
+    <li>Cái giá: không có gì đảm bảo dữ liệu sạch hay nhất quán — dễ biến thành "data swamp" (đầm lầy dữ liệu) nếu không có kỷ luật đặt tên và mô tả (metadata), đây cũng chính là lý do nhóm bài này có bài riêng về <a href="../data-quality/index.html">data quality</a>.</li>
+  </ul>
 </section>
 
 <section id="data-warehouse-lake-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Lakehouse</h2></div>
-  <p class="plan">Vì sao ranh giới giữa hai bên đang mờ dần.</p>
+  <div class="sh"><b>04</b><h2>Đối chiếu và lakehouse</h2></div>
+  <div class="cmp two">
+    <div><h5>Data warehouse</h5>
+      <p><b>Schema</b> on-write, ép trước khi lưu</p>
+      <p><b>Dữ liệu</b> có cấu trúc, đã sạch</p>
+      <p><b>Dùng cho</b> BI, báo cáo, dashboard</p>
+      <p><b>Chi phí</b> lưu trữ đắt hơn, tính toán trước tốn công</p></div>
+    <div><h5>Data lake</h5>
+      <p><b>Schema</b> on-read, tính lúc đọc</p>
+      <p><b>Dữ liệu</b> thô, mọi định dạng</p>
+      <p><b>Dùng cho</b> ML, khai phá dữ liệu, lưu trữ dài hạn</p>
+      <p><b>Chi phí</b> lưu trữ rẻ, nhưng dễ lộn xộn</p></div>
+  </div>
+  <p><strong>Data lakehouse</strong> là xu hướng gộp hai bên: lưu trên object storage rẻ như lake, nhưng thêm một lớp quản lý transaction và schema (ví dụ Delta Lake, Apache Iceberg) để có được độ tin cậy gần với warehouse mà không phải sao chép dữ liệu sang hai nơi. Không đào sâu công cụ cụ thể ở đây — điều cần nhớ là ranh giới warehouse/lake đang mờ dần, nhưng hai <em>triết lý</em> schema-on-write vs schema-on-read vẫn là khung để hiểu vì sao một hệ được thiết kế như vậy.</p>
 </section>
 
 <section id="data-warehouse-lake-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Ba câu thường gặp về warehouse/lake.</p>
+  <details class="qa"><summary>Vì sao không đổ hết vào data lake cho đơn giản?</summary>
+  <p>Vì phần lớn nhu cầu thực tế (báo cáo doanh thu tháng, dashboard cho lãnh đạo) cần truy vấn nhanh, lặp lại, trên dữ liệu đã biết cấu trúc — warehouse làm việc đó rẻ hơn nhiều so với việc mỗi lần đọc lại phải parse dữ liệu thô. Lake hợp cho dữ liệu chưa biết trước sẽ dùng thế nào.</p></details>
+  <details class="qa"><summary>Star schema khác gì schema chuẩn hoá (normalized) đã học ở nhóm SQL?</summary>
+  <p>Normalized schema tối ưu tránh trùng lặp cho ghi (đúng cho OLTP). Star schema chấp nhận trùng lặp có kiểm soát ở các bảng dimension để giảm số <code>JOIN</code> khi gộp dữ liệu — đúng cho OLAP. Đây là hai lựa chọn cho hai mục đích khác nhau, không phải một chuẩn thay thế chuẩn kia.</p></details>
+  <details class="qa"><summary>Dữ liệu đi vào warehouse/lake bằng cách nào?</summary>
+  <p>Qua các pipeline nạp dữ liệu định kỳ hoặc liên tục — chủ đề của hai bài kế tiếp: <a href="../etl-elt/index.html">ETL/ELT</a> quyết định transform trước hay sau khi load, và <a href="../batch-stream-processing/index.html">batch vs stream</a> quyết định nạp theo lô hay theo thời gian thực.</p></details>
 </section>
 
-<footer>Database · Data systems</footer>
+<footer>Database · Data systems · trước đó: <a href="../oltp-vs-olap/index.html">OLTP vs OLAP</a> · tiếp theo: <a href="../etl-elt/index.html">ETL &amp; ELT</a></footer>
 
       </article>
       <div class="nextprev" id="np"></div>

@@ -39,45 +39,143 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-norm3" data-skeleton="1" data-title="Normalization &amp; denormalization" data-tag="Database" data-blurb="1NF tới 3NF bằng ví dụ, BCNF khi nào cần, và vì sao hệ thống thật lại cố tình phá chuẩn.">
+      <article class="doc" id="art-norm3" data-title="Normalization &amp; denormalization" data-tag="Database" data-blurb="1NF tới 3NF bằng ví dụ, BCNF khi nào cần, và vì sao hệ thống thật lại cố tình phá chuẩn.">
         <header class="hero">
   <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
   <h1>Normalization &amp; <em>denormalization</em></h1>
-  <p class="lede">Chuẩn hoá để <b>không lưu một sự thật ở hai nơi</b>. Phi chuẩn hoá để đọc nhanh hơn.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Chuẩn hoá để <b>không lưu một sự thật ở hai nơi</b>. Phi chuẩn hoá để đọc nhanh hơn. Tiếp nối <a href="../constraints-integrity/index.html">Constraints &amp; integrity</a>.</p>
 </header>
 
-<section id="norm3-s1" class="lesson">
+<section id="norm3-s1">
   <div class="sh"><b>01</b><h2>Vấn đề: dị thường cập nhật</h2></div>
-  <p class="plan">Một bảng sai, ba kiểu hỏng — một hình.</p>
+  <p>Bài <a href="../../01-overview/db-overview/index.html#dbov-s3">Database overview</a> đã nêu ba anomaly bằng bảng đơn hàng nhét chung mọi thứ. Dùng lại đúng bảng đó để đi sâu:</p>
+<pre><code>orders_flat
+┌──────────┬───────┬───────────────┬───────────┬────────┐
+│ order_id │ khách │ email khách   │ sản phẩm  │ giá    │
+├──────────┼───────┼───────────────┼───────────┼────────┤
+│ 1        │ An    │ an@mail.com   │ Bàn phím  │ 500000 │
+│ 2        │ An    │ an@mail.com   │ Chuột     │ 200000 │
+│ 3        │ Bình  │ binh@mail.com │ Bàn phím  │ 500000 │
+└──────────┴───────┴───────────────┴───────────┴────────┘</code></pre>
+  <div class="grid2">
+    <div class="card bad"><h4>Update anomaly</h4><p>An đổi email → phải tìm và sửa đúng ở <i>mọi</i> dòng An từng xuất hiện (ở đây là 2 dòng). Quên một dòng là dữ liệu tự mâu thuẫn với chính nó.</p></div>
+    <div class="card bad"><h4>Insert anomaly</h4><p>Muốn thêm khách "Chi" nhưng Chi chưa mua gì → không có sản phẩm/giá để điền, phải nhét NULL hoặc giá trị giả vào hai cột đó.</p></div>
+    <div class="card bad"><h4>Delete anomaly</h4><p>Xoá đơn hàng duy nhất của Bình → mất luôn thông tin "Bình từng là khách", dù xoá-một-đơn-hàng và xoá-một-khách-hàng là hai việc hoàn toàn khác nhau.</p></div>
+  </div>
+  <p class="key">Gốc rễ chung của cả ba: <em>thông tin về khách hàng</em> (tên, email) đang bị lặp lại ở mọi dòng đơn hàng của khách đó, thay vì chỉ nằm ở đúng một chỗ. Chuẩn hoá là quy trình hình thức để tìm và sửa đúng loại lặp này.</p>
 </section>
 
-<section id="norm3-s2" class="lesson">
+<section id="norm3-s2">
   <div class="sh"><b>02</b><h2>1NF, 2NF, 3NF</h2></div>
-  <p class="plan">Mỗi mức một ví dụ, mỗi mức chữa đúng một bệnh.</p>
+  <p>Mỗi dạng chuẩn (normal form) chữa đúng một loại bệnh, và chuẩn sau luôn <i>giả định</i> đã đạt chuẩn trước.</p>
+
+  <h3>1NF — mỗi ô một giá trị nguyên tử</h3>
+  <p>Vi phạm khi một cột chứa nhiều giá trị nhét chung, ví dụ danh sách phân tách bởi dấu phẩy:</p>
+<pre><code><span class="cm">-- VI PHẠM 1NF</span>
+orders(order_id, khách, sản_phẩm)
+1, An, "Bàn phím, Chuột"        <span class="cm">-- hai sản phẩm nhét chung một ô</span>
+
+<span class="cm">-- ĐẠT 1NF — tách thành nhiều dòng, mỗi ô một giá trị</span>
+order_items(order_id, sản_phẩm)
+1, "Bàn phím"
+1, "Chuột"</code></pre>
+  <p>Đây chính là bẫy "nhét mảng vào một cột" sẽ nhắc lại ở <a href="../er-modeling/index.html">Schema design</a> — không tra được, không <code>JOIN</code> được, không ràng buộc được từng phần tử.</p>
+
+  <h3>2NF — không phụ thuộc bộ phận (partial dependency)</h3>
+  <p>Chỉ có ý nghĩa khi khoá chính là <b>composite key</b>. Vi phạm khi một cột chỉ phụ thuộc vào <i>một phần</i> của khoá tổ hợp, không phải toàn bộ:</p>
+<pre><code><span class="cm">-- VI PHẠM 2NF — khoá là (order_id, product_id)</span>
+order_items(order_id, product_id, quantity, tên_sản_phẩm)
+<span class="cm">-- tên_sản_phẩm chỉ phụ thuộc product_id, KHÔNG phụ thuộc order_id
+-- → lặp lại tên sản phẩm ở mọi order chứa sản phẩm đó</span>
+
+<span class="cm">-- ĐẠT 2NF — tách tên_sản_phẩm ra bảng products</span>
+order_items(order_id, product_id, quantity)
+products(product_id, tên_sản_phẩm)</code></pre>
+
+  <h3>3NF — không phụ thuộc bắc cầu (transitive dependency)</h3>
+  <p>Vi phạm khi một cột không khoá phụ thuộc vào một cột không khoá khác, thay vì phụ thuộc trực tiếp vào khoá chính:</p>
+<pre><code><span class="cm">-- VI PHẠM 3NF — khoá là order_id</span>
+orders(order_id, customer_id, mã_bưu_điện, tên_thành_phố)
+<span class="cm">-- tên_thành_phố phụ thuộc mã_bưu_điện, mã_bưu_điện mới phụ thuộc order_id
+-- → order_id → mã_bưu_điện → tên_thành_phố  là một chuỗi bắc cầu</span>
+
+<span class="cm">-- ĐẠT 3NF — tách thành bảng riêng cho mã bưu điện</span>
+orders(order_id, customer_id, mã_bưu_điện)
+postal_codes(mã_bưu_điện, tên_thành_phố)</code></pre>
+  <p>Áp cả ba dạng chuẩn vào bảng gốc ở mục 01, lược đồ cuối cùng tách thành ba bảng độc lập:</p>
+<pre><code>customers(customer_id, name, email)
+products(product_id, name, price)
+orders(order_id, customer_id, created_at)
+order_items(order_id, product_id, quantity)
+<span class="cm">-- email của An giờ chỉ nằm ở đúng MỘT dòng — sửa một lần, đúng khắp nơi</span></code></pre>
 </section>
 
-<section id="norm3-s3" class="lesson">
+<section id="norm3-s3">
   <div class="sh"><b>03</b><h2>BCNF</h2></div>
-  <p class="plan">Khi 3NF vẫn chưa đủ.</p>
+  <p><b>Boyce-Codd Normal Form</b> là bản siết chặt hơn của 3NF, chữa một trường hợp hiếm mà 3NF bỏ lọt: khi bảng có <i>nhiều candidate key chồng lấn nhau</i>.</p>
+<pre><code><span class="cm">-- một giáo viên dạy nhiều môn, mỗi môn chỉ một phòng cố định
+-- candidate key: (giáo_viên, môn_học) và (phòng, môn_học)
+tutoring(giáo_viên, môn_học, phòng)
+
+-- đạt 3NF (không cột nào phụ thuộc bắc cầu qua cột không khoá)
+-- nhưng VI PHẠM BCNF: phòng → môn_học
+-- (biết phòng là suy ra được môn học, mà "phòng" không phải candidate key đầy đủ)</code></pre>
+  <p>Cách chữa giống hệt các dạng chuẩn trước: tách bảng theo đúng phụ thuộc hàm (functional dependency) đang gây vi phạm — ở đây tách <code>room_subject(phòng, môn_học)</code> ra riêng.</p>
+  <div class="note">
+    <h4>Thực tế: 3NF là đủ cho hầu hết hệ thống</h4>
+    BCNF gần như chỉ xuất hiện trong đề thi và trường hợp có nhiều candidate key chồng lấn — hiếm gặp trong thiết kế thực tế. Biết BCNF tồn tại và giải thích được ví dụ là đủ cho phỏng vấn; không cần cố ép mọi bảng production đạt BCNF.
+  </div>
 </section>
 
-<section id="norm3-s4" class="lesson">
+<section id="norm3-s4">
   <div class="sh"><b>04</b><h2>Phi chuẩn hoá có chủ đích</h2></div>
-  <p class="plan">Đổi tính nhất quán lấy tốc độ đọc, và cách giữ an toàn.</p>
+  <p class="key">Chuẩn hoá tối ưu cho <b>ghi đúng</b> — mỗi sự thật một chỗ. Nhưng đọc dữ liệu chuẩn hoá cao thường cần <code>JOIN</code> nhiều bảng, và <code>JOIN</code> có giá về hiệu năng.</p>
+  <p><b>Denormalization</b> là cố ý phá vỡ chuẩn — chấp nhận lặp dữ liệu — để đổi lấy tốc độ đọc. Ví dụ kinh điển: lưu sẵn <code>total_price</code> đã tính trên bảng <code>orders</code> thay vì luôn <code>JOIN order_items</code> rồi <code>SUM</code> mỗi lần đọc.</p>
+<pre><code>-- chuẩn hoá đúng nghĩa: total phải tính lại mỗi lần đọc
+SELECT SUM(oi.quantity * p.price)
+FROM order_items oi JOIN products p ON p.id = oi.product_id
+WHERE oi.order_id = 1;
+
+-- phi chuẩn hoá: lưu sẵn total_price, đọc thẳng không cần JOIN
+orders(id, customer_id, total_price, ...)  -- total_price là dữ liệu "thừa", suy ra được từ bảng khác</code></pre>
+  <table>
+    <tr><th>Giữ an toàn khi phi chuẩn hoá</th><th>Cách làm</th></tr>
+    <tr><td>Đừng phi chuẩn hoá sớm</td><td>Chỉ làm khi đã đo được <code>JOIN</code> là điểm nghẽn thật, không đoán trước</td></tr>
+    <tr><td>Phải có cơ chế giữ đồng bộ</td><td>Trigger tự cập nhật, hoặc job định kỳ tính lại, hoặc chấp nhận eventual consistency có kiểm soát</td></tr>
+    <tr><td>Tài liệu hoá rõ cột nào là "cache"</td><td>Comment trong schema: cột này suy ra được, nguồn sự thật (source of truth) nằm ở bảng nào</td></tr>
+  </table>
+  <p>Phi chuẩn hoá là kỹ thuật cốt lõi ở các hệ <b>OLAP</b> (phân tích) — nơi đọc nhanh trên khối lớn quan trọng hơn ghi đúng tuyệt đối theo thời gian thực. Xem <a href="../../06-data-systems/oltp-vs-olap/index.html">OLTP vs OLAP</a> để so kỹ đánh đổi này ở quy mô hệ thống.</p>
 </section>
 
-<section id="norm3-s5" class="lesson">
+<section id="norm3-s5">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Chuẩn hoá quá đà, phi chuẩn hoá không có cơ chế đồng bộ, nhầm 2NF với 3NF.</p>
+  <div class="grid2">
+    <div class="card bad"><h4>Chuẩn hoá quá đà</h4><p>Tách bảng tới mức mọi truy vấn đơn giản cũng cần 6-7 <code>JOIN</code>. Chuẩn hoá là công cụ chống lặp dữ liệu, không phải mục tiêu tự thân — dừng ở mức phục vụ đúng nghiệp vụ.</p></div>
+    <div class="card bad"><h4>Phi chuẩn hoá không có cơ chế đồng bộ</h4><p>Lưu <code>total_price</code> nhưng không có trigger hay job nào cập nhật lại khi <code>order_items</code> đổi — dữ liệu lặp lệch dần với nguồn sự thật, đúng vấn đề mà chuẩn hoá sinh ra để chữa.</p></div>
+    <div class="card bad"><h4>Nhầm 2NF với 3NF</h4><p>2NF chỉ có nghĩa khi khoá là composite key (chữa phụ thuộc bộ phận); 3NF áp dụng cho mọi bảng (chữa phụ thuộc bắc cầu giữa các cột không khoá). Nhầm hai khái niệm này là lỗi hay gặp nhất khi trả lời phỏng vấn.</p></div>
+  </div>
 </section>
 
-<section id="norm3-s6" class="lesson">
+<section id="norm3-s6">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <details class="qa"><summary>1NF, 2NF, 3NF khác nhau ở điểm nào?</summary>
+  <p>1NF yêu cầu mỗi ô chỉ chứa một giá trị nguyên tử, không nhét danh sách vào một cột. 2NF yêu cầu mọi cột không khoá phải phụ thuộc vào <i>toàn bộ</i> khoá chính — chỉ có ý nghĩa khi khoá là composite key, chữa "phụ thuộc bộ phận". 3NF yêu cầu mọi cột không khoá phải phụ thuộc <i>trực tiếp</i> vào khoá chính, không qua một cột không khoá khác — chữa "phụ thuộc bắc cầu". Ba dạng lồng nhau: đạt 3NF thì đương nhiên đã đạt 2NF và 1NF.</p></details>
+
+  <details class="qa"><summary>Cho một ví dụ vi phạm 3NF và cách sửa?</summary>
+  <p>Bảng <code>orders(order_id, customer_id, mã_bưu_điện, tên_thành_phố)</code> vi phạm vì <code>tên_thành_phố</code> phụ thuộc vào <code>mã_bưu_điện</code>, mà <code>mã_bưu_điện</code> mới là cột phụ thuộc trực tiếp vào <code>order_id</code> — tạo chuỗi bắc cầu <code>order_id → mã_bưu_điện → tên_thành_phố</code>. Sửa bằng cách tách bảng <code>postal_codes(mã_bưu_điện, tên_thành_phố)</code> riêng, <code>orders</code> chỉ giữ <code>mã_bưu_điện</code>.</p></details>
+
+  <details class="qa"><summary>BCNF khác 3NF ở đâu, và khi nào cần tới nó?</summary>
+  <p>BCNF siết chặt hơn 3NF ở trường hợp bảng có nhiều candidate key chồng lấn nhau: nếu một cột không phải candidate key đầy đủ nhưng vẫn quyết định được một cột khác, bảng đó đạt 3NF nhưng chưa đạt BCNF. Trường hợp này khá hiếm trong thiết kế thực tế — chủ yếu gặp trong đề thi hoặc bảng có cấu trúc phụ thuộc bất thường. 3NF là đủ cho phần lớn hệ thống thật.</p></details>
+
+  <details class="qa"><summary>Khi nào nên cố tình phi chuẩn hoá?</summary>
+  <p>Khi đã đo được rằng <code>JOIN</code> nhiều bảng là điểm nghẽn hiệu năng thật, không phải đoán trước. Ví dụ điển hình là lưu sẵn tổng tiền đơn hàng thay vì tính lại từ <code>order_items</code> mỗi lần đọc, hoặc toàn bộ mô hình OLAP đánh đổi tính nhất quán thời gian thực lấy tốc độ đọc trên khối dữ liệu lớn. Điều kiện bắt buộc đi kèm: phải có cơ chế giữ đồng bộ rõ ràng — trigger, job định kỳ, hoặc quy trình ETL — nếu không dữ liệu lặp sẽ lệch dần, quay lại đúng vấn đề chuẩn hoá sinh ra để giải quyết.</p></details>
+
+  <details class="qa"><summary>Chuẩn hoá quá mức có vấn đề gì không?</summary>
+  <p>Có — chuẩn hoá không phải mục tiêu tự thân mà là công cụ chống lặp dữ liệu. Tách bảng quá mức khiến truy vấn đơn giản cũng cần nhiều <code>JOIN</code>, làm chậm hệ thống và khó viết SQL đúng. Nguyên tắc thực dụng: chuẩn hoá tới 3NF là điểm dừng hợp lý cho phần lớn schema OLTP, rồi phi chuẩn hoá có chọn lọc ở đúng những chỗ đã đo được là điểm nghẽn.</p></details>
 </section>
 
-<footer>Cơ sở dữ liệu · SQL · Chuẩn hoá & phi chuẩn hoá</footer>
+<footer>Cơ sở dữ liệu · SQL · Chuẩn hoá &amp; phi chuẩn hoá</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

@@ -39,40 +39,113 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-dnstls" data-skeleton="1" data-title="DNS & TLS" data-tag="CS" data-blurb="Hai chặng đầu tiên trước khi byte dữ liệu đầu tiên chạy, và chúng tốn bao nhiêu vòng khứ hồi.">
+      <article class="doc" id="art-dnstls" data-title="DNS & TLS" data-tag="Networking" data-blurb="Hai chặng đầu tiên trước khi byte dữ liệu đầu tiên chạy, và chúng tốn bao nhiêu vòng khứ hồi.">
         <header class="hero">
-  <p class="eyebrow">CS fundamentals</p>
+  <p class="eyebrow">Deep dive · Networking · nền tảng</p>
   <h1>DNS & <em>TLS</em></h1>
-  <p class="lede">Hai thứ nằm trước TCP trong mọi câu hỏi “gõ URL rồi chuyện gì xảy ra”.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Hai chặng đứng trước TCP trong mọi câu hỏi "gõ URL rồi chuyện gì xảy ra": DNS đổi tên miền thành địa chỉ IP, TLS thoả thuận một kênh mã hoá trước khi có byte dữ liệu nào đi qua. Bài <a href="../tcp-http/index.html">TCP &amp; HTTP</a> đếm chúng là 1 RTT và 1–2 RTT; bài này mở rộng chính hai con số đó.</p>
 </header>
 
 <section id="dnstls-s1" class="lesson">
   <div class="sh"><b>01</b><h2>DNS phân giải thế nào</h2></div>
-  <p class="plan">Đệ quy, các tầng cache, TTL.</p>
+  <p class="key">DNS ánh xạ tên miền (<code>example.com</code>) sang địa chỉ IP mà TCP dùng để mở kết nối. Không có một máy chủ nào biết hết mọi tên miền — việc tra cứu đi qua nhiều tầng, và mỗi tầng đều có thể trả lời từ cache trước khi phải hỏi tiếp.</p>
+<pre><code>Trình duyệt/máy         Resolver (ISP)          Root NS         .com TLD NS      example.com NS
+     │  "example.com ở đâu?"  │                     │                │                │
+     │───────────────────────►│                     │                │                │
+     │                        │──"ai giữ .com?"────►│                │                │
+     │                        │◄────────────────────│                │                │
+     │                        │──"ai giữ example.com?"───────────────►│                │
+     │                        │◄──────────────────────────────────────│                │
+     │                        │──"IP của example.com?"────────────────────────────────►│
+     │                        │◄────────────────────────────────────────────────────────│
+     │◄───────────── trả IP ──│
+     ▼
+Đây là chuỗi ĐẦY ĐỦ — chỉ xảy ra khi KHÔNG tầng nào có sẵn trong cache.
+Bình thường resolver của ISP đã nhớ từ lần tra cứu trước, và toàn bộ chuỗi trên rút gọn còn 0 vòng hỏi thêm.</code></pre>
+  <table>
+    <tr><th>Tầng cache</th><th>Vị trí</th></tr>
+    <tr><td>Cache trình duyệt</td><td>Nhanh nhất, phạm vi một tab/process</td></tr>
+    <tr><td>Cache hệ điều hành</td><td>Dùng chung cho mọi ứng dụng trên máy</td></tr>
+    <tr><td>Cache resolver của ISP</td><td>Dùng chung cho mọi khách hàng của ISP đó — lý do đa số truy vấn không bao giờ chạm tới root/TLD</td></tr>
+  </table>
+  <div class="note">
+    <h4>TTL quyết định "cache được bao lâu"</h4>
+    Mỗi bản ghi DNS mang một <strong>TTL (Time To Live)</strong>, tính bằng giây. Resolver giữ kết quả trong cache đúng bằng ngần ấy thời gian rồi mới hỏi lại authoritative nameserver. TTL càng dài, càng ít truy vấn ra mạng — nhưng cũng càng lâu để một thay đổi IP lan ra khắp nơi (xem mục 04).
+  </div>
 </section>
 
 <section id="dnstls-s2" class="lesson">
   <div class="sh"><b>02</b><h2>TLS bắt tay</h2></div>
-  <p class="plan">Mấy vòng khứ hồi, và TLS 1.3 rút ngắn ra sao.</p>
+  <p class="key">TLS thoả thuận thuật toán mã hoá và trao đổi khoá trước khi gửi được byte dữ liệu ứng dụng nào. Số vòng khứ hồi cần cho việc đó khác nhau giữa hai phiên bản đang dùng phổ biến — đúng con số đã nêu ở bảng "Đếm vòng khứ hồi" của bài TCP &amp; HTTP.</p>
+  <div class="cmp two">
+    <div class="c">
+      <h4>TLS 1.2 — 2 RTT</h4>
+      <div class="seq">
+        <div class="who"><span>Client</span><span>Server</span></div>
+        <div class="m"><i>ClientHello</i><div class="ar r"></div><u>đề xuất bộ thuật toán</u></div>
+        <div class="m"><i>ServerHello + Certificate</i><div class="ar l"></div><u>chọn thuật toán, gửi certificate</u></div>
+        <div class="m"><i>ClientKeyExchange</i><div class="ar r"></div><u>vòng thứ hai mới trao xong khoá</u></div>
+        <div class="m ok"><i>dữ liệu ứng dụng</i><div class="ar r"></div><u>bắt đầu sau 2 RTT</u></div>
+      </div>
+    </div>
+    <div class="c">
+      <h4>TLS 1.3 — 1 RTT (hoặc 0)</h4>
+      <div class="seq">
+        <div class="who"><span>Client</span><span>Server</span></div>
+        <div class="m"><i>ClientHello + key share</i><div class="ar r"></div><u>gộp luôn đề xuất khoá vào lượt đầu</u></div>
+        <div class="m"><i>ServerHello + Certificate + Finished</i><div class="ar l"></div><u>server chốt trong một lượt</u></div>
+        <div class="m ok"><i>dữ liệu ứng dụng</i><div class="ar r"></div><u>bắt đầu sau 1 RTT</u></div>
+      </div>
+    </div>
+  </div>
+  <div class="note warn">
+    <h4>0-RTT resumption đánh đổi gì</h4>
+    Khi nối lại một phiên TLS 1.3 đã có trước đó, client có thể gửi dữ liệu ứng dụng ngay trong gói đầu tiên — <strong>0 RTT</strong>. Cái giá là dữ liệu đó có thể bị kẻ tấn công ghi lại và <strong>gửi lặp (replay)</strong> mà server không phân biệt được với lần gửi gốc. Vì vậy 0-RTT chỉ nên dùng cho request an toàn và idempotent (ví dụ <code>GET</code>), không dùng cho thao tác như đặt hàng hay chuyển tiền.
+  </div>
 </section>
 
 <section id="dnstls-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Chứng chỉ</h2></div>
-  <p class="plan">Chuỗi tin cậy, một hình.</p>
+  <p class="key">Certificate của server chứng minh nó đúng là <code>example.com</code>, không phải kẻ đứng giữa giả mạo. Trình duyệt không tin server một cách trực tiếp — nó lần theo một <strong>chuỗi tin cậy (chain of trust)</strong> ngược lên tới một điểm neo đã cài sẵn.</p>
+  <div class="stack">
+    <div class="s ok"><b>Root CA</b><span>certificate authority gốc, cài sẵn trong hệ điều hành/trình duyệt — điểm neo tin cậy tuyệt đối</span></div>
+    <div class="s"><b>Intermediate CA</b><span>được Root CA ký, đứng giữa để Root không phải ký trực tiếp hàng triệu certificate</span></div>
+    <div class="s"><b>Certificate của server</b><span>được Intermediate CA ký, gắn với đúng tên miền <code>example.com</code></span></div>
+  </div>
+  <p>Trình duyệt xác minh <strong>ngược từ dưới lên</strong>: chữ ký trên certificate của server phải khớp khoá công khai của Intermediate CA, và chữ ký trên Intermediate phải khớp khoá công khai của một Root CA nằm trong danh sách đã tin cậy sẵn. Đứt một mắt xích — hết hạn, sai tên miền, ký bởi CA lạ — trình duyệt chặn ngay bằng cảnh báo "không an toàn".</p>
 </section>
 
 <section id="dnstls-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Ba bẫy</h2></div>
-  <p class="plan">TTL quá dài, bỏ qua chi phí bắt tay, không dùng lại kết nối.</p>
+
+  <p class="key">Ba lỗi này lặp lại nhiều nhất khi vận hành hệ thống có DNS và TLS ở phía trước.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>TTL DNS quá dài</h4><p>Đổi IP server (failover, đổi hạ tầng) nhưng TTL cũ còn 24 giờ — client vẫn gõ vào IP đã chết cho tới khi cache hết hạn. Downtime kéo dài không cần thiết, đúng lúc cần chuyển tải gấp nhất.</p></div>
+    <div class="card bad"><h4>Coi DNS + TLS là miễn phí</h4><p>Thiết kế hệ thống mà quên hai chặng này cũng tốn RTT. Với client ở xa (RTT cao), DNS + TCP + TLS trước khi có byte đầu tiên có thể tốn tới nửa giây — không phải chuyện "gần như tức thời".</p></div>
+    <div class="card bad"><h4>Không dùng lại kết nối</h4><p>Không có keep-alive/connection pool thì mỗi request lại DNS + TCP + TLS lại từ đầu — đúng lỗi đã nêu ở bài TCP &amp; HTTP, chỉ khác là ở đây trả giá ngay từ hai chặng đầu tiên.</p></div>
+  </div>
 </section>
 
 <section id="dnstls-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>DNS phân giải tên miền qua các bước nào?</summary>
+  <p>Truy vấn đi qua nhiều tầng theo kiểu đệ quy: resolver của máy/ISP hỏi root nameserver ai giữ <code>.com</code>, rồi hỏi TLD nameserver <code>.com</code> ai giữ <code>example.com</code>, rồi hỏi authoritative nameserver của chính domain đó để lấy IP. Đây là chuỗi đầy đủ, chỉ xảy ra khi chưa có gì trong cache. Thực tế đa số truy vấn dừng lại sớm hơn nhiều nhờ ba tầng cache: trình duyệt, hệ điều hành, và resolver của ISP — mỗi bản ghi giữ trong cache theo đúng TTL của nó rồi mới phải hỏi lại.</p></details>
+
+  <details class="qa"><summary>TLS 1.3 nhanh hơn TLS 1.2 ở đâu, và 0-RTT đánh đổi gì?</summary>
+  <p>TLS 1.2 cần 2 RTT: một lượt trao đổi ClientHello/ServerHello kèm certificate, một lượt nữa mới trao xong khoá mã hoá. TLS 1.3 gộp việc đề xuất khoá vào ngay lượt đầu tiên nên chỉ còn 1 RTT. Với 0-RTT resumption — nối lại một phiên đã có trước — client có thể gửi dữ liệu ứng dụng ngay trong gói đầu tiên, tức 0 RTT. Cái giá là dữ liệu đó có thể bị ghi lại và gửi lặp (replay attack) mà server không phân biệt được, nên 0-RTT chỉ an toàn cho request idempotent như GET, không dùng cho thao tác như đặt hàng hay thanh toán.</p></details>
+
+  <details class="qa"><summary>Chuỗi tin cậy chứng chỉ hoạt động thế nào?</summary>
+  <p>Có ba tầng: Root CA được cài sẵn trong hệ điều hành/trình duyệt làm điểm neo tin cậy, Root CA ký cho Intermediate CA, và Intermediate CA ký certificate của server. Trình duyệt xác minh ngược từ certificate của server lên tới Intermediate, rồi từ Intermediate lên tới một Root CA đã có sẵn trong danh sách tin cậy. Bất kỳ mắt xích nào đứt — hết hạn, sai tên miền, CA lạ — trình duyệt chặn ngay lập tức.</p></details>
+
+  <details class="qa"><summary>TTL DNS quá dài gây vấn đề gì trong thực tế?</summary>
+  <p>Khi đổi địa chỉ IP của server — ví dụ failover sang hạ tầng khác — client vẫn dùng IP cũ đã cache cho tới khi TTL hết hạn, bất kể IP cũ có còn hoạt động hay không. TTL càng dài, thời gian client "kẹt" ở địa chỉ cũ càng lâu, biến một lần chuyển tải có kế hoạch thành một đợt downtime kéo dài ngoài ý muốn. Đây là lý do hạ tầng hay hạ TTL xuống thấp trước một đợt migrate đã biết trước.</p></details>
 </section>
 
-<footer>CS fundamentals · DNS & TLS</footer>
+<footer>CS fundamentals · Networking → <a href="../networking-overview/index.html">Networking overview</a> · tiếp theo: <a href="../tcp-http/index.html">TCP &amp; HTTP</a></footer>
 
       </article>
       <div class="nextprev" id="np"></div>

@@ -39,45 +39,113 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-sqlsel" data-skeleton="1" data-title="SELECT, WHERE & ORDER BY" data-tag="Database" data-blurb="Thứ tự thực thi logic của một câu truy vấn — thứ giải thích gần hết lỗi SQL của người mới.">
+      <article class="doc" id="art-sqlsel" data-title="SELECT, WHERE & ORDER BY" data-tag="PostgreSQL" data-blurb="Thứ tự thực thi logic của một câu truy vấn — thứ giải thích gần hết lỗi SQL của người mới.">
         <header class="hero">
-  <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
+  <p class="eyebrow">Cơ sở dữ liệu · SQL · <a href="../sql-basics-overview/index.html">SQL basics</a></p>
   <h1>SELECT, WHERE & ORDER <em>BY</em></h1>
-  <p class="lede">Câu SQL <b>không chạy theo thứ tự bạn viết</b>. Biết thứ tự thật là hết nhầm.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Câu SQL <b>không chạy theo thứ tự bạn viết</b>. Biết thứ tự thật là hết nhầm alias, NULL, và DISTINCT.</p>
 </header>
 
-<section id="sqlsel-s1" class="lesson">
+<section id="sqlsel-s1">
   <div class="sh"><b>01</b><h2>Thứ tự thực thi logic</h2></div>
-  <p class="plan">FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY — một hình.</p>
+  <p>Bạn <em>viết</em> một câu SELECT theo thứ tự <code>SELECT → FROM → WHERE → ORDER BY</code>, nhưng database <em>chạy</em> nó theo thứ tự hoàn toàn khác:</p>
+  <div class="flow">
+    <div class="n"><h5>1 · FROM</h5><p>lấy bảng nguồn</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · WHERE</h5><p>lọc từng dòng thô</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>3 · SELECT</h5><p>tính cột, đặt alias</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>4 · DISTINCT</h5><p>loại dòng trùng</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>5 · ORDER BY / LIMIT</h5><p>sắp xếp, cắt bớt</p></div>
+  </div>
+  <p>(Bài này bỏ qua <code>GROUP BY</code>/<code>HAVING</code> — xem <a href="../sql-group-aggregate/index.html">GROUP BY &amp; aggregate</a>, chúng chạy xen giữa bước 2 và 3.)</p>
+<pre><code><span class="cm">-- bảng orders(id, customer, amount, status, created_at)</span>
+SELECT customer, amount <span class="kw">AS</span> so_tien
+FROM orders
+WHERE status = <span class="st">'paid'</span> AND amount &gt; <span class="st">100000</span>
+ORDER BY so_tien DESC
+LIMIT <span class="st">10</span>;</code></pre>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    <code>WHERE</code> chạy <strong>trước</strong> <code>SELECT</code>. Vì vậy nó chỉ thấy các cột gốc của bảng, không thấy alias hay cột tính toán mà <code>SELECT</code> mới tạo ra.
+  </div>
 </section>
 
-<section id="sqlsel-s2" class="lesson">
+<section id="sqlsel-s2">
   <div class="sh"><b>02</b><h2>WHERE lọc cái gì</h2></div>
-  <p class="plan">Lọc hàng, trước khi gom nhóm.</p>
+  <p><code>WHERE</code> lọc <b>từng dòng thô</b>, ngay sau khi <code>FROM</code> lấy dữ liệu — trước khi có bất kỳ gom nhóm hay tính toán nào. Các toán tử hay dùng:</p>
+  <table>
+    <tr><th>Toán tử</th><th>Ví dụ</th><th>Ý nghĩa</th></tr>
+    <tr><td><code>=</code> <code>!=</code> <code>&lt;&gt;</code> <code>&gt;</code> <code>&lt;</code></td><td><code>status = 'paid'</code></td><td>so sánh trực tiếp</td></tr>
+    <tr><td><code>BETWEEN</code></td><td><code>amount BETWEEN 100 AND 500</code></td><td>khoảng đóng hai đầu — tương đương <code>&gt;= AND &lt;=</code></td></tr>
+    <tr><td><code>IN</code></td><td><code>status IN ('paid','shipped')</code></td><td>khớp một trong danh sách — gọn hơn nhiều <code>OR</code></td></tr>
+    <tr><td><code>LIKE</code></td><td><code>email LIKE '%@gmail.com'</code></td><td><code>%</code> khớp mọi chuỗi, <code>_</code> khớp đúng một ký tự</td></tr>
+    <tr><td><code>IS NULL</code></td><td><code>shipped_at IS NULL</code></td><td>kiểm tra rỗng — <code>= NULL</code> không hoạt động, xem mục 04</td></tr>
+    <tr><td><code>AND</code> <code>OR</code> <code>NOT</code></td><td><code>NOT (status = 'cancelled')</code></td><td>kết hợp nhiều điều kiện — <code>AND</code> ưu tiên hơn <code>OR</code>, nên nhóm bằng ngoặc khi trộn cả hai</td></tr>
+  </table>
+<pre><code><span class="cm">-- ngoặc rõ ràng, tránh đọc nhầm độ ưu tiên</span>
+SELECT * FROM orders
+WHERE status = <span class="st">'paid'</span> AND (amount &gt; <span class="st">500000</span> OR customer = <span class="st">'VIP01'</span>);</code></pre>
 </section>
 
-<section id="sqlsel-s3" class="lesson">
+<section id="sqlsel-s3">
   <div class="sh"><b>03</b><h2>Bí danh dùng được ở đâu</h2></div>
-  <p class="plan">Vì sao ORDER BY thấy bí danh mà WHERE thì không.</p>
+  <p>Vì <code>SELECT</code> chạy <em>sau</em> <code>WHERE</code> nhưng <em>trước</em> <code>ORDER BY</code>, một alias đặt trong <code>SELECT</code> chỉ tồn tại từ điểm đó trở đi:</p>
+<pre><code><span class="cm">-- SAI — lỗi "column so_tien does not exist"</span>
+SELECT amount <span class="kw">AS</span> so_tien FROM orders WHERE so_tien &gt; <span class="st">100000</span>;
+
+<span class="cm">-- ĐÚNG — WHERE dùng tên cột gốc</span>
+SELECT amount <span class="kw">AS</span> so_tien FROM orders WHERE amount &gt; <span class="st">100000</span>;
+
+<span class="cm">-- ĐÚNG — ORDER BY chạy sau SELECT nên thấy alias</span>
+SELECT amount <span class="kw">AS</span> so_tien FROM orders ORDER BY so_tien DESC;</code></pre>
+  <p>Alias trên <em>bảng</em> (<code>FROM orders o</code>) thì khác — nó có ngay từ bước <code>FROM</code> nên dùng được ở mọi mệnh đề phía sau, kể cả <code>WHERE</code>.</p>
 </section>
 
-<section id="sqlsel-s4" class="lesson">
+<section id="sqlsel-s4">
   <div class="sh"><b>04</b><h2>NULL trong điều kiện</h2></div>
-  <p class="plan">IS NULL, và vì sao != không bắt được NULL.</p>
+  <p><code>NULL</code> nghĩa là <em>"không biết giá trị"</em>, không phải "rỗng" hay "0". SQL dùng logic ba giá trị: <code>TRUE</code>, <code>FALSE</code>, và <code>UNKNOWN</code> — bất kỳ so sánh nào với <code>NULL</code> đều ra <code>UNKNOWN</code>, và <code>WHERE</code> chỉ giữ lại dòng có kết quả <code>TRUE</code>.</p>
+<pre><code>NULL = NULL        <span class="cm">-- UNKNOWN, không phải TRUE</span>
+NULL != NULL       <span class="cm">-- UNKNOWN, không phải TRUE</span>
+NULL != <span class="st">5</span>          <span class="cm">-- UNKNOWN, không phải TRUE</span>
+
+<span class="cm">-- ĐÚNG cách kiểm tra rỗng</span>
+SELECT * FROM orders WHERE shipped_at IS NULL;
+SELECT * FROM orders WHERE shipped_at IS NOT NULL;</code></pre>
+  <div class="note warn">
+    <h4>Vì sao <code>NULL != NULL</code> lại hợp lý</h4>
+    Hai ô "không biết giá trị" không thể khẳng định là bằng nhau hay khác nhau — vì cả hai <em>đều không biết</em>. SQL trả về <code>UNKNOWN</code> thay vì đoán bừa, và <code>WHERE</code> loại bỏ mọi dòng <code>UNKNOWN</code> giống như loại bỏ <code>FALSE</code>.
+  </div>
 </section>
 
-<section id="sqlsel-s5" class="lesson">
+<section id="sqlsel-s5">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">DISTINCT che lỗi join, ORDER BY theo số cột, so sánh với NULL.</p>
+  <div class="grid2">
+    <div class="card bad"><h4>DISTINCT che lỗi JOIN</h4><p><code>SELECT DISTINCT</code> làm biến mất các dòng trùng do join sai làm nhân bản — nhưng không sửa nguyên nhân, chỉ giấu triệu chứng. Con số tổng hợp phía sau vẫn sai.</p></div>
+    <div class="card bad"><h4>ORDER BY theo số thứ tự cột</h4><p><code>ORDER BY 2</code> vẫn hợp lệ nhưng đổi thứ tự cột trong <code>SELECT</code> là đổi luôn ý nghĩa sắp xếp mà không ai để ý — dùng tên cột hoặc alias rõ ràng.</p></div>
+    <div class="card bad"><h4>So sánh trực tiếp với NULL</h4><p><code>WHERE col = NULL</code> không báo lỗi cú pháp nhưng luôn trả về rỗng, vì kết quả so sánh luôn là <code>UNKNOWN</code>. Phải dùng <code>IS NULL</code>.</p></div>
+  </div>
 </section>
 
-<section id="sqlsel-s6" class="lesson">
+<section id="sqlsel-s6">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <details class="qa"><summary>Thứ tự thực thi thật của một câu SELECT là gì?</summary>
+  <p><code>FROM</code> trước, lấy bảng nguồn. Rồi <code>WHERE</code> lọc từng dòng thô. Rồi mới tới <code>SELECT</code>, tính cột và đặt alias. Cuối cùng <code>ORDER BY</code> rồi <code>LIMIT</code>. Đây khác hẳn thứ tự viết trên màn hình, và là lý do <code>WHERE</code> không thấy được alias mà <code>SELECT</code> vừa đặt.</p></details>
+
+  <details class="qa"><summary>Vì sao <code>WHERE col = NULL</code> luôn trả về rỗng?</summary>
+  <p>Vì SQL dùng logic ba giá trị: so sánh bất kỳ thứ gì với <code>NULL</code> đều ra <code>UNKNOWN</code>, không phải <code>TRUE</code> hay <code>FALSE</code>. <code>WHERE</code> chỉ giữ dòng có kết quả đúng là <code>TRUE</code>, nên mọi dòng <code>UNKNOWN</code> bị loại giống hệt <code>FALSE</code>. Muốn kiểm tra rỗng phải dùng <code>IS NULL</code>.</p></details>
+
+  <details class="qa"><summary>Vì sao <code>ORDER BY</code> dùng được alias mà <code>WHERE</code> thì không?</summary>
+  <p>Vì <code>SELECT</code> — nơi tạo ra alias — chạy sau <code>WHERE</code> nhưng trước <code>ORDER BY</code> trong thứ tự thực thi thật. Tại thời điểm <code>WHERE</code> chạy, alias chưa tồn tại; tới lúc <code>ORDER BY</code> chạy thì nó đã có.</p></details>
+
+  <details class="qa"><summary><code>BETWEEN</code> có bao gồm hai đầu mút không?</summary>
+  <p>Có. <code>amount BETWEEN 100 AND 500</code> tương đương <code>amount &gt;= 100 AND amount &lt;= 500</code> — khoảng đóng cả hai đầu. Nhầm nó với khoảng mở là lỗi hay gặp khi so ranh giới ngày tháng.</p></details>
 </section>
 
-<footer>Cơ sở dữ liệu · SQL · SELECT, WHERE & ORDER BY</footer>
+<footer>Cơ sở dữ liệu · SQL · SELECT, WHERE &amp; ORDER BY</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

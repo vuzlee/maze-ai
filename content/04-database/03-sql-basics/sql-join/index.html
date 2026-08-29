@@ -39,42 +39,145 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-sqljoin" data-skeleton="1" data-title="JOIN" data-tag="Database" data-blurb="Bốn loại join bằng hình, vì sao join sai làm số hàng phình lên, và self join.">
+      <article class="doc" id="art-sqljoin" data-title="JOIN" data-tag="PostgreSQL" data-blurb="Bốn loại join bằng hình, vì sao join sai làm số hàng phình lên, và self join.">
         <header class="hero">
-  <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
+  <p class="eyebrow">Cơ sở dữ liệu · SQL · <a href="../sql-basics-overview/index.html">SQL basics</a></p>
   <h1><em>JOIN</em></h1>
-  <p class="lede">Chỗ sai nhiều nhất trong SQL, và <b>sai im lặng</b> — vẫn ra kết quả.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Nối tiếp <a href="../sql-select-filter/index.html">SELECT, WHERE &amp; ORDER BY</a>: giờ <code>FROM</code> không còn là một bảng, mà là nhiều bảng ghép lại. Đây là chỗ sai nhiều nhất trong SQL, và <b>sai im lặng</b> — vẫn ra kết quả, chỉ là sai.</p>
 </header>
 
-<section id="sqljoin-s1" class="lesson">
+<section id="sqljoin-s1">
   <div class="sh"><b>01</b><h2>Bốn loại join</h2></div>
-  <p class="plan">INNER, LEFT, RIGHT, FULL — một hình cho cả bốn.</p>
+  <p>Hai bảng ví dụ xuyên suốt bài này:</p>
+  <table>
+    <tr><th colspan="2">customers</th></tr>
+    <tr><th>id</th><th>name</th></tr>
+    <tr><td>1</td><td>An</td></tr>
+    <tr><td>2</td><td>Bình</td></tr>
+    <tr><td>3</td><td>Chi</td></tr>
+  </table>
+  <table>
+    <tr><th colspan="3">orders</th></tr>
+    <tr><th>id</th><th>customer_id</th><th>amount</th></tr>
+    <tr><td>101</td><td>1</td><td>500k</td></tr>
+    <tr><td>102</td><td>1</td><td>200k</td></tr>
+    <tr><td>103</td><td>2</td><td>300k</td></tr>
+    <tr><td>104</td><td>9</td><td>150k</td></tr>
+  </table>
+  <p>Chú ý: Chi (id=3) chưa có đơn hàng nào, và đơn 104 trỏ tới <code>customer_id=9</code> không tồn tại — dữ liệu bẩn thường gặp trong thực tế.</p>
+  <div class="cmp two">
+    <div><h5>INNER JOIN</h5>
+      <p>Chỉ giữ dòng <b>khớp cả hai bên</b></p>
+<pre><code>SELECT c.name, o.amount
+FROM customers c
+JOIN orders o ON o.customer_id = c.id;</code></pre>
+      <p>→ An–500k, An–200k, Bình–300k. <b>Mất</b> Chi (không có đơn) và đơn 104 (customer không tồn tại).</p></div>
+    <div><h5>LEFT JOIN</h5>
+      <p>Giữ <b>toàn bộ bên trái</b>, bên phải không khớp thì <code>NULL</code></p>
+<pre><code>SELECT c.name, o.amount
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id;</code></pre>
+      <p>→ thêm dòng Chi–<code>NULL</code>. Vẫn mất đơn 104 vì nó không thuộc bên trái.</p></div>
+  </div>
+  <div class="cmp two">
+    <div><h5>RIGHT JOIN</h5>
+      <p>Giữ <b>toàn bộ bên phải</b>, bên trái không khớp thì <code>NULL</code></p>
+<pre><code>SELECT c.name, o.amount
+FROM customers c
+RIGHT JOIN orders o ON o.customer_id = c.id;</code></pre>
+      <p>→ thêm dòng <code>NULL</code>–150k (đơn 104). Hiếm dùng vì đổi vế trái/phải của <code>LEFT JOIN</code> làm được y hệt và dễ đọc hơn.</p></div>
+    <div><h5>FULL OUTER JOIN</h5>
+      <p>Giữ <b>cả hai bên</b>, bên nào thiếu thì <code>NULL</code></p>
+<pre><code>SELECT c.name, o.amount
+FROM customers c
+FULL OUTER JOIN orders o ON o.customer_id = c.id;</code></pre>
+      <p>→ cả Chi–<code>NULL</code> lẫn <code>NULL</code>–150k đều xuất hiện. Dùng để tìm dữ liệu mồ côi ở cả hai phía.</p></div>
+  </div>
+  <p><code>CROSS JOIN</code> là trường hợp riêng: ghép <b>mọi dòng với mọi dòng</b>, không cần điều kiện <code>ON</code> — 3 khách × 4 đơn ra 12 dòng. Hiếm dùng trực tiếp, chủ yếu để sinh tổ hợp (ví dụ: mọi cặp size × màu của một sản phẩm).</p>
 </section>
 
-<section id="sqljoin-s2" class="lesson">
+<section id="sqljoin-s2">
   <div class="sh"><b>02</b><h2>Vì sao số hàng phình lên</h2></div>
-  <p class="plan">Join lên cột không duy nhất — ví dụ cụ thể.</p>
+  <p class="key">Join lên một cột <em>không duy nhất</em> nhân số dòng lên theo số lượng khớp ở cả hai bên — đây là nguyên nhân phổ biến nhất của báo cáo bị nhân đôi, nhân ba số liệu.</p>
+<pre><code><span class="cm">-- mỗi order có nhiều order_items → join thẳng vào orders sẽ nhân dòng</span>
+SELECT o.id, o.amount, oi.product_name
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id;
+<span class="cm">-- order 101 có 3 món → xuất hiện 3 lần trong kết quả, o.amount lặp lại 3 lần</span>
+
+<span class="cm">-- SUM(o.amount) trên kết quả này sẽ đếm order 101 những BA lần → SAI</span>
+SELECT SUM(o.amount) FROM orders o JOIN order_items oi ON oi.order_id = o.id;</code></pre>
+  <div class="note warn">
+    <h4>Dấu hiệu nhận biết</h4>
+    Nếu số dòng kết quả sau <code>JOIN</code> nhiều hơn hẳn số dòng bảng gốc, hoặc <code>SUM</code>/<code>COUNT</code> ra con số "quá to", nghi ngay join lên cột không duy nhất (quan hệ một-nhiều). Cách chữa: tính tổng hợp <em>trước</em> khi join (subquery/CTE — xem <a href="../sql-subquery-cte/index.html">bài sau</a>), hoặc dùng <code>COUNT(DISTINCT o.id)</code>.
+  </div>
 </section>
 
-<section id="sqljoin-s3" class="lesson">
+<section id="sqljoin-s3">
   <div class="sh"><b>03</b><h2>Self join</h2></div>
-  <p class="plan">Nối bảng với chính nó: cấp trên, so sánh theo thời gian.</p>
+  <p class="key">Nối một bảng với <em>chính nó</em> — cần khi một dòng tham chiếu tới một dòng khác trong cùng bảng.</p>
+<pre><code><span class="cm">-- employees(id, name, manager_id) — manager_id trỏ tới id trong CHÍNH bảng này</span>
+SELECT e.name <span class="kw">AS</span> nhan_vien, m.name <span class="kw">AS</span> quan_ly
+FROM employees e
+LEFT JOIN employees m ON e.manager_id = m.id;
+<span class="cm">-- LEFT JOIN vì CEO không có manager_id → quan_ly ra NULL, không bị loại khỏi kết quả</span></code></pre>
+  <p>Ví dụ thứ hai: so sánh một dòng với dòng <em>trước đó</em> theo thời gian (trước khi có window function):</p>
+<pre><code><span class="cm">-- tìm đơn hàng có amount tăng so với đơn liền trước của cùng khách</span>
+SELECT cur.id, cur.amount, prev.amount <span class="kw">AS</span> amount_truoc
+FROM orders cur
+JOIN orders prev
+  ON prev.customer_id = cur.customer_id
+  AND prev.id = (SELECT MAX(id) FROM orders WHERE customer_id = cur.customer_id AND id &lt; cur.id)
+WHERE cur.amount &gt; prev.amount;</code></pre>
+  <p>Alias khác nhau (<code>e</code>/<code>m</code>, <code>cur</code>/<code>prev</code>) là bắt buộc — không có chúng, database không biết bạn đang nói tới "bản sao" nào của bảng.</p>
 </section>
 
-<section id="sqljoin-s4" class="lesson">
+<section id="sqljoin-s4">
   <div class="sh"><b>04</b><h2>LEFT JOIN với điều kiện</h2></div>
-  <p class="plan">Đặt điều kiện ở ON hay WHERE — hai kết quả khác nhau.</p>
+  <p class="key">Đặt điều kiện lọc bảng phụ ở <code>ON</code> hay <code>WHERE</code> cho ra <b>hai kết quả khác nhau</b> — đây là lỗi kinh điển nhất của mục này.</p>
+<pre><code><span class="cm">-- MUỐN: mọi khách hàng, kèm đơn hàng "paid" nếu có (khách chưa có đơn paid vẫn phải xuất hiện)</span>
+
+<span class="cm">-- SAI — điều kiện ở WHERE biến LEFT JOIN thành INNER JOIN</span>
+SELECT c.name, o.amount
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.status = <span class="st">'paid'</span>;
+<span class="cm">-- Chi không có đơn nào → o.status là NULL → NULL = 'paid' là UNKNOWN → WHERE loại luôn Chi</span>
+
+<span class="cm">-- ĐÚNG — điều kiện nằm trong ON, chỉ ảnh hưởng việc GHÉP, không ảnh hưởng việc GIỮ dòng bên trái</span>
+SELECT c.name, o.amount
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id AND o.status = <span class="st">'paid'</span>;
+<span class="cm">-- Chi vẫn xuất hiện, chỉ là o.amount là NULL vì không có đơn paid nào để ghép</span></code></pre>
+  <div class="note key">
+    <h4>Quy tắc nhớ</h4>
+    <code>ON</code> quyết định <strong>ghép dòng nào với dòng nào</strong>, chạy trong lúc <code>FROM</code> dựng bảng kết quả. <code>WHERE</code> chạy <strong>sau</strong>, lọc trên bảng đã ghép xong — nên một điều kiện ở <code>WHERE</code> nhắm vào bảng phụ của <code>LEFT JOIN</code> sẽ loại luôn cả những dòng <code>NULL</code> mà <code>LEFT JOIN</code> cố tình giữ lại.
+  </div>
 </section>
 
-<section id="sqljoin-s5" class="lesson">
+<section id="sqljoin-s5">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Quên điều kiện join, LEFT JOIN hoá INNER vì WHERE, nhân bản hàng.</p>
+  <div class="grid2">
+    <div class="card bad"><h4>Quên điều kiện JOIN</h4><p>Viết <code>JOIN orders o</code> mà quên <code>ON</code>, hoặc gõ nhầm <code>,</code> thay vì <code>JOIN</code> — vô tình tạo ra <code>CROSS JOIN</code>, số dòng nhân lên gấp bội mà không báo lỗi cú pháp.</p></div>
+    <div class="card bad"><h4>LEFT JOIN hoá INNER vì WHERE</h4><p>Điều kiện lọc bảng phụ đặt ở <code>WHERE</code> thay vì <code>ON</code> — <code>NULL</code> không qua được điều kiện, các dòng <code>LEFT JOIN</code> định giữ lại bị loại mất, kết quả giống hệt <code>INNER JOIN</code>.</p></div>
+    <div class="card bad"><h4>Nhân bản hàng rồi SUM sai</h4><p>Join vào một bảng quan hệ một-nhiều (như <code>order_items</code>) rồi <code>SUM</code> cột của bảng "một" — mỗi dòng gốc bị đếm nhiều lần theo số dòng khớp bên "nhiều".</p></div>
+  </div>
 </section>
 
-<section id="sqljoin-s6" class="lesson">
+<section id="sqljoin-s6">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <details class="qa"><summary>Khác biệt giữa INNER JOIN và LEFT JOIN?</summary>
+  <p><code>INNER JOIN</code> chỉ giữ dòng khớp ở cả hai bảng — không khớp thì biến mất hoàn toàn. <code>LEFT JOIN</code> giữ toàn bộ bảng bên trái; dòng nào không khớp bên phải thì các cột bên phải là <code>NULL</code> nhưng dòng đó vẫn xuất hiện. Dùng <code>LEFT JOIN</code> khi cần biết cả những bản ghi "chưa có gì liên quan" — ví dụ khách hàng chưa từng mua.</p></details>
+
+  <details class="qa"><summary>Vì sao đặt điều kiện ở WHERE lại "phá" LEFT JOIN?</summary>
+  <p>Vì <code>ON</code> chạy trong lúc ghép dòng còn <code>WHERE</code> chạy sau, trên bảng đã ghép. Với dòng bên trái không khớp, các cột bên phải là <code>NULL</code>. Một điều kiện <code>WHERE cot_ben_phai = X</code> so với <code>NULL</code> luôn ra <code>UNKNOWN</code> nên bị loại — hiệu ứng giống hệt <code>INNER JOIN</code>, dù bạn viết <code>LEFT JOIN</code>. Muốn giữ đúng ngữ nghĩa "LEFT" thì điều kiện lọc bảng phải phải nằm trong <code>ON</code>.</p></details>
+
+  <details class="qa"><summary>Khi nào dùng self join?</summary>
+  <p>Khi một bảng có cột tham chiếu tới chính bảng đó — ví dụ <code>manager_id</code> trỏ tới <code>employees.id</code> khác, hoặc cần so sánh một dòng với dòng liền trước/liền sau theo thời gian. Bắt buộc đặt alias khác nhau cho hai lần xuất hiện của cùng một bảng, nếu không database không phân biệt được bạn đang nói tới "bản sao" nào.</p></details>
+
+  <details class="qa"><summary>Vì sao JOIN có thể làm số dòng phình lên bất ngờ?</summary>
+  <p>Khi join lên một cột không duy nhất ở phía đối diện — quan hệ một-nhiều hoặc nhiều-nhiều — mỗi dòng gốc bị nhân bản theo số dòng khớp được. Chạy <code>SUM</code>/<code>COUNT</code> trực tiếp trên kết quả đó sẽ đếm lặp. Cách an toàn là tổng hợp trước bằng subquery hoặc CTE rồi mới join, hoặc dùng <code>COUNT(DISTINCT ...)</code>.</p></details>
 </section>
 
 <footer>Cơ sở dữ liệu · SQL · JOIN</footer>

@@ -39,45 +39,151 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-tuning" data-skeleton="1" data-title="Query tuning" data-tag="Database" data-blurb="Quy trình khi một truy vấn chậm: đọc plan, tìm chỗ quét toàn bảng, sửa index hay sửa câu lệnh.">
+      <article class="doc" id="art-tuning" data-title="Query tuning" data-tag="PostgreSQL" data-blurb="Quy trình khi một truy vấn chậm: đọc plan, tìm chỗ quét toàn bảng, sửa index hay sửa câu lệnh.">
         <header class="hero">
-  <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
+  <p class="eyebrow">Deep dive · SQL · PostgreSQL</p>
   <h1>Query <em>tuning</em></h1>
-  <p class="lede">Câu hỏi vận hành hay gặp: <b>truy vấn này chậm, bạn làm gì trước</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Câu hỏi vận hành hay gặp nhất: <b>truy vấn này chậm, bạn làm gì trước</b>. Bài này không dạy cơ chế mới — nó ráp lại <a href="../sql-index-query-plan/index.html">index &amp; query plan</a> và <a href="../transaction-isolation/index.html">transaction &amp; isolation</a> thành một <b>quy trình thực chiến</b>: đọc <code>EXPLAIN ANALYZE</code> đúng cách, nhận ra N+1, và né các bẫy kinh điển như <code>SELECT *</code>, hàm bọc cột, và <code>OFFSET</code> lớn.</p>
 </header>
 
-<section id="tuning-s1" class="lesson">
+<section id="tuning-s1">
   <div class="sh"><b>01</b><h2>Quy trình sáu bước</h2></div>
-  <p class="plan">Từ đo tới sửa, theo đúng thứ tự.</p>
+  <p>Đây chính là checklist đã nêu ở cuối bài <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>, viết lại thành quy trình đầy đủ để dùng trực tiếp khi có báo cáo "trang này load chậm".</p>
+<pre><code>1. ĐO trước khi sửa       EXPLAIN ANALYZE truy vấn thật, với dữ liệu thật
+2. ĐỌC plan               tìm nút tốn nhất — nhân actual time với loops
+3. SO estimate vs actual   lệch nhiều → ANALYZE table trước, đừng vội đổi gì khác
+4. XÁC ĐỊNH loại vấn đề    một truy vấn chậm, hay N+1 (nhiều truy vấn nhỏ)?
+5. SỬA đúng chỗ            thêm/sửa index, viết lại câu lệnh, hoặc gộp truy vấn
+6. ĐO lại                  EXPLAIN ANALYZE lần nữa — xác nhận đã hết nút thắt cũ</code></pre>
+  <div class="note key">
+    <h4>Quy tắc quan trọng nhất của cả bài</h4>
+    <strong>Không đoán, đo.</strong> Trực giác về truy vấn nào chậm thường sai — nút thắt thật thường nằm ở một nơi không ai ngờ (một <code>ORDER BY</code> phụ, một cột JOIN thiếu index). Chạy <code>EXPLAIN ANALYZE</code> luôn là bước đầu tiên, không phải bước cuối cùng khi mọi cách khác đã thử.
+  </div>
 </section>
 
-<section id="tuning-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Đọc plan tìm gì</h2></div>
-  <p class="plan">Quét toàn bảng, ước lượng lệch, join sai thứ tự.</p>
+<section id="tuning-s2">
+  <div class="sh"><b>02</b><h2>Đọc plan — tìm ba dấu hiệu này trước</h2></div>
+  <p>Cơ chế đọc <code>EXPLAIN</code> đã học kỹ ở <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>. Ở đây là thứ tự tìm khi <em>không biết</em> plan có gì — quét theo đúng ba dấu hiệu này trước khi đọc chi tiết từng nút.</p>
+  <table>
+    <tr><th>Dấu hiệu</th><th>Nhìn ở đâu trong plan</th><th>Nghĩa là gì</th></tr>
+    <tr><td><strong>Seq Scan trên bảng lớn</strong></td><td>Tên nút <code>Seq Scan on orders</code> với <code>rows</code> lớn</td><td>Có thể thiếu index — nhưng chỉ đáng lo nếu điều kiện lọc chọn lọc (xem selectivity)</td></tr>
+    <tr><td><strong>estimate lệch xa actual</strong></td><td><code>rows=5</code> (ước lượng) vs <code>actual … rows=48000</code></td><td>Thống kê cũ — mọi quyết định của planner phía sau dựa trên con số sai</td></tr>
+    <tr><td><strong>Nested Loop với loops lớn</strong></td><td><code>loops=12000</code> trên một nút bên trong</td><td>Thiếu index trên cột join — nút bên trong bị quét lại 12.000 lần</td></tr>
+  </table>
+  <p>Sau khi khoanh được nút nghi vấn, nhân <code>actual time</code> với <code>loops</code> để biết nó thật sự chiếm bao nhiêu phần trăm tổng thời gian — đừng sửa nút chỉ vì nó "nhìn đáng ngờ" mà không chiếm phần lớn thời gian truy vấn.</p>
+  <div class="note warn">
+    <h4>Seq Scan không tự động là thủ phạm</h4>
+    Nếu bảng nhỏ hoặc điều kiện khớp phần lớn dòng, Seq Scan là <strong>lựa chọn đúng</strong> của planner, không phải lỗi. Đừng thêm index chỉ vì thấy chữ "Seq Scan" trong plan — xem lại mục điểm giao nhau ở bài index &amp; query plan trước khi kết luận.
+  </div>
 </section>
 
-<section id="tuning-s3" class="lesson">
+<section id="tuning-s3">
   <div class="sh"><b>03</b><h2>Sửa câu lệnh hay sửa index</h2></div>
-  <p class="plan">Bảng quyết định.</p>
+  <p>Cùng một triệu chứng "chậm" có thể cần hai loại sửa hoàn toàn khác nhau. Bảng dưới giúp quyết định nhanh cái nào trước.</p>
+  <table>
+    <tr><th>Sửa index khi…</th><th>Sửa câu lệnh khi…</th></tr>
+    <tr><td>Cột lọc/join chưa có index, và selectivity đủ cao</td><td>Điều kiện có hàm bọc cột — không index nào cứu được nếu không viết lại</td></tr>
+    <tr><td>Truy vấn chỉ cần vài cột nhưng phải quay lại bảng lấy — thêm <code>INCLUDE</code> để có Index Only Scan</td><td>Query lấy thừa dữ liệu (<code>SELECT *</code>) rồi lọc ở tầng ứng dụng</td></tr>
+    <tr><td>Index tổ hợp sai thứ tự cột (vi phạm leftmost prefix)</td><td>Cấu trúc truy vấn tự nó gây N+1 — không index nào gộp được nhiều lần đi vòng thành một</td></tr>
+    <tr><td>Thống kê cũ — trước khi đổi gì khác, chạy <code>ANALYZE</code></td><td><code>OFFSET</code> quá lớn cho phân trang — đổi cấu trúc phân trang, không phải thêm index</td></tr>
+  </table>
+<pre><code><span class="cm">-- ví dụ: hàm bọc cột — KHÔNG index nào cứu được câu này</span>
+SELECT * FROM orders WHERE YEAR(created_at) = <span class="st">2024</span>;
+
+<span class="cm">-- sửa câu lệnh, đẩy phép tính sang phía hằng số</span>
+SELECT * FROM orders
+WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; <span class="st">'2025-01-01'</span>;
+<span class="cm">-- giờ index thường trên created_at mới dùng được</span></code></pre>
+  <div class="note">
+    <h4>Cùng một lỗi, hai cách gây ra</h4>
+    <code>WHERE lower(email) = 'a@b.com'</code> và <code>WHERE YEAR(created_at) = 2024</code> là cùng một loại bẫy — hàm bọc quanh cột phá thứ tự sắp xếp của index. Cách chữa cũng có hai hướng tương ứng: tạo <strong>index biểu thức</strong> nếu không đổi được câu lệnh (ví dụ nằm trong thư viện ORM), hoặc <strong>viết lại điều kiện</strong> để cột đứng trần một bên dấu so sánh nếu chủ động được.
+  </div>
 </section>
 
-<section id="tuning-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>N+1 query</h2></div>
-  <p class="plan">Dấu hiệu và cách gộp.</p>
+<section id="tuning-s4">
+  <div class="sh"><b>04</b><h2>N+1 query — dấu hiệu và cách gộp</h2></div>
+  <p>Không phải mọi truy vấn chậm là <em>một</em> câu SQL chậm. Rất thường xuyên, mỗi câu SQL riêng lẻ chạy dưới 1ms nhưng ứng dụng gọi nó <strong>hàng trăm lần</strong> trong một request — đây là bài toán N+1, nguyên nhân chậm phổ biến nhất khi dùng ORM.</p>
+<pre><code><span class="cm"># dấu hiệu: log query có một câu lặp lại y hệt, chỉ khác tham số</span>
+SELECT * FROM orders WHERE user_id = 1;
+SELECT * FROM orders WHERE user_id = 2;
+SELECT * FROM orders WHERE user_id = 3;
+<span class="cm"># ... lặp lại 100 lần cho 100 user trong trang danh sách</span></code></pre>
+  <table>
+    <tr><th>Cách gộp</th><th>Khi nào dùng</th></tr>
+    <tr><td><code>WHERE user_id IN (1,2,3,...)</code></td><td>Đơn giản nhất, sửa được ngay cả khi không đổi ORM</td></tr>
+    <tr><td><code>JOIN</code> lấy hết trong một truy vấn</td><td>Cần dữ liệu hai bảng cùng lúc, chấp nhận trùng lặp cột bên "một"</td></tr>
+    <tr><td>Eager loading của ORM (<code>selectinload</code>, <code>includes</code>, <code>with()</code>…)</td><td>Đang dùng ORM — khai báo trước quan hệ cần nạp thay vì để nó tự lười tải (lazy load) từng dòng</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Vì sao N+1 nguy hiểm hơn một truy vấn chậm</h4>
+    Một truy vấn 200ms rất dễ bị chú ý và đưa vào EXPLAIN. N+1 thì mỗi truy vấn chỉ 1–2ms — <strong>không câu nào riêng lẻ trông đáng ngờ</strong> — nhưng cộng thời gian đi vòng qua mạng (round-trip) của 100 lần gọi lại thành hàng trăm ms. Công cụ APM đếm số lượng query trên một request là cách phát hiện đáng tin hơn nhìn từng câu SQL.
+  </div>
 </section>
 
-<section id="tuning-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Thêm index bừa, tối ưu chỗ không phải nút thắt, đo trên dữ liệu nhỏ.</p>
+<section id="tuning-s5">
+  <div class="sh"><b>05</b><h2>OFFSET lớn và keyset pagination</h2></div>
+  <p>Một bẫy hiệu năng riêng, đủ phổ biến để tách mục: phân trang bằng <code>OFFSET</code> chậm dần khi trang càng sâu, vì cơ sở dữ liệu vẫn phải <strong>đếm và bỏ qua</strong> hết số dòng ở các trang trước.</p>
+<pre><code><span class="cm">-- trang 1: nhanh</span>
+SELECT * FROM posts ORDER BY id LIMIT <span class="st">20</span> OFFSET <span class="st">0</span>;
+
+<span class="cm">-- trang 5000: chậm — vẫn phải đọc và bỏ qua 100.000 dòng trước đó</span>
+SELECT * FROM posts ORDER BY id LIMIT <span class="st">20</span> OFFSET <span class="st">100000</span>;
+
+<span class="cm">-- keyset pagination: nhớ vị trí cuối trang trước, nhảy thẳng tới đó</span>
+SELECT * FROM posts WHERE id &gt; <span class="st">100020</span> ORDER BY id LIMIT <span class="st">20</span>;
+<span class="cm">-- luôn nhanh như trang 1, vì id là index nên "id > x" là Index Scan trực tiếp</span></code></pre>
+  <p>Đánh đổi: keyset pagination không cho nhảy thẳng tới "trang số N" bất kỳ — chỉ đi tiếp/lùi tuần tự từ vị trí đang đứng. Đủ tốt cho infinite scroll và hầu hết API, nhưng không hợp với UI có ô nhập "tới trang 42".</p>
+  <div class="note">
+    <h4>Vì sao đây là chủ đề của bài này, không phải bài index</h4>
+    Vấn đề không nằm ở thiếu index — cột <code>id</code> đã có index sẵn. Vấn đề là <strong>cấu trúc câu truy vấn</strong> buộc cơ sở dữ liệu duyệt qua phần bị bỏ. Đây đúng là kiểu bẫy mà mục 03 nói tới: sửa câu lệnh, không sửa index.
+  </div>
 </section>
 
-<section id="tuning-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+<section id="tuning-s6">
+  <div class="sh"><b>06</b><h2>Connection pooling — sơ lược</h2></div>
+  <p>Một góc dễ bị bỏ quên khi "truy vấn tự nó đã nhanh mà cả hệ thống vẫn chậm": mở một kết nối TCP mới tới database tốn vài đến vài chục ms, đắt hơn nhiều truy vấn thật sự cần. <strong>Connection pool</strong> giữ sẵn một số kết nối đã mở, ứng dụng mượn rồi trả lại thay vì mở mới mỗi lần.</p>
+  <table>
+    <tr><th>Pool quá nhỏ</th><th>Pool quá lớn</th></tr>
+    <tr><td>Request phải xếp hàng chờ kết nối rảnh dù database còn dư sức xử lý</td><td>Database tốn RAM cho từng kết nối, và có thể vượt giới hạn <code>max_connections</code> cấu hình sẵn</td></tr>
+  </table>
+  <p>Kích thước pool hợp lý gắn với số CPU core của database và độ dài trung bình một transaction — không phải con số càng lớn càng an toàn. Đây là lý do một transaction mở quá lâu (nhắc ở bài <a href="../transaction-isolation/index.html">transaction &amp; isolation</a>) không chỉ gây khoá mà còn giữ chết một kết nối trong pool, làm cạn pool nhanh hơn tưởng.</p>
 </section>
 
-<footer>Cơ sở dữ liệu · SQL · Tối ưu truy vấn</footer>
+<section id="tuning-s7">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>SELECT * theo phản xạ</h4><p>Lấy thừa cột, tăng băng thông, và mất luôn cơ hội Index Only Scan nếu chỉ cần vài cột đã nằm trong index.</p></div>
+    <div class="card bad"><h4>Thiếu index trên cột JOIN hoặc WHERE hay dùng</h4><p>Dấu hiệu rõ nhất: Nested Loop với Seq Scan bên trong, <code>loops</code> bằng đúng số dòng bảng ngoài.</p></div>
+    <div class="card bad"><h4>Hàm bọc quanh cột trong WHERE</h4><p><code>YEAR(created_at) = 2024</code> hay <code>lower(email) = ...</code> phá thứ tự sắp xếp của index — viết lại điều kiện hoặc tạo index biểu thức.</p></div>
+    <div class="card bad"><h4>Không nhận ra N+1</h4><p>Mỗi truy vấn nhìn riêng lẻ đều nhanh, nhưng cộng dồn hàng trăm lần đi vòng mạng mới là chỗ chậm thật.</p></div>
+    <div class="card bad"><h4>Phân trang bằng OFFSET cho dữ liệu lớn</h4><p>Càng vào trang sâu càng chậm vì phải đọc và bỏ qua hết phần trước. Đổi sang keyset pagination nếu không cần nhảy trang tuỳ ý.</p></div>
+    <div class="card bad"><h4>Sửa mà không đo lại</h4><p>Thêm index hay viết lại câu lệnh xong là dừng — không chạy lại <code>EXPLAIN ANALYZE</code> để xác nhận nút thắt cũ đã thật sự biến mất.</p></div>
+  </div>
+</section>
+
+<section id="tuning-s8">
+  <div class="sh"><b>08</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Một truy vấn được báo là chậm trong production. Bạn làm gì đầu tiên?</summary>
+  <p>Đo trước khi sửa: chạy <code>EXPLAIN ANALYZE</code> với đúng tham số và dữ liệu thật, không đoán. Tìm nút tốn thời gian nhất, nhớ nhân <code>actual time</code> với <code>loops</code>. So <code>rows</code> ước lượng với thực tế — lệch nhiều thì chạy <code>ANALYZE</code> trước khi nghĩ tới việc đổi index hay viết lại câu lệnh, vì rất nhiều "plan xấu" chỉ do thống kê cũ.</p></details>
+
+  <details class="qa"><summary>Làm sao phân biệt một truy vấn chậm với bài toán N+1?</summary>
+  <p>Nhìn EXPLAIN của một câu SQL đơn lẻ không thấy gì bất thường — mỗi câu chỉ 1–2ms. Dấu hiệu N+1 nằm ở log truy vấn của cả request: một câu SQL gần như giống hệt lặp lại hàng chục, hàng trăm lần với chỉ tham số khác nhau. Công cụ APM đếm tổng số query trên một request là cách phát hiện đáng tin hơn xem từng câu SQL riêng lẻ.</p></details>
+
+  <details class="qa"><summary>Vì sao WHERE YEAR(created_at) = 2024 không dùng được index dù cột đã có index?</summary>
+  <p>Index B-tree được sắp theo giá trị <em>nguyên bản</em> của cột. Bọc một hàm quanh cột trước khi so sánh làm biến đổi giá trị đó, phá mất thứ tự sắp xếp mà index dựa vào, nên planner không dùng index được nữa — trừ khi có index biểu thức riêng cho đúng hàm đó. Cách sửa rẻ hơn là đẩy phép tính sang phía hằng số: viết lại thành khoảng <code>created_at >= '2024-01-01' AND created_at < '2025-01-01'</code>, giữ cột trần một bên dấu so sánh.</p></details>
+
+  <details class="qa"><summary>Vì sao phân trang bằng OFFSET chậm dần khi vào sâu, và keyset pagination giải quyết thế nào?</summary>
+  <p><code>LIMIT 20 OFFSET 100000</code> buộc cơ sở dữ liệu đọc và bỏ qua 100.000 dòng trước khi trả 20 dòng cần, dù dùng index. Keyset pagination nhớ khoá của dòng cuối trang trước rồi truy vấn <code>WHERE id > khoá_cuối ORDER BY id LIMIT 20</code> — luôn là một Index Scan trực tiếp, nhanh như trang đầu bất kể đang ở trang nào. Đánh đổi là mất khả năng nhảy thẳng tới một số trang tuỳ ý, chỉ đi tiếp/lùi tuần tự được.</p></details>
+
+  <details class="qa"><summary>Thêm index có phải lúc nào cũng là câu trả lời đúng khi truy vấn chậm?</summary>
+  <p>Không. Index chỉ giúp khi vấn đề là thiếu đường tìm nhanh tới dòng cần và selectivity đủ cao. Nó không cứu được: điều kiện có hàm bọc cột (phải viết lại câu lệnh hoặc tạo index biểu thức), N+1 (phải gộp truy vấn), hay OFFSET lớn (phải đổi cấu trúc phân trang). Thêm index bừa còn có giá thật: mỗi index thêm làm chậm mọi lần ghi và tốn dung lượng, kể cả khi không giải quyết đúng vấn đề.</p></details>
+
+  <details class="qa"><summary>Connection pool liên quan gì tới hiệu năng truy vấn nếu bản thân câu SQL đã nhanh?</summary>
+  <p>Mở một kết nối TCP mới tới database tốn nhiều hơn hầu hết truy vấn thật sự cần, nên pool giữ sẵn kết nối để tái dùng. Pool quá nhỏ làm request xếp hàng chờ dù database còn rảnh; pool quá lớn tốn RAM và có thể chạm giới hạn kết nối tối đa của database. Một transaction mở quá lâu — ví dụ quên <code>COMMIT</code>/<code>ROLLBACK</code> — không chỉ gây khoá mà còn giữ chết một slot trong pool, làm cạn pool nhanh hơn nhiều so với tưởng tượng.</p></details>
+</section>
+
+<footer>Deep dive · query tuning · quy trình tổng hợp, dùng lại index &amp; query plan và transaction &amp; isolation.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

@@ -509,7 +509,7 @@ window.CATALOG = [
       "blurb": "Địa chỉ ảo tới địa chỉ vật lý, page fault, và vì sao chương trình tưởng mình có cả bộ nhớ máy.",
       "n": 5,
       "path": "content/03-cs-fundamentals/02-os/memory-virtual-paging/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "lock-deadlock-race",
@@ -519,7 +519,7 @@ window.CATALOG = [
       "blurb": "Bốn điều kiện gây deadlock, mutex khác semaphore, và vì sao một phép cộng cũng có thể hỏng.",
       "n": 5,
       "path": "content/03-cs-fundamentals/02-os/lock-deadlock-race/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -535,17 +535,17 @@ window.CATALOG = [
       "blurb": "Từ lúc gõ URL tới lúc thấy trang: các tầng, và mỗi tầng tốn bao nhiêu vòng khứ hồi.",
       "n": 8,
       "path": "content/03-cs-fundamentals/03-networking/networking-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "dns-tls",
       "slug": "dnstls",
       "title": "DNS & TLS",
-      "tag": "CS",
+      "tag": "Networking",
       "blurb": "Hai chặng đầu tiên trước khi byte dữ liệu đầu tiên chạy, và chúng tốn bao nhiêu vòng khứ hồi.",
       "n": 5,
       "path": "content/03-cs-fundamentals/03-networking/dns-tls/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "tcp-http",
@@ -575,7 +575,7 @@ window.CATALOG = [
       "blurb": "Tài nguyên và động từ, mã trạng thái, phân trang, phiên bản, và hợp đồng giữa hai bên.",
       "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/rest-api-design/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "load-balancing",
@@ -585,7 +585,7 @@ window.CATALOG = [
       "blurb": "Bốn thuật toán phân phối, sticky session, health check, và tầng 4 khác tầng 7 ở đâu.",
       "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/load-balancing/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -601,7 +601,7 @@ window.CATALOG = [
       "blurb": "Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.",
       "n": 7,
       "path": "content/03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "consensus-leader-election",
@@ -611,7 +611,7 @@ window.CATALOG = [
       "blurb": "Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.",
       "n": 4,
       "path": "content/03-cs-fundamentals/04-distributed/consensus-leader-election/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -627,7 +627,7 @@ window.CATALOG = [
       "blurb": "Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.",
       "n": 7,
       "path": "content/03-cs-fundamentals/05-messaging/messaging-queue-pubsub/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    }
@@ -666,7 +666,7 @@ window.CATALOG = [
       "blurb": "Vì sao mô hình quan hệ thắng, và bốn khái niệm nền: quan hệ, khoá, ràng buộc, chuẩn hoá.",
       "n": 8,
       "path": "content/04-database/02-relational-basics/relational-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "relational-model",
@@ -674,9 +674,9 @@ window.CATALOG = [
       "title": "Relational model",
       "tag": "Database",
       "blurb": "Bảng, hàng, cột, miền giá trị, khoá chính và khoá ngoại — bộ từ vựng mọi câu hỏi SQL đứng trên.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/02-relational-basics/relational-model/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "constraints-integrity",
@@ -686,7 +686,7 @@ window.CATALOG = [
       "blurb": "NOT NULL, UNIQUE, CHECK, DEFAULT, khoá ngoại và hành vi khi xoá — để database tự chặn dữ liệu sai.",
       "n": 6,
       "path": "content/04-database/02-relational-basics/constraints-integrity/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "db-normalization",
@@ -722,37 +722,37 @@ window.CATALOG = [
       "blurb": "Thứ tự thực thi logic của một truy vấn — thứ giải thích gần hết lỗi SQL của người mới.",
       "n": 8,
       "path": "content/04-database/03-sql-basics/sql-basics-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sql-select-filter",
       "slug": "sqlsel",
       "title": "SELECT, WHERE & ORDER BY",
-      "tag": "Database",
+      "tag": "PostgreSQL",
       "blurb": "Thứ tự thực thi logic của một câu truy vấn — thứ giải thích gần hết lỗi SQL của người mới.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-select-filter/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sql-join",
       "slug": "sqljoin",
       "title": "JOIN",
-      "tag": "Database",
+      "tag": "PostgreSQL",
       "blurb": "Bốn loại join bằng hình, vì sao join sai làm số hàng phình lên, và self join.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-join/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sql-group-aggregate",
       "slug": "sqlagg",
       "title": "GROUP BY & aggregate",
-      "tag": "Database",
+      "tag": "PostgreSQL",
       "blurb": "Gom nhóm, WHERE khác HAVING ở đâu, COUNT(*) khác COUNT(cột), và bẫy NULL trong hàm tổng hợp.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-group-aggregate/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sql-subquery-cte",
@@ -774,11 +774,11 @@ window.CATALOG = [
       "dir": "sql-advanced-overview",
       "slug": "sqladv",
       "title": "SQL advanced overview",
-      "tag": "Database",
+      "tag": "Overview",
       "blurb": "Bốn thứ quyết định truy vấn chạy nhanh hay chậm và đúng hay sai khi có nhiều người ghi.",
       "n": 8,
       "path": "content/04-database/04-sql-advanced/sql-advanced-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sql-window-functions",
@@ -814,11 +814,11 @@ window.CATALOG = [
       "dir": "query-tuning",
       "slug": "tuning",
       "title": "Query tuning",
-      "tag": "Database",
+      "tag": "PostgreSQL",
       "blurb": "Quy trình khi một truy vấn chậm: đọc plan, tìm chỗ quét toàn bảng, sửa index hay sửa câu lệnh.",
-      "n": 6,
+      "n": 8,
       "path": "content/04-database/04-sql-advanced/query-tuning/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -831,10 +831,10 @@ window.CATALOG = [
       "slug": "nosql",
       "title": "NoSQL — four families",
       "tag": "Database",
-      "blurb": "Key-value, document, cột rộng, đồ thị: mỗi họ bỏ ràng buộc gì của mô hình quan hệ để đổi lấy gì.",
-      "n": 5,
+      "blurb": "Key-value, document, column-family, graph: mỗi họ bỏ ràng buộc gì của mô hình quan hệ để đổi lấy gì, và khi nào polyglot persistence là hợp lý.",
+      "n": 6,
       "path": "content/04-database/05-beyond-sql/nosql-landscape/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "sharding-replication",
@@ -858,9 +858,9 @@ window.CATALOG = [
       "title": "OLTP vs OLAP",
       "tag": "Data systems",
       "blurb": "Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.",
-      "n": 5,
+      "n": 6,
       "path": "content/04-database/06-data-systems/oltp-vs-olap/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "data-warehouse-lake",
@@ -870,7 +870,7 @@ window.CATALOG = [
       "blurb": "Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.",
       "n": 5,
       "path": "content/04-database/06-data-systems/data-warehouse-lake/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "etl-elt",
@@ -878,9 +878,9 @@ window.CATALOG = [
       "title": "ETL & ELT",
       "tag": "Data systems",
       "blurb": "Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.",
-      "n": 5,
+      "n": 6,
       "path": "content/04-database/06-data-systems/etl-elt/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "batch-stream-processing",

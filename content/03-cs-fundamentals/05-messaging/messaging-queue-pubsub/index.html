@@ -39,50 +39,109 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-mq" data-skeleton="1" data-title="Message queue & Pub/Sub" data-tag="Messaging" data-blurb="Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.">
+      <article class="doc" id="art-mq" data-title="Message queue & Pub/Sub" data-tag="Messaging" data-blurb="Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.">
         <header class="hero">
   <p class="eyebrow">CS fundamentals · Messaging</p>
   <h1>Message queue &amp; <em>Pub/Sub</em></h1>
   <p class="lede">Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="messaging-queue-pubsub-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Vì sao cần tách gửi và nhận ra khỏi gọi trực tiếp đồng bộ.</p>
+  <p>Cách đơn giản nhất để service A nhờ service B làm một việc là <strong>gọi trực tiếp, đồng bộ</strong> — ví dụ một HTTP call — rồi chờ B trả kết quả. Cách này có hai vấn đề gắn liền với bối cảnh hệ thống phân tán: nếu B chậm hoặc đang bảo trì, A cũng kẹt theo, vì cả hai buộc phải <strong>cùng sẵn sàng cùng một thời điểm</strong>; và nếu nhiều A cùng gọi dồn dập, B dễ quá tải vì phải xử lý ngay lập tức, không có chỗ nào để "xếp hàng chờ".</p>
+  <p>Một message queue hay broker đứng giữa A và B để <strong>tách rời về thời gian</strong>: A chỉ cần đẩy message vào queue rồi đi tiếp ngay, không quan tâm B có đang sống hay không; B đọc và xử lý theo tốc độ của riêng mình, khi nào rảnh thì đọc. A và B không còn phải cùng online tại cùng một khoảnh khắc — điều không tưởng khi gọi trực tiếp lại trở nên bình thường khi có một hàng đợi đứng giữa.</p>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    Gọi trực tiếp gắn A và B lại theo <strong>thời gian</strong>: chậm một bên, chậm cả hai. Message queue cắt sợi dây đó — cái giá phải trả là A không còn biết ngay kết quả, và hệ thống phải sống chung với độ trễ cùng khả năng message tới trùng hoặc mất, những chủ đề của cả bài này.
+  </div>
 </section>
 
 <section id="messaging-queue-pubsub-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Queue vs Pub/Sub</h2></div>
-  <p class="plan">Một người nhận, hay nhiều người nhận.</p>
+  <p>Hai mô hình giải hai bài toán khác nhau, phân biệt bằng câu hỏi: <strong>một message này rốt cuộc cần bao nhiêu bên xử lý?</strong></p>
+  <div class="cmp two">
+    <div><h5>Queue — point-to-point</h5>
+      <p><b>Ai nhận</b> đúng một consumer, dù có nhiều consumer cùng lắng nghe</p>
+      <p><b>Dùng khi</b> một tác vụ cần làm đúng một lần — xử lý đơn hàng, gửi một email</p>
+      <p><b>Nhiều consumer để làm gì</b> chia tải, không phải nhân bản công việc</p></div>
+    <div><h5>Pub/Sub — publish/subscribe</h5>
+      <p><b>Ai nhận</b> mọi subscriber đang lắng nghe topic đều nhận bản sao</p>
+      <p><b>Dùng khi</b> nhiều hệ thống độc lập đều cần biết về cùng một sự kiện</p>
+      <p><b>Ví dụ</b> "đơn hàng vừa tạo" cần cả service email, service kho, service phân tích cùng biết</p></div>
+  </div>
+  <div class="flow">
+    <div class="n"><h5>Queue</h5><p>1 producer → 1 queue → nhiều consumer <em>cạnh tranh</em>, mỗi message rơi vào đúng một consumer</p></div>
+    <div class="a">≠</div>
+    <div class="n ok"><h5>Pub/Sub</h5><p>1 publisher → 1 topic → mọi subscriber đều nhận <em>bản sao riêng</em> của cùng một message</p></div>
+  </div>
+  <p>Chọn sai mô hình lộ ra rất nhanh: dùng queue cho việc cần nhiều hệ thống cùng biết thì chỉ một hệ thống nhận được, các hệ thống còn lại mù thông tin; dùng pub/sub cho việc chỉ cần làm một lần thì nhiều consumer cùng xử lý trùng một việc.</p>
 </section>
 
 <section id="messaging-queue-pubsub-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Delivery semantics</h2></div>
-  <p class="plan">At-most-once, at-least-once, exactly-once có thật không.</p>
+  <table>
+    <tr><th>Mức đảm bảo</th><th>Nghĩa</th><th>Đánh đổi</th></tr>
+    <tr><td>At-most-once</td><td>Gửi tối đa một lần, không gửi lại</td><td>Nhanh nhất, nhưng có thể <strong>mất</strong> message nếu lỗi xảy ra trước khi consumer xử lý xong</td></tr>
+    <tr><td><strong>At-least-once</strong></td><td>Gửi lại nếu chưa nhận được ack từ consumer</td><td>Không mất message, nhưng có thể <strong>gửi trùng</strong> nếu ack bị mất trên đường về dù consumer đã xử lý xong — lựa chọn phổ biến nhất trong thực tế</td></tr>
+    <tr><td>Exactly-once</td><td>"Chỉ đúng một lần thật sự"</td><td>Gần như không thể đảm bảo tuyệt đối qua mạng không tin cậy</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>"Exactly-once" các hệ thống thực tế quảng cáo là gì</h4>
+    Về lý thuyết, không thể vừa đảm bảo message không mất vừa đảm bảo không trùng khi mạng có thể trễ hoặc rớt gói tuỳ ý — đây là hệ quả cùng bản chất với đánh đổi consistency/availability đã thấy ở <a href="../../04-distributed/cap-theorem-consistency/index.html">CAP &amp; consistency</a>. Cái các broker gọi là "exactly-once" thường là <strong>at-least-once delivery + idempotent processing</strong> ở phía consumer — xử lý trùng vẫn cho kết quả như xử lý một lần — chứ không phải một cơ chế mạng nào đó thần kỳ loại bỏ hẳn việc gửi trùng.
+  </div>
 </section>
 
 <section id="messaging-queue-pubsub-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Idempotency</h2></div>
-  <p class="plan">Vì sao consumer phải tự chịu trách nhiệm, không phải broker.</p>
+  <p>Broker (Kafka, RabbitMQ, SQS...) không thể tự tránh xử lý trùng, vì nó không biết ý nghĩa nghiệp vụ của message — nó chỉ đảm bảo được việc <em>gửi</em> (có thể trùng), còn "xử lý trùng có gây hậu quả gì" là bài toán chỉ consumer hiểu. Vì vậy trách nhiệm chống trùng nằm ở consumer, không phải broker.</p>
+  <p>Kỹ thuật phổ biến nhất: consumer lưu lại ID của các message đã xử lý (trong một database hoặc một set), khi gặp message trùng ID thì bỏ qua thay vì xử lý lại. Tinh thần giống hệt idempotency key ở tầng HTTP đã nói tại bài <a href="../../03-networking/tcp-http/index.html">TCP &amp; HTTP</a>, chỉ khác chỗ đứng: ở đó server lưu vết theo khoá client gửi lên để trả lại kết quả cũ khi client tự thử lại; ở đây chính consumer tự lưu vết message đã xử lý, vì broker gửi lại nó mà không hỏi ý kiến consumer.</p>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    At-least-once + dedup ở consumer &gt; hy vọng broker tự lo hết. Nếu xử lý một message hai lần gây hậu quả thật (trừ tiền, gửi email), idempotency ở consumer không phải "nice to have" — nó là phần bắt buộc của hệ thống, không phải phần broker cấp sẵn.
+  </div>
 </section>
 
 <section id="messaging-queue-pubsub-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Event streaming</h2></div>
-  <p class="plan">Kafka khác queue truyền thống ở đâu.</p>
+  <p>Kafka và các hệ event streaming tương tự khác queue truyền thống (RabbitMQ, SQS) ở một điểm cốt lõi: message <strong>không bị xoá</strong> ngay sau khi một consumer xử lý xong. Nó được lưu lại trong một log có thứ tự trong một khoảng thời gian (retention), và nhiều consumer group độc lập có thể đọc lại toàn bộ log đó theo tốc độ riêng — thậm chí đọc lại từ đầu (replay) nếu cần.</p>
+  <div class="stack">
+    <div class="n"><h5>Queue truyền thống</h5><p>consumer đọc xong → message biến mất, dùng một lần</p></div>
+    <div class="n ok"><h5>Event log (Kafka)</h5><p>message ở lại trong log theo retention → nhiều consumer group đọc độc lập, có thể replay lại từ đầu</p></div>
+  </div>
+  <p>Điều này biến message thành một "nguồn sự thật" (source of truth) có thể phát lại, thay vì chỉ là một thông báo dùng xong rồi mất — lý do Kafka thường làm xương sống cho event-driven architecture ở quy mô lớn, không chỉ là hàng đợi tác vụ đơn thuần.</p>
 </section>
 
 <section id="messaging-queue-pubsub-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
-  <p class="plan">Tưởng exactly-once là miễn phí.</p>
+
+  <p class="key">Phần lớn sự cố messaging đến từ việc coi các đảm bảo của broker là mạnh hơn thật.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Tưởng exactly-once là miễn phí</h4><p>Coi hệ thống messaging đã tự động đảm bảo mỗi message chỉ xử lý đúng một lần, không tự viết logic idempotent ở consumer. Message bị gửi lại do mạng chập chờn hoặc consumer crash trước khi kịp ack → trừ tiền hai lần, gửi email hai lần.</p></div>
+    <div class="card bad"><h4>Không đặt retention/TTL hợp lý</h4><p>Consumer chết hoặc chậm lâu ngày mà không ai để ý, message dồn vô hạn trong queue hoặc log, làm broker phình to và cạn tài nguyên.</p></div>
+    <div class="card bad"><h4>Dùng nhầm mô hình</h4><p>Cần nhiều hệ thống cùng biết một sự kiện nhưng lại dùng queue (chỉ một consumer nhận được), hoặc cần đúng một lần xử lý nhưng lại dùng pub/sub (nhiều subscriber cùng xử lý trùng).</p></div>
+  </div>
 </section>
 
 <section id="messaging-queue-pubsub-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Bốn câu thường gặp về messaging.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao cần message queue thay vì gọi trực tiếp đồng bộ?</summary>
+  <p>Gọi trực tiếp gắn hai service lại theo thời gian: bên gọi phải chờ, và nếu bên nhận chậm hoặc đang bảo trì thì bên gọi cũng kẹt theo; bên nhận cũng dễ quá tải nếu nhiều nơi gọi dồn dập vì phải xử lý ngay lập tức. Một queue đứng giữa tách rời hai bên về thời gian: bên gửi đẩy message rồi đi tiếp ngay, bên nhận xử lý theo tốc độ riêng khi rảnh. Cái giá là bên gửi không còn biết ngay kết quả, và phải sống chung với độ trễ cùng khả năng message trùng hoặc mất.</p></details>
+
+  <details class="qa"><summary>Queue và Pub/Sub khác nhau ở đâu, khi nào dùng cái nào?</summary>
+  <p>Queue (point-to-point): mỗi message chỉ rơi vào đúng một consumer, dù nhiều consumer cùng lắng nghe để chia tải — dùng khi một tác vụ cần làm đúng một lần, ví dụ xử lý đơn hàng. Pub/Sub: message được publish lên một topic và mọi subscriber đang lắng nghe đều nhận bản sao — dùng khi nhiều hệ thống độc lập đều cần biết về cùng một sự kiện, ví dụ "đơn hàng vừa tạo" cần cả service email, service kho, service phân tích cùng biết. Dùng nhầm mô hình là lỗi rất hay gặp: cần nhiều bên cùng biết mà lại dùng queue thì chỉ một bên nhận được.</p></details>
+
+  <details class="qa"><summary>"Exactly-once delivery" có thật sự tồn tại không?</summary>
+  <p>Về lý thuyết gần như không thể đảm bảo tuyệt đối qua một mạng không tin cậy — cùng bản chất với đánh đổi consistency/availability đã thấy ở CAP theorem. Cái các hệ thống thực tế gọi là "exactly-once" thường là at-least-once delivery (không mất, nhưng có thể gửi trùng) cộng với idempotent processing ở phía consumer, để xử lý trùng vẫn cho kết quả như xử lý một lần — không phải một cơ chế mạng nào tự loại bỏ hẳn việc gửi trùng.</p></details>
+
+  <details class="qa"><summary>Vì sao idempotency ở tầng consumer lại quan trọng, và làm thế nào?</summary>
+  <p>Vì broker chỉ đảm bảo được việc gửi (có thể trùng do at-least-once), còn "xử lý trùng có gây hậu quả gì không" là bài toán nghiệp vụ mà chỉ consumer hiểu — broker không thể tự biết. Kỹ thuật phổ biến là consumer lưu lại ID các message đã xử lý, gặp ID trùng thì bỏ qua thay vì xử lý lại. Tinh thần giống idempotency key ở tầng HTTP, chỉ khác chỗ lưu vết: ở HTTP server lưu theo khoá client gửi lên, còn ở đây consumer tự lưu vết vì broker gửi lại mà không hỏi ý kiến nó.</p></details>
 </section>
 
-<footer>CS fundamentals · Messaging</footer>
+<footer>CS fundamentals · Messaging · nối tiếp <a href="../../04-distributed/consensus-leader-election/index.html">Consensus &amp; leader election</a> · quay lại <a href="../../01-overview/cs-overview/index.html">CS fundamentals overview</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

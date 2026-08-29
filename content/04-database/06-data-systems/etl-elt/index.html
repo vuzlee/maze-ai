@@ -39,40 +39,79 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-etl" data-skeleton="1" data-title="ETL & ELT" data-tag="Data systems" data-blurb="Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.">
+      <article class="doc" id="art-etl" data-title="ETL & ELT" data-tag="Data systems" data-blurb="Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.">
         <header class="hero">
   <p class="eyebrow">Database · Data systems</p>
   <h1>ETL &amp; <em>ELT</em></h1>
   <p class="lede">Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="etl-elt-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Dữ liệu thô từ nguồn không dùng được ngay.</p>
+  <p class="key">Bài trước nói dữ liệu đi vào <a href="../data-warehouse-lake/index.html">warehouse hoặc lake</a> — nhưng đi vào <em>bằng cách nào</em>? Dữ liệu thô từ nguồn (database OLTP, log, API bên thứ ba) gần như không bao giờ dùng ngay được: sai định dạng ngày tháng, thiếu giá trị, trùng khoá, đơn vị tiền tệ khác nhau giữa các nguồn. Phải đi qua ba bước — <b>Extract</b> (lấy dữ liệu từ nguồn), <b>Transform</b> (làm sạch, chuẩn hoá, tính toán lại), <b>Load</b> (ghi vào kho đích) — câu hỏi chỉ là <em>thứ tự</em> giữa Transform và Load.</p>
 </section>
 
 <section id="etl-elt-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>ETL</h2></div>
-  <p class="plan">Transform trước khi load, hợp với warehouse có schema cứng.</p>
+  <div class="sh"><b>02</b><h2>ETL — transform trước khi load</h2></div>
+  <p class="key">Extract → Transform → Load: làm sạch và định hình dữ liệu ở một hạ tầng transform riêng, rồi mới ghi bản đã sạch vào kho đích.</p>
+  <div class="flow">
+    <div class="n"><h5>1 · Extract</h5><p>đọc từ database nguồn, API, file log</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Transform</h5><p>làm sạch, join, tính toán — trên engine transform riêng (Spark, script ETL)</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>3 · Load</h5><p>ghi bản đã sạch, đúng schema, vào warehouse</p></div>
+  </div>
+  <ul class="why">
+    <li>Hợp với data warehouse truyền thống — nơi <em>schema-on-write</em> đòi hỏi dữ liệu phải đúng khuôn <em>trước khi</em> vào bảng.</li>
+    <li>Cần một hạ tầng transform riêng (cluster Spark, máy chủ ETL) chạy song song, tốn chi phí vận hành thêm.</li>
+    <li>Logic transform nằm ngoài kho đích, khó theo dõi bằng đúng công cụ SQL mà người phân tích quen dùng.</li>
+  </ul>
 </section>
 
 <section id="etl-elt-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>ELT</h2></div>
-  <p class="plan">Load thô rồi transform trong kho đích, hợp với lake/warehouse mạnh.</p>
+  <div class="sh"><b>03</b><h2>ELT — load trước, transform sau</h2></div>
+  <p class="key">Extract → Load → Transform: đổ dữ liệu gần như thô vào thẳng kho đích, rồi transform bằng chính sức mạnh tính toán của kho đích đó.</p>
+  <div class="flow">
+    <div class="n"><h5>1 · Extract</h5><p>đọc từ database nguồn, API, file log</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Load</h5><p>đổ thẳng dữ liệu gần như thô vào warehouse/lake</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>3 · Transform</h5><p>chạy SQL/dbt ngay trong warehouse để làm sạch, tạo bảng tổng hợp</p></div>
+  </div>
+  <ul class="why">
+    <li>Trở nên phổ biến từ khi data warehouse cloud (Snowflake, BigQuery) vừa rẻ vừa mạnh — dùng chính engine column-oriented đó để transform nhanh hơn viết một hạ tầng transform riêng.</li>
+    <li>Transform viết bằng SQL (thường qua công cụ như dbt), nằm ngay trong kho đích — dễ đọc, dễ version, dễ kiểm tra hơn logic ẩn trong script ETL rời rạc.</li>
+    <li>Hợp cả với warehouse lẫn lake: dữ liệu thô cứ vào trước, mỗi nhóm dùng dữ liệu tự transform theo nhu cầu riêng thay vì chờ một pipeline ETL chung.</li>
+  </ul>
+  <p>Đây cũng là lý do ELT hợp tự nhiên với data lake ở bài trước: lake vốn đã theo triết lý "lưu thô, tính cấu trúc lúc đọc" — ELT chỉ là áp triết lý đó vào pipeline nạp dữ liệu.</p>
 </section>
 
 <section id="etl-elt-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Lỗi hay gặp</h2></div>
-  <p class="plan">Transform logic tản mát, không ai kiểm soát được toàn cảnh.</p>
+  <div class="sh"><b>04</b><h2>Batch job vs incremental load</h2></div>
+  <p>Dù chọn ETL hay ELT, bước Extract/Load còn một trục quyết định khác: chạy <b>toàn bộ dữ liệu mỗi lần</b> (full batch — đơn giản, chạy lại là an toàn, nhưng chậm khi bảng lớn) hay chỉ lấy <b>phần thay đổi từ lần trước</b> (incremental load — dựa vào cột <code>updated_at</code> hoặc log thay đổi, nhanh hơn nhiều nhưng phải xử lý đúng phần xoá/sửa). Đây là bước đệm dẫn sang câu hỏi rộng hơn: pipeline nên chạy theo <em>lô định kỳ</em> hay theo <em>sự kiện liên tục</em> — xem tiếp ở <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</p>
 </section>
 
 <section id="etl-elt-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Ba câu thường gặp về ETL/ELT.</p>
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Transform logic tản mát nhiều nơi</h4><p>Một phần transform trong script Python, một phần trong SQL view, một phần trong dashboard — không ai còn nắm được toàn cảnh dữ liệu đi qua những bước nào. ELT với công cụ như dbt giảm vấn đề này vì gom hết vào một nơi, viết bằng SQL, có version control.</p></div>
+    <div class="card bad"><h4>Không idempotent — chạy lại pipeline ra kết quả khác</h4><p>Job Extract chạy lại vào ngày hôm sau vô tình <code>INSERT</code> trùng thay vì <code>UPSERT</code>. Luôn thiết kế bước Load để chạy lại an toàn (idempotent), giống nguyên tắc idempotency đã gặp ở transaction.</p></div>
+    <div class="card bad"><h4>Incremental load bỏ sót dòng bị xoá</h4><p>Lấy theo <code>updated_at</code> chỉ bắt được sửa/thêm, không bắt được xoá cứng ở nguồn — kho đích âm thầm giữ dữ liệu đã lỗi thời.</p></div>
+    <div class="card bad"><h4>ELT đổ thô nhưng không ai transform tiếp</h4><p>Dữ liệu nằm mãi ở dạng thô trong warehouse vì bước transform bị hoãn "làm sau" — người dùng cuối phải tự viết lại cùng một logic làm sạch trong mỗi câu truy vấn.</p></div>
+  </div>
 </section>
 
-<footer>Database · Data systems</footer>
+<section id="etl-elt-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+  <details class="qa"><summary>Vì sao ELT phổ biến hơn ETL trong các hệ thống mới?</summary>
+  <p>Vì data warehouse cloud hiện nay (Snowflake, BigQuery) vừa rẻ vừa đủ mạnh để transform ngay bên trong, nên không cần đầu tư một hạ tầng transform riêng như thời ETL truyền thống. Viết transform bằng SQL/dbt cũng dễ đọc, dễ kiểm tra hơn logic ẩn trong pipeline ETL rời rạc.</p></details>
+  <details class="qa"><summary>Khi nào vẫn nên dùng ETL thay vì ELT?</summary>
+  <p>Khi kho đích không đủ mạnh để transform khối lớn (một số hệ warehouse cũ), khi cần lọc bỏ dữ liệu nhạy cảm (PII) <em>trước khi</em> nó chạm vào kho đích vì lý do tuân thủ, hoặc khi transform quá phức tạp để diễn đạt bằng SQL và cần ngôn ngữ lập trình đầy đủ.</p></details>
+  <details class="qa"><summary>ETL/ELT khác gì batch vs stream processing?</summary>
+  <p>ETL/ELT nói về <em>thứ tự</em> transform so với load. Batch vs stream nói về <em>tần suất/độ trễ</em> chạy pipeline đó — theo lô định kỳ hay theo từng sự kiện gần thời gian thực. Hai trục độc lập: có thể có pipeline ELT chạy theo batch mỗi đêm, hoặc pipeline ETL chạy streaming liên tục. Xem tiếp ở <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</p></details>
+</section>
+
+<footer>Database · Data systems · trước đó: <a href="../data-warehouse-lake/index.html">Data warehouse &amp; data lake</a> · tiếp theo: <a href="../batch-stream-processing/index.html">Batch vs stream processing</a></footer>
 
       </article>
       <div class="nextprev" id="np"></div>

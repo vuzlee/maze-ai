@@ -39,40 +39,103 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-oslock" data-skeleton="1" data-title="Lock, deadlock &amp; race condition" data-tag="CS" data-blurb="Bốn điều kiện gây deadlock, mutex khác semaphore, và vì sao một phép cộng cũng có thể hỏng.">
+      <article class="doc" id="art-oslock" data-title="Lock, deadlock &amp; race condition" data-tag="CS" data-blurb="Bốn điều kiện gây deadlock, mutex khác semaphore, và vì sao một phép cộng cũng có thể hỏng.">
         <header class="hero">
   <p class="eyebrow">CS fundamentals</p>
   <h1>Lock, deadlock &amp; race <em>condition</em></h1>
-  <p class="lede">Phần lý thuyết dùng chung cho mọi ngôn ngữ, không riêng Python.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Phần lý thuyết dùng chung cho mọi ngôn ngữ, không riêng Python — bài <a href="../../../02-python/04-concurrency/thread-process-gil/index.html">Thread, process &amp; GIL</a> ở kệ Python bàn tiếp phần đặc thù CPython.</p>
 </header>
 
 <section id="oslock-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Race condition</h2></div>
-  <p class="plan">Thao tác không nguyên tử, một hình.</p>
+  <p>Race condition xảy ra khi kết quả cuối cùng phụ thuộc vào <b>thứ tự thực thi không xác định</b> giữa nhiều luồng cùng truy cập một dữ liệu dùng chung. Đây không phải lỗi hiếm hay khó hình dung — nó nằm ngay trong phép toán tưởng như đơn giản nhất.</p>
+  <p>Ví dụ kinh điển: <code>counter += 1</code> <b>không phải</b> một thao tác nguyên tử (atomic). Ở mức máy, nó là ba bước tách rời: đọc giá trị hiện tại, cộng 1, ghi giá trị mới trở lại. Hai thread cùng chạy đoạn này gần như đồng thời có thể cùng <b>đọc được giá trị cũ như nhau</b>, cả hai cùng cộng 1 rồi cùng ghi lại giá trị mới giống nhau — một lần tăng bị mất trắng mà không có exception nào báo.</p>
+  <table>
+    <tr><th>Thời điểm</th><th>Thread A</th><th>Thread B</th><th>counter trong bộ nhớ</th></tr>
+    <tr><td>t0</td><td>đọc counter → 0</td><td>—</td><td>0</td></tr>
+    <tr><td>t1</td><td>—</td><td>đọc counter → 0</td><td>0</td></tr>
+    <tr><td>t2</td><td>tính 0 + 1 = 1</td><td>—</td><td>0</td></tr>
+    <tr><td>t3</td><td>—</td><td>tính 0 + 1 = 1</td><td>0</td></tr>
+    <tr><td>t4</td><td>ghi counter ← 1</td><td>—</td><td>1</td></tr>
+    <tr><td>t5</td><td>—</td><td>ghi counter ← 1</td><td><strong>1</strong> — lẽ ra phải là 2</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Mất một lần tăng, không có lỗi nào báo</h4>
+    Hai thread cùng tăng biến đúng một lần mỗi bên, kết quả đúng phải là <b>2</b> nhưng thực tế dừng ở <b>1</b>. Không có exception, không có log lỗi — chương trình chạy "bình thường" và trả về số sai. Đoạn code chạm vào dữ liệu dùng chung như thế này gọi là <b>critical section</b>, và nó cần được bảo vệ để chỉ một thread đi trọn vẹn cả ba bước đọc–cộng–ghi tại một thời điểm.
+  </div>
 </section>
 
 <section id="oslock-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Mutex, semaphore, lock đọc-ghi</h2></div>
-  <p class="plan">Khi nào dùng cái nào.</p>
+  <p>Ba công cụ dưới đây đều dùng để bảo vệ critical section khỏi race condition, nhưng khác nhau ở <b>bao nhiêu luồng được vào cùng lúc</b> và <b>ai được phép mở khoá</b>.</p>
+  <table>
+    <tr><th></th><th>Cơ chế</th><th>Số luồng được vào</th><th>Khi nào dùng</th></tr>
+    <tr><td><strong>Mutex</strong><br>(mutual exclusion)</td><td>Khoá nhị phân; luồng nào khoá thì đúng luồng đó phải mở</td><td>Đúng 1</td><td>Bảo vệ một critical section đơn giản — tăng biến đếm, sửa một cấu trúc dữ liệu dùng chung</td></tr>
+    <tr><td><strong>Semaphore</strong></td><td>Một bộ đếm; mỗi lần vào giảm 1, mỗi lần ra tăng 1. Đếm về 1 thì hành xử như mutex nhị phân, nhưng <b>không bắt buộc</b> đúng luồng đã lấy phải là luồng trả lại</td><td>N (cấu hình được)</td><td>Giới hạn số luồng dùng chung một tài nguyên hữu hạn — ví dụ connection pool tối đa N kết nối cùng lúc</td></tr>
+    <tr><td><strong>Read-write lock</strong></td><td>Tách hai chế độ: nhiều luồng <b>đọc</b> đồng thời được, nhưng <b>ghi</b> phải độc quyền — không ai khác được đọc lẫn ghi khi có một luồng đang ghi</td><td>Nhiều luồng đọc <em>hoặc</em> đúng 1 luồng ghi</td><td>Dữ liệu đọc nhiều hơn ghi rất nhiều — cache dùng chung, cấu hình ít khi đổi</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Semaphore không phải "mutex nhiều slot hơn"</h4>
+    Điểm khác cốt lõi không phải ở con số N — mà ở chỗ mutex mã hoá <b>quyền sở hữu</b> (ai khoá, người đó mở), còn semaphore chỉ mã hoá <b>số lượng</b> (còn bao nhiêu slot trống). Dùng semaphore đếm = 1 để thay mutex vẫn chạy được, nhưng mất đi ràng buộc "đúng luồng đã khoá mới được mở" — dễ mở nhầm từ một luồng khác nếu code không cẩn thận.
+  </div>
 </section>
 
 <section id="oslock-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Deadlock</h2></div>
-  <p class="plan">Bốn điều kiện, phá một là hết.</p>
+  <p>Deadlock xảy ra khi các luồng chờ nhau vô thời hạn, không luồng nào có thể tiến tiếp. Theo mô hình Coffman, deadlock chỉ xảy ra khi <b>cả bốn</b> điều kiện sau cùng đúng một lúc:</p>
+  <table>
+    <tr><th>#</th><th>Điều kiện</th><th>Ý nghĩa</th></tr>
+    <tr><td>1</td><td><strong>Mutual exclusion</strong></td><td>Tài nguyên không chia sẻ được — tại một thời điểm chỉ một luồng giữ nó</td></tr>
+    <tr><td>2</td><td><strong>Hold and wait</strong></td><td>Một luồng đang giữ tài nguyên này thì lại đi xin thêm tài nguyên khác</td></tr>
+    <tr><td>3</td><td><strong>No preemption</strong></td><td>Không ai có quyền cưỡng chế lấy lại tài nguyên đang bị giữ — chỉ luồng đang giữ mới tự trả</td></tr>
+    <tr><td>4</td><td><strong>Circular wait</strong></td><td>Tồn tại một vòng chờ khép kín: luồng này chờ tài nguyên của luồng kia, và ngược lại</td></tr>
+  </table>
+<pre><code>Thread A ──giữ──▶ Lock 1
+   ▲                  │
+   │ chờ Lock 2        │ chờ (Lock 2 đang bị B giữ)
+   │                  ▼
+Lock 2 ◀──giữ── Thread B
+
+A giữ Lock 1, xin thêm Lock 2 → phải chờ B.
+B giữ Lock 2, xin thêm Lock 1 → phải chờ A.
+Không ai nhường, không ai bị cưỡng chế nhả khoá → kẹt vĩnh viễn.</code></pre>
+  <div class="note key">
+    <h4>Phá bất kỳ một điều kiện là hết deadlock</h4>
+    Không cần phá cả bốn — chỉ cần loại bỏ được <b>một</b> điều kiện là chuỗi kẹt bị cắt. Cách thực tế phổ biến nhất là phá <b>circular wait</b>: quy ước một <b>thứ tự lấy khoá cố định</b> trên toàn hệ thống (ví dụ luôn lấy khoá có id nhỏ hơn trước), để không thể tồn tại hai luồng chờ nhau theo hai chiều ngược nhau.
+  </div>
 </section>
 
 <section id="oslock-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Khoá lồng nhau khác thứ tự, giữ khoá khi gọi I/O, khoá quá to.</p>
+
+  <p class="key">Ba lỗi này là nguồn phần lớn deadlock và nghẽn hiệu năng liên quan tới lock trong thực tế.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Khoá lồng nhau khác thứ tự</h4><p>Đoạn code này khoá A rồi B; đoạn code khác khoá B rồi A. Hai luồng chạy đúng lúc gặp nhau ở giữa là deadlock kinh điển. Giải pháp: quy ước thứ tự khoá cố định cho toàn hệ thống, không riêng từng hàm.</p></div>
+    <div class="card bad"><h4>Giữ khoá khi gọi I/O</h4><p>Network call, đọc file, gọi API ngoài — mọi I/O đều có thể chậm hoặc treo. Giữ khoá suốt thời gian chờ I/O chặn đứng mọi luồng khác cần khoá đó, biến một lời gọi chậm thành nghẽn toàn hệ thống.</p></div>
+    <div class="card bad"><h4>Khoá quá to (coarse-grained lock)</h4><p>Khoá cả một cấu trúc dữ liệu lớn hoặc cả một hàm dài, thay vì chỉ khoá đúng phần dữ liệu đang tranh chấp. Không sai về logic, nhưng triệt tiêu tính song song một cách không cần thiết.</p></div>
+  </div>
 </section>
 
 <section id="oslock-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Race condition là gì, cho ví dụ cụ thể?</summary>
+  <p>Race condition xảy ra khi kết quả phụ thuộc vào thứ tự thực thi không xác định giữa nhiều luồng truy cập cùng dữ liệu. Ví dụ kinh điển: <code>counter += 1</code> không phải một thao tác nguyên tử mà là ba bước đọc–cộng–ghi tách rời. Hai thread cùng chạy đoạn này gần như đồng thời có thể cùng đọc được giá trị cũ, cả hai cùng ghi lại giá trị mới giống nhau — mất một lần tăng mà không có lỗi nào báo. Cách sửa là bảo vệ đoạn đọc–cộng–ghi này (critical section) bằng một lock để chỉ một thread đi trọn vẹn tại một thời điểm.</p></details>
+
+  <details class="qa"><summary>Mutex khác semaphore thế nào?</summary>
+  <p>Mutex là khoá nhị phân — đúng một luồng được vào, và luồng nào khoá thì đúng luồng đó phải mở. Semaphore là một bộ đếm cho phép N luồng cùng truy cập; semaphore đếm bằng 1 hành xử giống mutex nhị phân, nhưng khác biệt cốt lõi là semaphore không bắt buộc đúng luồng đã lấy phải là luồng trả lại — nó mã hoá số lượng tài nguyên còn trống, không mã hoá quyền sở hữu. Dùng semaphore khi cần giới hạn số luồng truy cập một tài nguyên hữu hạn, ví dụ connection pool tối đa N kết nối.</p></details>
+
+  <details class="qa"><summary>Bốn điều kiện gây deadlock là gì, và cách phá phổ biến nhất?</summary>
+  <p>Theo mô hình Coffman: mutual exclusion (tài nguyên không chia sẻ được), hold and wait (giữ tài nguyên này trong khi xin thêm tài nguyên khác), no preemption (không ai cưỡng chế lấy lại được tài nguyên đang bị giữ), và circular wait (tồn tại một vòng chờ khép kín giữa các luồng). Deadlock chỉ xảy ra khi cả bốn cùng đúng, nên chỉ cần phá một điều kiện là hết. Cách phổ biến nhất là phá circular wait bằng cách quy ước một thứ tự lấy khoá cố định trên toàn hệ thống.</p></details>
+
+  <details class="qa"><summary>Vì sao không nên giữ lock khi gọi I/O?</summary>
+  <p>I/O — network call, đọc file, gọi API ngoài — có thể chậm bất thường hoặc treo hẳn, và thời gian chờ đó nằm ngoài tầm kiểm soát của luồng đang giữ khoá. Giữ lock suốt lúc chờ I/O chặn đứng mọi luồng khác đang cần khoá đó, biến một lời gọi mạng chậm thành nghẽn toàn hệ thống thay vì chỉ chậm riêng luồng đang gọi. Nguyên tắc chung: giữ critical section càng ngắn càng tốt, và không bao giờ để I/O nằm bên trong nó.</p></details>
 </section>
 
-<footer>CS fundamentals · Khoá, deadlock & race condition</footer>
+<footer>CS fundamentals · từ <a href="../memory-virtual-paging/index.html">Virtual memory &amp; paging</a> tới lock, deadlock &amp; race condition · xem lại <a href="../os-overview/index.html">Operating system overview</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

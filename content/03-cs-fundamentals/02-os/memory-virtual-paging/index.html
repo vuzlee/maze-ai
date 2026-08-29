@@ -39,40 +39,115 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-osmem" data-skeleton="1" data-title="Virtual memory &amp; paging" data-tag="CS" data-blurb="Địa chỉ ảo tới địa chỉ vật lý, page fault, và vì sao chương trình tưởng mình có cả bộ nhớ máy.">
+      <article class="doc" id="art-osmem" data-title="Virtual memory &amp; paging" data-tag="CS" data-blurb="Địa chỉ ảo tới địa chỉ vật lý, page fault, và vì sao chương trình tưởng mình có cả bộ nhớ máy.">
         <header class="hero">
   <p class="eyebrow">CS fundamentals</p>
   <h1>Virtual memory &amp; <em>paging</em></h1>
   <p class="lede">Giải thích được vì sao <b>truy cập tuần tự nhanh hơn ngẫu nhiên</b> nhiều lần.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="osmem-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vì sao cần virtual memory</h2></div>
-  <p class="plan">Cô lập, và ảo giác không gian liên tục.</p>
+
+  <p class="key">Virtual memory giải quyết hai vấn đề cùng lúc: <b>cô lập</b> giữa các process, và <b>ảo giác</b> mỗi process có toàn bộ bộ nhớ máy.</p>
+
+  <ul class="why">
+    <li><b>Cô lập</b> — mỗi process nhìn thấy một không gian địa chỉ ảo (virtual address space) riêng của mình, do hệ điều hành và CPU dịch sang địa chỉ vật lý (physical address) thật. Process A không thể đọc hay ghi nhầm vào bộ nhớ của process B, kể cả khi cả hai đang chạy song song trên cùng một máy — mọi con trỏ trong A chỉ trỏ vào phần địa chỉ ảo đã cấp cho A.</li>
+    <li><b>Ảo giác không gian liên tục</b> — process "tưởng" mình sở hữu toàn bộ dải địa chỉ của kiến trúc máy (ví dụ gần hết không gian 64-bit), liên tục từ đầu tới cuối, dù RAM vật lý nhỏ hơn thế rất nhiều lần và đang bị chia sẻ với hàng chục process khác. Ảo giác này vẫn giữ được ngay cả khi RAM không đủ chỗ, nhờ swap — đẩy tạm phần ít dùng xuống đĩa.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Ranh giới cô lập giữa process và thread, và chi phí context switch, nằm ở bài
+    <a href="../process-thread-scheduling/index.html">Process, thread &amp; scheduling</a>. Virtual memory là cơ chế đứng sau đúng ranh giới cô lập đó.
+  </div>
 </section>
 
-<section id="osmem-s2" class="lesson">
+<section id="osmem-s2">
   <div class="sh"><b>02</b><h2>Phân trang</h2></div>
-  <p class="plan">Bảng trang, TLB, một hình.</p>
+
+  <p>Bộ nhớ được chia thành các <b>page</b> — khối kích thước cố định, thường 4KB. Mỗi process có một <b>page table</b> (bảng trang) riêng, ánh xạ mỗi page ảo sang một <b>frame</b> — page vật lý tương ứng trong RAM. Mọi địa chỉ CPU dùng đều là địa chỉ ảo; phần cứng phải dịch nó sang địa chỉ vật lý trước khi thật sự chạm vào RAM.</p>
+
+  <div class="flow">
+    <div class="n"><h5>1 · Địa chỉ ảo</h5><p>CPU phát ra, chưa biết nằm ở đâu trong RAM</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>2 · Tra TLB</h5><p>hit → có ngay địa chỉ vật lý</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>3 · Tra page table</h5><p>chỉ khi TLB miss — nằm trong RAM, chậm hơn nhiều</p></div>
+  </div>
+
+  <p><b>TLB (Translation Lookaside Buffer)</b> là một cache rất nhỏ nằm ngay trong CPU, lưu sẵn các ánh xạ page → frame vừa dùng gần đây. Tra TLB chỉ mất một vài chu kỳ CPU; tra page table phải đi ra RAM, chậm hơn hẳn. Vì mọi lệnh truy cập bộ nhớ đều cần dịch địa chỉ, <b>TLB miss</b> — tức không tìm thấy ánh xạ trong TLB, phải quay lại tra page table — là một trong những nguồn chậm âm thầm nhất, vì nó lặp lại ở từng lệnh chứ không phải một lần.</p>
+
+  <div class="note key">
+    <h4>Vì sao TLB miss đắt</h4>
+    TLB chỉ chứa được vài trăm tới vài nghìn ánh xạ, nên chỉ những page đang dùng gần đây mới có mặt trong đó. Chương trình nhảy lung tung qua rất nhiều vùng địa chỉ khác nhau — ví dụ duyệt một cấu trúc dữ liệu rất lớn, rải rác trong bộ nhớ — sẽ liên tục làm TLB miss, buộc CPU phải tra page table trong RAM ở gần như mỗi lần truy cập. Đây là một lý do nữa (bên cạnh cache CPU) khiến dữ liệu gói gọn, truy cập tuần tự luôn nhanh hơn dữ liệu rải rác.
+  </div>
 </section>
 
-<section id="osmem-s3" class="lesson">
+<section id="osmem-s3">
   <div class="sh"><b>03</b><h2>Page fault</h2></div>
-  <p class="plan">Nhẹ, nặng, và cái giá của swap.</p>
+
+  <p><b>Page fault</b> xảy ra khi CPU truy cập một page chưa được ánh xạ vào RAM cho process hiện tại. Có hai loại, chênh lệch tốc độ rất lớn:</p>
+
+  <table>
+    <tr><th>Loại</th><th>Khi nào xảy ra</th><th>Tốc độ xử lý</th></tr>
+    <tr><td><b>Minor fault</b> (nhẹ)</td><td>Page đã có sẵn trong RAM (của process khác, hoặc shared library), chỉ chưa được map vào process này — ví dụ copy-on-write khi <code>fork()</code></td><td>Rất nhanh — chỉ cập nhật page table, không chạm đĩa</td></tr>
+    <tr><td><b>Major fault</b> (nặng)</td><td>Page phải đọc từ đĩa hoặc từ swap lên RAM</td><td>Chậm hơn truy cập RAM tới hàng nghìn, có khi hàng chục nghìn lần</td></tr>
+  </table>
+
+  <div class="bars">
+    <div class="b"><i>RAM (~100ns)</i><u style="width:1%"></u><b>tham chiếu</b></div>
+    <div class="b hi"><i>SSD (~100µs)</i><u style="width:15%"></u><b>~1.000 lần chậm hơn RAM</b></div>
+    <div class="b bad"><i>HDD (~10ms)</i><u style="width:100%"></u><b>~100.000 lần chậm hơn RAM</b></div>
+  </div>
+
+  <p><b>Cái giá của swap:</b> khi RAM không đủ chứa mọi page đang cần, hệ điều hành đẩy bớt page ít dùng ra đĩa (swap out) để nhường chỗ, rồi đọc lại (swap in) khi cần tới. Việc này giữ được ảo giác "đủ bộ nhớ" ở mục 01, nhưng mỗi lần swap in là một major fault. Nếu tình trạng thiếu RAM kéo dài, hệ thống liên tục swap ra rồi swap vào cùng những page — gọi là <b>thrashing</b> — và máy dành phần lớn thời gian hoán đổi page thay vì chạy việc thật, khiến hiệu năng sập hẳn dù CPU gần như không rảnh.</p>
+
+  <div class="note warn">
+    <h4>Thrashing trông giống CPU quá tải, nhưng không phải</h4>
+    Máy chạy chậm, quạt kêu to, nhưng CPU lại chủ yếu ở trạng thái chờ đĩa (I/O wait) chứ không thật sự tính toán. Dấu hiệu nhận ra: tỉ lệ major fault rất cao, hoạt động đĩa liên tục. Cách chữa duy nhất là giảm nhu cầu bộ nhớ (đóng bớt tiến trình, giảm kích thước làm việc) hoặc thêm RAM — tăng tốc độ CPU không giúp được gì.
+  </div>
 </section>
 
-<section id="osmem-s4" class="lesson">
+<section id="osmem-s4">
   <div class="sh"><b>04</b><h2>Tính cục bộ</h2></div>
-  <p class="plan">Vì sao thứ tự duyệt mảng đổi tốc độ nhiều lần.</p>
+
+  <p><b>Locality of reference</b> (tính cục bộ) là lý do duyệt một mảng tuần tự nhanh hơn duyệt ngẫu nhiên cùng lượng dữ liệu đó nhiều lần, dù độ phức tạp Big-O như nhau. Có hai dạng:</p>
+
+  <ul class="why">
+    <li><b>Spatial locality</b> (cục bộ không gian) — dữ liệu nằm gần nhau trong bộ nhớ thường được dùng gần nhau về thời gian. Cache CPU (L1/L2/L3) và cơ chế nạp page đều nạp theo <em>khối liền kề</em>, không nạp từng byte — nên chạm vào một phần tử thường kéo theo cả hàng xóm của nó đã có sẵn trong cache.</li>
+    <li><b>Temporal locality</b> (cục bộ thời gian) — dữ liệu vừa được dùng có khả năng cao sẽ được dùng lại ngay sau đó, nên giữ nó ở cache thay vì đẩy ra sớm là có lợi.</li>
+  </ul>
+
+  <div class="bars">
+    <div class="b bad"><i>truy cập ngẫu nhiên</i><u style="width:100%"></u><b>liên tục cache miss</b></div>
+    <div class="b hi"><i>truy cập tuần tự</i><u style="width:8%"></u><b>tận dụng prefetch, hiếm miss</b></div>
+  </div>
+
+  <p>Duyệt một mảng theo đúng thứ tự tận dụng được <b>prefetching</b> của CPU — phần cứng đoán trước và nạp sẵn khối tiếp theo trước khi chương trình chạm tới — và giữ tỉ lệ cache miss, page fault ở mức thấp. Truy cập ngẫu nhiên (nhảy tới vị trí bất kỳ trong một mảng rất lớn, hoặc đi theo con trỏ trong một <em>linked list</em> lớn không vừa cache) phá vỡ cả hai loại locality: mỗi bước nhảy có thể rơi vào một khối bộ nhớ hoàn toàn khác, buộc CPU phải đợi nạp lại từ cache thấp hơn hoặc từ RAM.</p>
+
+  <p>Đây chính là lý do thực tế đứng sau nhận xét quen thuộc "mảng nhanh hơn linked list dù cùng độ phức tạp Big-O": <a href="../../../01-dsa/03-data-structures/array-string/index.html">mảng</a> lưu liền kề nên tận dụng trọn locality, còn <a href="../../../01-dsa/03-data-structures/linked-list/index.html">linked list</a> mỗi node có thể nằm rải rác ở bất cứ đâu trên heap, nên mỗi bước duyệt có nguy cơ là một cache miss riêng.</p>
 </section>
 
 <section id="osmem-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Virtual memory giải quyết vấn đề gì?</summary>
+  <p>Hai vấn đề cùng lúc. Thứ nhất là <b>cô lập</b>: mỗi process có một không gian địa chỉ ảo riêng, được dịch sang địa chỉ vật lý qua page table, nên process này không thể đọc hay ghi nhầm vào bộ nhớ của process khác. Thứ hai là <b>ảo giác không gian liên tục</b>: mỗi process thấy như thể mình sở hữu toàn bộ dải địa chỉ của máy, dù RAM vật lý nhỏ hơn nhiều và đang chia sẻ cho nhiều process — ảo giác này vẫn giữ được nhờ swap ngay cả khi RAM không đủ.</p></details>
+
+  <details class="qa"><summary>TLB là gì và vì sao TLB miss lại đắt?</summary>
+  <p>TLB (Translation Lookaside Buffer) là một cache rất nhỏ trong CPU, lưu sẵn các ánh xạ page ảo → frame vật lý vừa dùng gần đây, để tránh phải tra page table mỗi lần truy cập bộ nhớ. Tra TLB chỉ mất vài chu kỳ CPU; TLB miss buộc phải tra page table nằm trong RAM, chậm hơn nhiều — và vì việc dịch địa chỉ diễn ra ở <b>từng</b> lệnh truy cập bộ nhớ, miss lặp lại liên tục sẽ cộng dồn thành chi phí lớn. Chương trình truy cập rải rác qua nhiều vùng địa chỉ (TLB chỉ chứa được vài trăm tới vài nghìn ánh xạ) sẽ miss thường xuyên hơn chương trình gói gọn dữ liệu và truy cập tuần tự.</p></details>
+
+  <details class="qa"><summary>Page fault nhẹ khác page fault nặng thế nào?</summary>
+  <p><b>Minor fault</b> xảy ra khi page cần đã có sẵn trong RAM — chỉ chưa được map vào process hiện tại, ví dụ copy-on-write hoặc shared library — nên xử lý rất nhanh, chỉ cập nhật page table. <b>Major fault</b> xảy ra khi page phải đọc từ đĩa hoặc từ swap lên, chậm hơn truy cập RAM tới hàng nghìn hoặc hàng chục nghìn lần vì đĩa (kể cả SSD) chậm hơn RAM rất nhiều bậc độ lớn. Khi RAM thiếu nghiêm trọng, hệ thống liên tục swap ra rồi swap vào cùng những page — gọi là thrashing — và dành phần lớn thời gian hoán đổi page thay vì chạy việc thật.</p></details>
+
+  <details class="qa"><summary>Vì sao truy cập tuần tự nhanh hơn truy cập ngẫu nhiên trên cùng một lượng dữ liệu?</summary>
+  <p>Vì locality of reference: cache CPU và cơ chế nạp page đều nạp theo khối liền kề, không nạp từng phần tử riêng lẻ. Truy cập tuần tự tận dụng <b>spatial locality</b> — chạm vào một phần tử thì các phần tử liền kề đã có sẵn trong cache nhờ prefetching — và <b>temporal locality</b> khi dữ liệu vừa dùng lại được dùng ngay sau đó. Truy cập ngẫu nhiên phá vỡ cả hai: mỗi bước nhảy có thể rơi vào một khối bộ nhớ khác hẳn, gây cache miss hoặc thậm chí page fault liên tục. Đây là lý do thực tế khiến mảng — lưu liền kề — nhanh hơn linked list — mỗi node rải rác trên heap — dù cùng độ phức tạp Big-O.</p></details>
 </section>
 
-<footer>CS fundamentals · Virtual memory & phân trang</footer>
+<footer>CS fundamentals · Virtual memory &amp; phân trang · bài trước <a href="../process-thread-scheduling/index.html">Process, thread &amp; scheduling</a> · bài sau <a href="../lock-deadlock-race/index.html">Lock, deadlock &amp; race condition</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

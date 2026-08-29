@@ -39,40 +39,181 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-shard" data-skeleton="1" data-title="Replication &amp; sharding" data-tag="Database" data-blurb="Bản sao đọc, chọn khoá phân mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.">
+      <article class="doc" id="art-shard" data-title="Replication &amp; sharding" data-tag="Database" data-blurb="Bản sao đọc, độ trễ sao chép, ba chiến lược chia mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.">
         <header class="hero">
-  <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
+  <p class="eyebrow">Deep dive · Database · SQL</p>
   <h1>Replication &amp; <em>sharding</em></h1>
-  <p class="lede">Bước cuối khi một máy không còn đủ — và nơi <b>chọn khoá sai thì rất khó sửa</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Bước cuối khi một máy không còn đủ — và nơi <b>chọn khoá sai thì rất khó sửa</b>. Bài này nói về nhân bản dữ liệu để đọc mở rộng và chịu lỗi, rồi tới phân mảnh khi ngay cả một máy mạnh nhất cũng không chứa nổi.</p>
 </header>
 
 <section id="shard-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Nhân bản trước</h2></div>
-  <p class="plan">Bản sao đọc, độ trễ sao chép, đọc thấy dữ liệu cũ.</p>
+
+  <p>Trước khi nghĩ tới chia nhỏ dữ liệu, bước rẻ hơn và nên làm trước luôn là <b>replication</b>: giữ nhiều bản sao giống hệt nhau của cùng một tập dữ liệu trên nhiều máy.</p>
+
+  <h3>Master-slave (leader-follower)</h3>
+<pre><code>          ghi
+Client ────────► LEADER (master)
+                    │  sao chép thay đổi
+          ┌─────────┼─────────┐
+          ▼         ▼         ▼
+      FOLLOWER   FOLLOWER   FOLLOWER (slave, chỉ đọc)
+
+Client đọc ─────► bất kỳ follower nào (đọc mở rộng)
+Leader chết  ─────► promote một follower lên làm leader mới</code></pre>
+  <p>Mọi lệnh ghi đi qua đúng một leader; các follower chỉ nhận và áp lại luồng thay đổi đó. Đây là cách phổ biến nhất vì đơn giản: không có hai bên cùng ghi nên không có xung đột ghi cần giải quyết.</p>
+
+  <h3>Master-master (multi-leader)</h3>
+  <p>Nhiều node cùng nhận ghi, mỗi node phát thay đổi của mình cho các node còn lại. Giải quyết được vấn đề "leader ở xa" cho ứng dụng nhiều vùng địa lý, nhưng đổi lại phải <b>tự xử lý xung đột ghi</b>: hai vùng cùng sửa một dòng gần như đồng thời thì ai thắng? Cần một chiến lược trộn (last-write-wins theo timestamp, CRDT, hoặc merge thủ công) — độ phức tạp tăng hẳn so với một leader duy nhất.</p>
+
+  <h3>Đồng bộ vs bất đồng bộ</h3>
+  <div class="cmp two">
+    <div>
+      <h5>Synchronous replication</h5>
+      <p>Leader chỉ báo "ghi thành công" sau khi <b>ít nhất một follower đã xác nhận</b> đã nhận bản ghi.</p>
+      <p>Đổi lấy: <b>durability cao hơn</b> — mất leader không mất dữ liệu vừa ghi — nhưng <b>latency ghi tăng</b> vì phải chờ mạng round-trip tới follower.</p>
+    </div>
+    <div>
+      <h5>Asynchronous replication</h5>
+      <p>Leader báo thành công <b>ngay khi ghi xong tại chỗ</b>, sao chép sang follower chạy nền, không chờ.</p>
+      <p>Đổi lấy: <b>latency ghi thấp</b> nhưng nếu leader chết đúng lúc đó, những bản ghi chưa kịp sao chép <b>mất luôn</b>.</p>
+    </div>
+  </div>
+  <p>Phần lớn hệ thống thật dùng bất đồng bộ cho tốc độ, và chấp nhận một cửa sổ rủi ro mất dữ liệu rất nhỏ; một số hệ dùng "semi-sync" — chờ đúng một follower xác nhận, các follower khác vẫn bất đồng bộ — để cân bằng.</p>
+
+  <h3>Replication lag</h3>
+  <p><b>Replication lag</b> là khoảng thời gian giữa lúc leader ghi xong và lúc follower áp lại xong bản ghi đó — luôn tồn tại ở chế độ bất đồng bộ, và có thể giãn ra khi follower quá tải hoặc mạng chậm. Hệ quả trực tiếp: đọc từ follower ngay sau khi vừa ghi vào leader có thể <b>không thấy thay đổi vừa rồi</b> — người dùng cập nhật hồ sơ, bấm reload, thấy dữ liệu cũ.</p>
+
+  <div class="note key">
+    <h4>Vì sao replicate</h4>
+    Ba lý do, thường đi cùng nhau: <b>đọc mở rộng</b> (chia tải đọc ra nhiều follower khi đọc nhiều hơn ghi rất nhiều — trường hợp phổ biến nhất), <b>high availability</b> (leader chết thì promote follower, hệ thống không chết theo), và <b>backup</b> (một bản sao riêng để phục hồi khi có sự cố hoặc lỗi thao tác).
+  </div>
+
+  <div class="note warn">
+    <h4>Cách né đọc dữ liệu cũ do lag</h4>
+    Ba cách hay dùng: đọc-sau-ghi thì đọc thẳng từ leader trong vài giây đầu ("read-your-writes"); gắn version/timestamp vào response và chờ follower bắt kịp version đó trước khi trả lời; hoặc đơn giản là chấp nhận độ trễ này ở những màn hình không quan trọng (đếm lượt xem, gợi ý) trong khi bắt buộc đọc từ leader ở những chỗ quan trọng (số dư, trạng thái đơn hàng).
+  </div>
 </section>
 
 <section id="shard-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Phân mảnh khi nào</h2></div>
-  <p class="plan">Dấu hiệu đã hết đường mở rộng theo chiều dọc.</p>
+
+  <p class="key">Replication nhân bản <em>toàn bộ</em> dữ liệu ra nhiều máy — mỗi máy vẫn phải chứa hết. Khi bản thân dữ liệu đã quá lớn cho một máy, nhân bản không giúp được gì nữa; đó là lúc cần <b>sharding</b> (phân mảnh): chia dữ liệu ra thành nhiều phần, mỗi phần nằm trên một máy khác nhau.</p>
+
+  <p>Dấu hiệu đã hết đường mở rộng theo chiều dọc (vertical scaling — mua máy mạnh hơn):</p>
+  <ul class="why">
+    <li>Toàn bộ working set không còn vừa RAM/SSD của máy mạnh nhất đang có trên thị trường, hoặc chi phí máy đó đã vượt xa lợi ích.</li>
+    <li>Thông lượng ghi đã vượt quá khả năng của một node đơn, kể cả sau khi đã tối ưu index và query.</li>
+    <li>Replication đã dùng hết để tách đọc/ghi nhưng bản thân lượng <b>ghi</b> vẫn quá tải cho một leader duy nhất — sharding phân cả tải ghi ra nhiều node, không chỉ tải đọc.</li>
+  </ul>
+
+  <p>Sharding thường là bước <b>cuối cùng</b>, không phải đầu tiên, vì cái giá của nó — mất đi ở mục 04 — là rất thật và khó đảo ngược. Trình tự nên thử: tối ưu query và index → thêm cache → replication cho đọc → rồi mới tới sharding.</p>
 </section>
 
 <section id="shard-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Chọn khoá phân mảnh</h2></div>
-  <p class="plan">Ba tiêu chí, và mảnh nóng.</p>
+
+  <p class="key">Ba chiến lược chia dữ liệu ra nhiều mảnh (shard) — khác nhau ở việc <em>thêm/bớt node thì phải dịch chuyển bao nhiêu dữ liệu</em>.</p>
+
+  <h3>Range-based sharding</h3>
+<pre><code>Shard A: user_id  1 .. 1,000,000
+Shard B: user_id  1,000,001 .. 2,000,000
+Shard C: user_id  2,000,001 .. 3,000,000</code></pre>
+  <p>Chia theo khoảng giá trị liên tục của khoá. Dễ hiểu, hỗ trợ tốt truy vấn theo dải (range query — "lấy user id từ X tới Y"). Nhược điểm: dữ liệu mới thường rơi vào một đầu dải (id tăng dần theo thời gian) nên dễ tạo <b>hotspot</b> — một shard nhận toàn bộ ghi mới trong khi các shard cũ gần như rảnh.</p>
+
+  <h3>Hash-based sharding</h3>
+<pre><code>shard_index = hash(user_id) % N     <span class="cm">// N = số shard hiện có</span></code></pre>
+  <p>Băm khoá rồi chia đều theo modulo số shard — phân bố tải rất đều, tránh hotspot của range-based. Nhược điểm lớn: <b>thêm hoặc bớt một node đổi N</b>, khiến gần như toàn bộ khoá đổi kết quả <code>hash % N</code> — phải rebalance lại gần hết dữ liệu trong hệ thống, rất tốn kém khi hệ đang chạy.</p>
+
+  <h3>Consistent hashing</h3>
+  <p>Giải đúng nhược điểm trên của hash-based thuần. Ý tưởng: đặt cả node và khoá lên cùng một <b>vòng tròn hash</b> (ví dụ 0 → 2³²−1); mỗi khoá thuộc về node gần nhất theo chiều kim đồng hồ trên vòng đó.</p>
+<pre><code>          node C
+            ●
+        ╱       ╲
+   key ●           ● node A
+        ╲       ╱
+            ●
+          node B
+
+thêm node D vào giữa A và C:
+chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, C không đổi gì</code></pre>
+  <p>Khi thêm hoặc bớt một node, chỉ những khoá nằm trong đoạn cung liền kề node đó cần dịch chuyển — trung bình chỉ khoảng <code>1/N</code> tổng dữ liệu, thay vì gần như toàn bộ như hash-based thuần. Đây là lý do consistent hashing là kỹ thuật nền của DynamoDB, Cassandra và phần lớn hệ phân tán hiện đại. Triển khai thật còn thêm <b>virtual node</b> (mỗi node vật lý ánh xạ vào nhiều điểm ảo trên vòng) để tải chia đều hơn khi số node ít.</p>
+
+  <h3>Ba tiêu chí chọn shard key</h3>
+  <ul class="why">
+    <li><b>Phân bố đều</b> — tránh giá trị lặp lại nhiều (ví dụ <code>country</code> khi phần lớn user ở một nước) gây một shard quá tải.</li>
+    <li><b>Khớp với truy vấn phổ biến nhất</b> — nếu 90% truy vấn lọc theo <code>user_id</code>, shard theo <code>user_id</code> để mỗi truy vấn chỉ chạm một shard; shard sai trục khiến mọi truy vấn phải quét tất cả các shard (scatter-gather).</li>
+    <li><b>Ổn định theo thời gian</b> — tránh khoá mà giá trị đổi liên tục (ví dụ trạng thái đơn hàng), vì đổi giá trị shard key nghĩa là phải di chuyển bản ghi sang shard khác.</li>
+  </ul>
+
+  <div class="note warn">
+    <h4>Mảnh nóng (hotspot) — ví dụ kinh điển</h4>
+    Shard theo <code>country</code> cho một app có 80% người dùng ở một quốc gia: một shard gánh gần hết tải trong khi các shard còn lại gần như rảnh — mất hết lợi ích của việc chia mảnh. Cách sửa thường dùng: ghép thêm một trường có độ phân tán cao vào khoá (composite key, ví dụ <code>hash(user_id)</code> thay vì <code>country</code>), hoặc chọn hẳn một khoá khác đã đo là phân bố đều.
+  </div>
+
+  <table>
+    <tr><th>Chiến lược</th><th>Phân bố tải</th><th>Rebalance khi thêm/bớt node</th><th>Hỗ trợ range query</th></tr>
+    <tr><td>Range-based</td><td>Dễ lệch (hotspot ở đầu dải mới)</td><td>Chỉ cần chia lại dải liền kề — tương đối cục bộ</td><td>Tốt — quét một dải liên tục trên ít shard</td></tr>
+    <tr><td>Hash-based (modulo N)</td><td>Đều</td><td><b>Gần như toàn bộ dữ liệu</b> phải dịch chuyển</td><td>Kém — phải quét tất cả shard</td></tr>
+    <tr><td>Consistent hashing</td><td>Đều (tốt hơn nữa với virtual node)</td><td>Chỉ khoảng <code>1/N</code> dữ liệu dịch chuyển</td><td>Kém — phải quét tất cả shard</td></tr>
+  </table>
 </section>
 
 <section id="shard-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Cái mất khi phân mảnh</h2></div>
-  <p class="plan">Join, transaction, khoá duy nhất toàn cục.</p>
+
+  <p class="key">Chia dữ liệu ra nhiều máy nghĩa là những phép toán vốn dễ trên một máy — join, transaction, unique — giờ phải <em>băng qua mạng</em> hoặc phải bỏ hẳn.</p>
+
+  <h3>Cross-shard query & join</h3>
+  <p>Một truy vấn chạm đúng một shard thì rẻ như trước. Nhưng một câu hỏi cần dữ liệu từ nhiều shard — ví dụ "tổng đơn hàng của toàn hệ thống theo ngày" khi đơn hàng shard theo <code>user_id</code> — không có JOIN xuyên shard sẵn có; ứng dụng (hoặc lớp middleware) phải tự truy vấn từng shard rồi gộp kết quả ở tầng ứng dụng (scatter-gather), chậm hơn hẳn và phức tạp hơn hẳn một JOIN trong SQL.</p>
+
+  <h3>Cross-shard transaction</h3>
+  <p>Một transaction cập nhật dữ liệu nằm trên hai shard khác nhau (ví dụ chuyển tiền giữa hai user rơi vào hai shard) không còn atomic miễn phí như trên một node. Cần một giao thức riêng — phổ biến nhất là <b>two-phase commit (2PC)</b> hoặc saga pattern — vừa chậm hơn, vừa thêm điểm có thể lỗi giữa chừng.</p>
+
+  <h3>Khoá duy nhất toàn cục</h3>
+  <p>Ràng buộc <code>UNIQUE</code> trên một cột (ví dụ email) chỉ đảm bảo được trong phạm vi <b>một shard</b> nếu để cơ sở dữ liệu tự lo — hai user cùng email nhưng rơi vào hai shard khác nhau thì không ai phát hiện. Cách xử lý: shard chính theo khoá cần unique, hoặc duy trì thêm một bảng/service tra cứu tập trung chỉ để kiểm tra tính duy nhất trước khi ghi.</p>
+
+  <div class="note key">
+    <h4>Nguyên tắc thiết kế bù lại</h4>
+    Thiết kế lại schema để phần lớn truy vấn <b>chỉ chạm một shard</b> — denormalize dữ liệu hay dùng cùng nhau vào cùng shard (theo cùng shard key), chấp nhận trùng lặp dữ liệu để đổi lấy việc không phải join xuyên shard. Đây là lý do vì sao chọn shard key đúng ngay từ đầu (mục 03) quan trọng hơn hẳn — sửa lại sau khi đã có dữ liệu lớn là một trong những việc tốn kém nhất trong vòng đời một hệ thống.
+  </div>
 </section>
 
 <section id="shard-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Sharding trước khi thử hết cách khác</h4><p>Tối ưu query, thêm index, thêm cache, replication cho đọc — thử hết trước. Sharding khó đảo ngược và mọi truy vấn xuyên shard đều đắt hơn.</p></div>
+    <div class="card bad"><h4>Chọn shard key theo trường hay đổi giá trị</h4><p>Đổi giá trị shard key nghĩa là phải di chuyển cả bản ghi sang shard khác. Chọn khoá ổn định theo thời gian.</p></div>
+    <div class="card bad"><h4>Hash modulo N cứng, không dùng consistent hashing</h4><p>Thêm một node là đổi N, kéo theo rebalance gần như toàn bộ dữ liệu. Consistent hashing chỉ dịch khoảng 1/N.</p></div>
+    <div class="card bad"><h4>Không kiểm tra phân bố trước khi chọn shard key</h4><p>Shard theo trường có giá trị lệch (như country) tạo hotspot — một shard quá tải, các shard khác gần như rảnh.</p></div>
+    <div class="card bad"><h4>Coi replication là đủ khi dữ liệu đã quá lớn</h4><p>Replication nhân bản toàn bộ dữ liệu — mỗi bản sao vẫn phải chứa hết. Khi bản thân dữ liệu vượt quá một máy, chỉ sharding mới giúp được.</p></div>
+    <div class="card bad"><h4>Đọc từ follower cho dữ liệu vừa ghi</h4><p>Replication lag khiến follower có thể chưa cập nhật. Đọc-sau-ghi ở nơi quan trọng nên đọc thẳng từ leader.</p></div>
+  </div>
 </section>
 
-<footer>Cơ sở dữ liệu · SQL · Nhân bản & phân mảnh</footer>
+<section id="shard-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Replication và sharding khác nhau ở đâu?</summary>
+  <p>Replication tạo nhiều bản sao <em>giống hệt nhau</em> của toàn bộ dữ liệu trên nhiều máy — dùng để đọc mở rộng, chịu lỗi, backup, nhưng mỗi bản sao vẫn phải chứa hết dữ liệu. Sharding <em>chia</em> dữ liệu thành nhiều phần khác nhau, mỗi phần nằm trên một máy — dùng khi bản thân dữ liệu đã lớn hơn một máy có thể chứa hoặc ghi kịp. Hai kỹ thuật thường đi cùng nhau: mỗi shard thường lại được replicate riêng để chịu lỗi.</p></details>
+
+  <details class="qa"><summary>Replication lag là gì, và nó gây hậu quả gì?</summary>
+  <p>Là khoảng trễ giữa lúc leader ghi xong và lúc follower áp lại xong bản ghi đó, luôn tồn tại ở chế độ bất đồng bộ. Hệ quả trực tiếp là đọc từ follower ngay sau khi ghi vào leader có thể thấy dữ liệu cũ — ví dụ người dùng vừa cập nhật hồ sơ, reload lại thấy dữ liệu chưa đổi. Cách né phổ biến: đọc-sau-ghi thì đọc thẳng từ leader, hoặc chờ follower bắt kịp một version cụ thể trước khi trả lời.</p></details>
+
+  <details class="qa"><summary>Vì sao consistent hashing tốt hơn hash modulo N khi thêm/bớt node?</summary>
+  <p>Với hash modulo N thuần, đổi N (thêm hoặc bớt một node) làm gần như mọi khoá đổi kết quả <code>hash % N</code>, nên gần như toàn bộ dữ liệu phải dịch chuyển. Consistent hashing đặt cả node và khoá lên một vòng tròn hash; mỗi khoá thuộc về node gần nhất theo chiều kim đồng hồ. Thêm hoặc bớt một node chỉ ảnh hưởng tới đoạn cung liền kề nó, nên chỉ khoảng 1/N dữ liệu cần dịch chuyển — đây là lý do nó là kỹ thuật nền của DynamoDB và Cassandra.</p></details>
+
+  <details class="qa"><summary>Ba tiêu chí chọn shard key là gì?</summary>
+  <p>Phân bố đều — tránh giá trị lặp nhiều gây một shard quá tải (hotspot); khớp với truy vấn phổ biến nhất — để phần lớn truy vấn chỉ chạm một shard thay vì phải scatter-gather qua tất cả; và ổn định theo thời gian — tránh khoá hay đổi giá trị vì đổi giá trị nghĩa là phải di chuyển cả bản ghi sang shard khác. Sai một trong ba tiêu chí này thường phải trả giá bằng việc thiết kế lại schema sau khi dữ liệu đã lớn.</p></details>
+
+  <details class="qa"><summary>Vì sao join qua nhiều shard lại đắt, và cách xử lý thường dùng là gì?</summary>
+  <p>Vì không có cơ chế JOIN xuyên shard có sẵn — dữ liệu nằm ở hai máy khác nhau, không có index chung để cơ sở dữ liệu tự ghép. Ứng dụng phải tự truy vấn từng shard rồi gộp kết quả ở tầng ứng dụng (scatter-gather), chậm hơn hẳn một JOIN cục bộ. Cách xử lý thường dùng là thiết kế schema để dữ liệu hay dùng cùng nhau nằm cùng một shard (denormalize theo shard key), chấp nhận trùng lặp dữ liệu để đổi lấy việc không phải join xuyên máy.</p></details>
+
+  <details class="qa"><summary>Sharding liên quan gì tới CAP theorem?</summary>
+  <p>Một hệ đã sharded và replicated là một hệ phân tán thật sự, nên phải đối mặt trực tiếp với đánh đổi của CAP theorem khi mạng giữa các node bị chia cắt — chọn nghiêng về nhất quán (CP) hay sẵn sàng (AP). Đây là lý thuyết nền phía sau các quyết định như đồng bộ hay bất đồng bộ replication ở mục 01; xem <a href="../../../03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html">CAP theorem &amp; consistency</a> để đào sâu phần đó.</p></details>
+</section>
+
+<footer>Deep dive · Database · SQL · Replication &amp; sharding · xem thêm <a href="../nosql-landscape/index.html">NoSQL — four families</a> để so đánh đổi consistency giữa các họ NoSQL.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

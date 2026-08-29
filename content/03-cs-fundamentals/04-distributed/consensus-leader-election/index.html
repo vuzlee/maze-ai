@@ -39,35 +39,55 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-consensus" data-skeleton="1" data-title="Consensus & leader election" data-tag="Distributed" data-blurb="Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.">
+      <article class="doc" id="art-consensus" data-title="Consensus & leader election" data-tag="Distributed" data-blurb="Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.">
         <header class="hero">
   <p class="eyebrow">CS fundamentals · Distributed systems</p>
   <h1>Consensus &amp; <em>leader election</em></h1>
   <p class="lede">Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="consensus-leader-election-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Vì sao cần đồng thuận khi có nhiều node.</p>
+  <p class="key">Nhiều node phải <b>đồng thuận</b> (consensus) về một giá trị hoặc một quyết định chung — ai đang là leader, giá trị nào được ghi vào log — ngay cả khi một số node chết, chậm, hoặc mạng giữa chúng gián đoạn tạm thời.</p>
+  <ul class="why">
+    <li>Cái khó không phải là "hỏi ý kiến từng node" — mà là <b>không node nào biết chắc</b> một node khác đã chết hẳn hay chỉ đang chậm/mất kết nối tạm thời. Chờ mãi thì hệ thống treo, quyết định vội thì có thể sai.</li>
+    <li>Bài <a href="../cap-theorem-consistency/index.html">CAP &amp; consistency</a> đã nói tới replication kiểu leader-follower ở mục 04 — bài này trả lời <em>ai/cái gì chọn ra leader đó</em>.</li>
+  </ul>
 </section>
 
 <section id="consensus-leader-election-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Raft</h2></div>
-  <p class="plan">Ý tưởng cốt lõi, không đi sâu chứng minh.</p>
+  <p class="key">Các node bầu ra <b>một leader duy nhất</b> trong một nhiệm kỳ (term); leader nhận lệnh ghi, ghi vào log của mình rồi sao chép sang follower.</p>
+  <div class="flow">
+    <div class="n"><h5>1 · Bầu leader</h5><p>các node bỏ phiếu, một node thắng trong một term</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Ghi log</h5><p>leader nhận lệnh, ghi vào log của mình</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>3 · Sao chép</h5><p>leader gửi log đó sang các follower</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>4 · Committed</h5><p>đa số (quorum) đã có log → coi là chốt</p></div>
+  </div>
+  <p>Một lệnh được coi là <b>committed</b> khi <b>đa số</b> (majority/quorum) node đã có nó trong log — nhờ vậy hệ thống vẫn đúng dù thiểu số node chết. Nếu leader ngừng gửi heartbeat, các follower đợi hết một khoảng timeout rồi tự tổ chức bầu leader mới. Raft được thiết kế để <b>dễ hiểu</b> hơn Paxos — thuật toán consensus cũ hơn, nổi tiếng khó hiểu — trong khi giải cùng bài toán.</p>
 </section>
 
 <section id="consensus-leader-election-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Leader election</h2></div>
-  <p class="plan">Vì sao cần, ai làm việc này (ZooKeeper, etcd).</p>
+  <p class="key">Nhiều hệ thống phân tán cần đúng <b>một</b> node điều phối tại một thời điểm, để tránh <b>split-brain</b> — hai node cùng tưởng mình là leader và ra quyết định mâu thuẫn.</p>
+  <p><b>ZooKeeper</b> và <b>etcd</b> là hai công cụ phổ biến chuyên cung cấp dịch vụ coordination/consensus (dựa trên họ thuật toán Paxos/Raft) để các hệ thống khác — Kafka, Kubernetes... — dùng làm nền tảng bầu leader, khoá phân tán (distributed lock), và lưu cấu hình dùng chung. Ở mức này chỉ cần nhận diện được vai trò của chúng, không cần biết cách cài đặt bên trong.</p>
 </section>
 
 <section id="consensus-leader-election-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Hai câu thường gặp ở mức nhận diện.</p>
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao hệ phân tán cần thuật toán consensus?</summary>
+  <p>Vì nhiều node phải thống nhất một giá trị hay một quyết định chung — ai là leader, giá trị nào được ghi — trong khi không node nào biết chắc một node khác đã chết hẳn hay chỉ đang chậm/mất kết nối tạm thời. Không có consensus, các node có thể đưa ra quyết định mâu thuẫn nhau.</p></details>
+
+  <details class="qa"><summary>Raft hoạt động theo ý tưởng gì, và ZooKeeper/etcd dùng để làm gì?</summary>
+  <p>Raft bầu một leader duy nhất mỗi term; leader ghi log rồi sao chép sang follower, lệnh được coi là committed khi đa số node đã có nó — nhờ vậy đúng đắn dù thiểu số node chết, và leader mới được bầu lại khi leader cũ ngừng heartbeat. ZooKeeper và etcd là các dịch vụ coordination dựng trên họ thuật toán này, được Kafka, Kubernetes... dùng để bầu leader, làm khoá phân tán và lưu cấu hình dùng chung.</p></details>
 </section>
 
-<footer>CS fundamentals · Distributed systems</footer>
+<footer>CS fundamentals · Distributed systems · bài trước <a href="../cap-theorem-consistency/index.html">CAP &amp; consistency</a> · tiếp theo <a href="../../05-messaging/messaging-queue-pubsub/index.html">Message queue &amp; Pub/Sub</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

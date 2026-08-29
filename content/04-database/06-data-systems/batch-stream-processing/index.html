@@ -39,40 +39,77 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-batch" data-skeleton="1" data-title="Batch vs stream processing" data-tag="Data systems" data-blurb="Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.">
+      <article class="doc" id="art-batch" data-title="Batch vs stream processing" data-tag="Data systems" data-blurb="Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.">
         <header class="hero">
   <p class="eyebrow">Database · Data systems</p>
   <h1>Batch vs <em>stream</em> processing</h1>
   <p class="lede">Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="batch-stream-processing-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Dữ liệu tới liên tục — xử lý ngay hay gom lại xử lý sau.</p>
+  <p class="key">Bài <a href="../etl-elt/index.html">ETL/ELT</a> nói về thứ tự transform và load. Còn một trục nữa: pipeline đó chạy <em>khi nào</em>? Dữ liệu (đơn hàng mới, click, log) tới liên tục suốt ngày — có thể gom lại rồi xử lý một lần theo lịch, hoặc xử lý ngay từng sự kiện khi nó vừa tới. Lựa chọn này quyết định trực tiếp độ trễ giữa "sự kiện xảy ra" và "kết quả sẵn sàng để dùng".</p>
 </section>
 
 <section id="batch-stream-processing-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Batch</h2></div>
-  <p class="plan">Đơn giản, throughput cao, độ trễ theo lô.</p>
+  <div class="sh"><b>02</b><h2>Batch processing</h2></div>
+  <p class="key">Gom dữ liệu lại thành từng lô, xử lý định kỳ — mỗi giờ, mỗi đêm.</p>
+  <ul class="why">
+    <li>Ví dụ điển hình: job Spark chạy lúc 2 giờ sáng, đọc toàn bộ đơn hàng trong ngày, tính doanh thu theo sản phẩm, ghi vào bảng báo cáo.</li>
+    <li>Độ trễ đo bằng <b>giờ hoặc ngày</b> — chấp nhận được vì không ai cần xem báo cáo doanh thu hôm qua ngay lập tức trong đêm.</li>
+    <li>Đơn giản để viết, dễ debug (chạy lại toàn bộ lô nếu sai), throughput cao vì xử lý theo khối lớn tận dụng tốt tài nguyên.</li>
+  </ul>
 </section>
 
 <section id="batch-stream-processing-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Stream</h2></div>
-  <p class="plan">Độ trễ thấp, phức tạp hơn — state, windowing, out-of-order.</p>
+  <div class="sh"><b>03</b><h2>Stream processing</h2></div>
+  <p class="key">Xử lý từng sự kiện (hoặc từng nhóm nhỏ) ngay khi nó tới, gần thời gian thực.</p>
+  <ul class="why">
+    <li>Ví dụ điển hình: Kafka đưa từng sự kiện thanh toán vào một topic, Flink đọc liên tục và tính điểm gian lận ngay trong mili-giây tới vài giây.</li>
+    <li>Phức tạp hơn batch đáng kể vì phải xử lý <b>state</b> (nhớ giá trị tích luỹ giữa các sự kiện), <b>windowing</b> (gộp sự kiện trong một khung thời gian trượt, ví dụ "số lượt click trong 5 phút gần nhất"), và dữ liệu đến <b>không đúng thứ tự</b> (out-of-order — sự kiện có thể tới trễ do mạng).</li>
+    <li>Đổi lại độ trễ thấp — <b>giây hoặc mili-giây</b> — nhưng hạ tầng chạy liên tục 24/7, chi phí vận hành và giám sát cao hơn batch nhiều.</li>
+  </ul>
 </section>
 
 <section id="batch-stream-processing-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Lambda/Kappa architecture</h2></div>
-  <p class="plan">Kết hợp cả hai thế nào.</p>
+  <div class="sh"><b>04</b><h2>Đánh đổi và khi nào dùng gì</h2></div>
+  <div class="axis">
+    <div class="stop on"><b>Batch</b><span>độ trễ giờ/ngày · đơn giản, rẻ</span></div>
+    <div class="stop"><b>Micro-batch</b><span>độ trễ phút · gần đúng giữa hai thái cực</span></div>
+    <div class="stop"><b>Streaming</b><span>độ trễ giây/mili-giây · state, windowing, chi phí cao</span></div>
+  </div>
+  <p class="axiscap"><span>đơn giản, rẻ, trễ</span><span><em>đổi độ trễ lấy độ phức tạp hạ tầng</em></span><span>tức thời, đắt, phức tạp</span></p>
+  <ul class="why">
+    <li><b>Cần streaming thật</b> khi giá trị của việc <em>biết ngay</em> lớn hơn chi phí vận hành: fraud detection (chặn giao dịch gian lận trước khi tiền đi), dashboard real-time (giám sát hệ thống), cảnh báo sự cố.</li>
+    <li><b>Batch là đủ</b> cho phần lớn báo cáo nghiệp vụ: doanh thu hằng ngày, huấn luyện lại một model ML theo tuần, đối soát dữ liệu cuối ngày — không ai mất gì nếu số liệu này chậm vài giờ.</li>
+  </ul>
+  <div class="note">
+    <h4>Lambda và Kappa architecture</h4>
+    <p><b>Lambda architecture</b> chạy song song cả hai đường: một pipeline batch (chính xác, nhưng trễ) và một pipeline stream (nhanh nhưng có thể xấp xỉ) để bù độ trễ, gộp kết quả lại khi trả lời truy vấn — đổi lại phải bảo trì hai bộ logic tương tự nhau. <b>Kappa architecture</b> đơn giản hoá bằng cách xử lý mọi thứ như stream, kể cả khi cần kết quả kiểu batch (chạy lại toàn bộ lịch sử sự kiện qua engine streaming). Không cần đào sâu cách triển khai — điều đáng nhớ là đây là hai cách <em>không phải chọn hẳn</em> một trong hai, mà kết hợp khi hệ thống cần cả độ chính xác lẫn độ trễ thấp.</p>
+  </div>
 </section>
 
 <section id="batch-stream-processing-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Ba câu thường gặp về batch/stream.</p>
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Dùng streaming khi batch là đủ</h4><p>Xây hạ tầng Kafka + Flink cho một báo cáo chạy mỗi ngày một lần — chi phí vận hành và độ phức tạp không tương xứng với lợi ích, trong khi một cron job đơn giản đã giải quyết xong.</p></div>
+    <div class="card bad"><h4>Bỏ qua out-of-order events</h4><p>Giả định sự kiện luôn tới đúng thứ tự thời gian, tính window sai khi có sự kiện tới trễ vài giây do mạng chậm — kết quả streaming sai một cách âm thầm.</p></div>
+    <div class="card bad"><h4>Không có cách xử lý lại khi stream job lỗi</h4><p>Batch job chạy lại dễ dàng (idempotent, chạy lại toàn bộ lô). Stream job cần cơ chế checkpoint/replay riêng — thiếu nó thì một lần crash là mất dữ liệu vĩnh viễn.</p></div>
+    <div class="card bad"><h4>Duy trì hai bộ logic Lambda mà để chúng lệch nhau</h4><p>Logic tính toán ở nhánh batch và nhánh stream dần khác nhau theo thời gian (một bên sửa bug, bên kia quên) — hai kết quả không khớp nhau mà không ai phát hiện ra.</p></div>
+  </div>
 </section>
 
-<footer>Database · Data systems</footer>
+<section id="batch-stream-processing-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+  <details class="qa"><summary>Làm sao chọn giữa batch và stream cho một bài toán cụ thể?</summary>
+  <p>Hỏi một câu: nếu kết quả trễ một giờ thay vì một giây, có ai bị ảnh hưởng thật không? Nếu không (báo cáo nội bộ, huấn luyện lại model định kỳ) thì batch luôn rẻ và đơn giản hơn. Nếu có (chặn gian lận, cảnh báo sự cố) thì mới đáng trả chi phí vận hành streaming.</p></details>
+  <details name="dq" class="qa"><summary>Windowing trong stream processing là gì?</summary>
+  <p>Vì dữ liệu tới liên tục không có điểm kết thúc, phải cắt thành từng khung thời gian (window) để tính toán được — ví dụ "tổng số lượt click mỗi 5 phút". Có window cố định (tumbling), window trượt (sliding), và window theo phiên (session). Đây là khái niệm chỉ tồn tại ở stream, batch không cần vì dữ liệu vốn đã là một khối trọn vẹn.</p></details>
+  <details class="qa"><summary>Micro-batch (như Spark Structured Streaming) là batch hay stream?</summary>
+  <p>Về bản chất kỹ thuật nó vẫn chạy batch — xử lý theo các lô rất nhỏ và rất thường xuyên (vài giây một lần) — nhưng đủ nhanh để đóng vai trò gần như streaming cho nhiều bài toán. Một lựa chọn thực dụng ở giữa hai thái cực, không cần hạ tầng streaming thuần (Flink) phức tạp bằng.</p></details>
+</section>
+
+<footer>Database · Data systems · trước đó: <a href="../etl-elt/index.html">ETL &amp; ELT</a> · tiếp theo: <a href="../data-quality/index.html">Data quality</a></footer>
 
       </article>
       <div class="nextprev" id="np"></div>

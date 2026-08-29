@@ -39,42 +39,136 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-relmodel" data-skeleton="1" data-title="Relational model" data-tag="Database" data-blurb="Bảng, hàng, cột, miền giá trị, khoá chính và khoá ngoại — bộ từ vựng mọi câu hỏi SQL đứng trên.">
+      <article class="doc" id="art-relmodel" data-title="Relational model" data-tag="Database" data-blurb="Bảng, hàng, cột, miền giá trị, khoá chính và khoá ngoại — bộ từ vựng mọi câu hỏi SQL đứng trên.">
         <header class="hero">
   <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
   <h1>Relational <em>model</em></h1>
-  <p class="lede">Năm khái niệm. Nắm đúng thì phần còn lại của kệ này chỉ là hệ quả.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Năm khái niệm. Nắm đúng thì phần còn lại của kệ này chỉ là hệ quả. Tiếp nối <a href="../relational-overview/index.html">Relational foundations overview</a>.</p>
 </header>
 
-<section id="relmodel-s1" class="lesson">
+<section id="relmodel-s1">
   <div class="sh"><b>01</b><h2>Quan hệ là gì</h2></div>
-  <p class="plan">Bảng như một tập hợp bộ giá trị — một hình.</p>
+  <p>Một <b>relation</b> (bảng) là một <b>tập hợp</b> các <b>tuple</b> (dòng) có cùng cấu trúc <b>attribute</b> (cột). "Tập hợp" là từ khoá — không phải danh sách, không có thứ tự cố định, và về lý thuyết không có hai dòng giống hệt nhau.</p>
+<pre><code>customers
+┌────┬────────┬─────────────────┬────────────┐
+│ id │ name   │ email            │ created_at │
+├────┼────────┼─────────────────┼────────────┤
+│ 1  │ An     │ an@mail.com     │ 2024-01-03 │
+│ 2  │ Bình   │ binh@mail.com   │ 2024-02-11 │
+└────┴────────┴─────────────────┴────────────┘
+
+id, name, email, created_at  → attribute (cột)
+mỗi dòng                     → tuple
+mỗi cột có một domain riêng: id ∈ số nguyên dương,
+                              email ∈ chuỗi khớp định dạng email</code></pre>
+  <p><b>Domain</b> là tập giá trị hợp lệ mà một cột được phép mang — không chỉ là kiểu dữ liệu (<code>INTEGER</code>, <code>TEXT</code>) mà còn là ràng buộc ngữ nghĩa: <code>age</code> có kiểu số nguyên nhưng domain thật là "số nguyên không âm, dưới 150".</p>
+  <div class="note key">
+    <h4>Khác biệt với file phẳng hay mảng dữ liệu</h4>
+    Trong một mảng hay một file <code>.csv</code>, "dòng thứ ba" là một khái niệm có nghĩa — nó nằm ở vị trí vật lý cố định. Trong mô hình quan hệ, <b>không có "dòng thứ ba"</b> theo nghĩa đó: <code>SELECT * FROM customers</code> không đảm bảo trả về theo bất kỳ thứ tự nào trừ khi có <code>ORDER BY</code>. Đây là hệ quả trực tiếp của việc coi bảng là tập hợp toán học, và nó giải phóng database engine tự do sắp xếp dữ liệu vật lý theo cách nhanh nhất cho nó, không phải cách ứng dụng ghi vào.
+  </div>
 </section>
 
-<section id="relmodel-s2" class="lesson">
+<section id="relmodel-s2">
   <div class="sh"><b>02</b><h2>Khoá chính</h2></div>
-  <p class="plan">Định danh duy nhất, khoá tự nhiên so với khoá thay thế.</p>
+  <p><b>Primary key (PK)</b> là một hoặc nhiều cột định danh <b>duy nhất</b> mỗi dòng trong bảng — không trùng, không NULL. Có hai cách chọn:</p>
+  <table>
+    <tr><th></th><th>Natural key</th><th>Surrogate key</th></tr>
+    <tr><td>Là gì</td><td>Một giá trị đã có sẵn ý nghĩa nghiệp vụ: số CMND, mã số thuế, email</td><td>Một giá trị máy sinh ra, không mang nghĩa gì: <code>SERIAL</code>, <code>UUID</code></td></tr>
+    <tr><td>Ưu điểm</td><td>Không cần cột thừa, tự nhiên đọc hiểu được</td><td>Không bao giờ đổi, không phụ thuộc nghiệp vụ bên ngoài</td></tr>
+    <tr><td>Nhược điểm</td><td>Nghiệp vụ đổi thì khoá đổi theo — email đổi, CMND cấp lại</td><td>Vô nghĩa khi đọc trực tiếp, phải join mới ra thông tin thật</td></tr>
+    <tr><td>Chọn khi</td><td>Giá trị chắc chắn không đổi theo thời gian (hiếm)</td><td>Mặc định nên dùng — an toàn hơn về lâu dài</td></tr>
+  </table>
+<pre><code>CREATE TABLE customers (
+  id         BIGSERIAL PRIMARY KEY,      <span class="cm">-- surrogate key</span>
+  email      TEXT UNIQUE NOT NULL,       <span class="cm">-- natural key tiềm năng, nhưng KHÔNG dùng làm PK</span>
+  name       TEXT NOT NULL
+);</code></pre>
+  <p>Lý do thực tế chọn surrogate key làm PK ngay cả khi có natural key: <code>email</code> vẫn cần <code>UNIQUE</code> để giữ ràng buộc nghiệp vụ, nhưng nếu khách đổi email thì mọi bảng khác đang <code>FOREIGN KEY</code> trỏ theo <code>email</code> sẽ phải cập nhật theo — trong khi trỏ theo <code>id</code> không bao giờ phải sửa.</p>
 </section>
 
-<section id="relmodel-s3" class="lesson">
+<section id="relmodel-s3">
   <div class="sh"><b>03</b><h2>Khoá ngoại</h2></div>
-  <p class="plan">Nối hai bảng, và nó hứa điều gì.</p>
+  <p><b>Foreign key (FK)</b> là một cột (hay tổ hợp cột) ở bảng con, giá trị của nó phải khớp với khoá chính ở bảng cha — hoặc là NULL nếu quan hệ đó không bắt buộc.</p>
+<pre><code>CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES customers(id),
+  total       NUMERIC(10,2) NOT NULL
+);
+<span class="cm">-- orders.customer_id là khoá ngoại trỏ tới customers.id</span></code></pre>
+  <p>Khoá ngoại là một <b>lời hứa</b>, không phải chỉ một con số: nó hứa rằng mọi giá trị <code>customer_id</code> trong <code>orders</code> đều tồn tại thật trong <code>customers</code> — không bao giờ có đơn hàng "mồ côi" trỏ tới khách hàng không tồn tại. Database tự kiểm tra lời hứa này ở mọi câu <code>INSERT</code>/<code>UPDATE</code>, thay vì để ứng dụng tự nhớ. Đây chính là <b>referential integrity</b>, sẽ nói kỹ hơn ở <a href="../constraints-integrity/index.html">Constraints &amp; integrity</a>.</p>
+
+  <h3>Ba dạng quan hệ và cách hiện thực</h3>
+  <table>
+    <tr><th>Quan hệ</th><th>Ví dụ</th><th>Cách hiện thực</th></tr>
+    <tr><td><b>1-1</b></td><td>Một user có đúng một hồ sơ profile</td><td>FK ở bảng con + <code>UNIQUE</code> trên cột FK đó</td></tr>
+    <tr><td><b>1-nhiều</b></td><td>Một khách có nhiều đơn hàng</td><td>FK ở bảng "nhiều" trỏ về bảng "một" — không cần bảng thứ ba</td></tr>
+    <tr><td><b>nhiều-nhiều</b></td><td>Một đơn hàng có nhiều sản phẩm, một sản phẩm nằm trong nhiều đơn</td><td><b>Bảng trung gian</b> (junction table) — bắt buộc, không có cách nào khác</td></tr>
+  </table>
+<pre><code><span class="cm">-- nhiều-nhiều: order &lt;-&gt; product, qua bảng trung gian order_items</span>
+CREATE TABLE order_items (
+  order_id   BIGINT REFERENCES orders(id),
+  product_id BIGINT REFERENCES products(id),
+  quantity   INT NOT NULL CHECK (quantity &gt; 0),
+  PRIMARY KEY (order_id, product_id)   <span class="cm">-- khoá tổ hợp, xem mục 04</span>
+);</code></pre>
+  <p>Bảng trung gian tồn tại vì một cột không thể chứa "nhiều giá trị" mà vẫn giữ được ràng buộc và tra cứu hiệu quả (xem thêm bẫy "nhét mảng vào một cột" ở <a href="../er-modeling/index.html#ermod-s5">Schema design</a>). Nó thường có thêm cột riêng của quan hệ đó — ở đây là <code>quantity</code>, thông tin chỉ có nghĩa khi gắn với đúng cặp order–product.</p>
 </section>
 
-<section id="relmodel-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Khoá dự tuyển & khoá tổ hợp</h2></div>
-  <p class="plan">Khi một cột không đủ.</p>
+<section id="relmodel-s4">
+  <div class="sh"><b>04</b><h2>Khoá dự tuyển &amp; khoá tổ hợp</h2></div>
+  <p><b>Candidate key</b> là bất kỳ cột (hay tổ hợp cột) nào <i>có thể</i> làm khoá chính — nghĩa là duy nhất và không NULL. Một bảng có thể có nhiều candidate key; chỉ một trong số đó được chọn làm primary key, số còn lại vẫn nên giữ ràng buộc <code>UNIQUE</code>.</p>
+<pre><code>customers (id, email, tax_code, name)
+-- candidate key: {id}, {email}, {tax_code}
+-- primary key được chọn: id (surrogate)
+-- email, tax_code vẫn cần UNIQUE để giữ đúng ngữ nghĩa nghiệp vụ</code></pre>
+  <p><b>Composite key</b> (khoá tổ hợp) là khi <i>không một cột nào riêng lẻ</i> đủ để định danh duy nhất một dòng — phải ghép nhiều cột lại. Ví dụ kinh điển là bảng trung gian ở mục trên: <code>(order_id, product_id)</code> cùng nhau mới duy nhất, vì một đơn có thể có nhiều sản phẩm và một sản phẩm nằm trong nhiều đơn.</p>
+  <div class="note">
+    <h4>Khi nào bắt buộc dùng composite key</h4>
+    Bảng trung gian của quan hệ nhiều-nhiều gần như luôn dùng composite key làm PK, vì ý nghĩa của một dòng <i>chính là</i> "cặp (A, B) này có tồn tại quan hệ không" — thêm một cột <code>id</code> riêng chỉ tạo khả năng chèn trùng cặp mà ràng buộc không bắt được.
+  </div>
 </section>
 
-<section id="relmodel-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Dùng khoá tự nhiên hay đổi, khoá tổ hợp quá dài, NULL trong khoá.</p>
+<section id="relmodel-s5">
+  <div class="sh"><b>05</b><h2>Relational algebra — cầu nối sang SQL</h2></div>
+  <p>Relational algebra là tập phép toán hình thức Codd định nghĩa để "hỏi" một quan hệ và luôn trả về một quan hệ khác — đây chính là nền lý thuyết mà mọi câu SQL sau này dịch xuống.</p>
+  <table>
+    <tr><th>Phép toán</th><th>Nghĩa</th><th>Tương ứng SQL</th></tr>
+    <tr><td><b>Select (σ)</b></td><td>Lọc <i>dòng</i> theo điều kiện</td><td><code>WHERE</code></td></tr>
+    <tr><td><b>Project (π)</b></td><td>Chọn <i>cột</i>, bỏ cột không cần</td><td><code>SELECT col1, col2</code></td></tr>
+    <tr><td><b>Join (⋈)</b></td><td>Ghép hai bảng theo điều kiện khớp</td><td><code>JOIN ... ON</code></td></tr>
+    <tr><td><b>Union (∪)</b></td><td>Gộp hai tập kết quả cùng cấu trúc</td><td><code>UNION</code></td></tr>
+  </table>
+<pre><code><span class="cm">-- "lấy tên và email của khách ở Hà Nội" viết bằng SQL,
+-- chính là project ∘ select trên bảng customers</span>
+SELECT name, email          <span class="cm">-- π (project)</span>
+FROM customers
+WHERE city = <span class="st">'Hà Nội'</span>;      <span class="cm">-- σ (select)</span></code></pre>
+  <p>Không cần nhớ ký hiệu toán học — điều đáng nhớ là <b>mỗi phép toán nhận vào bảng, trả ra bảng</b> (tính chất <i>closure</i>). Nhờ vậy các phép toán ghép được với nhau tuỳ ý: kết quả một <code>JOIN</code> lại đưa được vào một <code>WHERE</code> khác, đó là lý do SQL lồng được subquery và CTE — chủ đề của nhóm <a href="../../03-sql-basics/sql-basics-overview/index.html">SQL basics</a> tiếp theo.</p>
 </section>
 
-<section id="relmodel-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+<section id="relmodel-s6">
+  <div class="sh"><b>06</b><h2>Ba bẫy</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Dùng khoá tự nhiên hay đổi làm PK</h4><p>Chọn <code>email</code> hay số điện thoại làm primary key rồi khách đổi thông tin — mọi khoá ngoại trỏ theo phải cập nhật dây chuyền. Dùng surrogate key, giữ khoá tự nhiên như <code>UNIQUE</code> thường.</p></div>
+    <div class="card bad"><h4>Khoá tổ hợp quá dài</h4><p>Ghép 4-5 cột làm composite key khiến mọi bảng con phải nhắc lại toàn bộ tổ hợp đó làm khoá ngoại — lược đồ phình to, JOIN chậm. Cân nhắc thêm một surrogate key riêng nếu bảng đó còn là cha của bảng khác.</p></div>
+    <div class="card bad"><h4>NULL trong khoá</h4><p>Một cột nằm trong composite key mà cho phép NULL thì hai dòng cùng NULL ở cột đó vẫn được coi là "khác nhau" (NULL không bằng chính nó) — vô hiệu hoá tác dụng chống trùng của khoá. Mọi cột trong PK phải <code>NOT NULL</code>.</p></div>
+  </div>
+</section>
+
+<section id="relmodel-s7">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <details class="qa"><summary>Candidate key, primary key và unique key khác nhau thế nào?</summary>
+  <p>Candidate key là bất kỳ tổ hợp cột nào <i>có khả năng</i> làm khoá — duy nhất và không NULL; một bảng có thể có nhiều candidate key. Primary key là candidate key được <i>chọn</i> làm định danh chính thức — mỗi bảng chỉ có một. Unique key (ràng buộc <code>UNIQUE</code>) là cách giữ tính duy nhất cho các candidate key còn lại không được chọn làm PK, và khác PK ở chỗ nó vẫn cho phép NULL (thường một lần).</p></details>
+
+  <details class="qa"><summary>Vì sao nên dùng surrogate key thay vì natural key?</summary>
+  <p>Vì natural key gắn với nghiệp vụ nên có thể đổi — email, số điện thoại, mã số thuế đều từng đổi trong đời thực. Nếu nó là primary key, mọi khoá ngoại trỏ theo phải cập nhật dây chuyền, rủi ro cao và tốn hiệu năng. Surrogate key (thường là số tự tăng hoặc UUID) không mang nghĩa nghiệp vụ nên không bao giờ cần đổi, nhưng vẫn giữ natural key như một ràng buộc <code>UNIQUE</code> riêng để bảo toàn ngữ nghĩa.</p></details>
+
+  <details class="qa"><summary>Quan hệ nhiều-nhiều hiện thực trong SQL thế nào?</summary>
+  <p>Không có cách nào biểu diễn trực tiếp — luôn cần một bảng trung gian (junction table) với hai khoá ngoại trỏ tới hai bảng gốc, thường ghép lại làm composite primary key. Ví dụ order và product nối qua <code>order_items(order_id, product_id, quantity)</code>. Bảng trung gian còn là chỗ tự nhiên để lưu thuộc tính riêng của quan hệ đó, như <code>quantity</code> hay <code>joined_at</code>.</p></details>
+
+  <details class="qa"><summary>Foreign key khác gì so với chỉ lưu một số ID bình thường?</summary>
+  <p>Về mặt lưu trữ thì giống hệt — cùng là một số nguyên. Khác biệt nằm ở <b>ràng buộc</b>: khai báo <code>REFERENCES</code> bắt database từ chối mọi <code>INSERT</code>/<code>UPDATE</code> tạo ra giá trị không tồn tại ở bảng cha, và mặc định từ chối luôn việc xoá bản ghi cha đang được tham chiếu. Không có khai báo đó, cột vẫn chạy nhưng không ai đảm bảo tính toàn vẹn — dữ liệu mồ côi âm thầm tích tụ.</p></details>
 </section>
 
 <footer>Cơ sở dữ liệu · SQL · Mô hình quan hệ</footer>

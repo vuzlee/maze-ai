@@ -39,42 +39,116 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-sqlagg" data-skeleton="1" data-title="GROUP BY &amp; aggregate" data-tag="Database" data-blurb="Gom nhóm, WHERE khác HAVING ở đâu, COUNT(*) khác COUNT(cột), và bẫy NULL trong hàm tổng hợp.">
+      <article class="doc" id="art-sqlagg" data-title="GROUP BY &amp; aggregate" data-tag="PostgreSQL" data-blurb="Gom nhóm, WHERE khác HAVING ở đâu, COUNT(*) khác COUNT(cột), và bẫy NULL trong hàm tổng hợp.">
         <header class="hero">
-  <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
+  <p class="eyebrow">Cơ sở dữ liệu · SQL · <a href="../sql-basics-overview/index.html">SQL basics</a></p>
   <h1>GROUP BY &amp; <em>aggregate</em></h1>
-  <p class="lede">Một câu hỏi phân biệt người biết và người thuộc lòng: <b>WHERE hay HAVING</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Nối tiếp <a href="../sql-join/index.html">JOIN</a>: giờ các dòng đã lọc xong (<code>WHERE</code>) có thể bị <b>gom lại thành nhóm</b>. Một câu hỏi phân biệt người biết và người thuộc lòng: <b>WHERE hay HAVING</b>.</p>
 </header>
 
-<section id="sqlagg-s1" class="lesson">
+<section id="sqlagg-s1">
   <div class="sh"><b>01</b><h2>Gom nhóm làm gì</h2></div>
-  <p class="plan">Nhiều hàng thành một hàng — một hình.</p>
+  <p class="key"><code>GROUP BY</code> gom <em>nhiều dòng có cùng giá trị ở một cột</em> thành <em>một dòng kết quả</em>, kèm theo một con số tổng hợp cho mỗi nhóm.</p>
+<pre><code><span class="cm">-- orders(id, customer_id, status, amount)</span>
+<span class="cm">-- 1,  'paid',   500k
+-- 1,  'paid',   200k
+-- 2,  'paid',   300k
+-- 2,  'cancelled', 100k</span>
+
+SELECT customer_id, COUNT(*) <span class="kw">AS</span> so_don, SUM(amount) <span class="kw">AS</span> tong
+FROM orders
+GROUP BY customer_id;
+<span class="cm">-- customer_id=1 → so_don=2, tong=700k
+-- customer_id=2 → so_don=2, tong=400k
+-- 4 dòng gốc rút gọn còn 2 dòng, mỗi khách một dòng</span></code></pre>
+  <ul class="why">
+    <li>Mọi cột trong <code>SELECT</code> khi có <code>GROUP BY</code> phải là <b>cột đang gom</b> hoặc nằm trong một <b>hàm tổng hợp</b> — không có cách nào để hiển thị một giá trị "đại diện" cho cả nhóm nếu không nói rõ cách rút gọn.</li>
+    <li><code>GROUP BY</code> chạy <b>sau</b> <code>WHERE</code> trong thứ tự thực thi — dòng bị <code>WHERE</code> loại thì không bao giờ tới được bước gom nhóm.</li>
+  </ul>
 </section>
 
-<section id="sqlagg-s2" class="lesson">
+<section id="sqlagg-s2">
   <div class="sh"><b>02</b><h2>WHERE so với HAVING</h2></div>
-  <p class="plan">Trước và sau khi gom nhóm.</p>
+  <p class="key">Khác nhau đúng một chữ: <b>thời điểm chạy</b>. <code>WHERE</code> lọc <em>trước</em> khi gom nhóm, <code>HAVING</code> lọc <em>sau</em>.</p>
+  <div class="flow">
+    <div class="n"><h5>FROM</h5><p>bảng nguồn</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>WHERE</h5><p>lọc từng dòng thô</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>GROUP BY</h5><p>gom thành nhóm</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>HAVING</h5><p>lọc từng nhóm</p></div>
+  </div>
+<pre><code><span class="cm">-- WHERE: loại các dòng cancelled TRƯỚC khi gom, nên chúng không góp vào tổng</span>
+SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong
+FROM orders
+WHERE status != <span class="st">'cancelled'</span>
+GROUP BY customer_id;
+
+<span class="cm">-- HAVING: gom hết trước (kể cả cancelled), rồi loại NHÓM có tổng thấp</span>
+SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong
+FROM orders
+GROUP BY customer_id
+HAVING SUM(amount) &gt; <span class="st">500000</span>;
+<span class="cm">-- không thể viết WHERE SUM(amount) > 500000 — WHERE chạy TRƯỚC khi SUM tồn tại</span></code></pre>
+  <div class="note key">
+    <h4>Quy tắc nhớ</h4>
+    <code>WHERE</code> không được dùng hàm tổng hợp (<code>SUM</code>, <code>COUNT</code>…) vì tại thời điểm nó chạy, các nhóm còn chưa được tạo ra. Điều kiện nào cần một hàm tổng hợp thì bắt buộc phải nằm trong <code>HAVING</code>.
+  </div>
 </section>
 
-<section id="sqlagg-s3" class="lesson">
+<section id="sqlagg-s3">
   <div class="sh"><b>03</b><h2>COUNT(*) so với COUNT(cột)</h2></div>
-  <p class="plan">NULL bị bỏ qua ở đâu.</p>
+  <p class="key"><code>COUNT(*)</code> đếm <em>số dòng</em>, không quan tâm giá trị. <code>COUNT(cột)</code> chỉ đếm những dòng có giá trị <b>không phải NULL</b> ở cột đó — hai con số có thể khác nhau.</p>
+<pre><code><span class="cm">-- orders: 4 dòng, cột shipped_at có 2 dòng NULL (chưa giao)</span>
+SELECT
+  COUNT(*)         <span class="kw">AS</span> tong_don,        <span class="cm">-- 4</span>
+  COUNT(shipped_at) <span class="kw">AS</span> da_giao,        <span class="cm">-- 2 — bỏ qua NULL</span>
+  COUNT(DISTINCT customer_id) <span class="kw">AS</span> so_khach  <span class="cm">-- đếm không trùng</span>
+FROM orders;</code></pre>
+  <p>Mọi hàm tổng hợp trừ <code>COUNT(*)</code> đều <b>bỏ qua NULL</b> khi tính — đây là hành vi chung, không riêng gì <code>COUNT</code>, xem mục 05.</p>
 </section>
 
-<section id="sqlagg-s4" class="lesson">
+<section id="sqlagg-s4">
   <div class="sh"><b>04</b><h2>Gom theo nhiều cột</h2></div>
-  <p class="plan">Và cái bẫy cột không nằm trong GROUP BY.</p>
+  <p class="key"><code>GROUP BY</code> nhận nhiều cột — mỗi <em>tổ hợp giá trị</em> khác nhau của các cột đó là một nhóm riêng.</p>
+<pre><code>SELECT customer_id, status, COUNT(*) <span class="kw">AS</span> so_don
+FROM orders
+GROUP BY customer_id, status;
+<span class="cm">-- (1,'paid') và (1,'cancelled') là HAI nhóm khác nhau, dù cùng customer_id=1</span></code></pre>
+  <p>Cái bẫy hay gặp: chọn một cột trong <code>SELECT</code> mà <b>không</b> đưa vào <code>GROUP BY</code> và cũng không bọc trong hàm tổng hợp:</p>
+<pre><code><span class="cm">-- SAI ở hầu hết database (MySQL cũ cho qua nhưng kết quả không xác định)</span>
+SELECT customer_id, status, amount, COUNT(*)
+FROM orders
+GROUP BY customer_id;
+<span class="cm">-- lỗi: column "orders.status" must appear in GROUP BY or be used in an aggregate function
+-- vì mỗi nhóm customer_id có thể gồm NHIỀU status/amount khác nhau — hiển thị giá trị nào đây?</span></code></pre>
+  <p>PostgreSQL từ chối chạy câu này thẳng — đây là điểm an toàn hơn hẳn so với các engine im lặng chọn đại một giá trị.</p>
 </section>
 
-<section id="sqlagg-s5" class="lesson">
+<section id="sqlagg-s5">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">AVG bỏ qua NULL, lọc sau khi gom bằng WHERE, gom rồi mất chi tiết.</p>
+  <div class="grid2">
+    <div class="card bad"><h4>AVG bỏ qua NULL, không tính là 0</h4><p><code>AVG(rating)</code> trên 3 dòng có rating <code>5, NULL, 3</code> ra <code>4</code> (chia cho 2), không phải <code>2.67</code> (chia cho 3). NULL không tham gia phép chia lẫn phép cộng.</p></div>
+    <div class="card bad"><h4>Lọc sau khi gom bằng WHERE thay vì HAVING</h4><p><code>WHERE COUNT(*) > 1</code> báo lỗi cú pháp — hàm tổng hợp chưa tồn tại ở thời điểm <code>WHERE</code> chạy. Điều kiện trên kết quả gom nhóm phải nằm trong <code>HAVING</code>.</p></div>
+    <div class="card bad"><h4>Gom rồi mất chi tiết dòng gốc</h4><p>Một khi đã <code>GROUP BY customer_id</code>, không còn cách nào lấy lại <code>order_id</code> hay <code>created_at</code> của từng đơn trong cùng câu — muốn giữ cả chi tiết lẫn tổng hợp phải dùng window function hoặc subquery riêng.</p></div>
+  </div>
 </section>
 
-<section id="sqlagg-s6" class="lesson">
+<section id="sqlagg-s6">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <details class="qa"><summary>WHERE khác HAVING ở đâu?</summary>
+  <p>Khác nhau về thời điểm chạy trong thứ tự thực thi: <code>WHERE</code> lọc từng dòng thô, chạy <em>trước</em> <code>GROUP BY</code>; <code>HAVING</code> lọc từng nhóm đã gom xong, chạy <em>sau</em> <code>GROUP BY</code>. Hệ quả trực tiếp: <code>WHERE</code> không được dùng hàm tổng hợp vì lúc nó chạy các nhóm chưa tồn tại, còn <code>HAVING</code> thì bắt buộc phải dùng hàm tổng hợp hoặc cột đã gom nếu không thì nên dùng <code>WHERE</code> cho rẻ hơn.</p></details>
+
+  <details class="qa"><summary>COUNT(*) và COUNT(cột) khác nhau thế nào?</summary>
+  <p><code>COUNT(*)</code> đếm số dòng, không quan tâm giá trị nào là NULL. <code>COUNT(cột)</code> chỉ đếm các dòng có giá trị khác NULL ở cột đó. Nếu một cột có nhiều NULL (ví dụ <code>shipped_at</code> của đơn chưa giao), hai con số này sẽ lệch nhau, và độ lệch đó chính là số dòng NULL.</p></details>
+
+  <details class="qa"><summary>Vì sao không thể SELECT một cột không nằm trong GROUP BY?</summary>
+  <p>Vì mỗi nhóm sau <code>GROUP BY</code> có thể gộp nhiều dòng gốc với giá trị khác nhau ở cột đó — database không biết chọn giá trị nào để hiển thị cho cả nhóm. PostgreSQL từ chối chạy câu này với lỗi rõ ràng. Cách sửa: hoặc đưa cột đó vào <code>GROUP BY</code> (tách nhóm nhỏ hơn), hoặc bọc nó trong một hàm tổng hợp như <code>MAX()</code>, <code>ARRAY_AGG()</code>.</p></details>
+
+  <details class="qa"><summary>Các hàm tổng hợp xử lý NULL thế nào?</summary>
+  <p>Mọi hàm tổng hợp trừ <code>COUNT(*)</code> đều bỏ qua NULL khi tính, không coi nó là 0. <code>SUM</code> và <code>AVG</code> trên toàn NULL trả về NULL (không phải 0), và <code>AVG</code> chia cho số dòng <em>không NULL</em>, không phải tổng số dòng. Cần cẩn thận khi muốn NULL được tính như 0 — phải bọc <code>COALESCE(cot, 0)</code> trước khi đưa vào hàm tổng hợp.</p></details>
 </section>
 
 <footer>Cơ sở dữ liệu · SQL · GROUP BY & hàm tổng hợp</footer>

@@ -39,45 +39,104 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-lb" data-skeleton="1" data-title="Load balancing &amp; scaling" data-tag="CS" data-blurb="Bốn thuật toán phân phối, sticky session, health check, và tầng 4 khác tầng 7 ở đâu.">
+      <article class="doc" id="art-lb" data-title="Load balancing &amp; scaling" data-tag="CS" data-blurb="Bốn thuật toán phân phối, sticky session, health check, và tầng 4 khác tầng 7 ở đâu.">
         <header class="hero">
-  <p class="eyebrow">CS fundamentals</p>
+  <p class="eyebrow">CS fundamentals · Networking</p>
   <h1>Load balancing &amp; <em>scaling</em></h1>
   <p class="lede">Bước đầu tiên của mọi câu trả lời thiết kế hệ thống: <b>thêm máy thì đặt gì ở trước</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="lb-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vì sao cần</h2></div>
-  <p class="plan">Một máy hết chỗ — theo chiều dọc rồi theo chiều ngang.</p>
+
+  <p class="key">Một máy luôn có trần: hết CPU, hết băng thông, hết số kết nối đồng thời chịu được. Có hai hướng để vượt trần đó.</p>
+
+  <div class="cmp two">
+    <div><h5>Scale dọc — vertical scaling</h5><p><b>Cách làm</b> nâng cấp máy hiện có: nhiều CPU hơn, nhiều RAM hơn.</p><p><b>Giới hạn</b> đơn giản, không cần đổi kiến trúc — nhưng có <b>trần vật lý</b> (máy mạnh cỡ nào cũng hữu hạn) và vẫn là <b>một điểm chết duy nhất</b>: máy đó chết là cả hệ thống chết.</p></div>
+    <div><h5>Scale ngang — horizontal scaling</h5><p><b>Cách làm</b> thêm nhiều máy giống nhau, chạy song song.</p><p><b>Giới hạn</b> không có trần lý thuyết — thêm máy là thêm sức chịu tải. Đổi lại cần một thứ đứng trước để <b>chia việc</b> cho các máy đó: đó chính là load balancer.</p></div>
+  </div>
+
+  <p>Load balancing vì vậy không phải một tính năng phụ — nó là <em>điều kiện cần</em> để scale ngang có thể xảy ra. Không có nó, nhiều máy chỉ là nhiều máy rời rạc, không phải một hệ thống chịu tải tốt hơn.</p>
 </section>
 
 <section id="lb-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Thuật toán phân phối</h2></div>
-  <p class="plan">Round robin, ít kết nối nhất, băm nhất quán.</p>
+
+  <p class="key">Load balancer phải quyết định: request này đi máy nào. Ba cách phổ biến, mỗi cách tối ưu cho một tình huống khác nhau.</p>
+
+  <table>
+    <tr><th>Thuật toán</th><th>Cơ chế</th><th>Phù hợp khi</th></tr>
+    <tr><td><strong>Round robin</strong></td><td>Lần lượt quay vòng qua danh sách máy, không quan tâm tải hiện tại</td><td>Các request tốn thời gian xử lý gần bằng nhau; đơn giản, chi phí tính toán gần như bằng không</td></tr>
+    <tr><td><strong>Least connections</strong></td><td>Gửi tới máy đang có <em>ít</em> kết nối đang xử lý nhất</td><td>Thời gian xử lý mỗi request lệch nhau nhiều — round robin dễ dồn việc nặng vào một máy vừa nhận việc nặng khác</td></tr>
+    <tr><td><strong>Consistent hashing</strong></td><td>Băm theo một khoá (ví dụ user ID) để cùng khoá luôn đi về cùng một máy</td><td>Cần cache ở từng máy hoặc sticky session — request của cùng một user phải luôn chạm đúng máy đang giữ dữ liệu/trạng thái của họ</td></tr>
+  </table>
+
+  <div class="note key">
+    <h4>Vì sao "consistent" — không phải hash thường</h4>
+    Băm thường (<code>hash(key) % N</code>) có nghĩa là mỗi khi N — số máy — đổi, gần như <strong>toàn bộ</strong> key bị phân phối lại sang máy khác, vì kết quả modulo đổi hàng loạt. Consistent hashing sắp các máy và các key lên cùng một vòng băm, nên khi thêm hoặc bớt một máy, chỉ phần key nằm liền kề máy đó trên vòng bị ảnh hưởng — phần lớn key còn lại vẫn đi đúng máy cũ. Đây là lý do nó là lựa chọn mặc định cho các hệ có trạng thái phân tán trên nhiều máy (cache phân tán, sharding).
+  </div>
 </section>
 
 <section id="lb-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Tầng 4 so với tầng 7</h2></div>
-  <p class="plan">Cái nào thấy được nội dung request.</p>
+
+  <p class="key">Load balancer có thể đứng ở hai tầng khác nhau của mạng — khác biệt là nó có <em>đọc được nội dung request</em> hay không.</p>
+
+  <div class="cmp two">
+    <div><h5>Layer 4 — transport layer</h5><p><b>Nhìn thấy</b> chỉ IP và port (TCP/UDP), không đọc nội dung gói tin.</p><p><b>Đánh đổi</b> rất nhanh, chi phí xử lý gần như bằng không, nhưng không thể định tuyến theo path, header hay cookie vì không đọc được chúng.</p></div>
+    <div><h5>Layer 7 — application layer</h5><p><b>Nhìn thấy</b> toàn bộ request HTTP: path, header, cookie.</p><p><b>Đánh đổi</b> định tuyến thông minh hơn — route theo path (<code>/api</code> so với <code>/static</code>), theo header, hay terminate TLS ngay tại load balancer — nhưng tốn chi phí xử lý hơn Layer 4.</p></div>
+  </div>
+
+  <p>Chọn tầng nào là đánh đổi giữa tốc độ thuần và khả năng ra quyết định thông minh. Nhiều hệ thống dùng cả hai xếp chồng: một Layer 4 load balancer đứng ngoài cùng chịu tải thô, rồi một lớp Layer 7 phía sau định tuyến chi tiết theo path hoặc header.</p>
 </section>
 
 <section id="lb-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Health check & rút máy</h2></div>
-  <p class="plan">Rút êm, và vì sao cần.</p>
+  <div class="sh"><b>04</b><h2>Health check &amp; rút máy</h2></div>
+
+  <p class="key">Load balancer chỉ nên gửi traffic tới máy còn sống — nó biết điều đó nhờ định kỳ gửi <strong>health check</strong> tới từng máy backend.</p>
+
+  <ul class="why">
+    <li>Máy không phản hồi đúng — timeout, hoặc trả 5xx liên tục — bị <b>rút khỏi</b> danh sách nhận traffic mới cho tới khi khoẻ lại.</li>
+    <li>Không có health check, load balancer vẫn đều đặn gửi request tới một máy đã chết, và một phần người dùng ăn lỗi dù hệ thống tổng thể còn nhiều máy khoẻ khác.</li>
+  </ul>
+
+  <div class="note key">
+    <h4>Rút êm — graceful drain</h4>
+    Khi cần rút một máy chủ động (bảo trì, deploy phiên bản mới), không nên cắt đột ngột giữa chừng. Cách làm đúng là đánh dấu máy đó <strong>ngừng nhận request mới</strong>, nhưng vẫn để nó hoàn tất các request đang xử lý dở trước khi tắt hẳn. Cắt ngang một request đang chạy giữa chừng là trải nghiệm tệ nhất có thể tránh được hoàn toàn bằng một bước đợi ngắn.
+  </div>
 </section>
 
 <section id="lb-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Sticky session làm lệch tải, health check quá nông, một điểm chết duy nhất.</p>
+
+  <p class="key">Cả ba đều là kiểu lỗi "hệ thống chạy ổn 99% thời gian" — chỉ lộ ra khi tải lệch hoặc khi một máy bắt đầu hỏng.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Sticky session làm lệch tải</h4><p>Gán cứng một user luôn về một máy để giữ session trong bộ nhớ máy đó — nếu vài user hoạt động nhiều hơn hẳn, tải dồn lệch hẳn về vài máy. Giải pháp thường dùng: tách session ra một tầng lưu trữ dùng chung (Redis) thay vì sticky.</p></div>
+    <div class="card bad"><h4>Health check quá nông</h4><p>Chỉ kiểm tra "process còn sống" (ví dụ ping cổng TCP) mà không kiểm tra máy có <em>thực sự</em> xử lý được request — ví dụ nó đã mất kết nối tới database phía sau. Cần health check "sâu" kiểm tra luôn các phụ thuộc quan trọng.</p></div>
+    <div class="card bad"><h4>Một điểm chết duy nhất</h4><p>Chính load balancer cũng có thể là single point of failure nếu chỉ chạy một instance. Cần ít nhất hai load balancer (active-passive, hoặc DNS round-robin giữa nhiều LB) để một LB chết không kéo sập cả hệ thống.</p></div>
+  </div>
 </section>
 
 <section id="lb-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Scale dọc khác scale ngang thế nào, đánh đổi gì?</summary>
+  <p><b>Scale dọc</b> (vertical scaling) là nâng cấp máy hiện có — thêm CPU, thêm RAM. Đơn giản, không cần đổi kiến trúc, nhưng có trần vật lý và vẫn là một điểm chết duy nhất. <b>Scale ngang</b> (horizontal scaling) là thêm nhiều máy giống nhau chạy song song — không có trần lý thuyết, nhưng cần một load balancer đứng trước để chia việc, và kéo theo các bài toán mới như đồng bộ trạng thái giữa các máy.</p></details>
+
+  <details class="qa"><summary>Round robin, least connections và consistent hashing khác nhau ra sao, khi nào chọn cái nào?</summary>
+  <p><b>Round robin</b> quay vòng đều, đơn giản, hợp khi các request tốn thời gian gần bằng nhau. <b>Least connections</b> gửi tới máy đang rảnh nhất, công bằng hơn khi thời gian xử lý request lệch nhau nhiều. <b>Consistent hashing</b> băm theo khoá để cùng một khoá luôn về cùng một máy — cần khi có cache riêng từng máy hoặc sticky session, và ưu điểm lớn là khi thêm/bớt máy chỉ một phần nhỏ khoá bị phân phối lại thay vì xáo trộn toàn bộ như hash thường modulo N.</p></details>
+
+  <details class="qa"><summary>Load balancer tầng 4 khác tầng 7 ở đâu?</summary>
+  <p><b>Layer 4</b> chỉ nhìn IP và port, chuyển tiếp gói tin thẳng — rất nhanh nhưng không đọc được nội dung request. <b>Layer 7</b> đọc được HTTP: path, header, cookie — nên định tuyến thông minh hơn (route theo path, terminate TLS tại load balancer) nhưng tốn chi phí xử lý hơn. Nhiều hệ thống dùng cả hai xếp chồng.</p></details>
+
+  <details class="qa"><summary>Health check nông là gì và vì sao nguy hiểm?</summary>
+  <p>Health check nông chỉ kiểm tra process còn phản hồi (ví dụ ping được cổng TCP) mà không kiểm tra các phụ thuộc quan trọng phía sau, như kết nối tới database. Một máy có thể "còn sống" theo nghĩa đó nhưng vẫn trả lỗi cho mọi request thật, và load balancer vẫn tiếp tục gửi traffic tới nó vì health check báo khoẻ. Cần health check "sâu", kiểm tra luôn các phụ thuộc đó.</p></details>
 </section>
 
-<footer>CS fundamentals · Load balancing & mở rộng</footer>
+<footer>CS fundamentals · Networking · bài trước là <a href="../rest-api-design/index.html">REST API design</a>. Khi chính dữ liệu cũng phải chia ra nhiều máy chứ không chỉ máy tính toán, bước tiếp theo là <a href="../../04-distributed/cap-theorem-consistency/index.html">CAP &amp; consistency</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

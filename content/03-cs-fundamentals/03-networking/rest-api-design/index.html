@@ -39,45 +39,119 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-rest" data-skeleton="1" data-title="REST API design" data-tag="CS" data-blurb="Tài nguyên và động từ, mã trạng thái, phân trang, phiên bản, và hợp đồng giữa hai bên.">
+      <article class="doc" id="art-rest" data-title="REST API design" data-tag="CS" data-blurb="Tài nguyên và động từ, mã trạng thái, phân trang, phiên bản, và hợp đồng giữa hai bên.">
         <header class="hero">
-  <p class="eyebrow">CS fundamentals</p>
+  <p class="eyebrow">CS fundamentals · Networking</p>
   <h1>REST API <em>design</em></h1>
-  <p class="lede">Câu hỏi thiết kế hay gặp nhất ở vòng coding của vị trí backend và ML engineer.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Câu hỏi thiết kế hay gặp nhất ở vòng coding của vị trí backend và ML engineer. Bài này không giảng lại vận hành mạng — <b>TCP &amp; HTTP</b> đã làm việc đó — mà đứng ở góc nhìn người vẽ endpoint: đặt tên gì, chọn method nào, mã nào, và hai bên giữ hợp đồng với nhau ra sao khi dữ liệu và API cùng lớn lên.</p>
 </header>
 
 <section id="rest-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Tài nguyên, không phải hành động</h2></div>
-  <p class="plan">Đặt tên endpoint theo danh từ.</p>
+  <p class="key">REST đặt tên endpoint theo <b>danh từ</b> — thứ đang được thao tác — chứ không theo <b>động từ</b> — hành động đang làm. Hành động đã có chỗ riêng: HTTP method.</p>
+  <div class="cmp two">
+    <div><h5>Sai — động từ trong URL</h5>
+      <p><code>GET /getUserById?id=42</code></p>
+      <p><code>POST /createUser</code></p>
+      <p><code>POST /deleteOrder?id=7</code></p></div>
+    <div><h5>Đúng — danh từ, method mang nghĩa</h5>
+      <p><code>GET /users/42</code></p>
+      <p><code>POST /users</code></p>
+      <p><code>DELETE /orders/7</code></p></div>
+  </div>
+  <p>Ba quy ước giữ tên nhất quán trong cả kho endpoint:</p>
+  <ul class="why">
+    <li><b>Danh từ số nhiều cho collection</b> — <code>/orders</code> chứ không phải <code>/order</code>, kể cả khi collection rỗng.</li>
+    <li><b>Id cho một phần tử cụ thể</b> — <code>/orders/42</code> là đúng một đơn hàng, không phải một hành động trên đơn hàng.</li>
+    <li><b>Lồng tài nguyên con khi quan hệ sở hữu rõ ràng</b> — <code>/orders/42/items</code> hợp lý vì item không tồn tại tách khỏi order. Nhưng lồng quá sâu (<code>/users/1/orders/42/items/3/reviews</code>) làm URL khó đọc và khó cache; giới hạn thực tế là <b>3–4 cấp</b>, sâu hơn thì tách thành endpoint riêng có filter — ví dụ <code>/reviews?item=3</code>.</li>
+  </ul>
 </section>
 
 <section id="rest-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Chọn động từ và mã trạng thái</h2></div>
-  <p class="plan">Bảng tra nhanh.</p>
+  <p class="key">Method nói <b>ý định</b>, mã trạng thái nói <b>kết quả</b>. Bảng dưới là tra nhanh cho phần thiết kế; ý nghĩa vận hành đầy đủ của mã trạng thái — mã nào an toàn để thử lại, phân biệt 502/503/504 — nằm ở bài <a href="../tcp-http/index.html">TCP &amp; HTTP</a>, không nhắc lại ở đây.</p>
+  <table>
+    <tr><th>Method</th><th>Dùng khi</th><th>Mã thành công</th></tr>
+    <tr><td><code>GET</code></td><td>Đọc, không đổi trạng thái</td><td>200</td></tr>
+    <tr><td><code>POST</code></td><td>Tạo mới một tài nguyên</td><td>201 Created + header <code>Location</code> trỏ tới tài nguyên vừa tạo</td></tr>
+    <tr><td><code>PUT</code></td><td>Thay thế <b>toàn bộ</b> tài nguyên bằng bản mới</td><td>200 (kèm body) hoặc 204 (không body)</td></tr>
+    <tr><td><code>PATCH</code></td><td>Cập nhật <b>một phần</b> tài nguyên</td><td>200 hoặc 204</td></tr>
+    <tr><td><code>DELETE</code></td><td>Xoá</td><td>204 (thường), 200 nếu trả về bản ghi vừa xoá</td></tr>
+  </table>
+  <table>
+    <tr><th>Mã lỗi</th><th>Dùng khi</th></tr>
+    <tr><td>400 Bad Request</td><td>Request sai định dạng hoặc thiếu field bắt buộc — lỗi ở tầng parse, chưa chạm tới nghiệp vụ</td></tr>
+    <tr><td>422 Unprocessable Entity</td><td>Đúng định dạng nhưng sai nghiệp vụ — ví dụ email đã tồn tại, ngày kết thúc trước ngày bắt đầu</td></tr>
+    <tr><td>404 Not Found</td><td>Tài nguyên không tồn tại — id sai, hoặc đã bị xoá</td></tr>
+    <tr><td>409 Conflict</td><td>Xung đột trạng thái — ví dụ optimistic locking thất bại vì có người khác đã sửa trước</td></tr>
+  </table>
+  <div class="note">
+    <h4>Ranh giới 400 và 422</h4>
+    Câu hỏi phân biệt hay gặp: field <code>email</code> thiếu là 400 — request không đủ để hiểu; field <code>email</code> có nhưng trùng với tài khoản đã đăng ký là 422 — request hiểu được, nhưng nghiệp vụ từ chối. Nhiều API gộp cả hai vào 400 cho gọn, nhưng phân biệt được hai lớp lỗi này là dấu hiệu hiểu rõ chỗ ranh giới giữa validate cú pháp và validate nghiệp vụ.
+  </div>
 </section>
 
 <section id="rest-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Phân trang</h2></div>
-  <p class="plan">Offset so với con trỏ, khi nào phải dùng con trỏ.</p>
+  <div class="cmp two">
+    <div><h5>Offset-based</h5>
+      <p><code>?page=2&amp;limit=20</code></p>
+      <p><code>?offset=40&amp;limit=20</code></p>
+      <p>Đơn giản, nhảy thẳng tới trang N.</p></div>
+    <div><h5>Cursor-based</h5>
+      <p><code>?after=&lt;id_hoặc_token&gt;&amp;limit=20</code></p>
+      <p>Chỉ đi tiến/lùi tuần tự từ một điểm.</p></div>
+  </div>
+  <p><b>Offset</b> dễ hiểu và đủ dùng cho bảng nhỏ, nhưng có hai vấn đề khi bảng lớn dần: database vẫn phải quét qua toàn bộ số dòng bị bỏ trước khi tới trang mong muốn — offset càng lớn càng chậm; và nếu dữ liệu bị chèn hoặc xoá giữa hai lần gọi, thứ tự lệch đi, người dùng có thể thấy trùng dòng hoặc mất dòng khi lật trang.</p>
+  <p><b>Cursor</b> khắc phục cả hai: con trỏ trỏ thẳng vào một vị trí trong index nên không cần quét qua phần đã bỏ, và ổn định trước việc chèn/xoá vì nó bám theo giá trị chứ không bám theo số thứ tự. Đánh đổi là mất khả năng nhảy thẳng tới "trang số N" — chỉ đi tiếp hoặc lùi từ vị trí hiện tại.</p>
+  <div class="note key">
+    <h4>Khi nào bắt buộc dùng cursor</h4>
+    Dữ liệu ghi liên tục — feed, log, hàng đợi tin nhắn — nơi bản ghi mới chèn vào đầu bảng liên tục làm offset lệch ngay lập tức; hoặc bảng đã lớn tới hàng triệu dòng trở lên, nơi chi phí quét offset trở nên rõ rệt. Dưới ngưỡng đó, offset vẫn là lựa chọn hợp lý vì đơn giản hơn để cài và để hiển thị số trang cho người dùng.
+  </div>
 </section>
 
 <section id="rest-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Phiên bản & tương thích ngược</h2></div>
-  <p class="plan">Ba cách, đánh đổi từng cách.</p>
+  <table>
+    <tr><th>Cách</th><th>Ví dụ</th><th>Đánh đổi</th></tr>
+    <tr><td><b>Trong URL</b></td><td><code>/v1/orders</code>, <code>/v2/orders</code></td><td>Rõ ràng nhất, dễ thấy khi debug hay đọc log. Đổi lại: phá cache theo URL khi lên version mới, và phải duy trì nhiều nhánh code song song cho các version còn được dùng.</td></tr>
+    <tr><td><b>Qua header</b></td><td><code>Accept: application/vnd.api+json;version=2</code></td><td>URL sạch, ổn định qua các version. Đổi lại: khó thấy version đang gọi chỉ bằng nhìn URL, phải mở request để kiểm — chậm hơn khi debug nhanh.</td></tr>
+    <tr><td><b>Không versioning</b></td><td>Chỉ thêm field mới, không đổi nghĩa field cũ</td><td>Ít nhánh code nhất phải bảo trì. Đổi lại: đòi kỷ luật thiết kế rất cao — mọi thay đổi phải cộng thêm chứ không được sửa, và không giải quyết được lúc thật sự cần một breaking change.</td></tr>
+  </table>
+  <p>Ba cách không loại trừ nhau: nhiều API dùng versioning trong URL cho breaking change lớn, và giữ nguyên tắc "chỉ cộng thêm" bên trong mỗi version để giảm số lần phải bật version mới.</p>
 </section>
 
 <section id="rest-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Động từ trong URL, trả 200 kèm lỗi, phân trang offset trên bảng lớn.</p>
+
+  <p class="key">Ba lỗi thiết kế khiến API khó đoán, khó xử lý lỗi đúng cách, hoặc chậm dần khi dữ liệu lớn lên.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Động từ trong URL</h4><p><code>/api/getUserById</code>, <code>/deleteOrder</code> — vi phạm nguyên tắc tài nguyên-là-danh từ. Người gọi API không đoán được endpoint tiếp theo trông ra sao, vì mỗi endpoint tự đặt quy ước riêng.</p></div>
+    <div class="card bad"><h4>Trả 200 kèm lỗi trong body</h4><p><code>{"success": false, "error": "..."}</code> nhưng HTTP status vẫn 200. Phá vỡ mọi cơ chế xử lý lỗi chuẩn ở tầng HTTP — client, proxy, hệ thống giám sát không còn phân biệt được thành công/thất bại chỉ bằng status code, phải luôn mở body ra parse.</p></div>
+    <div class="card bad"><h4>Phân trang offset trên bảng lớn</h4><p>Hiệu năng giảm dần khi offset tăng, vì database phải bỏ qua từng ấy dòng trước khi lấy trang mong muốn. Bảng đủ lớn thì đây không còn là chi tiết vặt — chuyển sang cursor-based trước khi nó thành sự cố.</p></div>
+  </div>
 </section>
 
 <section id="rest-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>REST là gì, khác gì với gọi hàm RPC thông thường?</summary>
+  <p>REST mô hình hoá API xoay quanh <b>tài nguyên</b> — danh từ, đặt tên bằng URL — và dùng một tập method HTTP cố định (GET/POST/PUT/PATCH/DELETE) để nói ý định lên tài nguyên đó. RPC thì ngược lại: xoay quanh <b>hành động</b> — gọi thẳng một hàm ở xa với tên riêng, ví dụ <code>getUserOrders(userId)</code> — không gò vào khuôn tài nguyên/method. gRPC (đã nhắc ở bài TCP &amp; HTTP) là một dạng RPC hiện đại chạy trên HTTP/2, phù hợp cho gọi nội bộ giữa các service vì nhanh và có schema chặt; REST vẫn phổ biến hơn cho API công khai vì dễ đoán, dễ cache theo URL, và không cần thư viện đặc thù để gọi.</p></details>
+
+  <details class="qa"><summary>PUT khác PATCH thế nào?</summary>
+  <p><code>PUT</code> thay thế <b>toàn bộ</b> tài nguyên — gửi thiếu field nào thì field đó bị coi là xoá hoặc về giá trị mặc định. <code>PATCH</code> chỉ cập nhật <b>đúng phần được gửi lên</b>, các field khác giữ nguyên. Chọn sai gây bug âm thầm: dùng PUT để "sửa một field" mà quên gửi các field còn lại sẽ vô tình xoá dữ liệu cũ.</p></details>
+
+  <details class="qa"><summary>Vì sao cursor-based pagination tốt hơn offset trên bảng lớn?</summary>
+  <p>Offset buộc database quét hoặc đếm qua toàn bộ số dòng đã bỏ trước khi tới trang mong muốn — càng vào sâu càng chậm — và có thể lệch nếu dữ liệu bị chèn/xoá giữa các lần gọi. Cursor trỏ thẳng vào một vị trí trong index, không cần quét phần trước, và ổn định trước thay đổi dữ liệu vì nó bám theo giá trị (id, timestamp) chứ không bám theo số thứ tự dòng. Đánh đổi: mất khả năng nhảy thẳng tới trang số N, chỉ đi tiến/lùi tuần tự — chấp nhận được vì các trường hợp cần cursor (feed, log, bảng hàng triệu dòng) hiếm khi cần nhảy trang tuỳ ý.</p></details>
+
+  <details class="qa"><summary>Ba cách versioning API và đánh đổi của mỗi cách?</summary>
+  <p>Versioning trong URL (<code>/v1/orders</code>) rõ ràng và dễ debug nhất, nhưng phá cache theo URL khi lên version mới và phải giữ nhiều nhánh code song song. Versioning qua header (<code>Accept: ...;version=2</code>) giữ URL sạch và ổn định, nhưng khó thấy version đang gọi nếu chỉ nhìn URL. Không versioning — chỉ cộng thêm field mới, không đổi nghĩa field cũ — ít nhánh code nhất phải bảo trì, nhưng đòi kỷ luật thiết kế cao và không giải quyết được lúc thật sự cần một thay đổi phá vỡ.</p></details>
 </section>
 
-<footer>CS fundamentals · Thiết kế REST API</footer>
+<footer>CS fundamentals · Thiết kế REST API — mã trạng thái và idempotency ở góc nhìn vận hành, xem <a href="../tcp-http/index.html">TCP &amp; HTTP</a>; tầng cache đứng trước lời gọi API ở <a href="../caching/index.html">Caching</a>; điều phối nhiều instance của cùng API ở <a href="../load-balancing/index.html">Load balancing</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

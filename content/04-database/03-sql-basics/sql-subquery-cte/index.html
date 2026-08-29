@@ -39,42 +39,141 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-sqlcte" data-skeleton="1" data-title="Subquery & CTE" data-tag="Database" data-blurb="Truy vấn con tương quan và không tương quan, WITH cho dễ đọc, và CTE đệ quy để duyệt cây.">
+      <article class="doc" id="art-sqlcte" data-title="Subquery & CTE" data-tag="PostgreSQL" data-blurb="Truy vấn con tương quan và không tương quan, WITH cho dễ đọc, và CTE đệ quy để duyệt cây.">
         <header class="hero">
-  <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
+  <p class="eyebrow">Cơ sở dữ liệu · SQL · <a href="../sql-basics-overview/index.html">SQL basics</a></p>
   <h1>Subquery & <em>CTE</em></h1>
-  <p class="lede">Công cụ để <b>chia một truy vấn to thành các bước đọc được</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Nối tiếp <a href="../sql-group-aggregate/index.html">GROUP BY &amp; aggregate</a>: khi một câu hỏi cần <b>kết quả trung gian</b> trước khi lọc tiếp, subquery và CTE là công cụ để chia một truy vấn to thành các bước đọc được.</p>
 </header>
 
-<section id="sqlcte-s1" class="lesson">
+<section id="sqlcte-s1">
   <div class="sh"><b>01</b><h2>Truy vấn con ở ba chỗ</h2></div>
-  <p class="plan">SELECT, FROM, WHERE — mỗi chỗ một nghĩa.</p>
+  <p class="key">Một subquery là <em>một câu SELECT hoàn chỉnh nằm bên trong câu SELECT khác</em>. Nó đặt được ở ba vị trí, mỗi vị trí một vai trò khác nhau.</p>
+  <table>
+    <tr><th>Vị trí</th><th>Vai trò</th><th>Ví dụ</th></tr>
+    <tr><td><code>WHERE</code></td><td>Lọc dựa trên kết quả một truy vấn khác</td><td><code>WHERE customer_id IN (SELECT id FROM customers WHERE country='VN')</code></td></tr>
+    <tr><td><code>FROM</code></td><td>Dùng kết quả trung gian như một bảng tạm</td><td><code>FROM (SELECT customer_id, SUM(amount) t FROM orders GROUP BY customer_id) s</code></td></tr>
+    <tr><td><code>SELECT</code></td><td>Tính một giá trị đơn lẻ cho mỗi dòng</td><td><code>SELECT name, (SELECT COUNT(*) FROM orders WHERE customer_id=c.id) AS so_don FROM customers c</code></td></tr>
+  </table>
+<pre><code><span class="cm">-- FROM: giải bài toán "SUM rồi JOIN làm nhân dòng" đã nói ở bài JOIN —
+--       tổng hợp TRƯỚC trong subquery, join SAU trên kết quả đã gọn</span>
+SELECT c.name, s.tong
+FROM customers c
+JOIN (
+  SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong
+  FROM orders
+  GROUP BY customer_id
+) s ON s.customer_id = c.id;</code></pre>
 </section>
 
-<section id="sqlcte-s2" class="lesson">
+<section id="sqlcte-s2">
   <div class="sh"><b>02</b><h2>Tương quan hay không</h2></div>
-  <p class="plan">Cái nào chạy một lần, cái nào chạy mỗi hàng.</p>
+  <p class="key">Khác biệt quan trọng nhất: subquery có <em>tham chiếu tới bảng ngoài</em> không.</p>
+  <div class="cmp two">
+    <div><h5>Uncorrelated — không tương quan</h5>
+      <p>Tự chạy được <b>một mình</b>, không cần bảng ngoài</p>
+      <p>Database chạy <b>một lần</b>, dùng kết quả cho mọi dòng</p>
+<pre><code>SELECT * FROM orders
+WHERE customer_id IN (
+  SELECT id FROM customers WHERE country = <span class="st">'VN'</span>
+);</code></pre></div>
+    <div><h5>Correlated — tương quan</h5>
+      <p>Tham chiếu tới <b>cột của bảng ngoài</b> (<code>c.id</code>)</p>
+      <p>Về mặt khái niệm chạy <b>lại một lần cho mỗi dòng ngoài</b></p>
+<pre><code>SELECT c.name, (
+  SELECT COUNT(*) FROM orders o
+  WHERE o.customer_id = c.id
+) <span class="kw">AS</span> so_don
+FROM customers c;</code></pre></div>
+  </div>
+  <div class="note warn">
+    <h4>Vì sao correlated subquery đắt</h4>
+    Về mặt logic nó chạy lại cho từng dòng bảng ngoài — 10.000 khách nghĩa là 10.000 lần chạy subquery. Query planner hiện đại thường tối ưu thành join hoặc dùng index để tránh quét lặp thật sự, nhưng đây vẫn là dấu hiệu đầu tiên cần soi khi một truy vấn chậm bất thường trên bảng lớn.
+  </div>
 </section>
 
-<section id="sqlcte-s3" class="lesson">
+<section id="sqlcte-s3">
   <div class="sh"><b>03</b><h2>CTE với WITH</h2></div>
-  <p class="plan">Đặt tên cho từng bước.</p>
+  <p class="key"><code>WITH tên AS (...)</code> đặt tên cho một subquery, dùng lại được như một bảng tạm — cùng một truy vấn nhưng dễ đọc hơn hẳn khi lồng nhiều tầng.</p>
+<pre><code><span class="cm">-- không có CTE: đọc từ trong ra ngoài, dễ rối khi lồng 3-4 tầng</span>
+SELECT * FROM (
+  SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong
+  FROM orders
+  WHERE status = <span class="st">'paid'</span>
+  GROUP BY customer_id
+) s
+WHERE s.tong &gt; <span class="st">1000000</span>;
+
+<span class="cm">-- có CTE: đọc từ trên xuống, mỗi bước một cái tên có nghĩa</span>
+WITH paid_totals <span class="kw">AS</span> (
+  SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong
+  FROM orders
+  WHERE status = <span class="st">'paid'</span>
+  GROUP BY customer_id
+)
+SELECT * FROM paid_totals
+WHERE tong &gt; <span class="st">1000000</span>;</code></pre>
+  <p>Một câu có thể khai báo <b>nhiều CTE</b>, CTE sau được phép dùng CTE trước — đúng tinh thần "chia truy vấn to thành các bước nhỏ có tên":</p>
+<pre><code>WITH paid_totals <span class="kw">AS</span> (
+  SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong FROM orders
+  WHERE status = <span class="st">'paid'</span> GROUP BY customer_id
+),
+vip <span class="kw">AS</span> (
+  SELECT customer_id FROM paid_totals WHERE tong &gt; <span class="st">1000000</span>
+)
+SELECT c.name FROM customers c JOIN vip <span class="kw">ON</span> vip.customer_id = c.id;</code></pre>
 </section>
 
-<section id="sqlcte-s4" class="lesson">
+<section id="sqlcte-s4">
   <div class="sh"><b>04</b><h2>CTE đệ quy</h2></div>
-  <p class="plan">Duyệt cây phân cấp — một ví dụ.</p>
+  <p class="key"><code>WITH RECURSIVE</code> duyệt dữ liệu <em>phân cấp</em> — cây thư mục, sơ đồ tổ chức — thứ mà <code>JOIN</code> thường không làm được vì không biết trước cần join bao nhiêu tầng.</p>
+<pre><code><span class="cm">-- employees(id, name, manager_id) — tìm mọi cấp dưới của "Chi" (id=3)</span>
+WITH RECURSIVE subordinates <span class="kw">AS</span> (
+  <span class="cm">-- anchor: điểm bắt đầu</span>
+  SELECT id, name, manager_id, <span class="st">1</span> <span class="kw">AS</span> depth
+  FROM employees WHERE id = <span class="st">3</span>
+
+  UNION ALL
+
+  <span class="cm">-- recursive: nối thêm một tầng mỗi lượt lặp, dừng khi không còn dòng khớp</span>
+  SELECT e.id, e.name, e.manager_id, s.depth + <span class="st">1</span>
+  FROM employees e
+  JOIN subordinates s ON e.manager_id = s.id
+)
+SELECT * FROM subordinates ORDER BY depth;</code></pre>
+  <p>Cơ chế: PostgreSQL chạy phần <b>anchor</b> một lần để ra tập kết quả ban đầu, rồi lặp lại phần <b>recursive</b> — mỗi lượt chỉ nhìn các dòng <em>mới thêm ở lượt trước</em> — cho tới khi một lượt không sinh thêm dòng nào thì dừng.</p>
+  <div class="note warn">
+    <h4>Tránh vòng lặp vô hạn</h4>
+    Nếu dữ liệu có chu trình (A quản lý B, B quản lý A) thì CTE đệ quy sẽ chạy mãi. Với dữ liệu có khả năng lỗi như vậy, thêm giới hạn tầng: <code>WHERE depth &lt; 20</code> ở nhánh recursive.
+  </div>
 </section>
 
-<section id="sqlcte-s5" class="lesson">
+<section id="sqlcte-s5">
   <div class="sh"><b>05</b><h2>Ba bẫy</h2></div>
-  <p class="plan">Truy vấn con tương quan trong bảng lớn, NOT IN gặp NULL, CTE tưởng được vật hoá.</p>
+  <div class="grid2">
+    <div class="card bad"><h4>Correlated subquery trong bảng lớn</h4><p>Subquery tham chiếu bảng ngoài mà không có index phù hợp buộc database quét lại nhiều lần — chậm hẳn so với viết lại bằng <code>JOIN</code> hoặc CTE tổng hợp trước.</p></div>
+    <div class="card bad"><h4>NOT IN gặp NULL</h4><p><code>WHERE id NOT IN (SELECT customer_id FROM orders)</code> trả về <b>rỗng hoàn toàn</b> nếu subquery có dù chỉ một dòng <code>customer_id IS NULL</code> — so sánh với NULL luôn ra UNKNOWN, làm cả điều kiện NOT IN thành UNKNOWN. Dùng <code>NOT EXISTS</code> thay thế, nó không dính bẫy này.</p></div>
+    <div class="card bad"><h4>Tưởng CTE luôn được vật hoá (materialize)</h4><p>Trước PostgreSQL 12, CTE luôn chạy riêng rồi mới ghép — coi nó như một "rào chắn tối ưu". Từ bản 12 trở đi, planner có thể <em>inline</em> CTE giống subquery thường trừ khi ép bằng <code>MATERIALIZED</code>. Đừng giả định hành vi cũ khi không kiểm tra phiên bản.</p></div>
+  </div>
 </section>
 
-<section id="sqlcte-s6" class="lesson">
+<section id="sqlcte-s6">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <details class="qa"><summary>Correlated và uncorrelated subquery khác nhau thế nào?</summary>
+  <p>Uncorrelated subquery không tham chiếu gì tới bảng ngoài — nó tự đứng một mình, database chạy một lần rồi dùng kết quả cho toàn bộ câu lệnh ngoài. Correlated subquery tham chiếu tới cột của bảng ngoài, nên về mặt logic phải chạy lại cho mỗi dòng ngoài — đắt hơn hẳn trên bảng lớn, dù query planner hiện đại thường tối ưu lại bằng join.</p></details>
+
+  <details class="qa"><summary>Vì sao NOT IN với NULL lại nguy hiểm hơn NOT EXISTS?</summary>
+  <p><code>NOT IN</code> khai triển thành một chuỗi so sánh <code>!=</code> nối bằng <code>AND</code>. Nếu tập subquery chứa một NULL, phép so sánh với NULL đó luôn ra UNKNOWN, và <code>UNKNOWN AND ...</code> không thể là TRUE — toàn bộ điều kiện hoá UNKNOWN, kết quả rỗng dù logic mong muốn có nhiều dòng khớp. <code>NOT EXISTS</code> kiểm tra sự tồn tại chứ không so sánh giá trị trực tiếp nên không bị NULL ảnh hưởng — an toàn hơn để dùng mặc định.</p></details>
+
+  <details class="qa"><summary>CTE khác gì subquery lồng thông thường?</summary>
+  <p>Về mặt kết quả, không khác — CTE chỉ là cách đặt tên cho một subquery bằng <code>WITH</code>. Lợi ích là đọc được từ trên xuống thay vì từ trong ra ngoài, dùng lại được nhiều lần trong cùng câu lệnh, và CTE sau được phép tham chiếu CTE trước — rất hữu ích khi một câu hỏi cần chia thành nhiều bước tuần tự.</p></details>
+
+  <details class="qa"><summary>CTE đệ quy hoạt động ra sao?</summary>
+  <p>Gồm hai phần nối bằng <code>UNION ALL</code>: phần <em>anchor</em> chạy một lần để tạo tập kết quả gốc, phần <em>recursive</em> lặp lại nhiều lượt — mỗi lượt chỉ xét các dòng mới sinh ở lượt trước — cho tới khi một lượt không tạo thêm dòng nào thì dừng. Dùng để duyệt cấu trúc phân cấp như cây thư mục hay sơ đồ quản lý, nơi không biết trước cần bao nhiêu tầng <code>JOIN</code>.</p></details>
+
+  <details class="qa"><summary>Khi nào nên tách một câu SQL to thành CTE thay vì viết một câu duy nhất?</summary>
+  <p>Khi câu hỏi tự nhiên chia thành nhiều bước có ý nghĩa riêng — ví dụ "tính tổng theo khách" rồi "lọc khách VIP" rồi "join lấy tên". Viết mỗi bước thành một CTE có tên rõ ràng giúp người đọc sau này (kể cả chính mình sau ba tháng) hiểu ngay từng bước làm gì, thay vì phải bóc từ trong ra ngoài của một khối subquery lồng nhau.</p></details>
 </section>
 
 <footer>Cơ sở dữ liệu · SQL · Subquery & CTE</footer>

@@ -39,40 +39,92 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-oltp" data-skeleton="1" data-title="OLTP vs OLAP" data-tag="Data systems" data-blurb="Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.">
+      <article class="doc" id="art-oltp" data-title="OLTP vs OLAP" data-tag="Data systems" data-blurb="Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.">
         <header class="hero">
   <p class="eyebrow">Database · Data systems</p>
   <h1>OLTP vs <em>OLAP</em></h1>
   <p class="lede">Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="oltp-vs-olap-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Transaction nhiều nhưng nhỏ, và query ít nhưng quét hết bảng — hai kiểu tải khác nhau.</p>
+  <p class="key">Đến đây kho đã đi qua SQL, index, transaction — mọi thứ nói về <em>một</em> database phục vụ <em>một</em> ứng dụng. Nhưng một công ty không chỉ có một database: dữ liệu bán hàng, dữ liệu marketing, log sản phẩm phải <b>chảy tới nhau</b> để trả lời câu hỏi ở quy mô toàn công ty — "tháng này lãi bao nhiêu", "khách nào sắp rời bỏ". Nhóm bài này rời khỏi một database đơn lẻ, nhìn dữ liệu ở quy mô cả hệ thống.</p>
+  <p>Điểm xuất phát là nhận ra hai kiểu tải hoàn toàn khác nhau đang cạnh tranh trên cùng một tập dữ liệu:</p>
+  <ul class="why">
+    <li><b>Giao dịch (transaction):</b> "trừ kho 1 đơn vị", "ghi 1 dòng log đăng nhập" — rất nhiều lệnh, mỗi lệnh chạm rất ít dòng, cần trả lời trong mili-giây.</li>
+    <li><b>Phân tích (analytics):</b> "tổng doanh thu theo tháng theo vùng" — rất ít lệnh, nhưng mỗi lệnh quét hàng triệu dòng, gộp lại thành vài con số.</li>
+  </ul>
+  <div class="note key">
+    <h4>Nhớ một câu</h4>
+    OLTP tối ưu cho <strong>ghi và tra cứu điểm</strong>; OLAP tối ưu cho <strong>đọc khối lớn rồi tổng hợp</strong>. Hai mục tiêu tối ưu vật lý gần như ngược nhau, nên hiếm khi một hệ làm tốt cả hai.
+  </div>
 </section>
 
 <section id="oltp-vs-olap-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>OLTP</h2></div>
-  <p class="plan">Row-oriented, index cho tra cứu điểm.</p>
+  <div class="sh"><b>02</b><h2>OLTP — Online Transaction Processing</h2></div>
+  <p class="key">Hệ vận hành: bán hàng, đặt vé, chuyển khoản. Mỗi request chạm một vài dòng, và phải <em>đúng ngay lúc đó</em>.</p>
+  <ul class="why">
+    <li><b>Row-oriented:</b> dữ liệu lưu theo từng dòng liền nhau trên đĩa, vì thao tác điển hình là đọc/ghi <em>trọn một dòng</em> (một đơn hàng, một tài khoản).</li>
+    <li><b>Index B-Tree</b> cho tra cứu điểm — <code>WHERE order_id = 12345</code> — đã học ở nhóm SQL nâng cao, vẫn là công cụ chính ở đây.</li>
+    <li><b>ACID chặt</b> — transaction và isolation level (đã học ở <code>transaction-isolation</code>) tồn tại chính vì OLTP: nhiều giao dịch nhỏ chạy đồng thời không được phép làm sai số dư, sai tồn kho.</li>
+    <li><b>Schema chuẩn hoá (normalized)</b> — nối lại <code>db-normalization</code>: tách bảng để tránh trùng lặp và dị thường khi ghi, vì OLTP ghi liên tục.</li>
+  </ul>
+  <p>Ví dụ: PostgreSQL/MySQL phục vụ trực tiếp app bán hàng, mỗi request một transaction ngắn.</p>
 </section>
 
 <section id="oltp-vs-olap-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>OLAP</h2></div>
-  <p class="plan">Column-oriented, quét cả cột nhanh hơn quét cả dòng.</p>
+  <div class="sh"><b>03</b><h2>OLAP — Online Analytical Processing</h2></div>
+  <p class="key">Hệ báo cáo: "doanh thu quý này theo từng ngành hàng". Ít truy vấn, nhưng mỗi truy vấn quét gần hết bảng.</p>
+  <ul class="why">
+    <li><b>Column-oriented:</b> dữ liệu lưu theo từng cột liền nhau. Truy vấn <code>SUM(revenue)</code> chỉ cần đọc cột <code>revenue</code>, không phải đọc cả dòng — nhanh hơn nhiều lần so với row-oriented khi bảng có hàng trăm cột nhưng câu hỏi chỉ cần vài cột.</li>
+    <li><b>Schema thường denormalized</b> — <em>star schema</em> hoặc <em>snowflake schema</em> (một bảng fact trung tâm nối tới các bảng dimension), tối ưu cho việc gộp (aggregate) nhanh hơn là tránh trùng lặp. Xem chi tiết ở bài kế tiếp, <a href="../data-warehouse-lake/index.html">Data warehouse &amp; data lake</a>.</li>
+    <li>Chấp nhận đọc dữ liệu <em>hơi cũ</em> (cập nhật theo lô, không real-time từng dòng) để đổi lấy tốc độ quét khối lớn.</li>
+  </ul>
+  <p>Ví dụ: Snowflake, BigQuery, Redshift chạy báo cáo doanh thu theo tháng, theo vùng, theo kênh bán.</p>
 </section>
 
 <section id="oltp-vs-olap-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Vì sao tách</h2></div>
-  <p class="plan">Chạy OLAP trên OLTP thì nghẽn ở đâu.</p>
+  <div class="sh"><b>04</b><h2>Đối chiếu trực tiếp</h2></div>
+  <div class="cmp two">
+    <div><h5>OLTP</h5>
+      <p><b>Tải</b> nhiều giao dịch nhỏ</p>
+      <p><b>Thao tác</b> đọc/ghi từng dòng</p>
+      <p><b>Lưu trữ</b> row-oriented</p>
+      <p><b>Schema</b> chuẩn hoá (normalized)</p>
+      <p><b>Ưu tiên</b> độ trễ thấp, ACID chặt</p>
+      <p><b>Ví dụ</b> PostgreSQL, MySQL cho app bán hàng</p></div>
+    <div><h5>OLAP</h5>
+      <p><b>Tải</b> ít truy vấn, quét khối lớn</p>
+      <p><b>Thao tác</b> tổng hợp/aggregate trên nhiều dòng</p>
+      <p><b>Lưu trữ</b> column-oriented</p>
+      <p><b>Schema</b> denormalized — star/snowflake schema</p>
+      <p><b>Ưu tiên</b> throughput quét lớn, dữ liệu có thể hơi cũ</p>
+      <p><b>Ví dụ</b> Snowflake, BigQuery, Redshift cho báo cáo</p></div>
+  </div>
 </section>
 
 <section id="oltp-vs-olap-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Ba câu thường gặp về OLTP/OLAP.</p>
+  <div class="sh"><b>05</b><h2>Vì sao tách ra hai hệ</h2></div>
+  <p class="key">Chạy thẳng báo cáo OLAP trên database OLTP production là cách nhanh nhất để gây sự cố cho khách hàng thật.</p>
+  <ul class="why">
+    <li><b>Tranh tài nguyên:</b> một câu <code>SELECT</code> quét 50 triệu dòng chiếm hết CPU/IO mà các giao dịch nhỏ đang cần để trả lời trong mili-giây.</li>
+    <li><b>Tranh khoá:</b> quét lớn giữ snapshot lâu (nhớ lại <code>transaction-isolation</code>), cản <code>VACUUM</code>, làm bảng phình, làm mọi transaction khác chậm dần.</li>
+    <li><b>Schema lệch mục tiêu:</b> schema chuẩn hoá tốt cho ghi lại rất tệ cho gộp — một câu báo cáo phải <code>JOIN</code> qua chục bảng thay vì đọc thẳng vài cột.</li>
+  </ul>
+  <p>Lời giải chuẩn: tách dữ liệu ra một hệ riêng, sao chép và tổ chức lại cho mục đích phân tích — đó là lý do tồn tại của <a href="../data-warehouse-lake/index.html">data warehouse</a>, và dữ liệu chảy từ OLTP sang đó qua các pipeline <a href="../etl-elt/index.html">ETL/ELT</a>.</p>
 </section>
 
-<footer>Database · Data systems</footer>
+<section id="oltp-vs-olap-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+  <details class="qa"><summary>Vì sao không thêm index rồi chạy báo cáo thẳng trên OLTP?</summary>
+  <p>Index B-Tree giúp tra cứu điểm, không giúp quét gộp hàng triệu dòng — bản chất bài toán đọc khác nhau (row-oriented vs column-oriented), thêm index không đổi được bản chất lưu trữ. Ngoài ra vấn đề lớn hơn không phải tốc độ mà là <b>tranh tài nguyên và khoá</b> với giao dịch thật đang chạy.</p></details>
+  <details class="qa"><summary>Star schema và snowflake schema khác gì normalized schema đã học?</summary>
+  <p>Normalized (3NF) tối ưu tránh trùng lặp khi ghi — đúng cho OLTP. Star/snowflake schema chấp nhận trùng lặp có kiểm soát để giảm số lượng <code>JOIN</code> khi đọc gộp — đúng cho OLAP. Đây không phải hai chuẩn cạnh tranh mà là hai lựa chọn cho hai loại tải khác nhau.</p></details>
+  <details class="qa"><summary>HTAP (Hybrid Transactional/Analytical Processing) có xoá bỏ ranh giới này không?</summary>
+  <p>Một số hệ (TiDB, SingleStore) cố làm cả hai trong một engine bằng cách lưu song song cả row-oriented và column-oriented. Hữu ích khi độ trễ giữa "giao dịch xảy ra" và "thấy trong báo cáo" phải rất ngắn, nhưng vẫn là đánh đổi kỹ thuật phức tạp hơn, không phải mặc định — kiến trúc tách OLTP/OLAP vẫn phổ biến hơn nhiều trong thực tế.</p></details>
+</section>
+
+<footer>Database · Data systems · tiếp theo: <a href="../data-warehouse-lake/index.html">Data warehouse &amp; data lake</a></footer>
 
       </article>
       <div class="nextprev" id="np"></div>

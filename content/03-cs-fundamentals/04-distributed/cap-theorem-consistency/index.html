@@ -39,50 +39,107 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-cap" data-skeleton="1" data-title="CAP & consistency" data-tag="Distributed" data-blurb="Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.">
+      <article class="doc" id="art-cap" data-title="CAP & consistency" data-tag="Distributed" data-blurb="Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.">
         <header class="hero">
   <p class="eyebrow">CS fundamentals · Distributed systems</p>
   <h1>CAP &amp; <em>consistency</em></h1>
   <p class="lede">Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="cap-theorem-consistency-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Một node không đủ, nhiều node thì đánh đổi gì.</p>
+  <p class="key">Một node không chịu nổi khi hệ thống lớn lên — nhưng có nhiều node thì phải trả giá bằng một đánh đổi không thể né.</p>
+  <ul class="why">
+    <li>Một máy chủ có giới hạn: hết chỗ chứa dữ liệu, hoặc hết khả năng xử lý request. Cách chữa quen thuộc là chạy <b>nhiều node</b>, mỗi node giữ một bản sao (hoặc một phần) dữ liệu.</li>
+    <li>Ngay khi có nhiều bản sao nối với nhau qua mạng — mà mạng thì không tin cậy tuyệt đối — xuất hiện một câu hỏi không tránh được: <b>khi mạng giữa các node bị đứt</b> (network partition), hệ thống trả lời ngay bằng dữ liệu có thể cũ/sai, hay từ chối phục vụ để giữ đúng dữ liệu?</li>
+  </ul>
 </section>
 
 <section id="cap-theorem-consistency-s2" class="lesson">
   <div class="sh"><b>02</b><h2>CAP theorem</h2></div>
-  <p class="plan">Consistency / Availability / Partition tolerance — hiểu đúng "chọn 2/3".</p>
+  <p>CAP theorem đặt tên ba tính chất mà một hệ phân tán muốn có cùng lúc:</p>
+  <table>
+    <tr><th>Tính chất</th><th>Nghĩa là gì</th></tr>
+    <tr><td><b>C</b> — Consistency</td><td>Mọi node đọc thấy <em>cùng</em> một giá trị mới nhất tại cùng thời điểm</td></tr>
+    <tr><td><b>A</b> — Availability</td><td>Mọi request tới một node còn sống đều nhận được phản hồi — không bị treo, không bị từ chối</td></tr>
+    <tr><td><b>P</b> — Partition tolerance</td><td>Hệ thống vẫn hoạt động dù mạng giữa các node bị chia cắt hoặc mất kết nối một phần</td></tr>
+  </table>
+  <div class="note key">
+    <h4>"Chọn 2 trong 3" — hiểu cho đúng</h4>
+    Partition tolerance không phải một lựa chọn thật sự: trong một hệ phân tán thực tế, mạng <em>thế nào cũng</em> có lúc đứt hoặc chậm bất thường, nên P gần như bắt buộc phải chấp nhận. Lựa chọn thật sự chỉ nằm giữa <b>C</b> và <b>A</b>, và <b>chỉ có ý nghĩa lúc partition đang xảy ra</b> — lúc mạng bình thường, hệ thống hoàn toàn có thể vừa consistent vừa available.
+  </div>
+  <div class="mtx">
+    <div class="hd"></div><div class="hd">Khi partition xảy ra</div><div class="hd">Ví dụ</div>
+    <div class="hd rl">CP</div>
+    <div class="q bad"><b>Từ chối phục vụ</b><span>giữ đúng dữ liệu, thà không trả lời</span></div>
+    <div class="q"><span>nhiều hệ CSDL quan hệ truyền thống</span></div>
+    <div class="hd rl">AP</div>
+    <div class="q ok"><b>Vẫn trả lời</b><span>dữ liệu có thể chưa đồng bộ hết</span></div>
+    <div class="q"><span>DynamoDB, Cassandra</span></div>
+  </div>
 </section>
 
 <section id="cap-theorem-consistency-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Consistency models</h2></div>
-  <p class="plan">Strong, eventual, causal.</p>
+  <p>Consistency không phải bật/tắt — nó là một trục từ chặt tới lỏng:</p>
+  <div class="axis">
+    <div class="stop on"><b>STRONG</b><span>đọc luôn thấy ghi gần nhất</span></div>
+    <div class="stop"><b>CAUSAL</b><span>đúng thứ tự nhân-quả, không hơn</span></div>
+    <div class="stop"><b>EVENTUAL</b><span>rồi sẽ hội tụ, không hứa lúc nào</span></div>
+  </div>
+  <p class="axiscap"><span>chậm, luôn đúng</span><span><em>đổi độ chính xác tức thời lấy tốc độ</em></span><span>nhanh, có lúc đọc cũ</span></p>
+  <ul class="why">
+    <li><b>Strong consistency</b> — đọc luôn thấy giá trị ghi gần nhất, như thể chỉ có một bản sao duy nhất. Phải đồng bộ các node trước khi trả lời nên chậm hơn.</li>
+    <li><b>Eventual consistency</b> — các bản sao <em>sẽ</em> hội tụ về cùng giá trị nếu không có ghi mới, nhưng tại một thời điểm có thể đọc thấy giá trị cũ ở node khác. Đổi lại là tốc độ và sẵn sàng cao.</li>
+    <li><b>Causal consistency</b> — mức trung gian: thao tác có quan hệ nhân-quả (ví dụ trả lời một bình luận) luôn được thấy đúng thứ tự ở mọi nơi, nhưng hai thao tác không liên quan thì không đảm bảo thứ tự toàn cục — người khác có thể thấy hai bài đăng không liên quan theo thứ tự khác nhau.</li>
+  </ul>
 </section>
 
 <section id="cap-theorem-consistency-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Replication</h2></div>
-  <p class="plan">Leader–follower, quorum.</p>
+  <div class="stack">
+    <div class="s"><b>Client ghi</b><span>gửi lệnh ghi tới leader</span></div>
+    <div class="s ok"><b>Leader</b><span>ghi vào bản của mình, coi là "đã ghi"</span></div>
+    <div class="s"><b>Follower A, B, C…</b><span>nhận bản sao chép sau đó — có độ trễ</span></div>
+  </div>
+  <ul class="why">
+    <li><b>Leader–follower</b> — một node leader nhận mọi lệnh ghi, các follower sao chép lại từ leader. Đọc có thể phân tải ra follower để giảm tải cho leader, nhưng luôn có <em>độ trễ sao chép</em> (replication lag) — đọc ở follower có thể thấy dữ liệu cũ hơn leader một chút.</li>
+    <li><b>Quorum</b> — thay vì một leader cố định, yêu cầu một <em>số lượng tối thiểu</em> node xác nhận trước khi coi một thao tác đọc/ghi là thành công. Với N node, ghi thành công khi W node xác nhận, đọc thành công khi R node phản hồi; chọn <b>W + R &gt; N</b> đảm bảo luôn có ít nhất một node overlap giữa tập đã ghi và tập đang đọc, nên đọc luôn thấy được giá trị mới nhất. Đây là cách các hệ AP như Cassandra cân bằng consistency/availability một cách <em>có thể điều chỉnh được</em> — tăng W hoặc R để chặt hơn, giảm để nhanh và sẵn sàng hơn.</li>
+  </ul>
 </section>
 
 <section id="cap-theorem-consistency-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Sharding & partitioning</h2></div>
-  <p class="plan">Range/hash/consistent hashing, đánh đổi hotspot–rebalancing — áp dụng cụ thể vào database xem ở Database & SQL.</p>
+  <p>Một node vẫn có thể không chứa hết dữ liệu hoặc không chịu hết tải đọc/ghi khi dữ liệu vượt quy mô một máy — <b>sharding</b> (hay partitioning) là chia dữ liệu ra nhiều node theo một khoá (shard key), với ba chiến lược chính: <b>range-based</b> (chia theo khoảng giá trị khoá), <b>hash-based</b> (băm khoá để phân phối đều), và <b>consistent hashing</b> (băm nhưng giảm xáo trộn khi thêm/bớt node). Đánh đổi chính: thêm hoặc bớt node đòi <em>rebalance</em> — di chuyển dữ liệu giữa các node, tốn băng thông và thời gian — và chọn sai shard key có thể gây <em>hotspot</em>, một shard nhận quá nhiều tải trong khi các shard khác rảnh. Xem cách chọn shard key và mô hình replication topology cụ thể ở bài <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</p>
 </section>
 
 <section id="cap-theorem-consistency-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Đánh đổi thực tế</h2></div>
-  <p class="plan">Hệ thống nào chọn gì và vì sao.</p>
+  <p class="key">Chọn CP hay AP phụ thuộc chi phí của việc <em>sai</em> so với chi phí của việc <em>không phản hồi</em> — không có lựa chọn đúng chung cho mọi hệ thống.</p>
+  <ul class="why">
+    <li><b>Ngân hàng, hệ giao dịch tài chính</b> — thường ưu tiên CP / strong consistency: thà từ chối giao dịch còn hơn trả sai số dư tài khoản.</li>
+    <li><b>Mạng xã hội, news feed, giỏ hàng thương mại điện tử</b> — thường ưu tiên AP / eventual consistency: thà hiển thị dữ liệu hơi cũ (like chưa cập nhật, feed chậm vài giây) còn hơn không hiển thị được gì.</li>
+  </ul>
 </section>
 
 <section id="cap-theorem-consistency-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Bốn câu thường gặp về CAP và consistency.</p>
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>CAP theorem thật ra nói gì, "chọn 2 trong 3" có đúng không?</summary>
+  <p>Không hẳn. Partition tolerance không phải một lựa chọn — mạng thế nào cũng có lúc đứt hoặc chậm, nên P gần như bắt buộc phải chấp nhận trong mọi hệ phân tán thực tế. Lựa chọn thật sự chỉ còn giữa Consistency và Availability, và chỉ có ý nghĩa <b>đúng lúc partition đang xảy ra</b> — bình thường hệ thống có thể vừa consistent vừa available.</p></details>
+
+  <details class="qa"><summary>Strong consistency khác eventual consistency thế nào, đánh đổi gì?</summary>
+  <p><b>Strong</b> đảm bảo đọc luôn thấy giá trị ghi gần nhất, như chỉ có một bản sao — phải đồng bộ trước khi trả lời nên chậm hơn. <b>Eventual</b> chỉ hứa các bản sao sẽ hội tụ nếu không có ghi mới, nhưng tại một thời điểm có thể đọc thấy giá trị cũ ở node khác — đổi lại nhanh và sẵn sàng cao hơn. Causal consistency nằm giữa: giữ đúng thứ tự các thao tác có quan hệ nhân-quả, còn lại thì không đảm bảo.</p></details>
+
+  <details class="qa"><summary>Quorum trong replication hoạt động ra sao?</summary>
+  <p>Với N bản sao, một lần ghi cần W node xác nhận mới coi là thành công, một lần đọc cần hỏi R node. Chọn <b>W + R &gt; N</b> đảm bảo tập node đã ghi và tập node đang đọc luôn overlap ít nhất một node, nên đọc luôn thấy được giá trị mới nhất mà không cần mọi node đồng bộ ngay lập tức. Đây là cách Cassandra và các hệ tương tự cho phép chỉnh độ chặt consistency theo từng truy vấn.</p></details>
+
+  <details class="qa"><summary>Sharding giải quyết vấn đề gì, và rủi ro lớn nhất khi chọn sai shard key?</summary>
+  <p>Sharding chia dữ liệu ra nhiều node để một node không phải chứa hết dữ liệu hoặc chịu hết tải. Rủi ro lớn nhất là <b>hotspot</b>: chọn shard key khiến phần lớn request dồn vào một shard trong khi các shard khác rảnh — ví dụ băm theo ngày khi phần lớn traffic là "hôm nay". Xem chi tiết cách chọn shard key ở bài <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</p></details>
 </section>
 
-<footer>CS fundamentals · Distributed systems</footer>
+<footer>CS fundamentals · Distributed systems · phần cân bằng tải và mở rộng ở tầng mạng nằm ở bài <a href="../../03-networking/load-balancing/index.html">Load balancing &amp; scaling</a>, đồng thuận giữa các node khi cần một quyết định duy nhất ở bài <a href="../consensus-leader-election/index.html">Consensus &amp; leader election</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

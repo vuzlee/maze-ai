@@ -39,52 +39,143 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-sqlov" data-skeleton="1" data-title="SQL basics overview" data-tag="Database" data-blurb="Thứ tự thực thi logic của một truy vấn — thứ giải thích gần hết lỗi SQL của người mới.">
+      <article class="doc" id="art-sqlov" data-title="SQL basics overview" data-tag="Database" data-blurb="Thứ tự thực thi logic của một truy vấn — thứ giải thích gần hết lỗi SQL của người mới.">
         <header class="hero">
   <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
   <h1>SQL basics <em>overview</em></h1>
-  <p class="lede">Câu SQL <b>không chạy theo thứ tự bạn viết</b>. Bài này cho thấy thứ tự thật.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Câu SQL <b>không chạy theo thứ tự bạn viết</b>. Bài này cho thấy thứ tự thật, và bốn bài sau sẽ đi sâu từng phần của thứ tự đó.</p>
 </header>
 
 <section id="sqlov-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Hỏi dữ liệu bằng cách mô tả kết quả muốn có, không phải cách lấy.</p>
+  <p class="key">Mọi ngôn ngữ lập trình bạn từng học đều <em>khai báo cách làm</em>: mở vòng lặp, so sánh từng phần tử, cộng dồn. SQL yêu cầu điều ngược lại — <b>mô tả kết quả muốn thấy</b>, không nói database phải lấy nó bằng cách nào.</p>
+  <table>
+    <tr><th>Cách nghĩ thủ tục (procedural)</th><th>Cách nghĩ khai báo (declarative — SQL)</th></tr>
+    <tr><td>"Duyệt từng đơn hàng, nếu <code>status == 'paid'</code> thì cộng <code>amount</code> vào tổng"</td><td><code>SELECT SUM(amount) FROM orders WHERE status = 'paid'</code></td></tr>
+    <tr><td>Bạn quyết định vòng lặp, biến tạm, thứ tự duyệt</td><td>Bạn chỉ nói <em>muốn gì</em>; database tự quyết định quét bảng hay dùng index, duyệt theo thứ tự nào</td></tr>
+  </table>
+  <ul class="why">
+    <li>Vì SQL không nói "làm sao", database <b>được toàn quyền chọn cách thực thi nhanh nhất</b> — đây là chỗ query planner và index phát huy tác dụng.</li>
+    <li>Cái giá: đọc một câu SQL phức tạp, bạn phải <b>tưởng tượng ngược lại</b> nó chạy ra sao — và thứ tự "chạy ra sao" đó khác hẳn thứ tự bạn gõ trên màn hình.</li>
+  </ul>
+  <div class="note key">
+    <h4>Vì sao vấn đề này quan trọng</h4>
+    Phần lớn lỗi SQL của người mới — "sao WHERE không thấy alias", "sao COUNT(*) ra số khác COUNT(cột)" — không phải lỗi cú pháp, mà là <strong>hiểu sai thứ tự thực thi thật</strong>. Nắm đúng mục 03 dưới đây là gỡ được phần lớn.
+  </div>
 </section>
 
 <section id="sqlov-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Ý tưởng đầu tiên</h2></div>
-  <p class="plan">Lọc từng dòng bằng vòng lặp trong code ứng dụng.</p>
+  <p class="key">Trước khi có SQL, cách "tự nhiên" để lọc dữ liệu là kéo hết về code ứng dụng rồi <em>lặp qua từng dòng</em>.</p>
+<pre><code>rows = fetch_all("SELECT * FROM orders")   <span class="cm"># kéo hết cả bảng về</span>
+paid = []
+<span class="kw">for</span> r <span class="kw">in</span> rows:
+    <span class="kw">if</span> r.status == <span class="st">"paid"</span>:
+        paid.append(r)
+total = <span class="kw">sum</span>(r.amount <span class="kw">for</span> r <span class="kw">in</span> paid)</code></pre>
+  <ul class="why">
+    <li>Dễ hiểu vì nó giống mọi vòng lặp bạn từng viết — <b>không cần học ngôn ngữ mới</b>.</li>
+    <li>Nhưng phải kéo <em>toàn bộ</em> bảng qua mạng trước khi lọc được một dòng nào.</li>
+  </ul>
 </section>
 
 <section id="sqlov-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Vì sao nó chưa đủ</h2></div>
-  <p class="plan">Chậm, và không tận dụng được index hay tối ưu của database.</p>
+  <p class="key">Kéo hết dữ liệu về rồi lọc ở tầng ứng dụng bỏ phí toàn bộ thứ database làm giỏi nhất: <em>index</em>.</p>
+  <div class="bars">
+    <div class="b bad"><i>lọc ở ứng dụng · kéo cả 10 triệu dòng</i><u style="width:100%"></u><b>10.000.000 dòng qua mạng</b></div>
+    <div class="b hi"><i>WHERE + index · database lọc tại chỗ</i><u style="width:0.3%"></u><b>~3.000 dòng qua mạng</b></div>
+  </div>
+  <p class="stripnote"><span>con số minh hoạ, nhưng tỉ lệ chênh lệch này là chuyện thật khi bảng đủ lớn</span></p>
+  <ul class="why">
+    <li>Database biết cấu trúc dữ liệu của chính nó — index, thống kê phân bố giá trị — nên <b>lọc tại nguồn luôn rẻ hơn</b> lọc sau khi đã kéo về.</li>
+    <li>Với JOIN nhiều bảng, lặp thủ công ở ứng dụng nghĩa là tự viết lại thuật toán nối bảng — thứ database đã tối ưu sẵn hàng chục năm.</li>
+  </ul>
 </section>
 
 <section id="sqlov-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Dòng thời gian</h2></div>
-  <p class="plan">Mốc nào, năm nào, gỡ được giới hạn nào của mốc trước — một hình.</p>
+  <div class="sh"><b>04</b><h2>Thứ tự thực thi thật</h2></div>
+  <p class="key">Đây là điểm hay bị hỏi phỏng vấn nhất của cả nhóm: SQL <em>viết</em> theo một thứ tự nhưng <em>chạy</em> theo thứ tự khác hẳn.</p>
+  <div class="flow">
+    <div class="n"><h5>1 · FROM</h5><p>lấy bảng nguồn, thực hiện JOIN</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · WHERE</h5><p>lọc từng dòng thô</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>3 · GROUP BY</h5><p>gom các dòng còn lại thành nhóm</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>4 · HAVING</h5><p>lọc trên từng nhóm</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>5 · SELECT</h5><p>tính cột, đặt alias</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>6 · ORDER BY / LIMIT</h5><p>sắp xếp, cắt bớt</p></div>
+  </div>
+  <p>Trong khi đó, bạn <em>gõ</em> câu lệnh theo thứ tự <code>SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY</code>. Hai thứ tự lệch nhau ngay từ vị trí đầu tiên — <code>SELECT</code> đứng đầu dòng nhưng chạy gần cuối cùng.</p>
+  <div class="note key">
+    <h4>Vì sao lệch nhau lại quan trọng</h4>
+    Vì <code>SELECT</code> chạy <em>sau</em> <code>WHERE</code>, alias đặt trong <code>SELECT</code> chưa tồn tại khi <code>WHERE</code> chạy — đây là lý do <code>WHERE price_vnd &gt; 100</code> báo lỗi "column không tồn tại" trong khi <code>ORDER BY price_vnd</code> lại chạy được bình thường. Bài <a href="../sql-select-filter/index.html">SELECT, WHERE &amp; ORDER BY</a> đào sâu đúng chi tiết này.
+  </div>
 </section>
 
 <section id="sqlov-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Các nhánh</h2></div>
-  <p class="plan">Lọc · nối · gom nhóm · lồng truy vấn.</p>
+  <p class="key">Bốn bài còn lại của nhóm ứng với đúng bốn khối trong thứ tự thực thi ở trên.</p>
+  <div class="cmp two">
+    <div><h5>Lọc &amp; sắp xếp</h5>
+      <p><b>Vấn đề</b> chọn đúng dòng, đúng thứ tự</p>
+      <p><b>Công cụ</b> <code>WHERE</code>, <code>ORDER BY</code>, <code>LIMIT</code></p></div>
+    <div><h5>Nối bảng</h5>
+      <p><b>Vấn đề</b> dữ liệu nằm ở nhiều bảng khác nhau</p>
+      <p><b>Công cụ</b> <code>JOIN</code> bốn loại</p></div>
+  </div>
+  <div class="cmp two">
+    <div><h5>Gom nhóm</h5>
+      <p><b>Vấn đề</b> nhiều dòng cần rút gọn thành một con số</p>
+      <p><b>Công cụ</b> <code>GROUP BY</code>, <code>HAVING</code>, hàm tổng hợp</p></div>
+    <div><h5>Lồng truy vấn</h5>
+      <p><b>Vấn đề</b> câu hỏi cần trả lời qua nhiều bước</p>
+      <p><b>Công cụ</b> subquery, <code>WITH</code> (CTE)</p></div>
+  </div>
 </section>
 
 <section id="sqlov-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Bảng so sánh</h2></div>
-  <p class="plan">Mọi bài trong nhóm trên một bảng: ý tưởng · chi phí · khi nào chọn.</p>
+  <p class="key">Bốn bài, xếp theo đúng thứ tự thực thi mà mục 04 vừa nêu.</p>
+  <table>
+    <tr><th>Bài</th><th>Ý tưởng cốt lõi</th><th>Chọn khi</th></tr>
+    <tr><td><a href="../sql-select-filter/index.html">SELECT, WHERE &amp; ORDER BY</a></td><td>Chọn cột, lọc hàng, sắp xếp kết quả</td><td>Luôn cần — đây là câu SQL cơ bản nhất</td></tr>
+    <tr><td><a href="../sql-join/index.html">JOIN</a></td><td>Ghép dòng giữa hai bảng theo khoá chung</td><td>Dữ liệu bị chuẩn hoá tách ra nhiều bảng</td></tr>
+    <tr><td><a href="../sql-group-aggregate/index.html">GROUP BY &amp; aggregate</a></td><td>Rút gọn nhiều dòng thành một con số theo nhóm</td><td>Cần tổng, trung bình, đếm theo từng danh mục</td></tr>
+    <tr><td><a href="../sql-subquery-cte/index.html">Subquery &amp; CTE</a></td><td>Chia một câu hỏi to thành nhiều bước nhỏ</td><td>Câu hỏi cần kết quả trung gian trước khi lọc tiếp</td></tr>
+  </table>
 </section>
 
 <section id="sqlov-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Học theo thứ tự nào</h2></div>
-  <p class="plan">SELECT/WHERE → JOIN → GROUP BY → subquery & CTE.</p>
+  <p class="key">Bốn bài, đi đúng thứ tự này thì bài sau chỉ thêm đúng <em>một khối</em> vào thứ tự thực thi đã học.</p>
+  <div class="stack">
+    <div class="s"><b>1 · SELECT, WHERE &amp; ORDER BY</b><span>Nền của mọi câu SQL: chọn cột, lọc hàng, sắp xếp. Ba bài sau đều giả định bạn đã nắm thứ tự thực thi ở mục 04.</span></div>
+    <div class="s"><b>2 · JOIN</b><span>Ý mới: <code>FROM</code> không chỉ là một bảng mà có thể ghép nhiều bảng lại trước khi <code>WHERE</code> chạy.</span></div>
+    <div class="s"><b>3 · GROUP BY &amp; aggregate</b><span>Ý mới: sau <code>WHERE</code>, các dòng có thể bị gom lại thành nhóm — và có thêm một tầng lọc mới là <code>HAVING</code>.</span></div>
+    <div class="s ok"><b>4 · Subquery &amp; CTE</b><span>Không thêm khối mới vào thứ tự thực thi — chỉ là cách <em>gói</em> một câu SELECT hoàn chỉnh vào bên trong câu khác.</span></div>
+  </div>
+  <ul class="why">
+    <li>Đừng học JOIN trước khi chắc WHERE lọc <em>dòng nào</em> — nối sai bảng rồi lọc sai dòng thì lỗi chồng lỗi, khó truy ngược.</li>
+    <li>Sau bốn bài này, <a href="../../04-sql-advanced/sql-advanced-overview/index.html">SQL advanced</a> mới bàn tới window function, index và transaction — những thứ nằm phía <em>sau</em> khi câu SQL đã đúng logic.</li>
+  </ul>
 </section>
 
 <section id="sqlov-s8" class="lesson">
   <div class="sh"><b>08</b><h2>Từ điển bỏ túi</h2></div>
-  <p class="plan">Thuật ngữ sẽ gặp suốt nhóm này, mỗi từ một dòng.</p>
+  <table>
+    <tr><th>Từ</th><th>Nghĩa trong một câu</th></tr>
+    <tr><td><b>Declarative</b></td><td>Nói muốn kết quả gì, không nói cách lấy — đối lập với procedural.</td></tr>
+    <tr><td><b>Predicate</b></td><td>Biểu thức đúng/sai dùng để lọc, ví dụ điều kiện trong <code>WHERE</code>.</td></tr>
+    <tr><td><b>Alias</b></td><td>Tên tạm đặt cho cột hoặc bảng bằng <code>AS</code>, chỉ tồn tại trong phạm vi câu lệnh.</td></tr>
+    <tr><td><b>Aggregate function</b></td><td>Hàm rút gọn nhiều dòng thành một giá trị: <code>COUNT</code>, <code>SUM</code>, <code>AVG</code>…</td></tr>
+    <tr><td><b>Subquery</b></td><td>Một câu SELECT nằm bên trong câu SELECT khác.</td></tr>
+    <tr><td><b>CTE</b></td><td>Common Table Expression — đặt tên cho một subquery bằng <code>WITH</code> để dùng lại, dễ đọc hơn lồng nhau.</td></tr>
+    <tr><td><b>Query planner</b></td><td>Bộ phận của database quyết định cách thực thi thật một câu SQL — quét bảng hay dùng index, nối bảng theo thứ tự nào.</td></tr>
+  </table>
 </section>
 
 <footer>Cơ sở dữ liệu · SQL · SQL basics overview</footer>
