@@ -372,8 +372,8 @@ window.CATALOG = [
       "dir": "thread-process-gil",
       "slug": "gil",
       "title": "Thread, process & GIL",
-      "tag": "Python",
-      "blurb": "GIL khoá đúng cái gì, phân loại chờ hay tính, khi nào thread có lợi, process là cách duy nhất dùng nhiều lõi, và race condition mà GIL không cứu.",
+      "tag": "Concurrency",
+      "blurb": "Process và thread khác nhau ở bộ nhớ và chi phí chuyển ngữ cảnh — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.",
       "n": 10,
       "path": "content/02-python/04-concurrency/thread-process-gil/index.html",
       "skeleton": false
