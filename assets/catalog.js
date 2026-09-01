@@ -14,8 +14,8 @@ window.CATALOG = [
       "slug": "dsaov",
       "title": "DSA overview",
       "tag": "Overview",
-      "blurb": "Toàn cảnh nhánh DSA: từ mảng tới dynamic programming, học theo thứ tự nào, và mỗi thứ sinh ra để chữa giới hạn nào.",
-      "n": 8,
+      "blurb": "DSA là gì, kệ này gồm hai phần nào, và học theo thứ tự nào cho nhanh vào việc.",
+      "n": 3,
       "path": "content/01-dsa/01-overview/dsa-overview/index.html",
       "skeleton": false
      }
@@ -46,8 +46,8 @@ window.CATALOG = [
       "slug": "dsov",
       "title": "Data structures overview",
       "tag": "Overview",
-      "blurb": "Mỗi cấu trúc đổi thứ gì lấy thứ gì: bảng chi phí chung, và cây quyết định chọn cấu trúc theo đề.",
-      "n": 8,
+      "blurb": "Tám cách cất dữ liệu trên một bảng: chọn khi nào, và chi phí từng thao tác.",
+      "n": 2,
       "path": "content/01-dsa/03-data-structures/data-structures-overview/index.html",
       "skeleton": false
      },
@@ -77,7 +77,7 @@ window.CATALOG = [
       "title": "Hash map & set",
       "tag": "Data structure",
       "blurb": "Vì sao O(1) trung bình, va chạm xử lý thế nào, khi nào tụt về O(n), và ba pattern đổi thời gian lấy bộ nhớ.",
-      "n": 7,
+      "n": 6,
       "path": "content/01-dsa/03-data-structures/hash-map/index.html",
       "skeleton": false
      },
@@ -142,8 +142,8 @@ window.CATALOG = [
       "slug": "alov",
       "title": "Algorithms overview",
       "tag": "Overview",
-      "blurb": "Bốn họ kỹ thuật, dấu hiệu nhận đề của từng họ, và bảng tra từ ràng buộc n ra kỹ thuật được phép.",
-      "n": 8,
+      "blurb": "Đọc đề thấy chữ gì thì nghĩ tới pattern nào, và dữ liệu lớn cỡ nào thì được dùng cách nào.",
+      "n": 2,
       "path": "content/01-dsa/04-algorithms/algorithms-overview/index.html",
       "skeleton": false
      },
@@ -152,8 +152,8 @@ window.CATALOG = [
       "slug": "sort",
       "title": "Sorting",
       "tag": "Technique",
-      "blurb": "Ba thuật toán cần biết, vì sao O(n log n) là chặn dưới khi so sánh, tính ổn định, và sắp xếp theo khoá tuỳ biến.",
-      "n": 7,
+      "blurb": "Sáu thuật toán sort kèm code Python và complexity, vì sao O(n log n) là chặn dưới, và stable sort.",
+      "n": 8,
       "path": "content/01-dsa/04-algorithms/sorting/index.html",
       "skeleton": false
      },
@@ -276,7 +276,7 @@ window.CATALOG = [
       "title": "Python overview",
       "tag": "Overview",
       "blurb": "Python được thiết kế quanh vài quy tắc nhất quán — nắm chúng thì phần còn lại tự suy ra được.",
-      "n": 8,
+      "n": 6,
       "path": "content/02-python/01-overview/python-overview/index.html",
       "skeleton": false
      }
@@ -292,7 +292,7 @@ window.CATALOG = [
       "title": "Language core overview",
       "tag": "Overview",
       "blurb": "Bốn quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.",
-      "n": 8,
+      "n": 5,
       "path": "content/02-python/02-language-core/language-core-overview/index.html",
       "skeleton": false
      },
@@ -415,8 +415,8 @@ window.CATALOG = [
       "slug": "oop",
       "title": "OOP trong Python",
       "tag": "OOP",
-      "blurb": "Class, inheritance, composition và MRO — cách Python giải quyết đa kế thừa, và khi nào nên chọn composition.",
-      "n": 7,
+      "blurb": "Bốn trụ OOP mà Python hỗ trợ trực tiếp qua cú pháp: encapsulation, abstraction, inheritance, polymorphism — và MRO khi đa kế thừa.",
+      "n": 8,
       "path": "content/02-python/06-oop/oop-python/index.html",
       "skeleton": false
      }
@@ -471,7 +471,7 @@ window.CATALOG = [
       "title": "CS fundamentals overview",
       "tag": "CS",
       "blurb": "Từ một lệnh gọi hàm tới một request đi qua nửa vòng trái đất — các tầng trừu tượng và tầng nào hỏng thì thấy gì.",
-      "n": 8,
+      "n": 3,
       "path": "content/03-cs-fundamentals/01-overview/cs-overview/index.html",
       "skeleton": false
      }
@@ -487,7 +487,7 @@ window.CATALOG = [
       "title": "Operating system overview",
       "tag": "CS",
       "blurb": "Hệ điều hành chia một máy cho nhiều việc thế nào: tiến trình, bộ nhớ, và đồng bộ.",
-      "n": 8,
+      "n": 2,
       "path": "content/03-cs-fundamentals/02-os/os-overview/index.html",
       "skeleton": false
      },
@@ -532,8 +532,8 @@ window.CATALOG = [
       "slug": "netov",
       "title": "Networking overview",
       "tag": "CS",
-      "blurb": "Từ lúc gõ URL tới lúc thấy trang: các tầng, và mỗi tầng tốn bao nhiêu vòng khứ hồi.",
-      "n": 8,
+      "blurb": "Một request đi qua những bước nào, và năm bài của nhóm rút ngắn khúc nào.",
+      "n": 2,
       "path": "content/03-cs-fundamentals/03-networking/networking-overview/index.html",
       "skeleton": false
      },
@@ -647,8 +647,8 @@ window.CATALOG = [
       "slug": "dbov",
       "title": "Database overview",
       "tag": "Database",
-      "blurb": "Từ file phẳng tới mô hình quan hệ tới NoSQL — mỗi bước sinh ra để chữa giới hạn gì của bước trước.",
-      "n": 8,
+      "blurb": "Database giải bài toán gì, có mấy loại, và học theo thứ tự nào.",
+      "n": 3,
       "path": "content/04-database/01-overview/db-overview/index.html",
       "skeleton": false
      }
@@ -663,8 +663,8 @@ window.CATALOG = [
       "slug": "relov",
       "title": "Relational foundations overview",
       "tag": "Database",
-      "blurb": "Vì sao mô hình quan hệ thắng, và bốn khái niệm nền: quan hệ, khoá, ràng buộc, chuẩn hoá.",
-      "n": 8,
+      "blurb": "Bảng nối nhau bằng khoá thế nào, và bốn bài của nhóm học theo thứ tự nào.",
+      "n": 2,
       "path": "content/04-database/02-relational-basics/relational-overview/index.html",
       "skeleton": false
      },
@@ -696,7 +696,7 @@ window.CATALOG = [
       "blurb": "1NF tới 3NF bằng ví dụ, BCNF khi nào cần, và vì sao hệ thống thật lại cố tình phá chuẩn.",
       "n": 6,
       "path": "content/04-database/02-relational-basics/db-normalization/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "er-modeling",
@@ -719,8 +719,8 @@ window.CATALOG = [
       "slug": "sqlov",
       "title": "SQL basics overview",
       "tag": "Database",
-      "blurb": "Thứ tự thực thi logic của một truy vấn — thứ giải thích gần hết lỗi SQL của người mới.",
-      "n": 8,
+      "blurb": "SQL chạy theo thứ tự nào chứ không theo thứ tự viết, và bốn bài của nhóm.",
+      "n": 2,
       "path": "content/04-database/03-sql-basics/sql-basics-overview/index.html",
       "skeleton": false
      },
@@ -758,11 +758,11 @@ window.CATALOG = [
       "dir": "sql-subquery-cte",
       "slug": "sqlcte",
       "title": "Subquery & CTE",
-      "tag": "Database",
+      "tag": "PostgreSQL",
       "blurb": "Truy vấn con tương quan và không tương quan, WITH cho dễ đọc, và CTE đệ quy để duyệt cây.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-subquery-cte/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -775,8 +775,8 @@ window.CATALOG = [
       "slug": "sqladv",
       "title": "SQL advanced overview",
       "tag": "Overview",
-      "blurb": "Bốn thứ quyết định truy vấn chạy nhanh hay chậm và đúng hay sai khi có nhiều người ghi.",
-      "n": 8,
+      "blurb": "Ba thứ mà cú pháp SQL đúng không cứu được, và bốn bài của nhóm chữa cái nào.",
+      "n": 2,
       "path": "content/04-database/04-sql-advanced/sql-advanced-overview/index.html",
       "skeleton": false
      },
@@ -841,10 +841,10 @@ window.CATALOG = [
       "slug": "shard",
       "title": "Replication & sharding",
       "tag": "Database",
-      "blurb": "Bản sao đọc, chọn khoá phân mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.",
-      "n": 5,
+      "blurb": "Bản sao đọc, độ trễ sao chép, ba chiến lược chia mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.",
+      "n": 6,
       "path": "content/04-database/05-beyond-sql/sharding-replication/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -888,9 +888,9 @@ window.CATALOG = [
       "title": "Batch vs stream processing",
       "tag": "Data systems",
       "blurb": "Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.",
-      "n": 5,
+      "n": 6,
       "path": "content/04-database/06-data-systems/batch-stream-processing/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "data-quality",

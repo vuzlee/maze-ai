@@ -19,12 +19,12 @@ assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự �
 assets/favicon.svg               ← nguồn hình của logo; .ico + .png bên dưới sinh từ nó
 assets/favicon.ico · icon-192.png · icon-512.png · apple-touch-icon.png   (sinh tự động)
 content/                         ← thứ tự dưới đây = đúng thứ tự hiện trên giao diện
-  01-dsa/                        11 bài · 12 khung
+  01-dsa/                        23 bài · 0 khung
     category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
-    01-overview/{dsa-overview*}
+    01-overview/{dsa-overview}
     02-foundations/{big-o-complexity}
-    03-data-structures/{data-structures-overview*, array-string*, linked-list*, hash-map*, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie*, union-find}
-    04-algorithms/{algorithms-overview*, sorting*, two-pointers, sliding-window, prefix-sum*, binary-search, greedy*, intervals*, backtracking, graph-bfs-dfs-topo, shortest-path*, dynamic-programming}
+    03-data-structures/{data-structures-overview, array-string, linked-list, hash-map, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie, union-find}
+    04-algorithms/{algorithms-overview, sorting, two-pointers, sliding-window, prefix-sum, binary-search, greedy, intervals, backtracking, graph-bfs-dfs-topo, shortest-path, dynamic-programming}
   02-python/                        6 bài · 8 khung
     01-overview/{python-overview*}
     02-language-core/{language-core-overview*, memory-model-mutability, data-model-dunder*, iterator-generator, decorator-context-manager}
@@ -207,10 +207,30 @@ và giao diện tự xử lý:
 Viết nội dung xong thì **xoá `data-skeleton="1"`** và chạy lại `build.py` — không phải sửa gì khác.
 
 Quy ước dàn ý một khung bài, theo đúng thứ tự: **overview → cơ bản → nâng cao**.
-Mỗi kệ lớn có một bài `*-overview` dùng khuôn của
+
+Bài `*-overview` có **hai khuôn, chọn theo bản chất nhóm** — đừng mặc định lấy khuôn dài:
+
+**Nhóm là các biến thể cạnh tranh nhau** (bagging vs boosting, k-means vs DBSCAN) — hiểu cái sau
+*cần* hiểu cái trước sinh ra để chữa gì. Chuỗi nhân quả đó chính là nội dung, nên dùng khuôn của
 [Bản đồ nhánh cây](content/05-machine-learning/05-tree-models/tree-family-overview/index.html):
 vấn đề → ý tưởng đầu tiên → vì sao chưa đủ → dòng thời gian → các nhánh → học theo thứ tự nào →
-từ điển bỏ túi → học xong làm được gì.
+từ điển bỏ túi.
+
+**Nhóm là các công cụ song song** (array, hash map, heap — không cái nào sinh ra để chữa cái kia)
+thì khuôn trên **thành hình thức rỗng**: dòng thời gian chỉ còn là mốc năm, "vì sao chưa đủ" bị
+kéo dài cho vừa khuôn. Dùng khuôn ngắn 2–3 mục: **cách đọc bảng → bảng tra → (nếu là bài mở kệ)
+học theo thứ tự nào**. Xem [Data structures](content/01-dsa/03-data-structures/data-structures-overview/index.html)
+và [Algorithms](content/01-dsa/04-algorithms/algorithms-overview/index.html).
+
+Ba luật chung cho mọi overview:
+
+- **Đầu mục là danh từ, đọc là hiểu** — không đếm số ("Bốn thao tác"), không từ tự chế ("Nhận đề
+  thuộc họ nào"), không tiếng lóng ("Ràng buộc n"). Hai bài tra công cụ đặt tên thành cặp:
+  *Chọn cấu trúc nào* · *Chọn thuật toán nào*.
+- **Câu định nghĩa không được chứa thuật ngữ chưa giải thích.** Ví dụ đời thường trước, tên tiếng
+  Anh sau — "mở giữa rồi bỏ nửa" trước, "binary search" sau.
+- **Mỗi mục phải là thứ không bài nào khác làm được.** Kệ-overview định hướng; nhóm-overview là
+  bảng tra. Thứ tự học chỉ khai một chỗ, từ điển thì để ở bài chủ của từng từ.
 
 ## Tách một bài làm hai
 
@@ -330,18 +350,22 @@ Ba quy tắc khi soạn: mỗi mục **một** hình (cần hai hình thường 
 hình phải **thay được** đoạn văn chứ không minh hoạ thêm cho nó; chữ trong hình càng ít càng tốt.
 
 Chỉ dùng SVG khi hình có đường cong, đường chéo hoặc trục toạ độ thật — mẫu ở
-[mục mảng xoay](content/01-dsa/03-algorithms/binary-search/index.html#binsearch-s9):
+[mục mảng xoay](content/01-dsa/04-algorithms/binary-search/index.html#binsearch-s9):
 `viewBox="0 0 560 200"`, cột rộng 60, cách nhau 12, đáy y=158. Giữ nguyên khung này thì mọi
 biểu đồ cột trong kho nhìn như một bộ.
 
 ## Khuôn bài DSA
 
-Mười bài trong `01-dsa` dùng chung một khuôn: **lõi đọc 1,5 phút, phần còn lại để tra**.
+Các bài kỹ thuật trong `01-dsa` dùng chung một khuôn: **lõi đọc 1,5 phút, phần còn lại để tra**.
+
+Đầu mục **không đếm số** (~~Ba bẫy~~ → `Lỗi hay gặp`) và **thuật ngữ giữ nguyên tiếng Anh** như mọi
+chỗ khác trong kho: `Collision`, `Sweep line`, `Stable sort` — không dịch thành "va chạm", "đường
+quét", "tính ổn định".
 
 ```
 01  Ý tưởng               1 hình + 1 câu chốt + 2 gạch đầu dòng
 02  Mẫu code cần thuộc    1-2 khối 6-8 dòng
-03  Ba bẫy                3 thẻ ngắn
+03  Lỗi hay gặp           3 thẻ ngắn
 04  Lab                   chạy từng bước
 ─────────────────────────  hết phần đọc
 05+ Mỗi pattern một mục   dấu hiệu nhận đề (.sig) → sửa gì trong mẫu →
@@ -349,8 +373,8 @@ Mười bài trong `01-dsa` dùng chung một khuôn: **lõi đọc 1,5 phút, p
 cuối Hỏi đáp              4 câu, mỗi câu trả lời 1-2 dòng
 ```
 
-Hiện có **46 mục pattern** kèm **151 bài LeetCode riêng biệt** (160 lượt link, vài bài dùng lại
-ở chủ đề khác). Bài mới trong `01-dsa` phải theo đúng khuôn này. Các kệ khác tự do hơn nhưng vẫn giữ
+Hiện có **45 mục pattern** kèm **198 bài LeetCode riêng biệt** (222 lượt link, vài bài dùng lại
+ở chủ đề khác). Ba bài `*-overview` của kệ không theo khuôn này — xem phần khuôn overview ở trên. Bài mới trong `01-dsa` phải theo đúng khuôn này. Các kệ khác tự do hơn nhưng vẫn giữ
 ba lớp `.key` → `.why` → `details.deep` của bộ khuôn bài học.
 
 ## Kiểm trước khi coi là xong
@@ -368,14 +392,14 @@ khi bật kết quả tìm kiếm, và màu hardcode trong SVG/lab lệch khỏi
 
 ## Việc còn lại
 
-Khung thư mục đã dựng đủ cho cả syllabus — **152 khung bài** chờ viết nội dung (127 khung gốc +
+Khung thư mục đã dựng đủ cho cả syllabus — **102 khung bài** chờ viết nội dung (127 khung gốc +
 25 khung thêm theo `TAXONOMY.md`, xem tài liệu đó để biết lý do từng khung mới tồn tại và bài nào
 là chủ duy nhất khi một khái niệm chạm nhiều kệ). Mở bài ra là thấy dàn ý đã chốt; viết xong thì
 xoá `data-skeleton="1"` rồi chạy `tools/build.py`.
 
 | Kệ | Khung bài chờ viết |
 |---|---|
-| DSA — data structures & algorithms | DSA overview · Data structures overview · Array & string · Linked list · Hash map & set · Trie · Algorithms overview · Sorting · Prefix sum & difference array · Greedy · Interval · Shortest path |
+| DSA — data structures & algorithms | ✅ **xong** — 23 bài, không còn khung |
 | Python | Python overview · Language core overview · Data model & dunder · List, tuple & set · LeetCode toolkit · **OOP · Type hints & dataclass · Profiling & performance** |
 | CS fundamentals | CS fundamentals overview · Operating system overview · Process, thread & scheduling · Virtual memory & paging · Lock, deadlock & race condition · Networking overview · DNS & TLS · REST API design · Load balancing & scaling · **CAP & consistency · Consensus & leader election · Message queue & Pub/Sub** |
 | Database & SQL | Database overview · Relational foundations overview · Relational model · Constraints & integrity · Normalization & denormalization · Schema design · SQL basics overview · SELECT, WHERE & ORDER BY · JOIN · GROUP BY & aggregate · Subquery & CTE · SQL advanced overview · Query tuning · NoSQL — four families · Replication & sharding · **OLTP vs OLAP · Data warehouse & data lake · ETL & ELT · Batch vs stream processing · Data quality** |
