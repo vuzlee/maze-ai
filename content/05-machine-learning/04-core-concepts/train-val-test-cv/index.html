@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train/val/test &amp; cross-validation — MazeAI</title>
+<meta name="description" content="Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, sáu nguồn rò rỉ dữ liệu, và nested CV.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/04-core-concepts/train-val-test-cv/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Train/val/test &amp; cross-validation">
+<meta property="og:description" content="Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, sáu nguồn rò rỉ dữ liệu, và nested CV.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/04-core-concepts/train-val-test-cv/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-cv" data-title="Train/val/test &amp; cross-validation" data-tag="Generalization" data-blurb="Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, sáu nguồn rò rỉ dữ liệu, và nested CV.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Core concepts</p>
+  <h1>Train/val/test &amp; <em>cross-validation</em></h1>
+  <p class="lede">Chia sai một lần là <b>mọi con số sau đó đều vô nghĩa</b>. Bài này chốt: vì sao cần ba tập, chọn kiểu chia nào, và sáu nguồn rò rỉ dữ liệu làm điểm offline đẹp mà production sụp.</p>
+</header>
+
+<section id="cv-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vì sao ba tập chứ không hai</h2></div>
+
+  <p class="key">Tập validation bị dùng để <em>chọn</em>, nên nó đã bẩn. Cần một tập thứ ba chưa từng ảnh hưởng tới bất kỳ quyết định nào.</p>
+
+<pre><code>train (60%)       → học tham số của model
+validation (20%)  → chọn siêu tham số, chọn model, quyết định dừng
+test (20%)        → đo hiệu năng cuối cùng, dùng ĐÚNG MỘT LẦN</code></pre>
+
+  <p>Lý do cần tập thứ ba: mỗi lần bạn xem điểm validation rồi đổi gì đó, bạn đang <em>tối ưu theo tập validation</em>. Sau vài chục lần như vậy, điểm validation không còn là ước lượng khách quan — hiện tượng này gọi là overfit thích ứng.</p>
+
+<pre><code>Thử 100 cấu hình siêu tham số, chọn cái tốt nhất trên validation.
+Điểm validation của cấu hình thắng đã bị "chọn lọc" nên LẠC QUAN một cách hệ thống,
+kể cả khi mọi cấu hình đều tệ như nhau — vì bạn đang chọn ra cái may mắn nhất.
+
+→ tập test chưa từng ảnh hưởng tới quyết định nào mới cho ước lượng thật.</code></pre>
+
+  <div class="note warn">
+    <h4>Hệ quả kỷ luật</h4>
+    Đã xem điểm trên tập test thì <strong>không được sửa model rồi đo lại</strong>. Làm vậy là biến test thành validation, và bạn không còn tập nào để đánh giá khách quan. Trong dự án thật, cách giữ kỷ luật là <em>khoá tập test lại</em> và chỉ mở ra khi đã chốt mọi quyết định.
+  </div>
+</section>
+
+<section id="cv-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>k-fold cross-validation</h2></div>
+
+  <p class="key">Một lần chia đôi thì kết quả phụ thuộc may rủi của lần chia đó. <em>k-fold luân phiên mọi phần làm validation rồi lấy trung bình</em> — mọi mẫu đều được dùng để đánh giá đúng một lần.</p>
+
+<pre><code>5-fold:
+
+fold 1:  [VAL] [   ] [   ] [   ] [   ]
+fold 2:  [   ] [VAL] [   ] [   ] [   ]
+fold 3:  [   ] [   ] [VAL] [   ] [   ]
+fold 4:  [   ] [   ] [   ] [VAL] [   ]
+fold 5:  [   ] [   ] [   ] [   ] [VAL]
+
+kết quả = trung bình 5 điểm, kèm ĐỘ LỆCH CHUẨN giữa chúng</code></pre>
+
+  <ul class="why">
+    <li>Đừng chỉ nhìn trung bình. <b>Độ lệch chuẩn giữa các fold</b> mới cho biết con số có đáng tin không — lệch lớn nghĩa là kết quả phụ thuộc nhiều vào cách chia, và trung bình đó không nói lên mấy.</li>
+    <li>k = 5 hoặc 10 là mặc định tốt. k lớn hơn cho ước lượng ít thiên lệch hơn nhưng đắt gấp k lần và các fold chồng lấn nhiều nên kết quả dao động mạnh.</li>
+    <li>CV dùng khi <b>dữ liệu ít</b>. Có nhiều dữ liệu thì chia ba tập cố định vừa đủ tin cậy vừa rẻ hơn hẳn.</li>
+  </ul>
+</section>
+
+<section id="cv-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Chọn đúng kiểu chia</h2></div>
+
+  <p class="key">Chia ngẫu nhiên chỉ đúng khi các mẫu <em>độc lập và cùng phân phối</em>. Dữ liệu thật thường không thoả — và mỗi kiểu vi phạm có một kiểu chia riêng để chữa.</p>
+
+  <table>
+    <tr><th>Kiểu</th><th>Cách chia</th><th>Dùng khi</th></tr>
+    <tr><td>K-fold</td><td>Chia k phần, luân phiên một phần làm validation</td><td>Dữ liệu độc lập, cùng phân phối</td></tr>
+    <tr><td><strong>Stratified</strong> K-fold</td><td>Giữ tỉ lệ lớp giống nhau ở mọi fold</td><td>Phân loại — <em>luôn</em> nên dùng, nhất là khi lệch lớp</td></tr>
+    <tr><td><strong>Group</strong> K-fold</td><td>Mọi dòng của cùng một nhóm nằm trong cùng một fold</td><td>Nhiều dòng của cùng bệnh nhân, cùng khách hàng, cùng thiết bị</td></tr>
+    <tr><td><strong>Time series</strong> split</td><td>Luôn train trên quá khứ, validate trên tương lai</td><td>Mọi dữ liệu có thứ tự thời gian — <em>không bao giờ</em> xáo trộn</td></tr>
+    <tr><td>Leave-one-out</td><td>k = n</td><td>Dữ liệu rất ít; tốn kém và variance cao</td></tr>
+  </table>
+
+<pre><code>Time series split — sơ đồ:
+
+fold 1:  train [1 2 3]        val [4]
+fold 2:  train [1 2 3 4]      val [5]
+fold 3:  train [1 2 3 4 5]    val [6]
+                              ↑ luôn ở TƯƠNG LAI so với tập train</code></pre>
+
+  <div class="note warn">
+    <h4>Ba lỗi chia dữ liệu làm mọi con số vô nghĩa</h4>
+    <p><strong>Xáo trộn dữ liệu chuỗi thời gian.</strong> Model được huấn luyện trên tương lai rồi dự đoán quá khứ. Điểm số rất đẹp và hoàn toàn không dùng được.</p>
+    <p><strong>Cùng một thực thể ở cả hai bên.</strong> Bệnh nhân A có 50 dòng, một số vào train một số vào validation — model nhận ra bệnh nhân chứ không học bệnh. Phải dùng Group K-fold.</p>
+    <p><strong>Dòng trùng lặp.</strong> Dữ liệu thật thường có bản trùng; nếu bản gốc ở train và bản trùng ở validation thì điểm số bị thổi phồng. Khử trùng lặp <em>trước</em> khi chia.</p>
+  </div>
+</section>
+
+<section id="cv-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Rò rỉ dữ liệu</h2></div>
+
+  <p>Rò rỉ là khi thông tin lẽ ra không có lúc dự đoán lại lọt vào lúc huấn luyện. Đặc điểm chung: <strong>điểm số offline rất đẹp, production sụp</strong>.</p>
+
+  <table>
+    <tr><th>Nguồn</th><th>Ví dụ cụ thể</th><th>Cách chữa</th></tr>
+    <tr><td>Tiền xử lý trước khi chia</td><td><code>StandardScaler</code> fit trên toàn bộ dữ liệu — trung bình và độ lệch chuẩn đã chứa thông tin của tập kiểm tra</td><td>Đặt mọi bước vào <code>Pipeline</code>, fit chỉ trên train</td></tr>
+    <tr><td>Rò rỉ nhãn qua đặc trưng</td><td>Dự đoán khách có huỷ dịch vụ không, mà có cột <code>ngày_huỷ</code> hoặc <code>lý_do_huỷ</code></td><td>Với mỗi đặc trưng, hỏi: giá trị này có sẵn <em>tại thời điểm dự đoán</em> chưa?</td></tr>
+    <tr><td>Rò rỉ thời gian</td><td>Đặc trưng "tổng chi tiêu của khách" tính trên toàn bộ lịch sử, kể cả sau thời điểm dự đoán</td><td>Mọi đặc trưng tổng hợp phải cắt tại mốc thời gian dự đoán</td></tr>
+    <tr><td>Rò rỉ theo nhóm</td><td>Cùng bệnh nhân, cùng cửa hàng, cùng thiết bị xuất hiện ở cả train và test</td><td>Group K-fold</td></tr>
+    <tr><td>Chọn đặc trưng trên toàn bộ dữ liệu</td><td>Chọn 20 đặc trưng tương quan cao nhất với nhãn <em>trước</em> khi chia</td><td>Chọn đặc trưng bên trong mỗi fold</td></tr>
+    <tr><td>Lấy mẫu lại trước khi chia</td><td>SMOTE hoặc oversampling trên toàn bộ, làm bản sao của một mẫu nằm ở cả hai bên</td><td>Chỉ lấy mẫu lại trên <em>tập train</em> của từng fold</td></tr>
+  </table>
+
+<pre><code><span class="cm"># SAI — scaler thấy cả tập test</span>
+X_scaled = StandardScaler().fit_transform(X)
+X_tr, X_te = train_test_split(X_scaled, ...)
+
+<span class="cm"># ĐÚNG — pipeline đảm bảo mọi bước chỉ fit trên train</span>
+<span class="kw">from</span> sklearn.pipeline <span class="kw">import</span> make_pipeline
+pipe = make_pipeline(StandardScaler(), SelectKBest(k=<span class="st">20</span>), LogisticRegression())
+cross_val_score(pipe, X, y, cv=<span class="st">5</span>)      <span class="cm"># mỗi fold fit lại từ đầu</span></code></pre>
+
+  <div class="note key">
+    <h4>Câu hỏi vàng để phát hiện rò rỉ</h4>
+    Với <em>từng</em> đặc trưng, hỏi: <strong>"Tại thời điểm tôi cần đưa ra dự đoán trong thực tế, giá trị này đã tồn tại và lấy được chưa?"</strong> Nếu câu trả lời là không hoặc không chắc, đó là rò rỉ. Câu hỏi này bắt được bốn trong sáu nguồn ở bảng trên.
+  </div>
+</section>
+
+<section id="cv-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Nested CV</h2></div>
+
+  <p class="key">Dùng một tập validation để vừa <em>chọn</em> siêu tham số vừa <em>báo cáo</em> điểm là lạc quan. Nested CV tách hai việc đó bằng hai vòng lồng nhau.</p>
+
+<pre><code>Vòng NGOÀI (5 fold)  → đánh giá hiệu năng
+  └─ với mỗi fold ngoài:
+       Vòng TRONG (3 fold trên phần train của fold ngoài) → chọn siêu tham số
+       huấn luyện lại với siêu tham số thắng
+       đánh giá trên fold ngoài (chưa từng dùng để chọn gì)
+
+Tổng: 5 × 3 = 15 lần huấn luyện cho mỗi cấu hình.</code></pre>
+
+  <table>
+    <tr><th>Tình huống</th><th>Dùng</th></tr>
+    <tr><td>Dữ liệu lớn</td><td>Chia ba tập cố định — đơn giản, đủ tin cậy, rẻ</td></tr>
+    <tr><td>Dữ liệu nhỏ, cần con số đáng tin để báo cáo</td><td>Nested CV</td></tr>
+    <tr><td>Chỉ cần chọn model để triển khai</td><td>CV thường là đủ; không cần vòng ngoài</td></tr>
+  </table>
+
+  <p>Trong công việc thực tế, nested CV ít dùng vì đắt — chia ba tập cố định là đủ khi có nhiều dữ liệu. Nhưng biết nó tồn tại và biết <em>nó chữa vấn đề gì</em> là điều đáng nói khi bị hỏi về cách báo cáo hiệu năng.</p>
+</section>
+
+<section id="cv-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Checklist trước khi tin một con số</h2></div>
+
+  <ol>
+    <li><strong>Chia dữ liệu đúng kiểu chưa?</strong> Chuỗi thời gian chia theo thời gian, dữ liệu theo nhóm chia theo nhóm, phân loại thì stratified.</li>
+    <li><strong>Đã khử trùng lặp trước khi chia chưa?</strong></li>
+    <li><strong>Mọi bước tiền xử lý nằm trong pipeline chưa?</strong> Scaler, chọn đặc trưng, lấy mẫu lại đều phải fit trong từng fold.</li>
+    <li><strong>Từng đặc trưng có sẵn tại thời điểm dự đoán thật không?</strong></li>
+    <li><strong>Tập test còn nguyên chưa?</strong> Đã xem thì không được sửa model nữa.</li>
+    <li><strong>Metric có đúng mục tiêu nghiệp vụ không?</strong> Xem <a href="../../09-evaluation/metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a>.</li>
+    <li><strong>Có mốc so sánh chưa?</strong> Một baseline đơn giản để biết mức cải thiện thật là bao nhiêu.</li>
+    <li><strong>Kết quả có ổn định qua các fold không?</strong> Độ lệch chuẩn lớn giữa các fold nghĩa là con số trung bình không đáng tin.</li>
+  </ol>
+</section>
+
+<section id="cv-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Chuẩn hoá trước khi chia dữ liệu</h4><p>Rò rỉ phổ biến nhất, và hầu như luôn có trong code viết vội. Dùng <code>Pipeline</code>.</p></div>
+    <div class="card bad"><h4>Xáo trộn dữ liệu chuỗi thời gian</h4><p>Huấn luyện trên tương lai. Điểm số vô nghĩa hoàn toàn.</p></div>
+    <div class="card bad"><h4>Cùng thực thể ở cả train và test</h4><p>Model nhận ra thực thể chứ không học quy luật. Dùng Group K-fold.</p></div>
+    <div class="card bad"><h4>Dùng tập test nhiều lần</h4><p>Nó thành tập validation, và bạn hết chỗ để đánh giá khách quan.</p></div>
+    <div class="card bad"><h4>SMOTE trước khi chia</h4><p>Bản sao tổng hợp của một mẫu nằm ở cả hai bên. Chỉ lấy mẫu lại trên train.</p></div>
+    <div class="card bad"><h4>Chỉ nhìn trung bình các fold</h4><p>Bỏ qua độ lệch chuẩn thì không biết con số có ổn định hay chỉ là may rủi của một lần chia.</p></div>
+  </div>
+</section>
+
+<section id="cv-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>Vì sao cần cả validation và test?</summary>
+  <p>Vì mỗi lần xem điểm validation rồi đổi gì đó, ta đang tối ưu theo tập validation. Sau vài chục lần, điểm đó không còn khách quan — thử 100 cấu hình rồi chọn cái tốt nhất thì điểm của cái thắng đã bị chọn lọc nên lạc quan một cách hệ thống, kể cả khi mọi cấu hình đều tệ như nhau. Tập test chưa từng ảnh hưởng tới quyết định nào nên mới cho ước lượng thật. Kỷ luật kèm theo là đã xem test thì không sửa model rồi đo lại.</p></details>
+
+  <details class="qa"><summary>Kể vài nguồn rò rỉ dữ liệu bạn từng gặp hoặc biết.</summary>
+  <p>Phổ biến nhất là chuẩn hoá trước khi chia — scaler thấy cả tập test qua trung bình và độ lệch chuẩn. Rồi rò rỉ nhãn qua đặc trưng, ví dụ dự đoán khách huỷ dịch vụ mà trong dữ liệu có cột ngày huỷ. Rò rỉ thời gian khi đặc trưng tổng hợp tính trên toàn bộ lịch sử kể cả sau mốc dự đoán. Rò rỉ theo nhóm khi cùng bệnh nhân xuất hiện ở cả hai bên. Chọn đặc trưng trên toàn bộ dữ liệu trước khi chia. Và SMOTE trước khi chia. Cách phòng chung là để mọi bước vào <code>Pipeline</code>, và với từng đặc trưng thì hỏi: tại thời điểm dự đoán thật, giá trị này đã tồn tại chưa?</p></details>
+
+  <details class="qa"><summary>Khi nào dùng cross-validation, khi nào chia ba tập cố định?</summary>
+  <p>CV khi dữ liệu ít — nó dùng được mọi mẫu để đánh giá và cho biết kết quả ổn định tới đâu qua độ lệch chuẩn giữa các fold. Chia ba tập cố định khi dữ liệu nhiều: rẻ hơn k lần, và với hàng trăm nghìn mẫu thì một tập validation cũng đã đủ lớn để ước lượng chính xác.</p></details>
+
+  <details class="qa"><summary>Chia bao nhiêu phần trăm là đúng?</summary>
+  <p>Không có con số cố định — 60/20/20 chỉ là mặc định cho dữ liệu cỡ vừa. Điều thật sự quan trọng là <b>tập test đủ lớn để con số ổn định</b>. Với vài triệu mẫu thì 1% đã là hàng chục nghìn mẫu, quá đủ, và dành 98% cho train có lợi hơn. Với vài trăm mẫu thì nên dùng cross-validation thay vì chia cố định.</p></details>
+</section>
+
+<footer>Machine learning · Core concepts · đo cho đúng. Chẩn đoán và cách chữa nằm ở <a href="../overfitting-regularization/index.html">Overfitting &amp; regularization</a>; phân rã sai số ở <a href="../bias-variance-tradeoff/index.html">Bias–variance tradeoff</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

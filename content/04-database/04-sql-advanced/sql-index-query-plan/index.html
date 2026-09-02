@@ -269,52 +269,30 @@ FROM pg_stats WHERE tablename = <span class="st">'orders'</span> AND attname = <
 </section>
 
 <section id="sqlindex-s12">
-  <div class="sh"><b>12</b><h2>Bài toán N+1</h2></div>
-  <p>Không phải lỗi của cơ sở dữ liệu mà của tầng ứng dụng — nhưng đây là nguyên nhân chậm phổ biến nhất trong hệ thống thật.</p>
-<pre><code><span class="cm"># 1 truy vấn lấy danh sách, rồi N truy vấn cho từng phần tử</span>
-users = db.query(<span class="st">"SELECT * FROM users LIMIT 100"</span>)     <span class="cm"># 1</span>
-<span class="kw">for</span> u <span class="kw">in</span> users:
-    orders = db.query(<span class="st">"SELECT * FROM orders WHERE user_id = ?"</span>, u.id)   <span class="cm"># × 100</span>
-<span class="cm"># tổng 101 lần đi vòng tới database</span></code></pre>
-<pre><code><span class="cm"># cách 1: một truy vấn với IN</span>
-SELECT * FROM orders WHERE user_id IN (...);
-
-<span class="cm"># cách 2: JOIN, lấy hết trong một lần</span>
-SELECT u.*, o.* FROM users u LEFT JOIN orders o ON o.user_id = u.id;
-
-<span class="cm"># cách 3: với ORM — nạp sẵn quan hệ</span>
-session.query(User).options(selectinload(User.orders))</code></pre>
-  <p>Mỗi truy vấn tốn một lần đi vòng qua mạng — thường 0.5 tới 2 ms. 101 truy vấn nhanh cũng thành hàng trăm ms, trong khi bản thân dữ liệu chỉ cần vài ms để lấy. Đây là lý do nên đếm <em>số lượng truy vấn</em>, không chỉ tối ưu từng truy vấn.</p>
+  <div class="sh"><b>12</b><h2>Giới hạn của index</h2></div>
+  <p>Ba loại chậm mà index <strong>không</strong> chữa được, vì nguyên nhân không nằm trong database:</p>
+  <ul>
+    <li><strong>Nhiều truy vấn nhỏ thay vì một truy vấn.</strong> Mỗi lần đi vòng tới database tốn khoảng nửa tới hai ms; 101 truy vấn đã tối ưu vẫn chậm hơn một truy vấn hơi chậm. Đây là bài toán N+1 — xem <a href="../query-tuning/index.html">Query tuning</a>.</li>
+    <li><strong>Lấy thừa dữ liệu.</strong> <code>SELECT *</code> khi chỉ cần hai cột: index có đúng cũng phải quay về bảng lấy phần còn lại, mất luôn cơ hội index-only scan ở mục 08.</li>
+    <li><strong>Chờ ở tầng kết nối.</strong> Câu SQL chạy 1 ms nhưng request đợi 200 ms để mượn được một kết nối rảnh — nhìn vào plan sẽ không thấy gì bất thường.</li>
+  </ul>
+  <p>Khi có báo cáo "trang này chậm", quy trình đầy đủ để xác định vấn đề thuộc loại nào nằm ở <a href="../query-tuning/index.html">Query tuning</a>; bài này chỉ lo phần planner và index.</p>
 </section>
 
 <section id="sqlindex-s13">
-  <div class="sh"><b>13</b><h2>Checklist tối ưu một truy vấn chậm</h2></div>
-  <ol>
-    <li><strong>Chạy <code>EXPLAIN ANALYZE</code>.</strong> Đừng đoán.</li>
-    <li><strong>So <code>rows</code> ước lượng với thực tế.</strong> Lệch nhiều → chạy <code>ANALYZE</code> rồi xem lại.</li>
-    <li><strong>Tìm nút tốn nhất.</strong> Nhớ nhân <code>actual time</code> với <code>loops</code>.</li>
-    <li><strong>Xem có Seq Scan trên bảng lớn kèm điều kiện chọn lọc không.</strong> Đó là chỗ thiếu index.</li>
-    <li><strong>Kiểm tra điều kiện có làm index vô hiệu không</strong> — hàm bọc cột, lệch kiểu, ký tự thay thế ở đầu.</li>
-    <li><strong>Xem cột join có index không.</strong> Nested loop với seq scan bên trong là dấu hiệu rõ.</li>
-    <li><strong>Kiểm tra có lấy thừa dữ liệu không.</strong> <code>SELECT *</code> khi chỉ cần hai cột làm mất cơ hội index-only scan.</li>
-    <li><strong>Đếm số truy vấn mà ứng dụng phát ra.</strong> N+1 thường là vấn đề lớn hơn cả một truy vấn chậm.</li>
-  </ol>
-</section>
-
-<section id="sqlindex-s14">
-  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>13</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Index trên mọi cột "cho chắc"</h4><p>Ghi chậm gấp nhiều lần, tốn dung lượng, và phần lớn index không bao giờ được dùng.</p></div>
     <div class="card bad"><h4>Bọc hàm quanh cột trong WHERE</h4><p><code>lower(email) = ...</code> làm index vô hiệu. Dùng index biểu thức.</p></div>
     <div class="card bad"><h4>Tin rằng Seq Scan luôn xấu</h4><p>Với bảng nhỏ hoặc điều kiện khớp nhiều dòng, quét tuần tự đúng là rẻ hơn.</p></div>
     <div class="card bad"><h4>Sai thứ tự cột trong index tổ hợp</h4><p>Lọc theo cột thứ hai một mình thì index không dùng được. Cột so bằng đặt trước cột so khoảng.</p></div>
     <div class="card bad"><h4>Quên nhân với loops khi đọc plan</h4><p>Một nút 0.02ms nhưng chạy 10.000 lần là 200ms — thường chính là chỗ nghẽn.</p></div>
-    <div class="card bad"><h4>Tối ưu từng truy vấn mà bỏ qua số lượng truy vấn</h4><p>101 truy vấn nhanh vẫn chậm hơn 1 truy vấn hơi chậm.</p></div>
+    <div class="card bad"><h4>Tối ưu từng truy vấn mà bỏ qua số lượng truy vấn</h4><p>101 truy vấn nhanh vẫn chậm hơn 1 truy vấn hơi chậm — xem N+1 ở <a href="../query-tuning/index.html">Query tuning</a>.</p></div>
   </div>
 </section>
 
-<section id="sqlindex-s15">
-  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+<section id="sqlindex-s14">
+  <div class="sh"><b>14</b><h2>Hỏi đáp phỏng vấn</h2></div>
 
   <details class="qa"><summary>Vì sao thêm index làm SELECT nhanh lên nhưng INSERT chậm đi?</summary>
   <p>Index là một cấu trúc B-tree phụ được sắp theo giá trị cột, nên tìm kiếm chỉ mất O(log n) thay vì quét toàn bảng O(n). Nhưng nó phải luôn đồng bộ với bảng: mỗi <code>INSERT</code> phải chèn khoá vào <b>mọi</b> index của bảng, có thể gây tách nút; <code>UPDATE</code> cột được index thì phải xoá khoá cũ và chèn khoá mới. Bảng có 10 index thì một lần insert thành 11 lần ghi. Cộng thêm dung lượng, có khi bằng 20–50% kích thước bảng.</p></details>
@@ -331,8 +309,6 @@ session.query(User).options(selectinload(User.orders))</code></pre>
   <details class="qa"><summary>Hash join, merge join, nested loop — planner chọn thế nào?</summary>
   <p>Nested loop khi bảng ngoài nhỏ <b>và</b> bảng trong có index trên cột join — mỗi dòng ngoài chỉ mất một lần tra. Hash join khi join so bằng và hai bảng đều lớn không có index: dựng bảng băm từ bên nhỏ rồi quét bên lớn, tất cả đọc tuần tự. Merge join khi hai bên đã sắp theo cột join, thường vì đọc theo index. Hash join xuất hiện <b>không</b> có nghĩa là thiếu index — với hai bảng lớn cần ghép toàn bộ thì nó chính là lựa chọn tối ưu.</p></details>
 
-  <details class="qa"><summary>Bài toán N+1 là gì và chữa thế nào?</summary>
-  <p>Là khi ứng dụng phát một truy vấn lấy danh sách N phần tử, rồi phát thêm N truy vấn cho từng phần tử — tổng N+1 lần đi vòng tới database. Mỗi lần đi vòng tốn khoảng nửa tới hai ms nên 100 phần tử thành hàng trăm ms dù bản thân dữ liệu chỉ cần vài ms. Chữa bằng một truy vấn <code>IN</code>, một <code>JOIN</code>, hoặc bật nạp sẵn quan hệ nếu dùng ORM. Bài học chung là phải đếm số lượng truy vấn, không chỉ tối ưu từng truy vấn.</p></details>
 </section>
 
 <footer>Deep dive · index &amp; query plan · cú pháp và tên nút theo PostgreSQL; nguyên lý áp dụng chung cho MySQL và các hệ quan hệ khác.</footer>

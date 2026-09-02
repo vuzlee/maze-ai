@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCA &amp; dimensionality reduction — MazeAI</title>
+<meta name="description" content="Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/08-dimensionality/pca-dimensionality/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="PCA &amp; dimensionality reduction">
+<meta property="og:description" content="Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/08-dimensionality/pca-dimensionality/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-pca" data-title="PCA &amp; dimensionality reduction" data-tag="ML" data-blurb="Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Dimensionality reduction</p>
+  <h1>PCA &amp; dimensionality <em>reduction</em></h1>
+  <p class="lede">Một trăm cột, phần lớn nói đi nói lại cùng một thứ. PCA <b>xoay trục về hướng dữ liệu trải rộng nhất</b> rồi bỏ những hướng gần như không có gì — giữ 95% thông tin bằng 12 cột mới.</p>
+</header>
+
+<section id="pca-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vấn đề nó giải</h2></div>
+
+  <p class="key">Nhiều chiều không chỉ chậm. <em>Nó làm hỏng chính những model dựa trên khoảng cách, và làm mọi model dễ overfit hơn.</em></p>
+
+  <table>
+    <tr><th>Số chiều lớn gây ra</th><th>Hậu quả cụ thể</th></tr>
+    <tr><td><b>Khoảng cách mất nghĩa</b></td><td>Điểm gần nhất và xa nhất xích lại gần nhau — <a href="../../05-classical-ml/knn/index.html">KNN</a>, k-means, SVM kernel đều kém đi</td></tr>
+    <tr><td><b>Dữ liệu thưa ra</b></td><td>Thể tích không gian tăng theo hàm mũ, số mẫu thì không — mỗi vùng chỉ còn vài điểm</td></tr>
+    <tr><td><b>Nhiều tham số hơn</b></td><td>Model có nhiều bậc tự do hơn trên cùng lượng dữ liệu → variance cao, dễ <a href="../../04-core-concepts/overfitting-regularization/index.html">overfit</a></td></tr>
+    <tr><td><b>Cột trùng lặp thông tin</b></td><td>Đa cộng tuyến làm hệ số hồi quy dao động mạnh và mất khả năng diễn giải</td></tr>
+    <tr><td><b>Không vẽ ra được</b></td><td>Không nhìn được dữ liệu thì không phát hiện được cấu trúc hay lỗi trong đó</td></tr>
+  </table>
+
+  <p>Điều làm việc nén khả thi: dữ liệu thật gần như luôn <b>hạng thấp</b> — các cột liên quan chằng chịt với nhau, nên thông tin thật nằm trong một không gian con nhỏ hơn nhiều so với số cột.</p>
+
+  <ul class="why">
+    <li>Chiều cao và cân nặng là hai cột, nhưng gần như <b>một trục</b> — biết cái này đoán được cái kia. Trục thứ hai chỉ mang phần chênh lệch nhỏ.</li>
+    <li>PCA đi tìm đúng những trục đó: <b>một hệ trục mới</b>, trục đầu là hướng dữ liệu trải rộng nhất, trục sau vuông góc với trục trước và trải rộng nhì, và cứ thế.</li>
+    <li>Không phải cách giảm chiều duy nhất — chọn lọc đặc trưng bỏ hẳn cột, autoencoder học phép nén phi tuyến, t-SNE và UMAP dùng để vẽ. PCA là cái <b>rẻ nhất và dễ hiểu nhất</b>, nên là nơi bắt đầu.</li>
+  </ul>
+</section>
+
+<section id="pca-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Cơ chế</h2></div>
+
+  <p class="key">Toàn bộ thuật toán là: <em>tính ma trận hiệp phương sai, lấy eigenvector của nó, sắp xếp theo eigenvalue.</em></p>
+
+  <div class="flow">
+    <div class="n"><h5>1 · Trừ trung bình</h5><p>đưa dữ liệu về gốc toạ độ · thường <b>chia thêm độ lệch chuẩn</b></p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Hiệp phương sai</h5><p><code>C = XᵀX / (n−1)</code> · ma trận d×d</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>3 · Eigen</h5><p>eigenvector = <b>hướng</b>, eigenvalue = <b>phương sai theo hướng đó</b></p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>4 · Chiếu</h5><p>giữ p hướng đầu, chiếu dữ liệu lên chúng</p></div>
+  </div>
+
+<pre><code>C · v = λ · v          <span class="cm"># v: hướng chính · λ: lượng phương sai theo hướng đó</span>
+
+tỉ lệ phương sai giữ lại = (λ₁ + … + λ_p) / (λ₁ + … + λ_d)</code></pre>
+
+  <p>Vì sao lại là <b>hướng phương sai lớn nhất</b>: hướng nào dữ liệu gần như không đổi thì không giúp phân biệt các điểm với nhau — bỏ đi mất ít thông tin nhất. Nền toán ở <a href="../../02-math-foundations/linear-algebra-ml/index.html">Linear algebra</a>.</p>
+
+  <ul class="why">
+    <li>Các thành phần <b>vuông góc với nhau</b> theo xây dựng, nên các cột mới không còn tương quan — đây là cách chữa đa cộng tuyến triệt để nhất.</li>
+    <li>Thư viện thật <b>không tính eigen của ma trận hiệp phương sai</b> mà chạy <b>SVD</b> thẳng trên dữ liệu đã trừ trung bình: cùng kết quả, ổn định số học hơn và không phải dựng ma trận d×d.</li>
+    <li>Phép biến đổi là <b>tuyến tính và đảo ngược được</b> (bằng đúng phần đã giữ), nên PCA cũng dùng để nén và để lọc nhiễu — dựng lại từ vài thành phần đầu là bỏ bớt phần dao động nhỏ.</li>
+  </ul>
+</section>
+
+<section id="pca-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Chọn số thành phần</h2></div>
+
+  <p class="key">Không có con số đúng. <em>Có ba cách chọn, và mỗi cách trả lời một câu hỏi khác nhau.</em></p>
+
+  <div class="bars">
+    <div class="b hi"><i>PC1</i><u style="width:100%"></u><b>42% phương sai</b></div>
+    <div class="b"><i>PC2</i><u style="width:55%"></u><b>23% · cộng dồn 65%</b></div>
+    <div class="b"><i>PC3</i><u style="width:29%"></u><b>12% · 77%</b></div>
+    <div class="b"><i>PC4</i><u style="width:17%"></u><b>7% · 84%</b></div>
+    <div class="b"><i>PC5</i><u style="width:12%"></u><b>5% · 89%</b></div>
+    <div class="b"><i>PC6…PC100</i><u style="width:5%"></u><b>11% chia đều — phần lớn là nhiễu</b></div>
+  </div>
+  <p class="stripnote"><span>scree plot: phương sai từng thành phần</span><span><em>chỗ đường tụt hẳn rồi phẳng ra là ứng viên</em></span></p>
+
+  <table>
+    <tr><th>Cách chọn</th><th>Làm gì</th><th>Hợp khi</th></tr>
+    <tr><td><b>Ngưỡng phương sai</b></td><td>Giữ đủ thành phần để đạt 90–95% phương sai cộng dồn — <code>PCA(n_components=0.95)</code></td><td>Mặc định nên dùng; PCA là bước tiền xử lý trong pipeline</td></tr>
+    <tr><td><b>Scree plot</b></td><td>Vẽ phương sai từng thành phần, cắt ở chỗ đường gãy rồi phẳng</td><td>Muốn hiểu cấu trúc dữ liệu, không chỉ để nén</td></tr>
+    <tr><td><b>Đo bằng model phía sau</b></td><td>Đưa <code>n_components</code> vào cross-validation cùng các siêu tham số khác</td><td>PCA phục vụ một bài toán supervised cụ thể — <b>đáng tin nhất</b></td></tr>
+    <tr><td><b>2 hoặc 3</b></td><td>Đủ để vẽ ra màn hình</td><td>Chỉ để nhìn — và lúc này t-SNE hay UMAP thường cho hình dễ đọc hơn</td></tr>
+  </table>
+
+  <div class="note warn">
+    <h4>Bắt buộc chuẩn hoá thang đo trước</h4>
+    PCA đi tìm hướng có <b>phương sai lớn nhất</b>, mà phương sai phụ thuộc đơn vị đo. Cột lương tính bằng đồng có phương sai lớn hơn cột tuổi hàng tỷ lần, nên thành phần đầu tiên sẽ gần như trùng với cột lương — không phải vì nó quan trọng mà vì nó có đơn vị to. Đổi lương sang đơn vị nghìn là ra kết quả khác hẳn. Dùng <code>StandardScaler</code> trước, trừ khi mọi cột vốn đã cùng đơn vị (ảnh, phổ tín hiệu).
+  </div>
+</section>
+
+<section id="pca-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>PCA không phải chọn đặc trưng</h2></div>
+
+  <p class="key">Nó không bỏ cột nào cả. <em>Nó tạo ra cột mới, mỗi cột là tổ hợp của tất cả cột cũ — và đó là chỗ mất mát thật.</em></p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Chọn lọc đặc trưng</h5>
+      <p>Giữ lại <b>một tập con các cột gốc</b>: tuổi, số lần mua, giá trị đơn.</p>
+      <p>Cột giữ lại <b>vẫn nguyên tên và nguyên nghĩa</b>.</p>
+      <p>Thu thập dữ liệu mới thì <b>chỉ cần đo những cột đó</b>.</p>
+    </div>
+    <div>
+      <h5>PCA</h5>
+      <p>Tạo cột mới: <code>PC1 = 0,3·tuổi − 0,7·lương + 0,2·số đơn + …</code></p>
+      <p>Không cột nào có <b>tên gọi được</b> nữa.</p>
+      <p>Vẫn phải đo <b>toàn bộ cột gốc</b> mới tính được PC — không tiết kiệm gì ở khâu thu thập.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Vì thế PCA <b>phá khả năng diễn giải</b>. Bài toán cần trả lời "biến nào ảnh hưởng tới quyết định" — tín dụng, y tế, pháp lý — thì đây là cái giá thường không trả nổi.</li>
+    <li>Nó <b>không nhìn nhãn</b>. Hướng phương sai lớn nhất chưa chắc là hướng phân biệt được các lớp — có bài mà thông tin phân loại nằm gọn trong thành phần thứ 40. Cần một phép chiếu <em>có</em> nhìn nhãn thì đó là LDA.</li>
+    <li>Chỉ bắt được quan hệ <b>tuyến tính</b>. Dữ liệu nằm trên một mặt cong thì PCA không duỗi được — lúc đó là chỗ của kernel PCA, autoencoder, UMAP.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Fit trên train, transform cho test</h4>
+    PCA học trung bình, độ lệch chuẩn và các hướng chính <b>từ dữ liệu</b> — nên nó là một bước huấn luyện, không phải phép biến đổi cố định. Gọi <code>fit</code> trên toàn bộ dữ liệu rồi mới chia train/test là <b>rò rỉ dữ liệu</b>: thông tin từ tập test đã lọt vào các hướng chính. Đặt nó trong <code>Pipeline</code> để chuyện này không xảy ra được — xem <a href="../../04-core-concepts/train-val-test-cv/index.html">Train, validation &amp; test</a>.
+  </div>
+</section>
+
+<section id="pca-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">PCA luôn chạy được và luôn trả về kết quả — kể cả khi nó là bước sai.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Không chuẩn hoá thang đo</h4><p>Thành phần đầu chỉ phản ánh cột có đơn vị to nhất. Lỗi phổ biến nhất và im lặng nhất.</p></div>
+    <div class="card bad"><h4>Fit trước khi chia train/test</h4><p>Rò rỉ dữ liệu. Điểm test đẹp giả, và sập khi lên production.</p></div>
+    <div class="card bad"><h4>Dùng cho dữ liệu bảng rồi đưa vào cây</h4><p><a href="../../06-tree-models/xgboost/index.html">Tree ensemble</a> không cần giảm chiều và xử lý cột vô dụng rất tốt. PCA chỉ làm mất khả năng diễn giải mà không được gì.</p></div>
+    <div class="card bad"><h4>Chờ nó tăng độ chính xác</h4><p>PCA <em>bỏ bớt</em> thông tin. Nó giúp khi phần bỏ đi chủ yếu là nhiễu — không có gì đảm bảo điều đó.</p></div>
+    <div class="card bad"><h4>Đưa biến one-hot vào thẳng</h4><p>Phương sai của cột nhị phân không cùng loại với cột liên tục. Cân nhắc MCA hoặc chỉ áp PCA lên phần số.</p></div>
+    <div class="card bad"><h4>Diễn giải PC1 như một khái niệm</h4><p>Gọi PC1 là "mức độ giàu có" rồi tin luôn. Nó chỉ là một tổ hợp tuyến tính, không đảm bảo khớp khái niệm nào.</p></div>
+  </div>
+</section>
+
+<section id="pca-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>PCA làm gì, nói trong ba câu?</summary>
+  <p>Nó tìm một hệ trục mới, trong đó trục đầu là hướng dữ liệu trải rộng nhất, các trục sau vuông góc với trục trước và trải rộng dần ít đi. Các hướng đó chính là eigenvector của ma trận hiệp phương sai, còn eigenvalue là lượng phương sai theo mỗi hướng. Giữ vài trục đầu và bỏ phần còn lại là giảm chiều mà mất ít thông tin nhất theo nghĩa phương sai.</p>
+  </details>
+
+  <details class="qa"><summary>Vì sao phải chuẩn hoá trước khi chạy PCA?</summary>
+  <p>Vì PCA tối đa hoá phương sai, mà phương sai phụ thuộc đơn vị đo. Cột lương tính bằng đồng sẽ có phương sai lớn gấp hàng tỷ lần cột tuổi, nên thành phần đầu tiên gần như trùng với nó — chỉ vì đơn vị, không phải vì quan trọng. Đổi đơn vị là đổi kết quả, mà điều đó thì không được phép.</p>
+  </details>
+
+  <details class="qa"><summary>Chọn số thành phần thế nào?</summary>
+  <p>Ba cách. Đặt ngưỡng phương sai cộng dồn 90–95% là mặc định. Nhìn scree plot và cắt ở chỗ đường gãy rồi phẳng, nếu muốn hiểu cấu trúc. Còn khi PCA phục vụ một bài toán supervised thì cách đáng tin nhất là <b>coi số thành phần như một siêu tham số</b> và chọn bằng cross-validation cùng các siêu tham số khác.</p>
+  </details>
+
+  <details class="qa"><summary>PCA khác chọn lọc đặc trưng chỗ nào?</summary>
+  <p>Chọn lọc giữ lại một tập con các cột gốc — vẫn nguyên tên, nguyên nghĩa, và thu thập dữ liệu mới thì chỉ cần đo những cột đó. PCA tạo ra cột mới là tổ hợp tuyến tính của <b>tất cả</b> cột cũ, nên mất khả năng diễn giải và vẫn phải đo đủ mọi cột gốc. Cần giải thích được từng biến thì chọn lọc đặc trưng, không phải PCA.</p>
+  </details>
+
+  <details class="qa"><summary>PCA có luôn cải thiện model không?</summary>
+  <p>Không. Nó bỏ bớt thông tin, chỉ có lợi khi phần bỏ đi chủ yếu là nhiễu. Và vì nó <b>không nhìn nhãn</b>, hướng phương sai lớn nhất chưa chắc là hướng phân biệt được các lớp — có bài mà tín hiệu phân loại nằm ở một thành phần phương sai rất nhỏ, bỏ đi là mất hẳn. Với dữ liệu bảng và tree ensemble thì thường không nên dùng.</p>
+  </details>
+</section>
+
+<footer>Machine learning · Dimensionality reduction · nền toán ở <a href="../../02-math-foundations/linear-algebra-ml/index.html">Linear algebra</a>; hay đi trước một bước <a href="../../07-clustering/clustering-overview/index.html">phân cụm</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

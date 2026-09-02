@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overfitting &amp; regularization — MazeAI</title>
+<meta name="description" content="Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/04-core-concepts/overfitting-regularization/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Overfitting &amp; regularization">
+<meta property="og:description" content="Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/04-core-concepts/overfitting-regularization/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-overfit" data-title="Overfitting &amp; regularization" data-tag="Generalization" data-blurb="Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Core concepts</p>
+  <h1>Overfitting &amp;<br><em>regularization</em></h1>
+  <p class="lede">Model học thuộc dữ liệu thay vì học quy luật. Bài này là phần <b>chẩn đoán và cách chữa</b>: đọc chênh lệch train–validation để biết hỏng ở đâu, đọc <b>learning curve</b> để biết nên thêm dữ liệu hay thêm sức mạnh model, và chọn kỹ thuật regularize cho đúng bệnh.</p>
+</header>
+
+<section id="overfit-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Nhận biết bằng số, không bằng cảm giác</h2></div>
+
+  <p class="key">Overfit và underfit không nhìn ra bằng trực giác. <em>Chúng là hai con số đặt cạnh nhau</em>: lỗi trên tập train và lỗi trên tập validation.</p>
+
+  <p>Vì sao hai con số đó lại tách được hai loại hỏng hóc, và vì sao không thể chữa hết cả hai cùng lúc — nằm ở <a href="../bias-variance-tradeoff/index.html">Bias–variance tradeoff</a>. Còn cách chia dữ liệu để hai con số này đáng tin thì ở <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>. Bài này bắt đầu từ chỗ bạn đã có hai con số đó trong tay.</p>
+
+  <table>
+    <tr><th>Lỗi train</th><th>Lỗi validation</th><th>Chẩn đoán</th><th>Làm gì</th></tr>
+    <tr><td>Cao</td><td>Cao, gần bằng train</td><td><strong>Underfit</strong> — bias cao</td><td>Thêm đặc trưng, model mạnh hơn, huấn luyện lâu hơn, giảm regularization</td></tr>
+    <tr><td>Thấp</td><td>Cao, chênh lệch lớn</td><td><strong>Overfit</strong> — variance cao</td><td>Thêm dữ liệu, tăng regularization, giảm độ phức tạp</td></tr>
+    <tr><td>Thấp</td><td>Thấp</td><td>Tốt</td><td>Kiểm tra rò rỉ dữ liệu — quá tốt cũng là dấu hiệu đáng ngờ</td></tr>
+    <tr><td>Cao</td><td>Thấp hơn train</td><td>Bất thường</td><td>Tập validation quá dễ, hoặc chia dữ liệu sai, hoặc có dropout đang bật lúc đo train</td></tr>
+  </table>
+
+  <div class="note warn">
+    <h4>Khi kết quả "quá tốt"</h4>
+    Nếu lỗi validation gần bằng 0 hoặc AUC trên 0.99 ở một bài toán thật, khả năng cao nhất <strong>không</strong> phải bạn vừa làm ra một model xuất sắc — mà là có rò rỉ dữ liệu. Phản xạ đúng là đi soi lại <a href="../train-val-test-cv/index.html">cách chia dữ liệu và các nguồn rò rỉ</a> trước khi ăn mừng. Trong phỏng vấn, nói được phản xạ này là một điểm cộng đáng kể.
+  </div>
+</section>
+
+<section id="overfit-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Learning curve — thiếu dữ liệu hay thiếu model</h2></div>
+
+  <p class="key">Bảng ở mục trên nói model đang hỏng kiểu gì. <em>Learning curve nói tiếp: đi thu thập thêm dữ liệu có đáng không.</em></p>
+
+  <p>Vẽ lỗi train và lỗi validation theo <strong>số lượng mẫu huấn luyện</strong>. Hình dạng cho câu trả lời trực tiếp cho câu hỏi tốn kém nhất của một dự án.</p>
+
+<pre><code>Trường hợp A — khoảng cách LỚN, lỗi train thấp:
+  lỗi
+   │  val ─────────╮
+   │                ╰──────╮
+   │  train ─────────────────
+   └──────────────────── số mẫu
+  → variance cao. Hai đường ĐANG tiến gần nhau
+  → THÊM DỮ LIỆU SẼ GIÚP
+
+Trường hợp B — hai đường đã gặp nhau ở mức CAO:
+  lỗi
+   │  val ────────────────────
+   │  train ───────────────────
+   └──────────────────── số mẫu
+  → bias cao. Thêm dữ liệu KHÔNG giúp gì
+  → cần đặc trưng mới hoặc model mạnh hơn</code></pre>
+
+  <div class="note key">
+    <h4>Vì sao đây là đồ thị đáng vẽ nhất</h4>
+    Thu thập và gán nhãn dữ liệu là việc đắt nhất trong một dự án ML. Learning curve trả lời được câu "thêm 10.000 mẫu nữa có đáng không" bằng <em>bằng chứng</em> thay vì phỏng đoán: nếu hai đường đã dính nhau thì thêm dữ liệu chỉ tốn tiền. Đây là câu trả lời rất mạnh cho câu hỏi "làm sao anh biết cần thêm dữ liệu".
+  </div>
+</section>
+
+<section id="overfit-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Cách regularize</h2></div>
+
+  <p class="key"><b>Regularization</b> là mọi cách <em>cố ý hạn chế model lại</em> để nó không học thuộc nhiễu — dù phải chấp nhận sai hơn một chút trên dữ liệu train.</p>
+
+  <p>Nghe ngược đời: chủ động làm model tệ đi trên chính dữ liệu đang có. Nhưng lỗi train không phải thứ cần tối ưu — <a href="../../01-overview/ml-overview/index.html">generalization</a> mới là. Hạn chế đó có nhiều dạng: cộng một số hạng phạt vào loss, cắt bớt sức mạnh của model, dừng sớm, hoặc làm nhiễu dữ liệu đi. Dạng nào cũng là <b>cùng một giao dịch</b>: thêm chút bias để đổi lấy giảm nhiều variance. Khác nhau ở chỗ trả giá bằng gì.</p>
+
+  <table>
+    <tr><th>Cách</th><th>Cơ chế</th><th>Dùng cho</th></tr>
+    <tr><td><strong>Thêm dữ liệu</strong></td><td>Nhiễu khó học thuộc hơn khi có nhiều mẫu</td><td>Luôn tốt nhất nếu khả thi</td></tr>
+    <tr><td>L2 (weight decay)</td><td>Phạt tổng bình phương trọng số → trọng số nhỏ đều</td><td>Model tuyến tính, mạng nơ-ron</td></tr>
+    <tr><td>L1</td><td>Phạt tổng trị tuyệt đối → một số trọng số về đúng 0</td><td>Khi nghi phần lớn đặc trưng vô dụng</td></tr>
+    <tr><td>Dropout</td><td>Tắt ngẫu nhiên một phần nơ-ron khi train → mạng không phụ thuộc vài đường dẫn</td><td>Mạng nơ-ron; tắt khi suy luận</td></tr>
+    <tr><td>Early stopping</td><td>Dừng khi lỗi validation bắt đầu tăng</td><td><strong>Mọi</strong> phương pháp lặp — boosting, mạng nơ-ron</td></tr>
+    <tr><td>Data augmentation</td><td>Sinh biến thể hợp lý của mẫu — lật ảnh, đổi từ đồng nghĩa</td><td>Ảnh, âm thanh, văn bản</td></tr>
+  </table>
+
+  <p><strong>Giảm độ phức tạp</strong> cũng là regularization dù ít được gọi tên như vậy: giảm <code>max_depth</code> của cây, giảm số lớp của mạng, bỏ đặc trưng. Thường là cách nhanh nhất để thử.</p>
+
+  <ul class="why">
+    <li>L1 và L2 khác nhau ở <b>hình dạng vùng phạt</b>, và khác biệt đó dẫn tới việc L1 đẩy trọng số về đúng 0 còn L2 thì không — Ridge, Lasso và Elastic Net là ba cách trộn hai hình phạt này.</li>
+    <li>Thứ tự thử hợp lý: giảm độ phức tạp trước (rẻ và nhanh thấy kết quả), rồi tới regularization có tham số, rồi mới tính chuyện thu thập thêm dữ liệu.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Early stopping là món rẻ nhất trong bảng</h4>
+    Không cần thêm tham số, không cần thêm dữ liệu, và nó tự tìm điểm dừng tối ưu. Với boosting thì nó <strong>bắt buộc</strong>, vì <code>n_estimators</code> quá lớn chắc chắn dẫn tới overfit. Cách làm đúng: đặt số vòng lặp rất lớn, theo dõi lỗi trên tập validation, dừng khi không cải thiện sau n vòng liên tiếp, rồi quay lại lấy trọng số của vòng tốt nhất.
+  </div>
+</section>
+
+<section id="overfit-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Tinh chỉnh siêu tham số</h2></div>
+
+  <p class="key">Cường độ regularization là một siêu tham số — <em>và tìm nó là một bài toán tìm kiếm có ngân sách</em>. Cách tiêu ngân sách quyết định kết quả nhiều hơn người ta tưởng.</p>
+
+  <table>
+    <tr><th>Cách</th><th>Cơ chế</th><th>Ưu / nhược</th></tr>
+    <tr><td>Grid search</td><td>Thử mọi tổ hợp trên lưới định trước</td><td>Đầy đủ nhưng số tổ hợp tăng theo hàm mũ số tham số</td></tr>
+    <tr><td><strong>Random search</strong></td><td>Lấy mẫu ngẫu nhiên trong không gian</td><td>Thường tốt hơn grid với cùng ngân sách — xem dưới</td></tr>
+    <tr><td>Bayesian / TPE</td><td>Dùng kết quả đã thử để đoán vùng đáng thử tiếp</td><td>Hiệu quả nhất khi mỗi lần thử rất đắt; thêm phức tạp</td></tr>
+    <tr><td>Successive halving</td><td>Thử nhiều cấu hình với ít tài nguyên, loại dần, dồn tài nguyên cho cái sống sót</td><td>Rất hiệu quả cho mạng nơ-ron và boosting</td></tr>
+  </table>
+
+  <h3>Vì sao random thắng grid</h3>
+<pre><code>Ngân sách 9 lần thử, 2 tham số — nhưng chỉ MỘT tham số thật sự quan trọng.
+
+Grid 3×3:      chỉ thử 3 giá trị KHÁC NHAU của tham số quan trọng
+               (mỗi giá trị bị lặp 3 lần với 3 giá trị của tham số vô dụng)
+
+Random 9 lần:  thử 9 giá trị KHÁC NHAU của tham số quan trọng
+               → khả năng tìm được vùng tốt cao gấp ba</code></pre>
+
+  <p>Đây là kết quả của Bergstra và Bengio, và trực giác rất rõ: grid <strong>lãng phí ngân sách để dò kỹ những chiều không quan trọng</strong>. Trong thực tế, phần lớn siêu tham số ít ảnh hưởng và chỉ vài cái quyết định — nên random search gần như luôn là lựa chọn mặc định tốt hơn.</p>
+
+  <div class="note">
+    <h4>Mẹo về khoảng lấy mẫu</h4>
+    Với tham số trải qua nhiều bậc độ lớn — learning rate, hệ số regularization — hãy lấy mẫu theo <strong>thang logarithm</strong>, không phải thang đều. Lấy đều trong khoảng 0.0001 tới 0.1 thì 99% mẫu rơi vào vùng lớn hơn 0.001, bỏ sót hoàn toàn vùng nhỏ.
+  </div>
+</section>
+
+<section id="overfit-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Validation tốt nhưng production tệ</h2></div>
+
+  <p class="key">Chữa xong overfit trên tập offline vẫn chưa xong việc. <em>Còn một lớp hỏng nữa chỉ hiện ra khi model gặp dữ liệu thật.</em></p>
+
+  <table>
+    <tr><th>Nguyên nhân</th><th>Dấu hiệu</th><th>Kiểm tra</th></tr>
+    <tr><td><strong>Rò rỉ dữ liệu</strong></td><td>Điểm offline cao bất thường</td><td>Soi từng đặc trưng: giá trị này có sẵn lúc dự đoán chưa?</td></tr>
+    <tr><td><strong>Training–serving skew</strong></td><td>Cùng một đầu vào cho hai kết quả khác nhau ở hai môi trường</td><td>Ghi lại đặc trưng lúc phục vụ, so với đặc trưng lúc huấn luyện</td></tr>
+    <tr><td>Data drift</td><td>Phân phối đặc trưng đổi theo thời gian</td><td>Theo dõi phân phối từng đặc trưng, so với lúc huấn luyện</td></tr>
+    <tr><td>Concept drift</td><td>Quan hệ giữa x và y đổi — hành vi người dùng thay đổi</td><td>Theo dõi hiệu năng theo thời gian; huấn luyện lại định kỳ</td></tr>
+    <tr><td>Chia dữ liệu sai</td><td>Xáo trộn chuỗi thời gian, hoặc cùng nhóm ở hai bên</td><td>Chia lại theo <a href="../train-val-test-cv/index.html">thời gian hoặc theo nhóm</a> rồi đo lại</td></tr>
+    <tr><td>Vòng phản hồi</td><td>Model ảnh hưởng tới dữ liệu mà nó sẽ được huấn luyện tiếp trên đó</td><td>Chèn thêm phần khám phá ngẫu nhiên vào lưu lượng</td></tr>
+  </table>
+
+  <div class="note key">
+    <h4>Training–serving skew là nguyên nhân bị coi nhẹ nhất</h4>
+    Đặc trưng được tính bằng SQL lúc huấn luyện và bằng Python lúc phục vụ, hai bản cùng tên nhưng khác nhau ở cách xử lý giá trị thiếu, khác múi giờ, khác cách làm tròn. Model không hề biết và không báo lỗi — nó chỉ kém đi một cách khó hiểu. Đây là lý do <strong>feature store</strong> tồn tại: một nơi duy nhất định nghĩa đặc trưng cho cả hai đường.
+  </div>
+</section>
+
+<section id="overfit-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Chữa overfit bằng cách đổi model</h4><p>Đổi sang model mạnh hơn khi đang variance cao là làm nặng thêm. Đọc chẩn đoán trước, chọn thuốc sau.</p></div>
+    <div class="card bad"><h4>Thêm dữ liệu khi vấn đề là bias</h4><p>Learning curve đã dính nhau thì thêm mẫu chỉ tốn tiền. Cần đặc trưng mới hoặc model mạnh hơn.</p></div>
+    <div class="card bad"><h4>Tăng regularization tới mức underfit</h4><p>Chữa quá tay là rơi sang phía kia. Luôn theo dõi <em>cả hai</em> con số, không chỉ khoảng cách giữa chúng.</p></div>
+    <div class="card bad"><h4>Quên tắt dropout khi suy luận</h4><p>Kết quả dao động giữa các lần chạy và kém hơn thực lực của model.</p></div>
+    <div class="card bad"><h4>Boosting không đặt early stopping</h4><p><code>n_estimators</code> lớn thì overfit là chắc chắn, chỉ là sớm hay muộn.</p></div>
+    <div class="card bad"><h4>Lấy mẫu learning rate theo thang đều</h4><p>Bỏ sót vùng giá trị nhỏ. Dùng thang logarithm.</p></div>
+  </div>
+</section>
+
+<section id="overfit-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>Làm sao biết model đang overfit hay underfit?</summary>
+  <p>So lỗi train với lỗi validation. Cả hai cao và gần nhau là underfit, tức bias cao — cần đặc trưng tốt hơn hoặc model mạnh hơn. Lỗi train thấp mà validation cao là overfit, tức variance cao — cần thêm dữ liệu, tăng regularization, hoặc giảm độ phức tạp. Nếu cả hai đều rất thấp thì tôi đi kiểm tra rò rỉ dữ liệu trước khi tin, vì kết quả quá tốt ở bài toán thật thường là dấu hiệu rò rỉ.</p></details>
+
+  <details class="qa"><summary>Thêm dữ liệu có luôn giúp không?</summary>
+  <p>Không. Nó giúp khi vấn đề là variance, không giúp khi vấn đề là bias. Cách quyết định bằng bằng chứng là vẽ learning curve — lỗi train và validation theo số lượng mẫu. Nếu hai đường còn khoảng cách và đang tiến gần nhau thì thêm dữ liệu sẽ có tác dụng. Nếu chúng đã gặp nhau ở mức lỗi cao thì model đang bị chặn bởi bias, thêm dữ liệu chỉ tốn tiền — lúc đó cần đặc trưng mới hoặc model mạnh hơn.</p></details>
+
+  <details class="qa"><summary>Random search hay grid search?</summary>
+  <p>Random, gần như luôn. Với cùng ngân sách, grid lãng phí phần lớn số lần thử để dò kỹ những chiều không quan trọng: lưới 3×3 chỉ thử 3 giá trị khác nhau của tham số thật sự quan trọng, còn random 9 lần thì thử 9 giá trị khác nhau. Vì trong thực tế chỉ vài siêu tham số quyết định, random tìm được vùng tốt nhanh hơn nhiều. Một chi tiết quan trọng: với learning rate hay hệ số regularization thì phải lấy mẫu theo thang logarithm, nếu không sẽ bỏ sót hoàn toàn vùng giá trị nhỏ.</p></details>
+
+  <details class="qa"><summary>Vì sao early stopping được coi là regularization?</summary>
+  <p>Vì nó giới hạn độ phức tạp <em>hiệu dụng</em> của model. Một mạng nơ-ron hay một model boosting càng huấn luyện lâu thì càng bám sát dữ liệu train, kể cả phần nhiễu. Dừng sớm nghĩa là không cho nó đi tới mức đó — cùng tác dụng như phạt trọng số, nhưng trả giá bằng thời gian huấn luyện thay vì bằng một hệ số phải chỉnh.</p></details>
+
+  <details class="qa"><summary>Validation tốt nhưng lên production kém — bạn kiểm tra gì?</summary>
+  <p>Theo thứ tự. Rò rỉ dữ liệu trong tập offline — soi từng đặc trưng bằng câu hỏi giá trị này có sẵn lúc dự đoán chưa. Training–serving skew — đặc trưng tính bằng hai cách ở hai môi trường, khác nhau ở xử lý giá trị thiếu hay múi giờ, và model không báo lỗi mà chỉ kém đi; đây là nguyên nhân bị coi nhẹ nhất và là lý do feature store tồn tại. Cách chia dữ liệu — có xáo trộn chuỗi thời gian hoặc để cùng nhóm ở hai bên không. Rồi mới tới drift phân phối và vòng phản hồi từ chính model.</p></details>
+</section>
+
+<footer>Machine learning · Core concepts · chẩn đoán và cách chữa. Phân rã sai số ở <a href="../bias-variance-tradeoff/index.html">Bias–variance tradeoff</a>; cách chia dữ liệu ở <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

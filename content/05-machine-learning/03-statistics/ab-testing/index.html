@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A/B testing — MazeAI</title>
+<meta name="description" content="Thiết kế thí nghiệm, vấn đề nhìn sớm, năm cái bẫy thực tế, ý nghĩa thống kê so với ý nghĩa thực tiễn, và checklist trước khi triển khai.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/03-statistics/ab-testing/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="A/B testing">
+<meta property="og:description" content="Thiết kế thí nghiệm, vấn đề nhìn sớm, năm cái bẫy thực tế, ý nghĩa thống kê so với ý nghĩa thực tiễn, và checklist trước khi triển khai.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/03-statistics/ab-testing/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-abtest" data-title="A/B testing" data-tag="Statistics" data-blurb="Thiết kế thí nghiệm, vấn đề nhìn sớm, năm cái bẫy thực tế, ý nghĩa thống kê so với ý nghĩa thực tiễn, và checklist trước khi triển khai.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Statistics &amp; experimentation</p>
+  <h1>A/B <em>testing</em></h1>
+  <p class="lede">Phần toán đã xong ở bài trước; phần hỏng nhiều nhất trong thực tế nằm ở <b>chia nhóm, thời điểm dừng và chọn metric</b>. Bài này đi qua thiết kế một thí nghiệm, vì sao liếc kết quả giữa chừng làm tỉ lệ báo nhầm vọt lên, và checklist phải chạy trước khi tin một kết quả thắng.</p>
+</header>
+
+<section id="abtest-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>A/B test là thống kê cộng thêm hạ tầng</h2></div>
+
+  <p class="key">Phần toán đã xong ở bài trước. Phần <em>hỏng nhiều nhất trong thực tế</em> lại nằm ở chia nhóm, thời điểm dừng, và chọn metric.</p>
+
+  <ul class="why">
+    <li>Một test đúng về mặt công thức vẫn cho kết luận sai nếu <b>chia nhóm theo phiên thay vì theo người</b> — cùng một người rơi vào cả hai nhánh.</li>
+    <li>Và cái bẫy lớn nhất không phải công thức mà là <b>nhìn sớm</b>: cứ liếc kết quả mỗi ngày rồi dừng khi thấy p nhỏ thì tỉ lệ báo nhầm vọt lên nhiều lần.</li>
+  </ul>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Phần p-value, power, sample size và confidence interval nằm ở bài
+    <a href="../statistics/index.html">Thống kê cho phỏng vấn</a>.
+  </div>
+</section>
+
+<section id="abtest-s2">
+  <div class="sh"><b>02</b><h2>Thiết kế A/B test</h2></div>
+  <table>
+    <tr><th>Quyết định</th><th>Nội dung</th><th>Bẫy</th></tr>
+    <tr><td><strong>Đơn vị chia nhóm</strong></td><td>Chia theo người dùng, không theo phiên hoặc theo request</td><td>Chia theo phiên: một người thấy cả hai phiên bản, trải nghiệm không nhất quán và các quan sát không độc lập</td></tr>
+    <tr><td><strong>Metric chính</strong></td><td>Chọn <em>một</em>, chốt trước khi chạy</td><td>Đo 20 metric rồi báo cáo cái nào thắng — xem mục 09</td></tr>
+    <tr><td><strong>Guardrail</strong></td><td>Những metric không được xấu đi: độ trễ, tỉ lệ lỗi, tỉ lệ huỷ</td><td>Thắng metric chính nhưng làm tăng thời gian tải trang</td></tr>
+    <tr><td><strong>Ngẫu nhiên hoá</strong></td><td>Băm id người dùng cộng với id thí nghiệm</td><td>Băm chỉ theo id người dùng: người vào nhóm A ở test này luôn vào nhóm A ở mọi test sau</td></tr>
+    <tr><td><strong>Thời gian chạy</strong></td><td>Tính từ sample size, và tối thiểu một tuần trọn</td><td>Chạy ba ngày giữa tuần: bỏ mất hành vi cuối tuần</td></tr>
+    <tr><td><strong>Kiểm tra tính đúng đắn</strong></td><td>A/A test, kiểm tra tỉ lệ chia mẫu</td><td>Tin tưởng hệ thống chia nhóm mà chưa từng kiểm chứng</td></tr>
+  </table>
+  <div class="note">
+    <h4>A/A test — bước bị bỏ qua nhiều nhất</h4>
+    Chạy thí nghiệm với hai nhóm <em>giống hệt nhau</em>. Về lý thuyết không được có khác biệt có ý nghĩa. Nếu có, hệ thống thí nghiệm của bạn đang lỗi: chia nhóm thiên lệch, ghi log sai, hoặc metric tính khác nhau ở hai đường. Đây là cách duy nhất kiểm chứng nền tảng trước khi tin bất kỳ kết quả A/B nào.
+  </div>
+</section>
+
+<section id="abtest-s3">
+  <div class="sh"><b>03</b><h2>Nhìn sớm — vấn đề peeking</h2></div>
+<pre><code>Kiểm tra p-value mỗi ngày trong 14 ngày, dừng ngay khi thấy p &lt; 0.05.
+
+Tỉ lệ dương giả thật sự KHÔNG còn là 5%.
+Với khoảng 10 lần nhìn, nó lên tới 20–30%.
+
+Lý do: mỗi lần nhìn là một cơ hội để nhiễu ngẫu nhiên vượt ngưỡng.
+Nhìn đủ nhiều lần thì gần như CHẮC CHẮN sẽ có lúc p &lt; 0.05,
+kể cả khi hai phiên bản y hệt nhau.</code></pre>
+  <p>Đây là lỗi phổ biến nhất và tốn kém nhất trong A/B test thực tế, vì nó tạo ra một dòng chảy đều đặn những "cải tiến" không tồn tại.</p>
+  <table>
+    <tr><th>Cách xử lý</th><th>Cơ chế</th><th>Đánh đổi</th></tr>
+    <tr><td><strong>Chốt sample size trước</strong></td><td>Tính n, chạy đủ, chỉ phân tích một lần ở cuối</td><td>Đơn giản nhất và đúng nhất; nhưng không dừng sớm được</td></tr>
+    <tr><td>Sequential testing<br><span class="cm">alpha spending</span></td><td>Phân bổ alpha cho từng lần nhìn theo kế hoạch định trước</td><td>Dừng sớm hợp lệ; cần chuẩn bị trước, không dùng ngưỡng 0.05 nữa</td></tr>
+    <tr><td>Bayesian</td><td>Báo cáo xác suất hậu nghiệm thay vì p-value</td><td>Nhìn bất cứ lúc nào cũng hợp lệ về mặt diễn giải; cần chọn tiên nghiệm</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Điều nên nói khi bên sản phẩm muốn dừng sớm</h4>
+    Nhu cầu dừng sớm là chính đáng — chạy một biến thể tệ thêm mười ngày cũng tốn tiền. Câu trả lời đúng <strong>không phải</strong> cấm nhìn, mà là dùng phương pháp cho phép nhìn: sequential testing với alpha spending, hoặc Bayesian. Nói được điều này cho thấy bạn hiểu cả toán lẫn ràng buộc kinh doanh.
+  </div>
+</section>
+
+<section id="abtest-s4">
+  <div class="sh"><b>04</b><h2>Năm cái bẫy thực tế</h2></div>
+  <h3>1. Sample ratio mismatch</h3>
+<pre><code>Chia 50/50, nhưng dữ liệu về là 50.2% và 49.8% với hàng triệu người dùng.
+→ chênh lệch này quá lớn để là ngẫu nhiên → HỆ THỐNG CÓ LỖI
+
+Nguyên nhân thường gặp: một nhóm bị lỗi JavaScript nên không ghi log,
+bot bị lọc không đều, hoặc phiên bản mới tải chậm nên nhiều người thoát trước khi ghi nhận.
+
+→ Kết quả test KHÔNG dùng được. Phải sửa hệ thống rồi chạy lại.</code></pre>
+  <p>Đây là kiểm tra đầu tiên nên làm với mọi kết quả A/B, trước khi nhìn metric. Nó bắt được cả một lớp lỗi hạ tầng mà không có cách nào khác phát hiện.</p>
+  <h3>2. Nghịch lý Simpson</h3>
+<pre><code>Tổng thể:   B thắng A
+Chia theo thiết bị:
+  desktop:  A thắng B
+  mobile:   A thắng B
+
+Xảy ra khi tỉ lệ desktop/mobile khác nhau giữa hai nhóm — thường vì
+thí nghiệm bắt đầu ở thời điểm khác nhau, hoặc lấy mẫu không đồng đều.</code></pre>
+  <h3>3. Tác động của cái mới</h3>
+  <p>Người dùng cũ phản ứng với sự <em>thay đổi</em>, không phải với chất lượng của phiên bản mới. Chỉ số tăng trong tuần đầu rồi về lại mức cũ. Cách xử lý: chạy đủ lâu, và phân tích riêng người dùng mới — họ không có thói quen cũ nên không bị hiệu ứng này.</p>
+  <h3>4. Hiệu ứng mạng</h3>
+  <p>Với sản phẩm có tương tác giữa người dùng — nhắn tin, chia sẻ, đấu giá — nhóm A và nhóm B <strong>ảnh hưởng lẫn nhau</strong>, phá vỡ giả định độc lập. Cách xử lý: chia nhóm theo cụm (theo thành phố, theo nhóm bạn bè) thay vì theo từng người.</p>
+  <h3>5. Tác động dài hạn khác ngắn hạn</h3>
+  <p>Gửi nhiều thông báo hơn làm tăng lượt truy cập tuần này và tăng tỉ lệ tắt thông báo trong ba tháng. Cách xử lý: giữ một nhóm giữ nguyên trong thời gian dài để đo tác động tích luỹ, và luôn có guardrail dài hạn như tỉ lệ huỷ hoặc tỉ lệ tắt thông báo.</p>
+</section>
+
+<section id="abtest-s5">
+  <div class="sh"><b>05</b><h2>Ý nghĩa thống kê và ý nghĩa thực tiễn</h2></div>
+<pre><code>Test với 10 triệu người dùng:
+    B tăng tỉ lệ nhấp 0.02%, p = 0.001  ← có ý nghĩa THỐNG KÊ rất mạnh
+
+Nhưng:
+    doanh thu tăng thêm mỗi năm   ≈  50 triệu đồng
+    chi phí bảo trì tính năng mới ≈ 500 triệu đồng
+    → KHÔNG có ý nghĩa THỰC TIỄN → không triển khai</code></pre>
+  <p>Với sample size đủ lớn, <em>mọi</em> khác biệt đều trở nên có ý nghĩa thống kê — kể cả khác biệt vô nghĩa về mặt kinh doanh. Vì vậy quy trình đúng là <strong>chốt ngưỡng có ý nghĩa thực tiễn trước khi chạy test</strong>, rồi mới tính sample size để phát hiện được ngưỡng đó.</p>
+  <div class="note key">
+    <h4>Ba câu hỏi khép lại một A/B test</h4>
+    <p><strong>1. Có khác biệt không?</strong> → p-value.</p>
+    <p><strong>2. Khác biệt bao nhiêu, và biết chắc đến mức nào?</strong> → độ lớn tác động và confidence interval.</p>
+    <p><strong>3. Mức đó có đủ để đáng làm?</strong> → so với ngưỡng thực tiễn đã chốt trước, tính bằng tiền hoặc bằng chỉ số kinh doanh.</p>
+    Chỉ trả lời câu một là câu trả lời của người mới. Trả lời cả ba là câu trả lời của người đã ra quyết định thật.
+  </div>
+</section>
+
+<section id="abtest-s6">
+  <div class="sh"><b>06</b><h2>Checklist một A/B test</h2></div>
+  <ol>
+    <li><strong>Trước:</strong> chốt một metric chính, danh sách guardrail, và ngưỡng có ý nghĩa thực tiễn.</li>
+    <li><strong>Trước:</strong> tính sample size từ alpha, power, MDE; suy ra số ngày cần chạy.</li>
+    <li><strong>Trước:</strong> xác định đơn vị chia nhóm là người dùng, và kiểm tra hàm băm có trộn id thí nghiệm.</li>
+    <li><strong>Trước:</strong> đã từng chạy A/A test để kiểm chứng hệ thống chưa.</li>
+    <li><strong>Trong:</strong> chỉ theo dõi tính đúng đắn — tỉ lệ chia mẫu, tỉ lệ lỗi. Không nhìn metric chính.</li>
+    <li><strong>Trong:</strong> chạy đủ tuần trọn để phủ chu kỳ ngày trong tuần.</li>
+    <li><strong>Sau:</strong> kiểm tra sample ratio mismatch <em>trước</em> khi xem kết quả.</li>
+    <li><strong>Sau:</strong> báo độ lớn tác động kèm confidence interval, không chỉ p-value.</li>
+    <li><strong>Sau:</strong> kiểm tra guardrail; kiểm tra kết quả có nhất quán giữa các phân khúc chính.</li>
+    <li><strong>Sau:</strong> so với ngưỡng thực tiễn đã chốt ở bước 1 rồi mới ra quyết định.</li>
+  </ol>
+</section>
+
+<section id="abtest-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Ba lỗi vận hành này làm hỏng kết quả trước cả khi tính tới công thức.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Dừng test khi thấy p &lt; 0.05</h4><p>Tỉ lệ dương giả lên 20–30%. Chốt sample size trước, hoặc dùng sequential testing.</p></div>
+    <div class="card bad"><h4>Chia nhóm theo phiên thay vì theo người</h4><p>Một người thấy cả hai phiên bản; các quan sát không độc lập.</p></div>
+    <div class="card bad"><h4>Bỏ qua kiểm tra tỉ lệ chia mẫu</h4><p>Bỏ lỡ cả một lớp lỗi hạ tầng làm mọi kết quả vô nghĩa.</p></div>
+  </div>
+</section>
+
+<section id="abtest-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Vì sao không được nhìn kết quả giữa lúc test đang chạy?</summary>
+  <p>Vì mỗi lần nhìn là một cơ hội để nhiễu ngẫu nhiên vượt ngưỡng. Nếu kiểm p-value hằng ngày và dừng ngay khi thấy dưới 0.05 thì tỉ lệ dương giả thật sự không còn là 5% mà lên tới 20–30% với khoảng mười lần nhìn — kể cả khi hai phiên bản y hệt nhau. Cách đúng là chốt sample size trước rồi chỉ phân tích một lần. Nhưng nhu cầu dừng sớm là chính đáng, nên nếu cần thì dùng sequential testing với alpha spending, hoặc phương pháp Bayes — cả hai cho phép nhìn nhiều lần một cách hợp lệ.</p></details>
+
+  <details class="qa"><summary>Kết quả cho thấy B thắng, bạn kiểm tra gì trước khi triển khai?</summary>
+  <p>Đầu tiên là sample ratio mismatch — nếu tỉ lệ chia lệch quá mức ngẫu nhiên thì hệ thống có lỗi và mọi con số vô nghĩa. Rồi kiểm tra guardrail: độ trễ, tỉ lệ lỗi, tỉ lệ huỷ có xấu đi không. Rồi xem kết quả có nhất quán giữa các phân khúc chính không — để loại trừ nghịch lý Simpson. Rồi xét tác động của cái mới bằng cách phân tích riêng người dùng mới. Cuối cùng so độ lớn tác động với ngưỡng có ý nghĩa thực tiễn đã chốt từ trước: có ý nghĩa thống kê không đồng nghĩa với đáng triển khai.</p></details>
+
+  <details class="qa"><summary>Chia nhóm theo người hay theo phiên?</summary>\n  <p>Gần như luôn là <b>theo người</b>, bằng cách băm một id ổn định. Chia theo phiên làm cùng một người rơi vào cả hai nhánh ở những lần truy cập khác nhau — trải nghiệm bất nhất, và quan trọng hơn là <b>các quan sát không còn độc lập</b> nên sai số chuẩn bị đánh giá thấp và p-value quá lạc quan. Khi hiệu ứng có thể lan giữa người dùng — mạng xã hội, sàn hai chiều — thì phải lên một mức nữa: chia theo cụm hoặc theo vùng địa lý.</p></details>
+
+  <details class="qa"><summary>Test chạy đủ sample size nhưng kết quả không có ý nghĩa thống kê — làm gì tiếp?</summary>\n  <p>Trước hết <b>đừng chạy thêm cho tới khi nó đẹp</b> — đó chính là peeking. Nhìn <b>confidence interval</b> thay vì p-value: nếu nó hẹp và nằm gọn quanh 0 thì đây là kết luận thật, hiệu ứng nhỏ hơn mức đáng quan tâm; nếu nó rộng thì test bị thiếu power và câu trả lời là chưa biết. Rồi mới tới tách nhóm nhỏ để tìm giả thuyết mới, nhưng phải coi đó là <b>khám phá</b> cần một test riêng để xác nhận.</p></details>
+</section>
+
+<footer>Machine learning · Statistics &amp; experimentation · phần p-value, power và confidence interval nằm ở bài <a href="../statistics/index.html">Statistics</a>. Chặng tiếp theo của kệ: <a href="../../04-core-concepts/core-concepts-overview/index.html">Core concepts</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

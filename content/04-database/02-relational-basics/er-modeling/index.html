@@ -39,45 +39,173 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-ermod" data-skeleton="1" data-title="Schema design" data-tag="Database" data-blurb="Từ một đoạn mô tả nghiệp vụ ra sơ đồ thực thể — quan hệ, rồi ra bảng: quan hệ 1-n, n-n, bảng nối.">
+      <article class="doc" id="art-ermod" data-title="Schema design" data-tag="Database" data-blurb="Từ một đoạn mô tả nghiệp vụ ra sơ đồ thực thể — quan hệ, rồi ra bảng: quan hệ 1-n, n-n, bảng nối.">
         <header class="hero">
   <p class="eyebrow">Cơ sở dữ liệu · SQL</p>
   <h1>Schema <em>design</em></h1>
-  <p class="lede">Kỹ năng bị hỏi thẳng trong vòng thiết kế: <b>cho một mô tả, vẽ ra bảng</b>.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
+  <p class="lede">Bài cuối của nhóm, và là bài <b>ráp lại</b>: <a href="../relational-model/index.html">khoá</a> cho biết bảng nối nhau bằng gì, <a href="../constraints-integrity/index.html">ràng buộc</a> cho biết database tự chặn được gì, <a href="../db-normalization/index.html">chuẩn hoá</a> cho biết tách tới đâu. Ở đây dùng cả ba để làm đúng một việc bị hỏi thẳng trong vòng thiết kế: <b>cho một đoạn mô tả, vẽ ra bảng</b>.</p>
 </header>
 
 <section id="ermod-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Thực thể và quan hệ</h2></div>
-  <p class="plan">Danh từ thành bảng, động từ thành quan hệ.</p>
+
+  <p class="key">Đọc mô tả nghiệp vụ như một câu tiếng Việt: <em>danh từ thành bảng, động từ nối hai danh từ thành quan hệ, tính từ của danh từ thành cột</em>.</p>
+
+  <p>Lấy một đoạn mô tả đúng kiểu người phỏng vấn đọc cho bạn nghe:</p>
+
+<pre><code><span class="cm">"Khách hàng đặt đơn hàng. Mỗi đơn gồm nhiều sản phẩm,
+ mỗi sản phẩm thuộc một danh mục. Khách có thể lưu
+ nhiều địa chỉ giao hàng."</span></code></pre>
+
+  <div class="flow">
+    <div class="n"><h5>1 · Gạch danh từ</h5><p>khách hàng · đơn hàng · sản phẩm · danh mục · địa chỉ</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Gạch động từ</h5><p>đặt · gồm · thuộc · lưu</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>3 · Hỏi "mấy?"</h5><p>một khách mấy đơn · một đơn mấy sản phẩm</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>4 · Ra bảng</h5><p>mỗi danh từ một bảng, mỗi quan hệ một khoá ngoại hoặc một bảng nối</p></div>
+  </div>
+
+  <ul class="why">
+    <li>Không phải danh từ nào cũng thành bảng. Thử một câu: <b>nó có tồn tại độc lập, và có thuộc tính riêng không?</b> "Danh mục" có (tên, mô tả, ảnh) → thành bảng. "Màu áo" chỉ là một chuỗi ký tự → chỉ là cột của <code>products</code>.</li>
+    <li>Bước 3 mới là bước quyết định. Cùng một động từ "gồm" nhưng trả lời "một" hay "nhiều" cho ra hai lược đồ khác hẳn nhau — mục sau nói kỹ.</li>
+    <li>Sơ đồ ER (entity–relationship) chỉ là <b>cách vẽ</b> ba bước trên ra giấy. Trong phỏng vấn không ai chấm ký hiệu chân chim (crow's foot) vẽ đẹp hay xấu — họ chấm bạn có hỏi đúng câu "mấy?" hay không.</li>
+  </ul>
 </section>
 
 <section id="ermod-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>1-1, 1-n, n-n</h2></div>
-  <p class="plan">Mỗi loại hiện ra thành bảng thế nào.</p>
+  <div class="sh"><b>02</b><h2>Cardinality</h2></div>
+
+  <p class="key">Với mỗi quan hệ, hỏi <em>hai chiều</em>: một A có mấy B, và một B có mấy A. Hai câu trả lời ghép lại quyết định khoá ngoại nằm ở đâu.</p>
+
+  <table>
+    <tr><th>Quan hệ</th><th>Ví dụ</th><th>Hiện ra thành</th><th>Khoá ngoại đặt ở đâu</th></tr>
+    <tr><td><b>1-1</b></td><td>Một user có đúng một hồ sơ</td><td>Hai bảng, hoặc gộp làm một</td><td>Ở bảng phụ, kèm <code>UNIQUE</code></td></tr>
+    <tr><td><b>1-n</b></td><td>Một khách có nhiều đơn</td><td>Hai bảng</td><td>Ở bảng "nhiều" — <code>orders.customer_id</code></td></tr>
+    <tr><td><b>n-n</b></td><td>Một đơn nhiều sản phẩm, một sản phẩm nhiều đơn</td><td><b>Ba</b> bảng</td><td>Hai khoá ngoại ở bảng thứ ba — xem mục 03</td></tr>
+  </table>
+
+<pre><code><span class="cm">-- 1-n: khoá ngoại LUÔN nằm ở bảng phía "nhiều"</span>
+customers(<span class="kw">id</span>, name)
+orders(<span class="kw">id</span>, customer_id → customers.id, created_at)
+<span class="cm">-- đặt ngược lại (customers.order_id) là không thể:
+--   một khách có 10 đơn thì nhét 10 giá trị vào một ô kiểu gì?</span></code></pre>
+
+  <div class="note key">
+    <h4>1-1 — gộp hay tách</h4>
+    Quan hệ 1-1 hầu như luôn <b>gộp được</b> vào một bảng. Chỉ tách khi có lý do cụ thể: nhóm cột hiếm dùng và cồng kềnh (ảnh, mô tả dài) để bảng chính gọn hơn, nhóm cột nhạy cảm để phân quyền riêng, hoặc phần lớn dòng để trống nhóm cột đó. Không có lý do nào trong ba lý do trên thì tách chỉ tạo thêm một JOIN cho mọi truy vấn.
+  </div>
+
+  <p>Còn một chiều nữa hay bị quên: <b>bắt buộc hay tuỳ chọn</b> (participation). "Mỗi đơn hàng <em>phải</em> thuộc một khách" khác với "một đơn <em>có thể</em> chưa gán khách" — chiều này quyết định cột khoá ngoại là <code>NOT NULL</code> hay cho phép <code>NULL</code>, chứ không đổi số bảng.</p>
 </section>
 
 <section id="ermod-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Bảng nối</h2></div>
-  <p class="plan">n-n luôn cần bảng thứ ba — một hình.</p>
+
+  <p class="key">Quan hệ n-n <em>luôn</em> cần một bảng thứ ba. Không phải quy ước cho đẹp — không có cách nào khác.</p>
+
+<pre><code>orders                order_items                products
+┌────┬──────────┐    ┌──────────┬────────────┐  ┌────┬──────────┐
+│ id │ khách_id │    │ order_id │ product_id │  │ id │ tên      │
+├────┼──────────┤    ├──────────┼────────────┤  ├────┼──────────┤
+│ 1  │ 7        │◄───┤ 1        │ 55         ├─►│ 55 │ Bàn phím │
+│ 2  │ 7        │◄───┤ 1        │ 91         ├─►│ 91 │ Chuột    │
+└────┴──────────┘◄───┤ 2        │ 55         ├─►└────┴──────────┘
+                     └──────────┴────────────┘
+   một đơn ─── nhiều dòng ───► order_items ◄─── nhiều dòng ─── một sản phẩm
+   n-n bị bẻ thành HAI quan hệ 1-n, mỗi bên một cái</code></pre>
+
+  <ul class="why">
+    <li>Vì sao bắt buộc: khoá ngoại là <b>một ô, một giá trị</b>. Đơn 1 có hai sản phẩm thì không nhét được hai <code>product_id</code> vào một ô — bẻ đôi thành hai quan hệ 1-n là cách duy nhất giữ được ràng buộc và tra cứu.</li>
+    <li>Bảng nối thường có <b>cột của riêng nó</b> — thông tin chỉ có nghĩa khi gắn với đúng một cặp: <code>quantity</code>, <code>price_at_purchase</code>, <code>added_at</code>. Đây là dấu hiệu nó không chỉ là "bảng kỹ thuật" mà là một thực thể thật (một dòng trong hoá đơn).</li>
+    <li>Khoá chính của nó thường là <b>khoá tổ hợp</b> <code>(order_id, product_id)</code> — vừa định danh vừa chặn luôn việc thêm trùng một sản phẩm hai lần vào cùng đơn.</li>
+  </ul>
+
+<pre><code>CREATE TABLE order_items (
+  order_id           BIGINT <span class="kw">NOT NULL</span> REFERENCES orders(id) ON DELETE CASCADE,
+  product_id         BIGINT <span class="kw">NOT NULL</span> REFERENCES products(id) ON DELETE RESTRICT,
+  quantity           INT    <span class="kw">NOT NULL</span> CHECK (quantity &gt; <span class="st">0</span>),
+  price_at_purchase  NUMERIC(<span class="st">12</span>,<span class="st">2</span>) <span class="kw">NOT NULL</span>,
+  <span class="kw">PRIMARY KEY</span> (order_id, product_id)
+);</code></pre>
+
+  <div class="note">
+    <h4>Vì sao <code>price_at_purchase</code> chứ không JOIN sang <code>products.price</code></h4>
+    Giá sản phẩm đổi theo thời gian; hoá đơn cũ phải giữ giá <em>lúc mua</em>. Đây là một trong số ít trường hợp lặp dữ liệu <b>không phải</b> vi phạm chuẩn hoá — hai con số mang hai ý nghĩa khác nhau: một là "giá hiện tại", một là "giá đã chốt". Cùng lý do đó, <code>ON DELETE RESTRICT</code> ở <code>product_id</code>: xoá một sản phẩm đang nằm trong hoá đơn cũ là làm hỏng lịch sử.
+  </div>
 </section>
 
 <section id="ermod-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Bài mẫu</h2></div>
-  <p class="plan">Từ mô tả một sàn thương mại điện tử ra lược đồ đầy đủ.</p>
+  <div class="sh"><b>04</b><h2>Bài mẫu — sàn thương mại điện tử</h2></div>
+
+  <p class="key">Chạy đủ bốn bước của mục 01 trên đúng đoạn mô tả đầu bài, ra lược đồ hoàn chỉnh.</p>
+
+  <table>
+    <tr><th>Câu trong mô tả</th><th>Hỏi "mấy?"</th><th>Ra</th></tr>
+    <tr><td>Khách hàng <b>đặt</b> đơn hàng</td><td>1 khách → n đơn; 1 đơn → 1 khách</td><td>1-n · <code>orders.customer_id</code></td></tr>
+    <tr><td>Mỗi đơn <b>gồm</b> nhiều sản phẩm</td><td>1 đơn → n sản phẩm; 1 sản phẩm → n đơn</td><td>n-n · bảng <code>order_items</code></td></tr>
+    <tr><td>Sản phẩm <b>thuộc</b> một danh mục</td><td>1 sản phẩm → 1 danh mục; 1 danh mục → n sản phẩm</td><td>1-n · <code>products.category_id</code></td></tr>
+    <tr><td>Khách <b>lưu</b> nhiều địa chỉ</td><td>1 khách → n địa chỉ; 1 địa chỉ → 1 khách</td><td>1-n · <code>addresses.customer_id</code></td></tr>
+  </table>
+
+<pre><code>customers(<span class="kw">id</span>, name, email UNIQUE, created_at)
+   │ 1-n
+   ├──► addresses(<span class="kw">id</span>, customer_id, line1, city, is_default)
+   │ 1-n
+   └──► orders(<span class="kw">id</span>, customer_id, shipping_address_id, status, created_at)
+             │ n-n qua bảng nối
+             └──► order_items(order_id, product_id, quantity, price_at_purchase)
+                        │
+             products(<span class="kw">id</span>, name, price, category_id) ◄──┘
+                        │ n-1
+             categories(<span class="kw">id</span>, name, parent_id)</code></pre>
+
+  <ul class="why">
+    <li><code>orders.shipping_address_id</code> là một quan hệ <b>không có trong mô tả</b> — bạn phải tự hỏi: đơn hàng giao tới địa chỉ nào? Người phỏng vấn thường cố tình để trống chỗ này để xem bạn có hỏi lại không.</li>
+    <li><code>categories.parent_id</code> trỏ về chính bảng đó (self-reference) — cách chuẩn để biểu diễn danh mục nhiều tầng "Điện tử → Máy tính → Bàn phím". Truy vấn nó cần <a href="../../03-sql-basics/sql-subquery-cte/index.html">CTE đệ quy</a>.</li>
+    <li>Lược đồ này ở <b>3NF</b> — mỗi sự thật một chỗ. Nếu sau này báo cáo doanh thu quá chậm vì phải JOIN bốn bảng, đó là lúc cân nhắc <a href="../db-normalization/index.html">phi chuẩn hoá có chủ đích</a>, không phải bây giờ.</li>
+  </ul>
+
+  <div class="note key">
+    <h4>Ba câu nên hỏi lại trước khi vẽ</h4>
+    Vòng thiết kế chấm cả việc <b>làm rõ yêu cầu</b>, không chỉ cái lược đồ. Ba câu gần như luôn đáng hỏi: <b>(1)</b> có cần giữ lịch sử không — giá cũ, địa chỉ cũ, trạng thái cũ? <b>(2)</b> xoá thật hay đánh dấu đã xoá — người dùng xoá tài khoản thì đơn hàng cũ đi đâu? <b>(3)</b> quy mô bao nhiêu — vài nghìn dòng và vài trăm triệu dòng dẫn tới hai thiết kế khác nhau.
+  </div>
 </section>
 
 <section id="ermod-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
-  <p class="plan">Nhét mảng vào một cột, thiếu bảng nối, quá nhiều bảng tra.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Nhét mảng vào một cột</h4><p><code>tags = "sale,hot,new"</code> hay <code>product_ids = "55,91"</code>. Không tra được bằng index, không JOIN được, không ràng buộc được từng phần tử — và vi phạm 1NF ngay từ đầu. Tách thành bảng nối.</p></div>
+    <div class="card bad"><h4>Quên bảng nối cho n-n</h4><p>Cố nhét <code>order_id</code> vào <code>products</code> — thành ra một sản phẩm chỉ thuộc được đúng một đơn. Dấu hiệu: câu trả lời "mấy?" ở <em>cả hai chiều</em> đều là "nhiều" mà lược đồ chỉ có hai bảng.</p></div>
+    <div class="card bad"><h4>Bảng tra cho thứ chỉ có một cột</h4><p>Tạo hẳn <code>statuses(id, name)</code> cho bốn trạng thái đơn hàng cố định. Thêm một JOIN vào mọi truy vấn để đổi lấy gần như không gì — dùng <code>CHECK</code> hoặc kiểu <code>ENUM</code>. Chỉ tách bảng khi danh sách <em>người dùng sửa được</em> hoặc có thuộc tính riêng.</p></div>
+    <div class="card bad"><h4>Dùng natural key làm khoá chính</h4><p>Lấy <code>email</code> làm khoá chính của <code>customers</code>. Khách đổi email là phải sửa dây chuyền mọi bảng đang trỏ tới. Giữ <code>UNIQUE</code> trên email, nhưng khoá chính dùng <a href="../relational-model/index.html">surrogate key</a>.</p></div>
+    <div class="card bad"><h4>Cột lặp có đánh số</h4><p><code>phone1, phone2, phone3</code>. Khách thứ tư có bốn số thì sao — thêm cột? Đây là quan hệ 1-n bị nguỵ trang thành cột, tách ra bảng <code>phones</code>.</p></div>
+    <div class="card bad"><h4>Không nghĩ tới lịch sử</h4><p>Đơn hàng JOIN thẳng sang <code>products.price</code>. Sản phẩm tăng giá là mọi hoá đơn cũ trong hệ thống tự đổi số tiền theo — dữ liệu kế toán sai một cách âm thầm.</p></div>
+  </div>
 </section>
 
 <section id="ermod-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
-  <p class="plan">4 câu.</p>
+
+  <details class="qa"><summary>Cho một đoạn mô tả nghiệp vụ, bạn bắt đầu từ đâu?</summary>
+  <p>Gạch danh từ trước — mỗi danh từ có tồn tại độc lập và có thuộc tính riêng là một bảng ứng viên. Rồi gạch động từ nối hai danh từ, và với mỗi động từ hỏi "mấy?" theo <em>cả hai chiều</em>: một A có mấy B, một B có mấy A. Hai câu trả lời đó quyết định là 1-1, 1-n hay n-n, và từ đó biết khoá ngoại đặt ở đâu hoặc có cần bảng nối không. Trước khi vẽ, hỏi lại người phỏng vấn ba thứ mô tả thường bỏ trống: có cần giữ lịch sử không, xoá thật hay đánh dấu, và quy mô dữ liệu bao nhiêu.</p></details>
+
+  <details class="qa"><summary>Vì sao quan hệ n-n bắt buộc phải có bảng thứ ba?</summary>
+  <p>Vì một khoá ngoại là một ô chứa đúng một giá trị. Với 1-n, đặt khoá ngoại ở phía "nhiều" là đủ — mỗi đơn hàng chỉ trỏ tới một khách. Với n-n thì cả hai phía đều "nhiều", đặt ở bên nào cũng phải nhét nhiều giá trị vào một ô. Bảng nối bẻ n-n thành hai quan hệ 1-n, mỗi bên một cái. Nó thường có cột riêng — số lượng, giá lúc mua — nên thực chất là một thực thể thật, không chỉ là bảng kỹ thuật.</p></details>
+
+  <details class="qa"><summary>Khi nào tách quan hệ 1-1 ra hai bảng thay vì gộp một?</summary>
+  <p>Mặc định là gộp — tách 1-1 chỉ thêm một JOIN cho mọi truy vấn. Ba lý do đáng tách: nhóm cột cồng kềnh và hiếm dùng (ảnh, mô tả dài) muốn để bảng chính gọn và nhanh; nhóm cột nhạy cảm cần phân quyền riêng ở tầng database; hoặc phần lớn dòng để trống nhóm cột đó nên tách ra thì tiết kiệm hơn. Không rơi vào ba trường hợp này thì gộp.</p></details>
+
+  <details class="qa"><summary>Vì sao không dùng email làm khoá chính của bảng khách hàng?</summary>
+  <p>Email là natural key — nó mang nghĩa nghiệp vụ nên có thể đổi. Khách đổi email là phải cập nhật dây chuyền mọi bảng đang tham chiếu theo email. Surrogate key (<code>BIGSERIAL</code>, <code>UUID</code>) không bao giờ đổi vì nó không mang nghĩa gì. Vẫn giữ <code>UNIQUE NOT NULL</code> trên email để ràng buộc nghiệp vụ "không hai khách cùng email" được database bảo đảm — chỉ là nó không làm khoá chính.</p></details>
+
+  <details class="qa"><summary>Vì sao lưu <code>price_at_purchase</code> trong <code>order_items</code> mà không JOIN sang bảng sản phẩm?</summary>
+  <p>Vì hai con số mang hai ý nghĩa khác nhau: <code>products.price</code> là giá <em>hiện tại</em>, còn giá trong hoá đơn là giá <em>đã chốt lúc mua</em>. JOIN sang bảng sản phẩm nghĩa là mỗi lần đổi giá thì mọi hoá đơn cũ tự đổi số tiền theo — sai về kế toán và không thể đối soát. Đây không phải vi phạm chuẩn hoá dù nhìn như lặp dữ liệu, vì hai giá trị không phải cùng một sự thật. Cùng lý do, đơn hàng nên lưu bản chụp địa chỉ giao lúc đặt thay vì luôn trỏ sang địa chỉ hiện tại của khách.</p></details>
 </section>
 
-<footer>Cơ sở dữ liệu · SQL · Thiết kế lược đồ từ yêu cầu</footer>
+<footer>Cơ sở dữ liệu · SQL · Schema design · bài cuối nhóm — tiếp theo: <a href="../../03-sql-basics/sql-basics-overview/index.html">SQL basics</a>, viết truy vấn trên đúng lược đồ vừa thiết kế.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

@@ -88,7 +88,15 @@
 
 <section id="etl-elt-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Batch job vs incremental load</h2></div>
-  <p>Dù chọn ETL hay ELT, bước Extract/Load còn một trục quyết định khác: chạy <b>toàn bộ dữ liệu mỗi lần</b> (full batch — đơn giản, chạy lại là an toàn, nhưng chậm khi bảng lớn) hay chỉ lấy <b>phần thay đổi từ lần trước</b> (incremental load — dựa vào cột <code>updated_at</code> hoặc log thay đổi, nhanh hơn nhiều nhưng phải xử lý đúng phần xoá/sửa). Đây là bước đệm dẫn sang câu hỏi rộng hơn: pipeline nên chạy theo <em>lô định kỳ</em> hay theo <em>sự kiện liên tục</em> — xem tiếp ở <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</p>
+  <p>Dù chọn ETL hay ELT, bước Extract/Load còn một trục quyết định khác: chạy <b>toàn bộ dữ liệu mỗi lần</b> (full batch — đơn giản, chạy lại là an toàn, nhưng chậm khi bảng lớn) hay chỉ lấy <b>phần thay đổi từ lần trước</b> (incremental load — nhanh hơn nhiều nhưng phải xử lý đúng phần xoá/sửa). Có hai cách lấy phần thay đổi đó:</p>
+
+  <table>
+    <tr><th>Cách</th><th>Cơ chế</th><th>Đánh đổi</th></tr>
+    <tr><td><b>Timestamp</b></td><td>Truy vấn <code>WHERE updated_at &gt; lần_chạy_trước</code></td><td>Không cần quyền gì đặc biệt, làm được với mọi nguồn. Nhưng <b>không bắt được xoá cứng</b>, và bỏ sót dòng nếu nguồn quên cập nhật <code>updated_at</code>.</td></tr>
+    <tr><td><b>CDC</b><br>change data capture</td><td>Đọc thẳng <b>write-ahead log</b> của database nguồn (Debezium, logical replication) — mọi <code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code> thành một dòng sự kiện</td><td>Bắt đủ cả xoá, độ trễ tính bằng giây, và <b>không đặt thêm tải truy vấn lên hệ nguồn</b>. Đổi lại phải có quyền replication, thêm một thành phần hạ tầng phải vận hành, và sự kiện có thể tới trùng nên bên nhận phải idempotent.</td></tr>
+  </table>
+
+  <p>CDC chính là chỗ ranh giới batch/stream mờ đi: nó biến một database quan hệ thành một <em>luồng sự kiện</em>. Đây là bước đệm dẫn sang câu hỏi rộng hơn — pipeline nên chạy theo <em>lô định kỳ</em> hay theo <em>sự kiện liên tục</em>: xem tiếp ở <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</p>
 </section>
 
 <section id="etl-elt-s5" class="lesson">
@@ -96,7 +104,7 @@
   <div class="grid2">
     <div class="card bad"><h4>Transform logic tản mát nhiều nơi</h4><p>Một phần transform trong script Python, một phần trong SQL view, một phần trong dashboard — không ai còn nắm được toàn cảnh dữ liệu đi qua những bước nào. ELT với công cụ như dbt giảm vấn đề này vì gom hết vào một nơi, viết bằng SQL, có version control.</p></div>
     <div class="card bad"><h4>Không idempotent — chạy lại pipeline ra kết quả khác</h4><p>Job Extract chạy lại vào ngày hôm sau vô tình <code>INSERT</code> trùng thay vì <code>UPSERT</code>. Luôn thiết kế bước Load để chạy lại an toàn (idempotent), giống nguyên tắc idempotency đã gặp ở transaction.</p></div>
-    <div class="card bad"><h4>Incremental load bỏ sót dòng bị xoá</h4><p>Lấy theo <code>updated_at</code> chỉ bắt được sửa/thêm, không bắt được xoá cứng ở nguồn — kho đích âm thầm giữ dữ liệu đã lỗi thời.</p></div>
+    <div class="card bad"><h4>Incremental load bỏ sót dòng bị xoá</h4><p>Lấy theo <code>updated_at</code> chỉ bắt được sửa/thêm, không bắt được xoá cứng ở nguồn — kho đích âm thầm giữ dữ liệu đã lỗi thời. Cần CDC, hoặc quy ước xoá mềm ở nguồn.</p></div>
     <div class="card bad"><h4>ELT đổ thô nhưng không ai transform tiếp</h4><p>Dữ liệu nằm mãi ở dạng thô trong warehouse vì bước transform bị hoãn "làm sau" — người dùng cuối phải tự viết lại cùng một logic làm sạch trong mỗi câu truy vấn.</p></div>
   </div>
 </section>

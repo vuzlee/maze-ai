@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probability calibration — MazeAI</title>
+<meta name="description" content="Model xếp hạng đúng vẫn có thể nói 0.9 khi thực tế là 0.6: biểu đồ tin cậy, model nào lệch sẵn, Platt scaling và isotonic regression.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/09-evaluation/calibration/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Probability calibration">
+<meta property="og:description" content="Model xếp hạng đúng vẫn có thể nói 0.9 khi thực tế là 0.6: biểu đồ tin cậy, model nào lệch sẵn, Platt scaling và isotonic regression.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/09-evaluation/calibration/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-calib" data-title="Probability calibration" data-tag="Evaluation" data-blurb="Model xếp hạng đúng vẫn có thể nói 0.9 khi thực tế là 0.6: biểu đồ tin cậy, model nào lệch sẵn, Platt scaling và isotonic regression.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Model evaluation</p>
+  <h1>Probability <em>calibration</em></h1>
+  <p class="lede">Trục thứ ba của đánh giá, sau <a href="../metrics-confusion-matrix/index.html">confusion matrix</a> và <a href="../roc-auc-pr/index.html">đường cong</a>: model xếp hạng đúng vẫn có thể <b>nói 0.9 khi thực tế là 0.6</b>.</p>
+</header>
+
+<section id="calib-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vấn đề nó giải</h2></div>
+
+  <p class="key">Accuracy hỏi "quyết định có đúng không", AUC hỏi "xếp hạng có đúng không". <em>Calibration hỏi câu thứ ba: con số 0.9 kia có nghĩa gì không.</em></p>
+
+  <p>Hai model có thể có AUC bằng hệt nhau mà một cái nói 0.9 khi thực tế là 0.9, cái kia nói 0.9 khi thực tế chỉ 0.6. AUC không phân biệt được, vì nó chỉ nhìn <b>thứ tự</b> — bóp méo mọi điểm số bằng một hàm đơn điệu thì AUC không đổi một chút nào, dù giá trị xác suất đã sai hẳn.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Chỉ cần xếp hạng</h5>
+      <p>Lấy top-1000 khách có khả năng rời bỏ cao nhất để gọi điện.</p>
+      <p>Giá trị xác suất <b>không quan trọng</b> — chỉ cần thứ tự đúng.</p>
+      <p>AUC là đủ.</p>
+    </div>
+    <div>
+      <h5>Cần giá trị thật</h5>
+      <p>Gửi voucher 50.000đ nếu <em>giá trị kỳ vọng</em> vượt chi phí.</p>
+      <p>Tính bằng tiền thì <b>0.9 hay 0.6 ra hai quyết định khác nhau</b>.</p>
+      <p>Phải hiệu chỉnh.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Calibration là điều kiện để xác suất <b>đi vào một phép tính tiếp theo</b>: giá trị kỳ vọng bằng tiền, rủi ro tín dụng, hợp nhất dự đoán từ nhiều model, hay đặt ngưỡng theo chi phí.</li>
+    <li>Nó <b>trực giao với khả năng xếp hạng</b>: hiệu chỉnh lại không làm AUC thay đổi (phép biến đổi là đơn điệu), và AUC cao không bảo đảm hiệu chỉnh tốt.</li>
+    <li>Vì thế đừng chọn giữa hai thứ — <b>báo cả AUC lẫn một thước đo calibration</b> khi xác suất được dùng để tính chứ không chỉ để xếp thứ tự.</li>
+  </ul>
+</section>
+
+<section id="calib-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Đo bằng biểu đồ tin cậy</h2></div>
+
+  <p class="key">Chia dự đoán thành các nhóm theo xác suất, rồi hỏi trong mỗi nhóm: <em>model nói bao nhiêu, thực tế bao nhiêu.</em></p>
+
+<pre><code>Model được hiệu chỉnh tốt: trong tất cả các ca model nói "70%",
+                            đúng khoảng 70% thực sự là dương.
+
+Cách kiểm tra: chia dự đoán thành 10 nhóm theo xác suất,
+mỗi nhóm so xác suất trung bình với tỉ lệ dương thực tế.
+
+  nhóm      xác suất TB   tỉ lệ thật    nhận xét
+  0.0–0.1      0.05         0.04        tốt
+  0.4–0.5      0.45         0.31        model QUÁ TỰ TIN
+  0.9–1.0      0.95         0.88        quá tự tin</code></pre>
+
+  <p>Vẽ các cặp đó lên mặt phẳng, trục x là xác suất model nói và trục y là tỉ lệ thật, thì model hoàn hảo nằm trên <b>đường chéo</b>. Đường nằm dưới đường chéo nghĩa là quá tự tin; nằm trên nghĩa là quá dè dặt. Đó là <b>reliability diagram</b>.</p>
+
+  <ul class="why">
+    <li>Gộp lệch của mọi nhóm thành một số thì được <b>ECE — Expected Calibration Error</b>, trung bình có trọng số của <code>|xác suất − tỉ lệ thật|</code>. Tiện để so hai model, nhưng che mất chỗ lệch nằm ở đâu, nên đừng bỏ biểu đồ.</li>
+    <li><b>Brier score</b> — trung bình bình phương sai lệch giữa xác suất và nhãn 0/1 — gộp cả calibration lẫn khả năng phân biệt vào một con số. Thấp là tốt, nhưng thấp vì lý do gì thì phải nhìn biểu đồ mới biết.</li>
+    <li>Số nhóm là một đánh đổi: <b>nhiều nhóm thì thấy chi tiết nhưng mỗi nhóm ít mẫu và nhiễu</b>. Mười nhóm là mặc định hợp lý; dữ liệu ít thì chia theo phân vị thay vì chia đều.</li>
+  </ul>
+</section>
+
+<section id="calib-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Model nào lệch sẵn</h2></div>
+
+  <p class="key">Mức lệch không ngẫu nhiên mà <em>đoán trước được từ cách model học</em>.</p>
+
+  <table>
+    <tr><th>Model</th><th>Calibration mặc định</th></tr>
+    <tr><td>Logistic regression</td><td><strong>Tốt</strong> — log loss chính là loss function tối ưu cho xác suất</td></tr>
+    <tr><td>Gradient boosting</td><td>Khá, nhưng thường hơi lệch ở hai đầu</td></tr>
+    <tr><td>Random Forest</td><td>Kém ở hai đầu — trung bình của nhiều cây ít khi cho ra 0 hay 1</td></tr>
+    <tr><td>SVM</td><td>Kém — đầu ra là khoảng cách tới siêu phẳng, không phải xác suất</td></tr>
+    <tr><td>Mạng nơ-ron sâu</td><td><strong>Thường quá tự tin</strong> — hay cho ra 0.99 khi thực tế chỉ 0.8</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Quy luật đằng sau bảng: model nào <b>tối ưu thẳng một loss function về xác suất</b> (log loss) thì hiệu chỉnh sẵn; model nào tối ưu thứ khác — biên như <a href="../../05-classical-ml/svm/index.html">SVM</a>, hay số phiếu như <a href="../../06-tree-models/random-forest/index.html">Random Forest</a> — thì đầu ra chỉ là điểm số đội lốt xác suất.</li>
+    <li>Trường hợp Random Forest dễ hình dung: xác suất là tỉ lệ cây bỏ phiếu dương, mà để ra đúng 1.0 thì <b>cả trăm cây phải đồng ý tuyệt đối</b> — gần như không xảy ra, nên xác suất bị co về giữa.</li>
+    <li>Mạng nơ-ron lệch theo hướng ngược lại và ngày càng nặng khi model lớn hơn: huấn luyện lâu đẩy loss xuống bằng cách đẩy xác suất về sát 0 và 1, <b>tự tin tăng nhanh hơn độ đúng</b>.</li>
+  </ul>
+</section>
+
+<section id="calib-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Chữa bằng Platt scaling &amp; isotonic</h2></div>
+
+  <p class="key">Cả hai đều học một hàm đơn điệu ánh xạ điểm số cũ sang xác suất mới. <em>Vì đơn điệu nên thứ tự không đổi, nên AUC không đổi.</em></p>
+
+  <p>Cách chữa: <strong>Platt scaling</strong> (fit một logistic regression trên điểm số) hoặc <strong>isotonic regression</strong> (fit một hàm đơn điệu bậc thang, linh hoạt hơn nhưng cần nhiều dữ liệu hơn). Cả hai phải fit trên một tập <em>riêng</em>, không phải tập huấn luyện.</p>
+
+  <table>
+    <tr><th></th><th>Platt scaling</th><th>Isotonic regression</th></tr>
+    <tr><td>Hình dạng hàm</td><td>Sigmoid — hai tham số</td><td>Bậc thang đơn điệu — rất nhiều bậc</td></tr>
+    <tr><td>Dữ liệu cần</td><td>Ít, vài trăm mẫu là chạy được</td><td>Nhiều — dưới ~1.000 mẫu là <strong>overfit</strong></td></tr>
+    <tr><td>Chữa được lệch dạng nào</td><td>Chỉ dạng sigmoid, đúng với SVM và mạng nơ-ron</td><td>Bất kỳ dạng đơn điệu nào</td></tr>
+    <tr><td>Rủi ro</td><td>Không chữa nổi lệch dạng lạ</td><td>Bậc thang bám nhiễu khi dữ liệu ít</td></tr>
+  </table>
+
+  <div class="note warn">
+    <h4>Fit trên tập nào</h4>
+    Fit bộ hiệu chỉnh trên chính tập huấn luyện thì nó học lại đúng cái quá tự tin của model — biểu đồ sẽ đẹp giả và <a href="../../04-core-concepts/overfitting-regularization/index.html">rò rỉ dữ liệu</a> vào thước đo. Phải dùng một tập riêng, hoặc dùng cross-validation để sinh điểm số out-of-fold rồi fit trên đó. Trong sklearn, <code>CalibratedClassifierCV</code> làm sẵn cả hai kiểu.
+  </div>
+</section>
+
+<section id="calib-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Khi nào mới cần</h2></div>
+
+  <p class="key">Không phải bài toán nào cũng cần hiệu chỉnh. <em>Câu hỏi duy nhất: xác suất đi đâu sau khi model trả về.</em></p>
+
+  <div class="stack">
+    <div class="s"><b>Chỉ để xếp hạng</b><span>lấy top-k, sắp thứ tự hiển thị — <em>không cần</em>, AUC là đủ</span></div>
+    <div class="s"><b>Cắt ngưỡng cố định</b><span>ngưỡng dò trên tập validation — không cần, vì ngưỡng tự bù cho độ lệch</span></div>
+    <div class="s ok"><b>Vào một phép tính</b><span>giá trị kỳ vọng bằng tiền, rủi ro tín dụng, đặt ngưỡng theo chi phí — <em>cần</em></span></div>
+    <div class="s ok"><b>Hợp nhất nhiều model</b><span>cộng hoặc trung bình xác suất từ nhiều nguồn — cần, không thì model tự tin nhất lấn át</span></div>
+  </div>
+
+  <div class="note">
+    <h4>Khi nào calibration mới quan trọng</h4>
+    Khi xác suất được <strong>dùng để tính toán tiếp</strong>, không chỉ để xếp hạng. Ví dụ: quyết định có gửi voucher hay không dựa trên giá trị kỳ vọng bằng tiền, tính rủi ro tín dụng, hay hợp nhất dự đoán từ nhiều model. Nếu chỉ cần xếp hạng để lấy top-k thì AUC đủ, calibration không quan trọng. Phân biệt được hai tình huống này là câu trả lời tốt.
+  </div>
+</section>
+
+<section id="calib-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Hiệu chỉnh sai còn nguy hơn không hiệu chỉnh, vì con số trông đáng tin hơn hẳn.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Fit bộ hiệu chỉnh trên tập huấn luyện</h4><p>Nó học lại đúng độ lệch cũ. Biểu đồ đẹp trên giấy, lệch nguyên vẹn khi chạy thật.</p></div>
+    <div class="card bad"><h4>Dùng isotonic với vài trăm mẫu</h4><p>Bậc thang bám nhiễu. Dữ liệu ít thì Platt scaling an toàn hơn nhiều.</p></div>
+    <div class="card bad"><h4>Tưởng hiệu chỉnh làm model đúng hơn</h4><p>Nó không đổi thứ tự nên không đổi AUC, không bắt thêm được ca nào. Chỉ sửa giá trị.</p></div>
+    <div class="card bad"><h4>Coi đầu ra <code>decision_function</code> của SVM là xác suất</h4><p>Đó là khoảng cách tới siêu phẳng, chưa chuẩn hoá. Phải qua Platt scaling mới thành xác suất.</p></div>
+    <div class="card bad"><h4>Chỉ nhìn ECE</h4><p>Một con số che mất chỗ lệch. Lệch ở nhóm 0.9 nguy hơn hẳn lệch ở nhóm 0.1 — phải nhìn biểu đồ.</p></div>
+    <div class="card bad"><h4>Hiệu chỉnh xong rồi không đo lại</h4><p>Phân phối dữ liệu trôi thì độ lệch quay lại. Đo calibration định kỳ như mọi metric khác.</p></div>
+  </div>
+</section>
+
+<section id="calib-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Calibration là gì, khác accuracy và AUC ở đâu?</summary>
+  <p>Model được hiệu chỉnh tốt khi <b>trong tất cả các ca nó nói "70%", đúng khoảng 70% thực sự là dương</b>. Accuracy đo quyết định, AUC đo thứ tự, calibration đo <em>giá trị</em> của xác suất. Ba trục độc lập: hai model AUC bằng nhau có thể lệch calibration rất khác nhau, và hiệu chỉnh lại không làm AUC nhúc nhích vì phép biến đổi là đơn điệu.</p></details>
+
+  <details class="qa"><summary>Khi nào calibration mới quan trọng?</summary>
+  <p>Khi xác suất được <b>dùng để tính toán tiếp</b> chứ không chỉ để xếp hạng: quyết định gửi voucher dựa trên giá trị kỳ vọng bằng tiền, tính rủi ro tín dụng, hợp nhất dự đoán từ nhiều model. Nếu chỉ cần lấy top-k thì thứ tự là đủ và AUC trả lời hết. Phân biệt được hai tình huống này quan trọng hơn thuộc tên thuật toán hiệu chỉnh.</p></details>
+
+  <details class="qa"><summary>Vì sao Random Forest hiệu chỉnh kém ở hai đầu?</summary>
+  <p>Xác suất của nó là tỉ lệ cây bỏ phiếu dương. Để ra đúng 1.0 thì cả trăm cây phải đồng ý tuyệt đối — hiếm khi xảy ra vì mỗi cây học trên bootstrap khác nhau và chỉ xét một phần đặc trưng. Kết quả là xác suất bị <b>co về giữa</b>: ca chắc chắn dương chỉ ra 0.9 thay vì 0.99. Mạng nơ-ron sâu lệch ngược lại — quá tự tin, hay cho 0.99 khi thực tế 0.8.</p></details>
+
+  <details class="qa"><summary>Platt scaling và isotonic regression khác nhau thế nào, chọn cái nào?</summary>
+  <p>Platt fit một sigmoid hai tham số; isotonic fit một hàm bậc thang đơn điệu bất kỳ. Isotonic linh hoạt hơn nên chữa được nhiều dạng lệch hơn, nhưng <b>cần nhiều dữ liệu</b> — dưới cỡ nghìn mẫu là overfit vào nhiễu. Ít dữ liệu hoặc lệch có dạng sigmoid (SVM, mạng nơ-ron) thì chọn Platt. Cả hai bắt buộc fit trên tập riêng hoặc trên điểm số out-of-fold.</p></details>
+
+  <details class="qa"><summary>Đo calibration bằng gì?</summary>
+  <p>Chính là <b>reliability diagram</b>: chia dự đoán thành khoảng 10 nhóm theo xác suất, mỗi nhóm so xác suất trung bình với tỉ lệ dương thật, model hoàn hảo nằm trên đường chéo. Gộp thành một số thì có <b>ECE</b> — trung bình có trọng số của độ lệch từng nhóm — và <b>Brier score</b>, trung bình bình phương sai lệch so với nhãn 0/1. Nên báo kèm biểu đồ vì một con số che mất chỗ lệch nằm ở đâu.</p></details>
+</section>
+
+<footer>Machine learning · Model evaluation · trục thứ ba, sau <a href="../metrics-confusion-matrix/index.html">confusion matrix</a> và <a href="../roc-auc-pr/index.html">ROC-AUC &amp; PR curve</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

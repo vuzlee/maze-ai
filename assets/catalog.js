@@ -291,7 +291,7 @@ window.CATALOG = [
       "slug": "lcov",
       "title": "Language core overview",
       "tag": "Overview",
-      "blurb": "Bốn quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.",
+      "blurb": "Các quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.",
       "n": 5,
       "path": "content/02-python/02-language-core/language-core-overview/index.html",
       "skeleton": false
@@ -301,9 +301,29 @@ window.CATALOG = [
       "slug": "memory",
       "title": "Memory model & mutability",
       "tag": "Python internals",
-      "blurb": "Biến là cái tên, không phải ô nhớ. Gán, shallow, deep copy, bốn cái bẫy, đếm tham chiếu và rò rỉ bộ nhớ.",
-      "n": 15,
+      "blurb": "Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.",
+      "n": 11,
       "path": "content/02-python/02-language-core/memory-model-mutability/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "memory-management-gc",
+      "slug": "memgc",
+      "title": "Memory management & GC",
+      "tag": "Python internals",
+      "blurb": "Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.",
+      "n": 5,
+      "path": "content/02-python/02-language-core/memory-management-gc/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "scope-legb",
+      "slug": "scope",
+      "title": "Scope & LEGB",
+      "tag": "Language core",
+      "blurb": "Python tra một cái tên ở đâu: bốn tầng LEGB, global và nonlocal, và cách hàm nhận đối số qua *args, **kwargs.",
+      "n": 6,
+      "path": "content/02-python/02-language-core/scope-legb/index.html",
       "skeleton": false
      },
      {
@@ -322,7 +342,7 @@ window.CATALOG = [
       "title": "Iterator & generator",
       "tag": "Python",
       "blurb": "Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.",
-      "n": 11,
+      "n": 10,
       "path": "content/02-python/02-language-core/iterator-generator/index.html",
       "skeleton": false
      },
@@ -334,6 +354,16 @@ window.CATALOG = [
       "blurb": "Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.",
       "n": 7,
       "path": "content/02-python/02-language-core/decorator-context-manager/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "exception-handling",
+      "slug": "exc",
+      "title": "Exception handling",
+      "tag": "Language core",
+      "blurb": "try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.",
+      "n": 6,
+      "path": "content/02-python/02-language-core/exception-handling/index.html",
       "skeleton": false
      }
     ]
@@ -706,7 +736,7 @@ window.CATALOG = [
       "blurb": "Từ một đoạn mô tả nghiệp vụ ra sơ đồ thực thể — quan hệ, rồi ra bảng: quan hệ 1-n, n-n, bảng nối.",
       "n": 6,
       "path": "content/04-database/02-relational-basics/er-modeling/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -760,7 +790,7 @@ window.CATALOG = [
       "title": "Subquery & CTE",
       "tag": "PostgreSQL",
       "blurb": "Truy vấn con tương quan và không tương quan, WITH cho dễ đọc, và CTE đệ quy để duyệt cây.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/03-sql-basics/sql-subquery-cte/index.html",
       "skeleton": false
      }
@@ -796,7 +826,7 @@ window.CATALOG = [
       "title": "SQL — index & query plan",
       "tag": "PostgreSQL",
       "blurb": "Đọc EXPLAIN, vì sao planner bỏ qua index, leftmost prefix, ba thuật toán join, và bài toán N+1.",
-      "n": 15,
+      "n": 14,
       "path": "content/04-database/04-sql-advanced/sql-index-query-plan/index.html",
       "skeleton": false
      },
@@ -842,7 +872,7 @@ window.CATALOG = [
       "title": "Replication & sharding",
       "tag": "Database",
       "blurb": "Bản sao đọc, độ trễ sao chép, ba chiến lược chia mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/05-beyond-sql/sharding-replication/index.html",
       "skeleton": false
      }
@@ -868,7 +898,7 @@ window.CATALOG = [
       "title": "Data warehouse & data lake",
       "tag": "Data systems",
       "blurb": "Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.",
-      "n": 5,
+      "n": 6,
       "path": "content/04-database/06-data-systems/data-warehouse-lake/index.html",
       "skeleton": false
      },
@@ -898,9 +928,9 @@ window.CATALOG = [
       "title": "Data quality",
       "tag": "Data systems",
       "blurb": "Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.",
-      "n": 5,
+      "n": 6,
       "path": "content/04-database/06-data-systems/data-quality/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    }
@@ -909,7 +939,7 @@ window.CATALOG = [
  {
   "dir": "05-machine-learning",
   "name": "Machine learning",
-  "note": "Nền toán trước, khái niệm lõi sau, rồi mới tới từng model. Bias–variance là sợi chỉ xuyên suốt cả kệ.",
+  "note": "Toán và thống kê trước, khái niệm lõi sau, rồi mới tới từng model. Bias–variance là sợi chỉ xuyên suốt cả kệ.",
   "groups": [
    {
     "dir": "01-overview",
@@ -919,11 +949,11 @@ window.CATALOG = [
       "dir": "ml-overview",
       "slug": "mlov",
       "title": "Machine learning overview",
-      "tag": "ML",
-      "blurb": "Từ perceptron 1958 tới ensemble tới deep learning — mỗi làn sóng chữa giới hạn gì và vì sao có hai mùa đông AI.",
-      "n": 8,
+      "tag": "Overview",
+      "blurb": "Máy học luật từ ví dụ thay vì được viết luật: ba kiểu bài toán, các họ model, và học theo thứ tự nào.",
+      "n": 5,
       "path": "content/05-machine-learning/01-overview/ml-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
@@ -935,392 +965,76 @@ window.CATALOG = [
       "dir": "math-foundations-overview",
       "slug": "mathov",
       "title": "Math foundations overview",
-      "tag": "ML",
-      "blurb": "Sáu mảnh toán thật sự dùng trong ML, và mỗi mảnh xuất hiện ở đâu trong các bài sau.",
-      "n": 8,
+      "tag": "Overview",
+      "blurb": "Sáu mảnh toán thật sự dùng trong ML, mỗi mảnh trả lời câu hỏi nào và xuất hiện lại ở bài model nào.",
+      "n": 3,
       "path": "content/05-machine-learning/02-math-foundations/math-foundations-overview/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "probability-basics",
       "slug": "prob",
       "title": "Probability",
-      "tag": "ML",
+      "tag": "Math",
       "blurb": "Biến ngẫu nhiên, xác suất có điều kiện, độc lập, và các phân phối hay gặp trong ML.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/probability-basics/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "expectation-variance",
       "slug": "expvar",
       "title": "Expectation & variance",
-      "tag": "ML",
+      "tag": "Math",
       "blurb": "Tuyến tính của kỳ vọng, phương sai của tổng, hiệp phương sai, và luật số lớn với CLT.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/expectation-variance/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "bayes-theorem",
       "slug": "bayes",
       "title": "Bayes' theorem",
-      "tag": "ML",
+      "tag": "Math",
       "blurb": "Tiên nghiệm, khả năng, hậu nghiệm; nghịch lý xét nghiệm y tế; và Bayes trong Naive Bayes.",
-      "n": 5,
+      "n": 4,
       "path": "content/05-machine-learning/02-math-foundations/bayes-theorem/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "linear-algebra-ml",
       "slug": "linalg",
       "title": "Linear algebra for ML",
-      "tag": "ML",
+      "tag": "Math",
       "blurb": "Vector, ma trận, nhân ma trận đọc thế nào, hạng, eigenvalue và eigenvector — chỉ phần thật sự dùng.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/linear-algebra-ml/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "gradient-optimization",
       "slug": "grad",
       "title": "Gradient & optimization",
-      "tag": "ML",
+      "tag": "Math",
       "blurb": "Đạo hàm riêng, gradient chỉ hướng nào, quy tắc chuỗi, hàm lồi, và gradient descent hội tụ ra sao.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/gradient-optimization/index.html",
-      "skeleton": true
+      "skeleton": false
      },
      {
       "dir": "mle-map",
       "slug": "mle",
       "title": "MLE & MAP",
-      "tag": "ML",
+      "tag": "Math",
       "blurb": "Vì sao chọn loss function chính là chọn giả định phân phối, và regularization chính là tiên nghiệm.",
-      "n": 5,
+      "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/mle-map/index.html",
-      "skeleton": true
+      "skeleton": false
      }
     ]
    },
    {
-    "dir": "03-core-concepts",
-    "name": "Core concepts",
-    "books": [
-     {
-      "dir": "core-concepts-overview",
-      "slug": "ccov",
-      "title": "Core concepts overview",
-      "tag": "ML",
-      "blurb": "Năm khái niệm dùng lại ở mọi model: kiểu học, bias–variance, chia dữ liệu, regularization, đặc trưng.",
-      "n": 8,
-      "path": "content/05-machine-learning/03-core-concepts/core-concepts-overview/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "supervised-unsupervised",
-      "slug": "para",
-      "title": "Supervised, unsupervised & reinforcement",
-      "tag": "ML",
-      "blurb": "Có giám sát, không giám sát, tăng cường — và cách nhận ra bài toán của bạn thuộc kiểu nào.",
-      "n": 5,
-      "path": "content/05-machine-learning/03-core-concepts/supervised-unsupervised/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "bias-variance-tradeoff",
-      "slug": "bv",
-      "title": "Bias–variance tradeoff",
-      "tag": "ML",
-      "blurb": "Phân rã sai số thành ba phần, đường cong đánh đổi, và vì sao ensemble tấn công đúng một phần trong đó.",
-      "n": 7,
-      "path": "content/05-machine-learning/03-core-concepts/bias-variance-tradeoff/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "train-val-test-cv",
-      "slug": "cv",
-      "title": "Train/val/test & cross-validation",
-      "tag": "ML",
-      "blurb": "Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, và rò rỉ dữ liệu.",
-      "n": 6,
-      "path": "content/05-machine-learning/03-core-concepts/train-val-test-cv/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "overfitting-regularization",
-      "slug": "overfit",
-      "title": "Overfitting & regularization",
-      "tag": "Generalization",
-      "blurb": "Đọc learning curve, bias–variance, sáu nguồn rò rỉ dữ liệu, vì sao random search thắng grid, và chia dữ liệu đúng kiểu.",
-      "n": 15,
-      "path": "content/05-machine-learning/03-core-concepts/overfitting-regularization/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "feature-engineering",
-      "slug": "feat",
-      "title": "Feature engineering",
-      "tag": "ML",
-      "blurb": "Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác, và khi nào để model tự lo.",
-      "n": 6,
-      "path": "content/05-machine-learning/03-core-concepts/feature-engineering/index.html",
-      "skeleton": true
-     }
-    ]
-   },
-   {
-    "dir": "04-classical-ml",
-    "name": "Classical models",
-    "books": [
-     {
-      "dir": "classical-models-overview",
-      "slug": "clsov",
-      "title": "Classical models overview",
-      "tag": "ML",
-      "blurb": "Sáu model kinh điển trên một bảng: giả định, ranh giới quyết định, chi phí, và khi nào chọn cái nào.",
-      "n": 8,
-      "path": "content/05-machine-learning/04-classical-ml/classical-models-overview/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "linear-regression",
-      "slug": "linreg",
-      "title": "Linear regression",
-      "tag": "Foundations",
-      "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
-      "n": 9,
-      "path": "content/05-machine-learning/04-classical-ml/linear-regression/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "logistic-regression",
-      "slug": "logreg",
-      "title": "Logistic regression",
-      "tag": "Foundations",
-      "blurb": "Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.",
-      "n": 9,
-      "path": "content/05-machine-learning/04-classical-ml/logistic-regression/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "ridge-lasso-elasticnet",
-      "slug": "ridge",
-      "title": "Ridge, Lasso & Elastic Net",
-      "tag": "ML",
-      "blurb": "L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở loss và ở hình học.",
-      "n": 8,
-      "path": "content/05-machine-learning/04-classical-ml/ridge-lasso-elasticnet/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "svm",
-      "slug": "svm",
-      "title": "SVM",
-      "tag": "ML",
-      "blurb": "Lề lớn nhất, support vector, kernel trick, và vì sao nó từng thắng trước khi deep learning tới.",
-      "n": 6,
-      "path": "content/05-machine-learning/04-classical-ml/svm/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "knn",
-      "slug": "knn",
-      "title": "KNN",
-      "tag": "ML",
-      "blurb": "Model không huấn luyện, chọn k thế nào, chi phí ở lúc suy luận, và curse of dimensionality.",
-      "n": 5,
-      "path": "content/05-machine-learning/04-classical-ml/knn/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "naive-bayes",
-      "slug": "nb",
-      "title": "Naive Bayes",
-      "tag": "ML",
-      "blurb": "Giả định độc lập ngây thơ, vì sao nó sai mà vẫn chạy tốt, làm mượt Laplace, và phân loại văn bản.",
-      "n": 5,
-      "path": "content/05-machine-learning/04-classical-ml/naive-bayes/index.html",
-      "skeleton": true
-     }
-    ]
-   },
-   {
-    "dir": "05-tree-models",
-    "name": "Tree models",
-    "books": [
-     {
-      "dir": "tree-family-overview",
-      "slug": "treeintro",
-      "title": "Tree models overview",
-      "tag": "Overview",
-      "blurb": "Bài đầu tiên của nhánh: người ta đang cố giải quyết vấn đề gì, lịch sử 40 năm của nhánh này, hai hướng bagging và boosting, và học theo thứ tự nào.",
-      "n": 8,
-      "path": "content/05-machine-learning/05-tree-models/tree-family-overview/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "decision-tree",
-      "slug": "dtree",
-      "title": "Decision tree",
-      "tag": "Overview",
-      "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba núm để hãm nó lại.",
-      "n": 12,
-      "path": "content/05-machine-learning/05-tree-models/decision-tree/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "random-forest",
-      "slug": "rf",
-      "title": "Random forest & bagging",
-      "tag": "Ensemble",
-      "blurb": "Vì sao trung bình nhiều cây giảm variance, tập con đặc trưng, OOB score miễn phí, và cái bẫy của feature importance.",
-      "n": 6,
-      "path": "content/05-machine-learning/05-tree-models/random-forest/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "gradient-boosting",
-      "slug": "gb",
-      "title": "Gradient boosting",
-      "tag": "Ensemble",
-      "blurb": "Cộng cây nông theo phần dư, learning_rate đổi lấy n_estimators, XGBoost/LightGBM, và vì sao vẫn thắng deep learning trên dữ liệu bảng.",
-      "n": 6,
-      "path": "content/05-machine-learning/05-tree-models/gradient-boosting/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "xgboost",
-      "slug": "xgb",
-      "title": "XGBoost",
-      "tag": "Ensemble",
-      "blurb": "Xấp xỉ Taylor bậc hai của loss, số hạng phạt ngay trong objective, tìm split theo histogram và xử lý dữ liệu thưa.",
-      "n": 8,
-      "path": "content/05-machine-learning/05-tree-models/xgboost/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "lightgbm",
-      "slug": "lgbm",
-      "title": "LightGBM",
-      "tag": "Ensemble",
-      "blurb": "Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa loại trừ nhau.",
-      "n": 8,
-      "path": "content/05-machine-learning/05-tree-models/lightgbm/index.html",
-      "skeleton": true
-     }
-    ]
-   },
-   {
-    "dir": "06-clustering",
-    "name": "Clustering",
-    "books": [
-     {
-      "dir": "clustering-overview",
-      "slug": "clov",
-      "title": "Clustering overview",
-      "tag": "ML",
-      "blurb": "Bốn họ phân cụm: theo tâm, theo mật độ, theo tầng, theo phân phối — và cụm hình gì thì họ nào bắt được.",
-      "n": 8,
-      "path": "content/05-machine-learning/06-clustering/clustering-overview/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "kmeans-clustering",
-      "slug": "kmeans",
-      "title": "K-means & clustering",
-      "tag": "ML",
-      "blurb": "Thuật toán lặp hai bước, chọn k bằng elbow và silhouette, giới hạn hình dạng cụm, và DBSCAN.",
-      "n": 5,
-      "path": "content/05-machine-learning/06-clustering/kmeans-clustering/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "dbscan",
-      "slug": "dbscan",
-      "title": "DBSCAN",
-      "tag": "ML",
-      "blurb": "Cụm là vùng đông đúc nối nhau; không cần biết k trước, và tự đánh dấu điểm nhiễu.",
-      "n": 8,
-      "path": "content/05-machine-learning/06-clustering/dbscan/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "hdbscan",
-      "slug": "hdb",
-      "title": "HDBSCAN",
-      "tag": "ML",
-      "blurb": "Chạy DBSCAN ở mọi mức eps cùng lúc rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.",
-      "n": 8,
-      "path": "content/05-machine-learning/06-clustering/hdbscan/index.html",
-      "skeleton": true
-     }
-    ]
-   },
-   {
-    "dir": "07-dimensionality",
-    "name": "Dimensionality reduction",
-    "books": [
-     {
-      "dir": "pca-dimensionality",
-      "slug": "pca",
-      "title": "PCA & dimensionality reduction",
-      "tag": "ML",
-      "blurb": "Giữ phương sai lớn nhất, quan hệ với eigenvalue, chọn số thành phần, và PCA không phải chọn đặc trưng.",
-      "n": 5,
-      "path": "content/05-machine-learning/07-dimensionality/pca-dimensionality/index.html",
-      "skeleton": true
-     }
-    ]
-   },
-   {
-    "dir": "08-evaluation",
-    "name": "Model evaluation",
-    "books": [
-     {
-      "dir": "evaluation-overview",
-      "slug": "evov",
-      "title": "Model evaluation overview",
-      "tag": "ML",
-      "blurb": "Chọn metric theo bài toán và theo tỉ lệ lớp: từ confusion matrix tới đường cong tới calibration.",
-      "n": 8,
-      "path": "content/05-machine-learning/08-evaluation/evaluation-overview/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "metrics-confusion-matrix",
-      "slug": "metrics",
-      "title": "Metric & confusion matrix",
-      "tag": "Evaluation",
-      "blurb": "Bốn ô ra mọi chỉ số, vì sao ROC-AUC nói dối khi lớp dương hiếm, chọn ngưỡng theo chi phí, và calibration.",
-      "n": 15,
-      "path": "content/05-machine-learning/08-evaluation/metrics-confusion-matrix/index.html",
-      "skeleton": false
-     },
-     {
-      "dir": "roc-auc-pr",
-      "slug": "roc",
-      "title": "ROC-AUC & PR curve",
-      "tag": "ML",
-      "blurb": "Hai đường cong đọc thế nào, vì sao lớp dương hiếm thì phải nhìn PR chứ không nhìn ROC.",
-      "n": 5,
-      "path": "content/05-machine-learning/08-evaluation/roc-auc-pr/index.html",
-      "skeleton": true
-     },
-     {
-      "dir": "calibration",
-      "slug": "calib",
-      "title": "Probability calibration",
-      "tag": "ML",
-      "blurb": "Xác suất model nói có đúng là xác suất không, biểu đồ tin cậy, Platt scaling và isotonic.",
-      "n": 5,
-      "path": "content/05-machine-learning/08-evaluation/calibration/index.html",
-      "skeleton": true
-     }
-    ]
-   },
-   {
-    "dir": "09-statistics",
+    "dir": "03-statistics",
     "name": "Statistics & experimentation",
     "books": [
      {
@@ -1330,7 +1044,7 @@ window.CATALOG = [
       "tag": "Statistics",
       "blurb": "Định nghĩa chính xác của p-value, bốn đại lượng gắn nhau, sample size và power, confidence interval, so sánh nhiều lần, và tương quan với nhân quả.",
       "n": 10,
-      "path": "content/05-machine-learning/09-statistics/statistics/index.html",
+      "path": "content/05-machine-learning/03-statistics/statistics/index.html",
       "skeleton": false
      },
      {
@@ -1340,7 +1054,323 @@ window.CATALOG = [
       "tag": "Statistics",
       "blurb": "Thiết kế thí nghiệm, vấn đề nhìn sớm, năm cái bẫy thực tế, ý nghĩa thống kê so với ý nghĩa thực tiễn, và checklist trước khi triển khai.",
       "n": 8,
-      "path": "content/05-machine-learning/09-statistics/ab-testing/index.html",
+      "path": "content/05-machine-learning/03-statistics/ab-testing/index.html",
+      "skeleton": false
+     }
+    ]
+   },
+   {
+    "dir": "04-core-concepts",
+    "name": "Core concepts",
+    "books": [
+     {
+      "dir": "core-concepts-overview",
+      "slug": "ccov",
+      "title": "Core concepts overview",
+      "tag": "Overview",
+      "blurb": "Năm khái niệm dùng lại ở mọi model: gọi tên bài toán, phân rã sai số, chia dữ liệu, chống quá khớp, chuẩn bị đặc trưng.",
+      "n": 3,
+      "path": "content/05-machine-learning/04-core-concepts/core-concepts-overview/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "supervised-unsupervised",
+      "slug": "para",
+      "title": "Supervised, unsupervised & reinforcement",
+      "tag": "ML",
+      "blurb": "Gọi tên bài toán cho đúng: nhãn tới từ đâu, khi nào hồi quy khi nào phân loại, và bốn cách xoay xở khi nhãn quá đắt.",
+      "n": 5,
+      "path": "content/05-machine-learning/04-core-concepts/supervised-unsupervised/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "bias-variance-tradeoff",
+      "slug": "bv",
+      "title": "Bias–variance tradeoff",
+      "tag": "Generalization",
+      "blurb": "Phân rã sai số thành ba phần, đường cong đánh đổi, và kỹ thuật nào đánh vào phần nào.",
+      "n": 7,
+      "path": "content/05-machine-learning/04-core-concepts/bias-variance-tradeoff/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "train-val-test-cv",
+      "slug": "cv",
+      "title": "Train/val/test & cross-validation",
+      "tag": "Generalization",
+      "blurb": "Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, sáu nguồn rò rỉ dữ liệu, và nested CV.",
+      "n": 8,
+      "path": "content/05-machine-learning/04-core-concepts/train-val-test-cv/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "overfitting-regularization",
+      "slug": "overfit",
+      "title": "Overfitting & regularization",
+      "tag": "Generalization",
+      "blurb": "Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.",
+      "n": 7,
+      "path": "content/05-machine-learning/04-core-concepts/overfitting-regularization/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "feature-engineering",
+      "slug": "feat",
+      "title": "Feature engineering",
+      "tag": "ML",
+      "blurb": "Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác — và khi nào để model tự lo.",
+      "n": 6,
+      "path": "content/05-machine-learning/04-core-concepts/feature-engineering/index.html",
+      "skeleton": false
+     }
+    ]
+   },
+   {
+    "dir": "05-classical-ml",
+    "name": "Classical models",
+    "books": [
+     {
+      "dir": "classical-models-overview",
+      "slug": "clsov",
+      "title": "Classical models overview",
+      "tag": "Overview",
+      "blurb": "Sáu model kinh điển trên một bảng: mỗi cái giả định một hình dạng khác nhau cho dữ liệu, và giả định đó quyết định khi nào chọn cái nào.",
+      "n": 3,
+      "path": "content/05-machine-learning/05-classical-ml/classical-models-overview/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "linear-regression",
+      "slug": "linreg",
+      "title": "Linear regression",
+      "tag": "Foundations",
+      "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
+      "n": 9,
+      "path": "content/05-machine-learning/05-classical-ml/linear-regression/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "logistic-regression",
+      "slug": "logreg",
+      "title": "Logistic regression",
+      "tag": "Foundations",
+      "blurb": "Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.",
+      "n": 9,
+      "path": "content/05-machine-learning/05-classical-ml/logistic-regression/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "ridge-lasso-elasticnet",
+      "slug": "ridge",
+      "title": "Ridge, Lasso & Elastic Net",
+      "tag": "ML",
+      "blurb": "Ba cách regularize model tuyến tính: L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở hình dạng vùng phạt.",
+      "n": 7,
+      "path": "content/05-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "svm",
+      "slug": "svm",
+      "title": "SVM",
+      "tag": "ML",
+      "blurb": "Lề lớn nhất, support vector, tham số C và gamma, kernel trick — và vì sao nó từng thắng trước khi deep learning tới.",
+      "n": 7,
+      "path": "content/05-machine-learning/05-classical-ml/svm/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "knn",
+      "slug": "knn",
+      "title": "KNN",
+      "tag": "ML",
+      "blurb": "Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.",
+      "n": 6,
+      "path": "content/05-machine-learning/05-classical-ml/knn/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "naive-bayes",
+      "slug": "nb",
+      "title": "Naive Bayes",
+      "tag": "ML",
+      "blurb": "Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.",
+      "n": 6,
+      "path": "content/05-machine-learning/05-classical-ml/naive-bayes/index.html",
+      "skeleton": false
+     }
+    ]
+   },
+   {
+    "dir": "06-tree-models",
+    "name": "Tree models",
+    "books": [
+     {
+      "dir": "tree-family-overview",
+      "slug": "treeintro",
+      "title": "Tree models overview",
+      "tag": "Overview",
+      "blurb": "Bài đầu tiên của nhánh: người ta đang cố giải quyết vấn đề gì, lịch sử 40 năm của nhánh này, hai hướng bagging và boosting, và học theo thứ tự nào.",
+      "n": 8,
+      "path": "content/05-machine-learning/06-tree-models/tree-family-overview/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "decision-tree",
+      "slug": "dtree",
+      "title": "Decision tree",
+      "tag": "Overview",
+      "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba núm để hãm nó lại.",
+      "n": 12,
+      "path": "content/05-machine-learning/06-tree-models/decision-tree/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "random-forest",
+      "slug": "rf",
+      "title": "Random forest & bagging",
+      "tag": "Ensemble",
+      "blurb": "Vì sao trung bình nhiều cây giảm variance, tập con đặc trưng, OOB score miễn phí, và cái bẫy của feature importance.",
+      "n": 6,
+      "path": "content/05-machine-learning/06-tree-models/random-forest/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "gradient-boosting",
+      "slug": "gb",
+      "title": "Gradient boosting",
+      "tag": "Ensemble",
+      "blurb": "Cộng cây nông theo phần dư, learning_rate đổi lấy n_estimators, XGBoost/LightGBM, và vì sao vẫn thắng deep learning trên dữ liệu bảng.",
+      "n": 6,
+      "path": "content/05-machine-learning/06-tree-models/gradient-boosting/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "xgboost",
+      "slug": "xgb",
+      "title": "XGBoost",
+      "tag": "Ensemble",
+      "blurb": "Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.",
+      "n": 7,
+      "path": "content/05-machine-learning/06-tree-models/xgboost/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "lightgbm",
+      "slug": "lgbm",
+      "title": "LightGBM",
+      "tag": "Ensemble",
+      "blurb": "Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa — ba mẹo đổi lấy tốc độ.",
+      "n": 6,
+      "path": "content/05-machine-learning/06-tree-models/lightgbm/index.html",
+      "skeleton": false
+     }
+    ]
+   },
+   {
+    "dir": "07-clustering",
+    "name": "Clustering",
+    "books": [
+     {
+      "dir": "clustering-overview",
+      "slug": "clov",
+      "title": "Clustering overview",
+      "tag": "Overview",
+      "blurb": "Bốn họ phân cụm — theo tâm, theo mật độ, theo tầng, theo phân phối — cụm hình gì thì họ nào bắt được, và chấm điểm bằng gì khi không có đáp án.",
+      "n": 4,
+      "path": "content/05-machine-learning/07-clustering/clustering-overview/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "kmeans-clustering",
+      "slug": "kmeans",
+      "title": "K-means & clustering",
+      "tag": "ML",
+      "blurb": "Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.",
+      "n": 6,
+      "path": "content/05-machine-learning/07-clustering/kmeans-clustering/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "dbscan",
+      "slug": "dbscan",
+      "title": "DBSCAN",
+      "tag": "ML",
+      "blurb": "Cụm là vùng đông đúc nối nhau: không cần biết k trước, bắt được cụm hình bất kỳ, và tự đánh dấu điểm nhiễu.",
+      "n": 8,
+      "path": "content/05-machine-learning/07-clustering/dbscan/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "hdbscan",
+      "slug": "hdb",
+      "title": "HDBSCAN",
+      "tag": "ML",
+      "blurb": "Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.",
+      "n": 7,
+      "path": "content/05-machine-learning/07-clustering/hdbscan/index.html",
+      "skeleton": false
+     }
+    ]
+   },
+   {
+    "dir": "08-dimensionality",
+    "name": "Dimensionality reduction",
+    "books": [
+     {
+      "dir": "pca-dimensionality",
+      "slug": "pca",
+      "title": "PCA & dimensionality reduction",
+      "tag": "ML",
+      "blurb": "Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.",
+      "n": 6,
+      "path": "content/05-machine-learning/08-dimensionality/pca-dimensionality/index.html",
+      "skeleton": false
+     }
+    ]
+   },
+   {
+    "dir": "09-evaluation",
+    "name": "Model evaluation",
+    "books": [
+     {
+      "dir": "evaluation-overview",
+      "slug": "evov",
+      "title": "Model evaluation overview",
+      "tag": "Overview",
+      "blurb": "Ba câu hỏi độc lập về một model — xếp hạng, quyết định, xác suất — và bảng tra chọn metric theo bài toán và theo tỉ lệ lớp.",
+      "n": 3,
+      "path": "content/05-machine-learning/09-evaluation/evaluation-overview/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "metrics-confusion-matrix",
+      "slug": "metrics",
+      "title": "Metric & confusion matrix",
+      "tag": "Evaluation",
+      "blurb": "Bốn ô sinh ra mọi chỉ số: precision với recall chọn theo chi phí lỗi, vì sao accuracy nói dối khi dữ liệu lệch, và chốt ngưỡng bằng tiền thay vì bằng F1.",
+      "n": 12,
+      "path": "content/05-machine-learning/09-evaluation/metrics-confusion-matrix/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "roc-auc-pr",
+      "slug": "roc",
+      "title": "ROC-AUC & PR curve",
+      "tag": "Evaluation",
+      "blurb": "Hai đường cong khi ngưỡng chưa cố định: ý nghĩa xác suất của AUC, vì sao lớp dương hiếm thì ROC nói dối, và mức cơ sở của PR-AUC không phải 0.5.",
+      "n": 6,
+      "path": "content/05-machine-learning/09-evaluation/roc-auc-pr/index.html",
+      "skeleton": false
+     },
+     {
+      "dir": "calibration",
+      "slug": "calib",
+      "title": "Probability calibration",
+      "tag": "Evaluation",
+      "blurb": "Model xếp hạng đúng vẫn có thể nói 0.9 khi thực tế là 0.6: biểu đồ tin cậy, model nào lệch sẵn, Platt scaling và isotonic regression.",
+      "n": 7,
+      "path": "content/05-machine-learning/09-evaluation/calibration/index.html",
       "skeleton": false
      }
     ]

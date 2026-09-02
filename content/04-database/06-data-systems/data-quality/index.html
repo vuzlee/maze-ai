@@ -39,40 +39,159 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-dq" data-skeleton="1" data-title="Data quality" data-tag="Data systems" data-blurb="Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.">
+      <article class="doc" id="art-dq" data-title="Data quality" data-tag="Data systems" data-blurb="Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.">
         <header class="hero">
   <p class="eyebrow">Database · Data systems</p>
   <h1>Data <em>quality</em></h1>
   <p class="lede">Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.</p>
-  <p class="wip">Khung bài — dàn ý đã chốt, nội dung chưa viết.</p>
 </header>
 
 <section id="data-quality-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="plan">Lỗi im lặng nguy hiểm hơn lỗi crash.</p>
+
+  <p class="key">Job <a href="../etl-elt/index.html">ETL</a> báo xanh, dashboard vẫn vẽ ra biểu đồ. <em>Không ai biết con số đã sai từ ba tuần trước.</em></p>
+
+  <p>Một lỗi làm pipeline crash là lỗi <b>tốt</b>: nó dừng ngay, có stack trace, có người sửa trong ngày. Lỗi dữ liệu thì khác — nguồn đổi đơn vị tiền từ đồng sang nghìn đồng, một API bên thứ ba bắt đầu trả <code>null</code> cho trường vốn luôn có giá trị, một job chạy hai lần làm nhân đôi số dòng. Pipeline không thấy gì bất thường vì <b>về mặt kỹ thuật không có gì hỏng</b>: dữ liệu vẫn đúng kiểu, vẫn ghi được vào bảng.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Lỗi hệ thống</h5>
+      <p>Job chết, kết nối đứt, hết dung lượng.</p>
+      <p><b>Phát hiện:</b> ngay lập tức, tự động.</p>
+      <p><b>Thiệt hại:</b> báo cáo chậm vài giờ.</p>
+    </div>
+    <div>
+      <h5>Lỗi dữ liệu</h5>
+      <p>Sai đơn vị, thiếu giá trị, trùng dòng.</p>
+      <p><b>Phát hiện:</b> khi có người tình cờ thấy số lạ — thường là hàng tuần sau.</p>
+      <p><b>Thiệt hại:</b> mọi quyết định dựa trên số đó, và niềm tin vào toàn bộ hệ thống dữ liệu.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Cái giá thật không phải con số sai — mà là <b>mọi con số khác trở nên đáng ngờ</b>. Một lần dashboard sai là lần sau người ta tự export CSV ra Excel tính lại.</li>
+    <li>Vì lỗi không tự báo, phải <b>chủ động đi hỏi</b>: định nghĩa trước "thế nào là đúng" rồi kiểm liên tục. Đó là toàn bộ nội dung bài này.</li>
+  </ul>
 </section>
 
 <section id="data-quality-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Các chiều đo</h2></div>
-  <p class="plan">Completeness, accuracy, consistency, timeliness.</p>
+  <div class="sh"><b>02</b><h2>Chiều đo chất lượng</h2></div>
+
+  <p class="key">"Dữ liệu tốt" quá mơ hồ để kiểm. <em>Sáu chiều dưới đây tách nó thành các câu hỏi có câu trả lời đúng/sai</em> — mỗi câu viết được thành một truy vấn.</p>
+
+  <table>
+    <tr><th>Chiều</th><th>Câu hỏi</th><th>Kiểm bằng</th></tr>
+    <tr><td><b>Completeness</b><br>đầy đủ</td><td>Có thiếu giá trị hoặc thiếu cả dòng không?</td><td>Tỉ lệ <code>NULL</code> mỗi cột · số dòng hôm nay so với trung bình 7 ngày</td></tr>
+    <tr><td><b>Uniqueness</b><br>không trùng</td><td>Một thực thể có bị đếm hai lần không?</td><td><code>COUNT(*)</code> so với <code>COUNT(DISTINCT khoá)</code></td></tr>
+    <tr><td><b>Validity</b><br>hợp lệ</td><td>Giá trị có nằm trong miền cho phép không?</td><td>Kiểu, khoảng (<code>age BETWEEN 0 AND 150</code>), tập giá trị cho phép, định dạng</td></tr>
+    <tr><td><b>Consistency</b><br>nhất quán</td><td>Các bảng/nguồn có mâu thuẫn nhau không?</td><td>Tổng doanh thu ở bảng tổng hợp so với tính lại từ bảng chi tiết · khoá ngoại mồ côi</td></tr>
+    <tr><td><b>Accuracy</b><br>chính xác</td><td>Có khớp với sự thật ngoài đời không?</td><td>Đối soát với nguồn độc lập — khó nhất, thường không kiểm tự động được</td></tr>
+    <tr><td><b>Timeliness</b><br>kịp thời</td><td>Dữ liệu mới tới mức nào?</td><td>Thời điểm bản ghi mới nhất so với ngưỡng cam kết (freshness)</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Năm chiều đầu kiểm được bằng chính SQL đã học ở nhóm <a href="../../03-sql-basics/sql-basics-overview/index.html">SQL basics</a> — <code>COUNT</code>, <code>DISTINCT</code>, <code>IS NULL</code>, <code>LEFT JOIN … IS NULL</code>. Không cần công cụ mới để bắt đầu.</li>
+    <li><b>Accuracy là chiều duy nhất không tự kiểm được</b>: không có nguồn sự thật nào để so, trừ khi đi đối soát tay. Đây là lý do người ta dồn sức vào năm chiều còn lại và chấp nhận accuracy chỉ được kiểm bằng mẫu.</li>
+  </ul>
+
+<pre><code><span class="cm">-- ba chiều đầu, viết thành một truy vấn duy nhất chạy sau mỗi lần load</span>
+SELECT
+  COUNT(*)                                        AS so_dong,
+  COUNT(*) - COUNT(customer_id)                   AS thieu_customer_id,   <span class="cm">-- completeness</span>
+  COUNT(*) - COUNT(DISTINCT order_id)             AS so_dong_trung,       <span class="cm">-- uniqueness</span>
+  COUNT(*) FILTER (WHERE amount &lt; <span class="st">0</span>)              AS am_vo_ly,            <span class="cm">-- validity</span>
+  MAX(created_at)                                 AS ban_ghi_moi_nhat     <span class="cm">-- timeliness</span>
+FROM orders_staging;</code></pre>
 </section>
 
 <section id="data-quality-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Kiểm tra ở đâu</h2></div>
-  <p class="plan">Tại nguồn, tại pipeline, hay tại nơi dùng.</p>
+
+  <p class="key">Càng kiểm gần nguồn càng rẻ. <em>Ba chốt, mỗi chốt bắt được loại lỗi mà chốt sau không bắt kịp nữa.</em></p>
+
+  <div class="stack">
+    <div class="s"><b>1 · Tại nguồn — ràng buộc trong database</b><span><code>NOT NULL</code>, <code>UNIQUE</code>, <code>CHECK</code>, <code>FOREIGN KEY</code> ở hệ OLTP chặn dữ liệu sai <em>ngay lúc ghi</em>, trước khi nó tồn tại. Rẻ nhất và chắc nhất — xem <a href="../../02-relational-basics/constraints-integrity/index.html">Constraints &amp; integrity</a>. Giới hạn: chỉ áp được cho dữ liệu bạn sở hữu, không áp được cho file CSV hay API bên thứ ba.</span></div>
+    <div class="s"><b>2 · Tại pipeline — kiểm sau mỗi bước load</b><span>Chốt chính cho dữ liệu từ ngoài. Sau mỗi lần nạp, chạy bộ kiểm sáu chiều trên bảng staging <em>trước khi</em> đẩy vào bảng chính. Đây là nơi <code>dbt test</code>, Great Expectations, Soda hoạt động — khai báo kỳ vọng bằng YAML/SQL và chạy như một bước của pipeline.</span></div>
+    <div class="s ok"><b>3 · Tại nơi dùng — đối soát trên bảng tổng hợp</b><span>Chốt cuối, bắt loại lỗi hai chốt trên không thấy: logic transform sai. Từng bảng nguồn đều hợp lệ nhưng con số cuối vẫn vô lý — tổng doanh thu tháng này gấp ba tháng trước, tỉ lệ chuyển đổi vượt 100%. Kiểm bằng quy tắc nghiệp vụ, không phải quy tắc kỹ thuật.</span></div>
+  </div>
+
+  <p>Khi một kiểm tra thất bại, có hai cách xử — chọn theo việc <b>dữ liệu sai tệ hơn, hay dữ liệu thiếu tệ hơn</b>:</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Fail fast — dừng pipeline</h5>
+      <p>Không cho dữ liệu nghi ngờ đi tiếp. Dashboard giữ số cũ của hôm qua.</p>
+      <p><b>Chọn khi</b> số liệu dùng để ra quyết định tiền bạc: báo cáo tài chính, tính hoa hồng, đối soát.</p>
+    </div>
+    <div>
+      <h5>Quarantine — tách riêng, chạy tiếp</h5>
+      <p>Đẩy dòng lỗi sang một bảng riêng, phần còn lại vẫn vào kho kèm cảnh báo.</p>
+      <p><b>Chọn khi</b> mất toàn bộ dữ liệu tệ hơn mất vài phần trăm: log hành vi, dữ liệu huấn luyện, thống kê xu hướng.</p>
+    </div>
+  </div>
+
+  <div class="note key">
+    <h4>Data contract</h4>
+    Phần lớn lỗi dữ liệu sinh ra ở <b>ranh giới giữa hai đội</b>: đội backend đổi tên một trường, đổi đơn vị, hoặc thôi không ghi một cột — không ai báo cho đội dữ liệu. <b>Data contract</b> là cam kết viết thành file (schema, kiểu, miền giá trị, tần suất cập nhật, ai chịu trách nhiệm) giữa bên sinh dữ liệu và bên dùng, kiểm tự động trong CI của bên sinh. Cái giá: bên sinh mất tự do đổi schema tuỳ ý và phải chạy thêm một bước kiểm trước mỗi lần deploy. Đổi lại, lỗi bị chặn ở chỗ nó phát sinh thay vì lộ ra ở dashboard ba tuần sau.
+  </div>
 </section>
 
 <section id="data-quality-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Lỗi hay gặp</h2></div>
-  <p class="plan">Chỉ kiểm schema mà không kiểm giá trị.</p>
+  <div class="sh"><b>04</b><h2>Giám sát liên tục</h2></div>
+
+  <p class="key">Kiểm theo luật cố định chỉ bắt được lỗi <em>bạn đã nghĩ ra trước</em>. Còn lại phải nhìn vào <em>xu hướng</em>: hôm nay lệch bất thường so với chính nó hôm qua.</p>
+
+  <table>
+    <tr><th>Tín hiệu</th><th>Cảnh báo khi</th><th>Bắt được lỗi gì</th></tr>
+    <tr><td><b>Freshness</b></td><td>Bản ghi mới nhất cũ hơn ngưỡng cam kết</td><td>Job chết âm thầm, nguồn ngừng gửi</td></tr>
+    <tr><td><b>Volume</b></td><td>Số dòng lệch xa dải bình thường của cùng thứ trong tuần</td><td>Nạp thiếu một phần, hoặc chạy hai lần</td></tr>
+    <tr><td><b>Schema</b></td><td>Cột bị thêm, mất, hoặc đổi kiểu</td><td>Bên sinh dữ liệu đổi mà không báo</td></tr>
+    <tr><td><b>Distribution</b></td><td>Trung bình, tỉ lệ <code>NULL</code>, tỉ lệ mỗi giá trị lệch khỏi lịch sử</td><td>Đổi đơn vị, đổi nghĩa trường, lỗi logic transform</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Bốn tín hiệu này gọi chung là <b>data observability</b> — đo <em>hành vi</em> của dữ liệu theo thời gian, khác với kiểm theo luật cố định ở mục 03. Cả hai đều cần: luật bắt lỗi đã biết, quan sát bắt lỗi chưa từng nghĩ tới.</li>
+    <li>Đổi lại là <b>cảnh báo giả</b>: doanh số ngày lễ tăng vọt là bình thường nhưng ngưỡng thống kê vẫn kêu. Ngưỡng quá nhạy thì đội trực tắt thông báo, và lúc đó hệ giám sát coi như không có.</li>
+    <li>Chiều <b>distribution</b> đúng là thứ mà hệ ML gọi là <b>data drift</b> — cùng phép đo, khác mục đích: ở đây để phát hiện pipeline hỏng, ở đó để biết khi nào phải huấn luyện lại model. Cơ chế đo (PSI, KL divergence) và ngưỡng cụ thể xem ở <a href="../../../10-mlops/03-lifecycle/mlops-serving/index.html">Monitoring &amp; serving</a>.</li>
+  </ul>
 </section>
 
 <section id="data-quality-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
-  <p class="plan">Hai câu thường gặp về data quality.</p>
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Chỉ kiểm schema mà không kiểm giá trị</h4><p>Cột <code>amount</code> vẫn là <code>NUMERIC</code>, vẫn không <code>NULL</code> — kiểm tra schema báo xanh. Nhưng nguồn đã đổi đơn vị từ đồng sang nghìn đồng, mọi con số nhỏ đi 1000 lần. Schema đúng không suy ra giá trị đúng.</p></div>
+    <div class="card bad"><h4>Kiểm sau khi đã ghi vào bảng chính</h4><p>Phát hiện lỗi khi dữ liệu bẩn đã trộn lẫn với dữ liệu sạch — giờ phải truy ngược xem dòng nào của lần nạp nào. Kiểm trên bảng staging trước, đạt rồi mới đẩy sang bảng chính.</p></div>
+    <div class="card bad"><h4>Cảnh báo quá nhiều rồi không ai đọc</h4><p>Đặt ngưỡng quá nhạy, mỗi sáng 40 cảnh báo mà 38 cái là bình thường. Sau hai tuần cả đội lọc hết vào thư mục rác — và cái cảnh báo thật thứ 39 cũng nằm trong đó.</p></div>
+    <div class="card bad"><h4>Không ai sở hữu bảng</h4><p>Cảnh báo bắn vào một kênh chung, mỗi người tưởng người khác xử lý. Mỗi tập dữ liệu phải có <b>một</b> chủ có tên, giống nguyên tắc một khái niệm một chủ trong thiết kế.</p></div>
+    <div class="card bad"><h4>Pipeline không idempotent</h4><p>Chạy lại một job đã chạy nửa chừng làm <code>INSERT</code> trùng thay vì <code>UPSERT</code> — chính hành động sửa lỗi lại tạo ra lỗi uniqueness. Xem <a href="../etl-elt/index.html">ETL &amp; ELT</a>.</p></div>
+    <div class="card bad"><h4>Sửa số ở dashboard thay vì ở nguồn</h4><p>Thêm một mệnh đề <code>WHERE amount &lt; 1e9</code> trong báo cáo để lọc giá trị vô lý. Con số hết lạ, nguyên nhân còn nguyên, và mọi báo cáo khác vẫn đang dùng dữ liệu bẩn đó.</p></div>
+  </div>
 </section>
 
-<footer>Database · Data systems</footer>
+<section id="data-quality-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>Đo chất lượng dữ liệu bằng những chiều nào?</summary>
+  <p>Sáu chiều: completeness (thiếu giá trị hay thiếu dòng), uniqueness (trùng khoá), validity (giá trị nằm trong miền cho phép), consistency (các bảng không mâu thuẫn nhau), accuracy (khớp sự thật ngoài đời), timeliness (dữ liệu mới tới mức nào). Năm chiều đầu kiểm được bằng SQL thuần và nên tự động hoá. Accuracy là chiều khó nhất vì không có nguồn sự thật để so — thường chỉ đối soát được bằng mẫu hoặc bằng một nguồn độc lập.</p></details>
+
+  <details class="qa"><summary>Vì sao lỗi dữ liệu nguy hiểm hơn lỗi hệ thống?</summary>
+  <p>Vì nó không tự báo. Job chết thì có cảnh báo trong vài phút; dữ liệu sai thì pipeline vẫn xanh, dashboard vẫn vẽ, và lỗi chỉ lộ ra khi có người tình cờ thấy con số vô lý — thường là hàng tuần sau, khi đã có những quyết định dựa trên nó. Thiệt hại lớn nhất không phải con số sai mà là mất niềm tin: một lần sai là lần sau người dùng tự export ra Excel tính lại, và hệ thống dữ liệu mất hết giá trị.</p></details>
+
+  <details class="qa"><summary>Nên đặt kiểm tra chất lượng ở đâu trong pipeline?</summary>
+  <p>Ba chốt, càng gần nguồn càng rẻ. Tại nguồn: ràng buộc database chặn dữ liệu sai ngay lúc ghi — chắc nhất nhưng chỉ áp được cho dữ liệu mình sở hữu. Tại pipeline: chạy bộ kiểm trên bảng staging sau mỗi lần nạp, đạt rồi mới đẩy vào bảng chính — chốt chính cho dữ liệu từ ngoài. Tại nơi dùng: đối soát quy tắc nghiệp vụ trên bảng tổng hợp, bắt loại lỗi hai chốt kia không thấy được là logic transform sai dù mọi bảng nguồn đều hợp lệ.</p></details>
+
+  <details class="qa"><summary>Khi một kiểm tra thất bại, nên dừng pipeline hay cho chạy tiếp?</summary>
+  <p>Tuỳ dữ liệu sai hay dữ liệu thiếu tệ hơn. Fail fast — dừng hẳn, giữ số cũ — đúng cho số liệu ra quyết định tiền bạc: báo cáo tài chính, tính hoa hồng, đối soát; thà không có số còn hơn có số sai. Quarantine — tách dòng lỗi sang bảng riêng, phần còn lại vẫn vào kèm cảnh báo — đúng cho log hành vi hay dữ liệu huấn luyện, nơi mất toàn bộ tệ hơn mất vài phần trăm. Điểm chung: dòng bị loại phải đi đâu đó đếm được, không được im lặng biến mất.</p></details>
+
+  <details class="qa"><summary>Data contract là gì và nó giải quyết vấn đề gì?</summary>
+  <p>Là cam kết viết thành file giữa bên sinh dữ liệu và bên dùng: schema, kiểu, miền giá trị, tần suất cập nhật, ai chịu trách nhiệm — và được kiểm tự động trong CI của bên sinh. Nó chữa nguồn lỗi phổ biến nhất: đội backend đổi tên trường hoặc đổi đơn vị mà đội dữ liệu không biết, tới khi dashboard sai mới phát hiện. Cái giá là bên sinh mất tự do đổi schema tuỳ ý; đổi lại lỗi bị chặn ngay chỗ phát sinh thay vì lộ ra ở cuối chuỗi.</p></details>
+
+  <details class="qa"><summary>Kiểm theo luật và giám sát theo xu hướng khác nhau ra sao?</summary>
+  <p>Kiểm theo luật là những khẳng định cố định — <code>amount &gt; 0</code>, <code>order_id</code> không trùng — chỉ bắt được lỗi đã nghĩ ra trước. Giám sát theo xu hướng (data observability) theo dõi bốn tín hiệu freshness, volume, schema, distribution rồi cảnh báo khi hôm nay lệch bất thường so với chính nó trước đó — bắt được cả lỗi chưa từng nghĩ tới. Cần cả hai, nhưng loại thứ hai sinh ra cảnh báo giả (ngày lễ, khuyến mãi), nên phải chỉnh ngưỡng cẩn thận: cảnh báo quá nhiều thì cả đội tắt thông báo, và lúc đó hệ giám sát coi như không tồn tại.</p></details>
+</section>
+
+<footer>Database · Data systems · bài cuối kệ — trước đó: <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

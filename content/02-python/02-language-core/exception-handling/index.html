@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exception handling — MazeAI</title>
+<meta name="description" content="try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/exception-handling/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Exception handling">
+<meta property="og:description" content="try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/exception-handling/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-exc" data-title="Exception handling" data-tag="Language core" data-blurb="try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.">
+        <header class="hero">
+  <p class="eyebrow">Python · language core</p>
+  <h1>Exception <em>handling</em></h1>
+  <p class="lede">Python không trả mã lỗi. Hàm nào không làm được việc thì <b>ném một object lên</b>, và nó bay ngược theo chuỗi lời gọi cho tới khi có ai bắt. Viết đúng phần bắt là ranh giới rõ nhất giữa code chạy được và code chạy được trên production.</p>
+</header>
+
+<section id="exc-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Ý tưởng</h2></div>
+
+  <p class="key">Trả mã lỗi thì người gọi <em>được quyền quên kiểm tra</em>. Ném exception thì không — không bắt là chương trình dừng.</p>
+
+<pre class="core"><code><span class="cm"># kiểu mã lỗi: quên một dòng if là bug đi tiếp âm thầm</span>
+val, err = parse(s)
+<span class="kw">if</span> err: ...
+
+<span class="cm"># kiểu exception: không xử lý thì nó tự ồn ào</span>
+val = parse(s)          <span class="cm"># hỏng ở đây là dừng ngay, kèm traceback</span></code></pre>
+
+  <ul class="why">
+    <li>Exception <b>bay ngược lên</b> qua từng khung hàm cho tới khi gặp <code>except</code> khớp — nên chỗ xử lý lỗi không cần nằm cạnh chỗ sinh lỗi.</li>
+    <li>Đổi lại: đường đi của lỗi không hiện trong chữ ký hàm. Muốn biết hàm ném gì thì phải đọc tài liệu hoặc đọc code.</li>
+    <li>Trong Python, exception còn dùng cho <b>luồng chạy bình thường</b> — <code>StopIteration</code> kết thúc vòng <code>for</code>, <code>KeyError</code> là cách <code>dict</code> báo thiếu khoá.</li>
+  </ul>
+</section>
+
+<section id="exc-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Bốn khối, bốn vai trò</h2></div>
+
+  <p class="key">Hai khối ai cũng dùng, hai khối bị bỏ quên nhưng làm code sạch hơn hẳn.</p>
+
+<pre class="core"><code><span class="kw">try</span>:
+    f = <span class="kw">open</span>(path)          <span class="cm"># chỉ đặt ở đây phần CÓ THỂ hỏng</span>
+<span class="kw">except</span> FileNotFoundError <span class="kw">as</span> e:
+    log(e); <span class="kw">raise</span>           <span class="cm"># bắt đúng loại đã lường trước</span>
+<span class="kw">else</span>:
+    process(f)                <span class="cm"># chạy khi KHÔNG có lỗi</span>
+<span class="kw">finally</span>:
+    cleanup()                 <span class="cm"># chạy trong MỌI trường hợp</span></code></pre>
+
+  <table>
+    <tr><th>Khối</th><th>Chạy khi</th><th>Vì sao đáng dùng</th></tr>
+    <tr><td><code>try</code></td><td>luôn</td><td>giữ <b>càng ít dòng càng tốt</b> — bọc cả hàm là bắt nhầm lỗi của dòng khác</td></tr>
+    <tr><td><code>except</code></td><td>có lỗi khớp loại</td><td>ghi rõ loại lỗi bạn đã lường trước</td></tr>
+    <tr><td><code>else</code></td><td>không có lỗi nào</td><td>tách phần "chạy tiếp" ra khỏi phần được canh chừng</td></tr>
+    <tr><td><code>finally</code></td><td>mọi trường hợp, kể cả <code>return</code></td><td>đóng tài nguyên — chạy cả khi lỗi đang bay lên tiếp</td></tr>
+  </table>
+
+  <p class="stripnote"><span><code>finally</code> cho tài nguyên là cách viết tay</span><span>có <code>__enter__</code>/<code>__exit__</code> rồi thì <a href="../decorator-context-manager/index.html"><em>context manager</em></a> gọn hơn</span></p>
+</section>
+
+<section id="exc-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Cây Exception</h2></div>
+
+  <p class="key">Bắt một lớp là bắt <em>toàn bộ nhánh dưới nó</em>. Vì vậy vị trí trong cây quyết định bạn bắt được bao nhiêu.</p>
+
+<pre><code>BaseException
+├── SystemExit          <span class="cm">← sys.exit()</span>
+├── KeyboardInterrupt   <span class="cm">← Ctrl-C</span>
+├── GeneratorExit
+└── Exception           <span class="cm">← MỌI lỗi bình thường nằm dưới đây</span>
+    ├── ArithmeticError → ZeroDivisionError
+    ├── LookupError     → IndexError, KeyError
+    ├── OSError         → FileNotFoundError, PermissionError, TimeoutError
+    ├── ValueError      <span class="cm">← đúng kiểu, sai giá trị</span>
+    ├── TypeError       <span class="cm">← sai kiểu</span>
+    └── RuntimeError    → RecursionError</code></pre>
+
+  <div class="note warn">
+    <h4>Vì sao ba nhánh kia không nằm dưới <code>Exception</code></h4>
+    <code>SystemExit</code> và <code>KeyboardInterrupt</code> là <b>yêu cầu dừng chương trình</b>, không phải lỗi. Tách chúng ra ngoài <code>Exception</code> để <code>except Exception</code> — cách bắt rộng nhất còn hợp lý — không nuốt mất Ctrl-C. Đây cũng là lý do <code>except:</code> trần khác hẳn <code>except Exception:</code>: nó bắt cả những thứ này.
+  </div>
+
+  <p>Bắt nhiều loại thì viết thành tuple, và <b>xếp loại hẹp lên trước loại rộng</b> — Python thử từng <code>except</code> theo thứ tự, gặp cái khớp đầu tiên là dừng:</p>
+
+<pre><code><span class="kw">except</span> (FileNotFoundError, PermissionError) <span class="kw">as</span> e: ...
+<span class="kw">except</span> OSError <span class="kw">as</span> e: ...      <span class="cm"># rộng hơn → phải xếp sau</span></code></pre>
+</section>
+
+<section id="exc-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Exception tự viết và raise from</h2></div>
+
+  <p class="key">Một lớp cha cho cả thư viện, để người dùng bắt được <em>mọi lỗi của bạn</em> bằng một dòng.</p>
+
+<pre class="core"><code><span class="kw">class</span> AppError(Exception): <span class="kw">pass</span>              <span class="cm"># gốc chung</span>
+<span class="kw">class</span> ConfigError(AppError): <span class="kw">pass</span>
+<span class="kw">class</span> RetryableError(AppError): <span class="kw">pass</span>
+
+<span class="cm"># người dùng chọn độ rộng họ muốn:</span>
+<span class="kw">except</span> ConfigError: ...      <span class="cm"># đúng một loại</span>
+<span class="kw">except</span> AppError: ...         <span class="cm"># mọi lỗi của thư viện này</span></code></pre>
+
+  <p>Khi đổi một lỗi tầng dưới thành lỗi tầng trên, dùng <code>raise ... from</code> để <b>giữ nguyên nguồn gốc</b>:</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Mất dấu vết</h5>
+<pre class="core" style="margin:6px 0"><code><span class="kw">except</span> KeyError:
+    <span class="kw">raise</span> ConfigError(<span class="st">"thiếu khoá"</span>)</code></pre>
+      <p>Traceback vẫn hiện lỗi cũ nhưng kèm dòng khó hiểu "During handling of the above exception, another exception occurred".</p>
+    </div>
+    <div>
+      <h5>Nối đúng nguyên nhân</h5>
+<pre class="core" style="margin:6px 0"><code><span class="kw">except</span> KeyError <span class="kw">as</span> e:
+    <span class="kw">raise</span> ConfigError(<span class="st">"thiếu khoá"</span>) <span class="kw">from</span> e</code></pre>
+      <p>Traceback ghi rõ "The above exception was the direct cause" — người đọc log biết ngay lỗi gốc là gì.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Ném lại nguyên vẹn</h4>
+    Trong <code>except</code>, một chữ <code>raise</code> trần ném lại đúng exception đang xử lý, <b>giữ nguyên traceback gốc</b>. Đó là cách ghi log rồi vẫn để lỗi bay lên: <code>except OSError as e: log(e); raise</code>. Viết <code>raise e</code> thì traceback bị cắt lại từ dòng này.
+  </div>
+</section>
+
+<section id="exc-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Lỗi đầu tiên là thứ <em>xoá dấu vết của mọi bug khác</em> trong service.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4><code>except:</code> hoặc <code>except Exception: pass</code></h4><p>Nuốt cả lỗi lập trình lẫn Ctrl-C. Service vẫn "chạy" trong khi dữ liệu đã sai. Bắt loại hẹp, và đã bắt thì phải <b>log hoặc ném lại</b>.</p></div>
+    <div class="card bad"><h4>Khối <code>try</code> quá rộng</h4><p>Bọc cả hàm thì <code>except KeyError</code> bắt luôn <code>KeyError</code> của một dòng khác mà bạn không hề lường trước.</p></div>
+    <div class="card bad"><h4><code>return</code> trong <code>finally</code></h4><p>Nó <b>nuốt mất exception đang bay lên</b> — hàm trả về bình thường như chưa có gì xảy ra.</p></div>
+    <div class="card bad"><h4>Dùng exception cho luồng chạy thông thường</h4><p>Bắt <code>KeyError</code> để kiểm tra khoá thì <code>d.get(k)</code> hoặc <code>k in d</code> vừa rõ hơn vừa nhanh hơn.</p></div>
+  </div>
+
+  <div class="note warn">
+    <h4>EAFP — nhưng đúng chỗ</h4>
+    Python chuộng <em>easier to ask forgiveness than permission</em>: cứ thử rồi bắt lỗi, thay vì kiểm tra trước. Nó đúng khi trường hợp lỗi <b>hiếm</b> (mở file, gọi mạng) — kiểm tra trước vừa thừa vừa có khe hở giữa lúc kiểm và lúc dùng. Nó sai khi lỗi là chuyện <b>thường xuyên</b>: bắt exception tốn hơn một phép kiểm tra rất nhiều.
+  </div>
+</section>
+
+<section id="exc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary><code>except Exception</code> và <code>except:</code> trần khác nhau thế nào?</summary>
+  <p><code>except:</code> bắt từ <code>BaseException</code>, tức nuốt luôn <code>KeyboardInterrupt</code> và <code>SystemExit</code> — Ctrl-C không dừng được chương trình nữa. <code>except Exception</code> chỉ bắt các lỗi bình thường, nên đó là mức rộng nhất còn chấp nhận được, và chỉ nên dùng ở ranh giới ngoài cùng của service để ghi log rồi ném lại. Cả hai đều không nên đi kèm <code>pass</code>.</p></details>
+
+  <details class="qa"><summary><code>else</code> trong <code>try</code> để làm gì?</summary>
+  <p>Nó chạy khi khối <code>try</code> không ném lỗi nào. Lợi ích là giữ <code>try</code> chỉ chứa đúng dòng có thể hỏng: phần xử lý tiếp theo nằm trong <code>else</code> nên nếu chính nó ném ra cùng loại lỗi thì cũng không bị <code>except</code> ở trên bắt nhầm. Không có <code>else</code> thì phần đó phải nằm trong <code>try</code>, và ranh giới lỗi bị nhoè.</p></details>
+
+  <details class="qa"><summary><code>finally</code> có luôn chạy không?</summary>
+  <p>Có, kể cả khi khối <code>try</code> có <code>return</code>, <code>break</code> hay đang có exception bay lên — đó là lý do nó là chỗ đóng tài nguyên. Hai lưu ý: <code>return</code> đặt trong chính <code>finally</code> sẽ <b>nuốt mất</b> exception đang bay và ghi đè giá trị trả về, nên đừng làm; và nó không chạy nếu tiến trình bị giết cứng hoặc <code>os._exit()</code>.</p></details>
+
+  <details class="qa"><summary>Khi nào bạn viết exception riêng?</summary>
+  <p>Khi viết thư viện hoặc một module có ranh giới rõ: một lớp gốc chung như <code>AppError</code> rồi các lớp con cụ thể. Người dùng chọn được độ rộng họ muốn bắt bằng đúng một dòng, và bạn đổi chi tiết bên trong mà không phá code của họ. Ném thẳng <code>ValueError</code> thì người gọi không phân biệt được lỗi của bạn với lỗi của thư viện khác trong cùng khối <code>try</code>.</p></details>
+
+  <details class="qa"><summary><code>raise</code>, <code>raise e</code> và <code>raise X from e</code> khác nhau ra sao?</summary>
+  <p><code>raise</code> trần ném lại đúng exception đang xử lý và giữ nguyên traceback gốc — dùng khi chỉ muốn ghi log rồi để lỗi đi tiếp. <code>raise e</code> ném lại cùng object nhưng traceback bị cắt từ dòng đó, nên mất chỗ hỏng thật. <code>raise X from e</code> ném một lỗi mới và ghi rõ <code>e</code> là nguyên nhân trực tiếp — cách chuẩn khi dịch lỗi tầng dưới sang lỗi tầng trên.</p></details>
+</section>
+
+<footer>Python · language core · phần <code>with</code> và <code>__exit__</code> ở <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

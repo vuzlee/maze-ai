@@ -107,11 +107,38 @@ Leader chết  ─────► promote một follower lên làm leader mới<
     <li>Replication đã dùng hết để tách đọc/ghi nhưng bản thân lượng <b>ghi</b> vẫn quá tải cho một leader duy nhất — sharding phân cả tải ghi ra nhiều node, không chỉ tải đọc.</li>
   </ul>
 
-  <p>Sharding thường là bước <b>cuối cùng</b>, không phải đầu tiên, vì cái giá của nó — mất đi ở mục 04 — là rất thật và khó đảo ngược. Trình tự nên thử: tối ưu query và index → thêm cache → replication cho đọc → rồi mới tới sharding.</p>
+  <p>Sharding thường là bước <b>cuối cùng</b>, không phải đầu tiên, vì cái giá của nó — mất đi ở mục 05 — là rất thật và khó đảo ngược. Trình tự nên thử: tối ưu query và index → thêm cache → replication cho đọc → partitioning trong một node (mục 03) → rồi mới tới sharding.</p>
 </section>
 
 <section id="shard-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Chọn shard key</h2></div>
+  <div class="sh"><b>03</b><h2>Partitioning trong một node</h2></div>
+
+  <p class="key">Có một nấc trung gian mà nhiều người bỏ qua: <em>chia bảng thành nhiều mảnh nhưng vẫn để trên cùng một máy</em>. Cùng ý tưởng chia dữ liệu, không phải trả giá của hệ phân tán.</p>
+
+<pre><code><span class="cm">-- PostgreSQL: chia bảng orders theo tháng</span>
+CREATE TABLE orders (id bigint, created_at date, ...) PARTITION BY RANGE (created_at);
+
+CREATE TABLE orders_2026_08 PARTITION OF orders
+  FOR VALUES FROM (<span class="st">'2026-08-01'</span>) TO (<span class="st">'2026-09-01'</span>);
+
+<span class="cm">-- truy vấn lọc theo created_at chỉ đọc đúng một mảnh (partition pruning)</span>
+SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>;</code></pre>
+
+  <p>Ba thứ nó cho mà index không cho được:</p>
+  <ul class="why">
+    <li><b>Partition pruning</b> — planner loại thẳng các mảnh không thể chứa kết quả, trước cả khi đụng tới index. Bảng 5 năm dữ liệu nhưng truy vấn tháng này chỉ chạm 1/60 số dòng.</li>
+    <li><b>Xoá dữ liệu cũ tức thì</b> — <code>DROP TABLE orders_2021_01</code> mất mili giây, trong khi <code>DELETE</code> vài chục triệu dòng khoá bảng hàng giờ và để lại rác cho vacuum dọn.</li>
+    <li><b>Bảo trì theo mảnh</b> — <code>VACUUM</code>, rebuild index, nén dữ liệu cũ làm được trên từng mảnh thay vì cả bảng.</li>
+  </ul>
+
+  <div class="note key">
+    <h4>Ba nấc thang, đi theo thứ tự</h4>
+    <b>Index</b> — bảng vẫn là một, chỉ thêm đường tra cứu. <b>Partitioning</b> — chia bảng thành mảnh, vẫn một máy, vẫn một transaction, ứng dụng không cần biết. <b>Sharding</b> — chia ra nhiều máy, mất join và transaction xuyên mảnh. Đừng nhảy cóc: rất nhiều hệ tưởng cần shard thật ra chỉ cần partition theo thời gian.
+  </div>
+</section>
+
+<section id="shard-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Chọn shard key</h2></div>
 
   <p class="key">Ba chiến lược chia dữ liệu ra nhiều mảnh (shard) — khác nhau ở việc <em>thêm/bớt node thì phải dịch chuyển bao nhiêu dữ liệu</em>.</p>
 
@@ -159,8 +186,8 @@ chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, 
   </table>
 </section>
 
-<section id="shard-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Cái mất khi sharding</h2></div>
+<section id="shard-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Cái mất khi sharding</h2></div>
 
   <p class="key">Chia dữ liệu ra nhiều máy nghĩa là những phép toán vốn dễ trên một máy — join, transaction, unique — giờ phải <em>băng qua mạng</em> hoặc phải bỏ hẳn.</p>
 
@@ -175,12 +202,12 @@ chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, 
 
   <div class="note key">
     <h4>Nguyên tắc thiết kế bù lại</h4>
-    Thiết kế lại schema để phần lớn truy vấn <b>chỉ chạm một shard</b> — denormalize dữ liệu hay dùng cùng nhau vào cùng shard (theo cùng shard key), chấp nhận trùng lặp dữ liệu để đổi lấy việc không phải join xuyên shard. Đây là lý do vì sao chọn shard key đúng ngay từ đầu (mục 03) quan trọng hơn hẳn — sửa lại sau khi đã có dữ liệu lớn là một trong những việc tốn kém nhất trong vòng đời một hệ thống.
+    Thiết kế lại schema để phần lớn truy vấn <b>chỉ chạm một shard</b> — denormalize dữ liệu hay dùng cùng nhau vào cùng shard (theo cùng shard key), chấp nhận trùng lặp dữ liệu để đổi lấy việc không phải join xuyên shard. Đây là lý do vì sao chọn shard key đúng ngay từ đầu (mục 04) quan trọng hơn hẳn — sửa lại sau khi đã có dữ liệu lớn là một trong những việc tốn kém nhất trong vòng đời một hệ thống.
   </div>
 </section>
 
-<section id="shard-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+<section id="shard-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Sharding trước khi thử hết cách khác</h4><p>Tối ưu query, thêm index, thêm cache, replication cho đọc — thử hết trước. Sharding khó đảo ngược và mọi truy vấn xuyên shard đều đắt hơn.</p></div>
     <div class="card bad"><h4>Chọn shard key theo trường hay đổi giá trị</h4><p>Đổi giá trị shard key nghĩa là phải di chuyển cả bản ghi sang shard khác. Chọn khoá ổn định theo thời gian.</p></div>
@@ -191,8 +218,8 @@ chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, 
   </div>
 </section>
 
-<section id="shard-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+<section id="shard-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
 
   <details class="qa"><summary>Replication và sharding khác nhau ở đâu?</summary>
   <p>Replication tạo nhiều bản sao <em>giống hệt nhau</em> của toàn bộ dữ liệu trên nhiều máy — dùng để đọc mở rộng, chịu lỗi, backup, nhưng mỗi bản sao vẫn phải chứa hết dữ liệu. Sharding <em>chia</em> dữ liệu thành nhiều phần khác nhau, mỗi phần nằm trên một máy — dùng khi bản thân dữ liệu đã lớn hơn một máy có thể chứa hoặc ghi kịp. Hai kỹ thuật thường đi cùng nhau: mỗi shard thường lại được replicate riêng để chịu lỗi.</p></details>
@@ -208,6 +235,9 @@ chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, 
 
   <details class="qa"><summary>Vì sao join qua nhiều shard lại đắt, và cách xử lý thường dùng là gì?</summary>
   <p>Vì không có cơ chế JOIN xuyên shard có sẵn — dữ liệu nằm ở hai máy khác nhau, không có index chung để cơ sở dữ liệu tự ghép. Ứng dụng phải tự truy vấn từng shard rồi gộp kết quả ở tầng ứng dụng (scatter-gather), chậm hơn hẳn một JOIN cục bộ. Cách xử lý thường dùng là thiết kế schema để dữ liệu hay dùng cùng nhau nằm cùng một shard (denormalize theo shard key), chấp nhận trùng lặp dữ liệu để đổi lấy việc không phải join xuyên máy.</p></details>
+
+  <details class="qa"><summary>Partitioning và sharding khác nhau ra sao?</summary>
+  <p>Cùng ý tưởng chia dữ liệu theo một khoá, khác ở chỗ các mảnh nằm đâu. Partitioning chia bảng thành nhiều mảnh <em>trên cùng một node</em>: ứng dụng vẫn viết SQL như cũ, join và transaction vẫn hoạt động bình thường, cái được là partition pruning và xoá dữ liệu cũ bằng <code>DROP TABLE</code> thay vì <code>DELETE</code>. Sharding chia ra <em>nhiều node</em>: được thêm khả năng mở rộng tải ghi và dung lượng, nhưng mất join xuyên mảnh, mất transaction atomic xuyên mảnh và mất ràng buộc unique toàn cục. Rất nhiều hệ tưởng cần shard thật ra chỉ cần partition theo thời gian.</p></details>
 
   <details class="qa"><summary>Sharding liên quan gì tới CAP theorem?</summary>
   <p>Một hệ đã sharded và replicated là một hệ phân tán thật sự, nên phải đối mặt trực tiếp với đánh đổi của CAP theorem khi mạng giữa các node bị chia cắt — chọn nghiêng về nhất quán (CP) hay sẵn sàng (AP). Đây là lý thuyết nền phía sau các quyết định như đồng bộ hay bất đồng bộ replication ở mục 01; xem <a href="../../../03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html">CAP theorem &amp; consistency</a> để đào sâu phần đó.</p></details>

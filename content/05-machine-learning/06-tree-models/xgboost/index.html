@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XGBoost — MazeAI</title>
+<meta name="description" content="Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/xgboost/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="XGBoost">
+<meta property="og:description" content="Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/xgboost/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-xgb" data-title="XGBoost" data-tag="Ensemble" data-blurb="Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Tree models</p>
+  <h1><em>XGBoost</em></h1>
+  <p class="lede">Không phải "gradient boosting chạy nhanh hơn" — nó <b>đổi hẳn hàm mục tiêu</b>. Từ chỗ đi mò theo gradient, nó viết ra được <b>công thức tính thẳng giá trị tối ưu của mỗi lá</b>, và nhét regularization vào ngay trong công thức đó.</p>
+</header>
+
+<section id="xgb-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vấn đề nó giải</h2></div>
+
+  <p class="key"><a href="../gradient-boosting/index.html">Gradient boosting</a> gốc có hai chỗ để ngỏ: <em>nó chỉ nhìn độ dốc, và nó không biết gì về độ phức tạp của cây mình vừa mọc</em>.</p>
+
+  <p>Nhắc lại cơ chế gốc: mỗi vòng tính phần dư — thực chất là gradient âm của loss — rồi mọc một cây khớp vào phần dư đó. Cách này chạy được, nhưng cây mọc ra theo tiêu chí quen thuộc của cây quyết định (Gini, MSE), tức là <b>tiêu chí mọc cây và hàm mục tiêu của boosting không phải một thứ</b>. Chống overfit thì làm sau, bằng cắt tỉa và <code>learning_rate</code>.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Gradient boosting gốc</h5>
+      <p>Chỉ dùng <b>đạo hàm bậc nhất</b> — biết dốc về hướng nào, không biết dốc bao lâu thì tới đáy.</p>
+      <p>Regularization là <b>hậu xử lý</b>: cắt tỉa cây sau khi đã mọc xong.</p>
+    </div>
+    <div>
+      <h5>XGBoost</h5>
+      <p>Thêm <b>đạo hàm bậc hai</b> — biết cả độ cong, nên tính thẳng ra bước nhảy tối ưu.</p>
+      <p>Phạt độ phức tạp nằm <b>trong objective</b>: cây mọc ra đã tính sẵn cái giá của việc thêm lá.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Chỗ này là điểm mới thật sự. Nhiều thứ khác người ta hay gán cho XGBoost — histogram, chạy song song, xử lý dữ liệu thưa — là <b>kỹ thuật</b>, quan trọng cho tốc độ nhưng không đổi bài toán.</li>
+  </ul>
+</section>
+
+<section id="xgb-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Ý tưởng cốt lõi</h2></div>
+
+  <p class="key">Không cần biết loss trông ra sao trên toàn miền — <em>chỉ cần xấp xỉ nó bằng một parabol quanh chỗ đang đứng</em>, và parabol thì có đỉnh giải ra được bằng công thức.</p>
+
+  <p>Ở vòng thứ <code>t</code>, model hiện tại đã dự đoán <code>ŷ</code>, và ta cần biết thêm một lượng <code>f(x)</code> vào thì loss đổi thế nào. Khai triển Taylor tới bậc hai quanh <code>ŷ</code>:</p>
+
+<pre><code>L(ŷ + f) ≈ L(ŷ) + g·f + ½·h·f²
+                   ↑      ↑
+              g = đạo hàm bậc 1   h = đạo hàm bậc 2 (Hessian)
+              "dốc hướng nào"     "dốc cong bao nhiêu"
+
+L(ŷ) là hằng số ở vòng này → bỏ. Còn lại một hàm bậc hai theo f.</code></pre>
+
+  <p>Đây là chỗ mọi thứ mở ra: một hàm bậc hai có đỉnh, và đỉnh đó tìm bằng công thức chứ không phải mò từng bước. Nên nếu biết mỗi mẫu rơi vào lá nào, ta <b>tính thẳng được giá trị tối ưu của lá đó</b> — không cần lặp, không cần learning rate ở bước này.</p>
+
+  <ul class="why">
+    <li>Cái giá phải trả: loss buộc phải <b>khả vi hai lần</b>. Hầu hết loss thông dụng — MSE, log loss — đều thoả, nên trong thực tế đây không phải hạn chế đáng kể.</li>
+    <li><code>g</code> và <code>h</code> tính riêng cho <em>từng mẫu</em> và chỉ phụ thuộc vào dự đoán hiện tại. Nên đổi bài toán chỉ là đổi công thức <code>g</code>, <code>h</code> — phần mọc cây giữ nguyên. Đó là lý do XGBoost dùng chung một lõi cho hồi quy, phân loại và xếp hạng.</li>
+  </ul>
+</section>
+
+<section id="xgb-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Hàm mục tiêu</h2></div>
+
+  <p class="key">Gộp các mẫu theo lá, cộng thêm phần phạt độ phức tạp — <em>và bài toán mọc cây trở thành một bài tối ưu duy nhất</em>.</p>
+
+<pre><code>Obj = Σ [ Gⱼ·wⱼ + ½(Hⱼ + λ)·wⱼ² ]  +  γ·T
+       lá j                              ↑ số lá
+
+  Gⱼ = tổng g của các mẫu rơi vào lá j
+  Hⱼ = tổng h của các mẫu rơi vào lá j
+  wⱼ = giá trị lá j trả về      λ, γ = hai siêu tham số phạt
+
+Đạo hàm theo wⱼ rồi cho bằng 0:
+
+  wⱼ* = − Gⱼ / (Hⱼ + λ)          ← giá trị lá tối ưu, tính thẳng
+  Obj* = − ½ Σ Gⱼ²/(Hⱼ + λ) + γT ← điểm của cả cây</code></pre>
+
+  <p>Hai siêu tham số phạt nằm ngay trong công thức, không phải bước sau: <code>λ</code> đứng ở mẫu số nên kéo mọi giá trị lá về gần 0 — đúng là <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">L2</a> áp lên giá trị lá. <code>γ</code> tính tiền cho mỗi chiếc lá tồn tại, nên cây chỉ mọc thêm khi lợi ích vượt được cái giá đó.</p>
+
+  <div class="note key">
+    <h4>Gain — chia hay không chia</h4>
+    Từ <code>Obj*</code> suy thẳng ra tiêu chí tách nút: <b>gain = điểm sau khi tách − điểm trước khi tách − γ</b>. Nếu gain âm thì không tách. Đây là điểm khác cây quyết định thường rõ nhất: cây thường tách theo Gini rồi cắt tỉa sau, còn XGBoost <b>tách theo chính hàm mục tiêu</b> mà nó đang tối ưu — mọc và chống overfit là một việc, không phải hai.
+  </div>
+
+  <ul class="why">
+    <li><code>Hⱼ</code> ở mẫu số có tác dụng phụ rất hữu ích: lá chứa ít mẫu thì <code>Hⱼ</code> nhỏ, giá trị trả về bị <code>λ</code> ghìm mạnh hơn. Model <b>tự nghi ngờ những lá mỏng</b> mà không cần luật riêng nào.</li>
+    <li>Vẫn cần <code>learning_rate</code> (còn gọi là <code>eta</code>): nhân giá trị lá với một số nhỏ trước khi cộng vào model. Nó khác λ — λ hãm <em>từng cây</em>, <code>eta</code> hãm <em>tốc độ tích luỹ</em> qua nhiều cây.</li>
+  </ul>
+</section>
+
+<section id="xgb-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Kỹ thuật làm nó chạy được ở quy mô thật</h2></div>
+
+  <p class="key">Công thức trên vô dụng nếu mỗi lần tách phải quét mọi ngưỡng của mọi cột. <em>Ba mẹo kỹ thuật dưới đây là thứ đưa nó từ đúng sang dùng được.</em></p>
+
+  <table>
+    <tr><th>Kỹ thuật</th><th>Làm gì</th><th>Được gì</th></tr>
+    <tr><td><b>Histogram</b></td><td>Gộp giá trị liên tục vào ~256 thùng, chỉ xét ngưỡng ở biên thùng</td><td>Số ngưỡng phải thử giảm từ n xuống 256</td></tr>
+    <tr><td><b>Sparsity-aware</b></td><td>Học sẵn một <b>hướng mặc định</b> cho mỗi nút: giá trị thiếu đi nhánh nào</td><td>Không cần điền khuyết; dữ liệu thưa chỉ duyệt phần khác 0</td></tr>
+    <tr><td><b>Block nén theo cột</b></td><td>Sắp xếp trước mỗi cột và lưu thành khối, dùng lại qua mọi vòng</td><td>Chạy song song theo cột; tận dụng cache</td></tr>
+  </table>
+
+  <p>Mẹo thứ hai đáng nhớ nhất trong lúc dùng thật: XGBoost <b>không cần bạn điền giá trị thiếu</b>. Nó coi "thiếu" là một tín hiệu và học xem hướng nào cho gain tốt hơn. Điền bừa bằng trung bình là xoá mất tín hiệu đó — xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</p>
+</section>
+
+<section id="xgb-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Đánh đổi và khi nào chọn nó</h2></div>
+
+  <table>
+    <tr><th>Mạnh</th><th>Yếu</th></tr>
+    <tr><td>Chính xác hàng đầu trên dữ liệu bảng; cực ổn định giữa các lần chạy</td><td>Chậm hơn <a href="../lightgbm/index.html">LightGBM</a> rõ rệt trên dữ liệu rất lớn</td></tr>
+    <tr><td>Không cần co giãn đặc trưng, xử lý giá trị thiếu sẵn</td><td>Biến phân loại <b>phải mã hoá trước</b>, không nhận trực tiếp</td></tr>
+    <tr><td>Nhiều núm điều chỉnh, kiểm soát overfit tốt</td><td>Chính vì nhiều núm nên tinh chỉnh tốn công; mặc định hiếm khi là tốt nhất</td></tr>
+  </table>
+
+  <p>Nơi nó thống trị: <b>dữ liệu bảng cỡ vừa</b> — vài nghìn tới vài triệu dòng. Đây là lựa chọn mặc định ở Kaggle suốt gần một thập kỷ và ở nhiều hệ xếp hạng production, vì trên loại dữ liệu này nó vẫn thường thắng mạng nơ-ron; lý do nằm ở <a href="../gradient-boosting/index.html">Gradient boosting</a>.</p>
+
+  <ul class="why">
+    <li>Thứ tự chỉnh tham số đáng theo: <code>n_estimators</code> đặt cao rồi dùng <b>early stopping</b> → <code>max_depth</code> (3–8) → <code>learning_rate</code> (0,01–0,3, giảm thì tăng số cây) → <code>subsample</code> và <code>colsample_bytree</code> → cuối cùng mới tới <code>lambda</code> và <code>gamma</code>.</li>
+    <li>Chỉnh bằng random search chứ đừng grid: xem <a href="../../04-core-concepts/overfitting-regularization/index.html">Overfitting &amp; regularization</a>.</li>
+  </ul>
+</section>
+
+<section id="xgb-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Điền giá trị thiếu trước khi đưa vào</h4><p>Xoá mất tín hiệu mà sparsity-aware split đang khai thác. Cứ để nguyên <code>NaN</code>.</p></div>
+    <div class="card bad"><h4>Không dùng early stopping</h4><p>Boosting overfit dần theo số cây. Đặt <code>n_estimators</code> cao rồi để tập validation quyết định điểm dừng.</p></div>
+    <div class="card bad"><h4>Giảm <code>learning_rate</code> mà quên tăng số cây</h4><p>Hai tham số bù trừ nhau. Giảm eta mà giữ nguyên số cây là underfit.</p></div>
+    <div class="card bad"><h4>Dùng tập test làm tập early stopping</h4><p>Con số cuối cùng thành lạc quan giả. Cần một tập validation riêng.</p></div>
+    <div class="card bad"><h4>Tin thẳng feature importance</h4><p>Importance theo số lần chia thiên vị biến nhiều giá trị. Dùng SHAP hoặc permutation importance khi cần kết luận.</p></div>
+    <div class="card bad"><h4>Cây quá sâu</h4><p><code>max_depth</code> 10+ trên dữ liệu bảng gần như luôn overfit. Boosting cần cây <em>nông</em> — sức mạnh tới từ số lượng cây.</p></div>
+  </div>
+</section>
+
+<section id="xgb-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>XGBoost khác gradient boosting gốc ở chỗ nào?</summary>
+  <p>Điểm mới thật sự là hàm mục tiêu. Gradient boosting gốc chỉ dùng đạo hàm bậc nhất và mọc cây theo tiêu chí quen thuộc của cây quyết định, rồi chống overfit bằng cắt tỉa sau. XGBoost khai triển Taylor tới bậc hai nên có thêm thông tin về độ cong, từ đó viết ra công thức tính thẳng giá trị tối ưu của mỗi lá thay vì mò theo gradient. Và nó đưa hai số hạng phạt — lambda cho độ lớn giá trị lá, gamma cho số lá — vào ngay trong objective, nên tiêu chí tách nút chính là hàm mục tiêu đang tối ưu: mọc cây và chống overfit trở thành một việc.</p></details>
+
+  <details class="qa"><summary>Vì sao cần đạo hàm bậc hai?</summary>
+  <p>Đạo hàm bậc nhất chỉ cho biết dốc về hướng nào, không cho biết đi bao xa thì tới đáy — nên phải mò từng bước nhỏ. Thêm đạo hàm bậc hai là biết cả độ cong, và xấp xỉ loss bằng một parabol quanh chỗ đang đứng. Parabol thì có đỉnh giải ra được bằng công thức, nên giá trị tối ưu của lá tính thẳng ra là <code>−G/(H+λ)</code>. Cái giá là loss phải khả vi hai lần, nhưng MSE và log loss đều thoả nên trong thực tế đây không phải hạn chế.</p></details>
+
+  <details class="qa"><summary><code>lambda</code> và <code>gamma</code> làm gì?</summary>
+  <p>Cả hai là regularization đặt thẳng trong objective. <code>lambda</code> đứng ở mẫu số của công thức giá trị lá nên kéo mọi giá trị lá về gần 0 — đúng là L2 áp lên giá trị lá, và nó ghìm mạnh hơn ở những lá chứa ít mẫu vì khi đó H nhỏ. <code>gamma</code> là tiền phải trả cho mỗi chiếc lá tồn tại, nên một phép tách chỉ được chấp nhận khi gain vượt qua gamma. Cả hai khác <code>learning_rate</code>: lambda và gamma hãm từng cây, còn learning_rate hãm tốc độ tích luỹ qua nhiều cây.</p></details>
+
+  <details class="qa"><summary>XGBoost xử lý giá trị thiếu thế nào?</summary>
+  <p>Ở mỗi nút nó học sẵn một hướng mặc định: thử cho mọi mẫu thiếu đi nhánh trái, rồi thử đi nhánh phải, chọn hướng cho gain tốt hơn. Nên "thiếu" được coi là một tín hiệu có thể mang thông tin chứ không phải lỗ hổng cần bịt. Hệ quả thực dụng là không nên điền khuyết bằng trung bình trước khi đưa vào — làm vậy là xoá mất tín hiệu đó. Cùng cơ chế này cũng giúp nó chỉ duyệt phần khác 0 nên chạy nhanh trên dữ liệu thưa.</p></details>
+
+  <details class="qa"><summary>Khi nào chọn XGBoost, khi nào LightGBM?</summary>
+  <p>Dữ liệu cỡ vừa và ưu tiên độ ổn định thì XGBoost: cây mọc theo tầng nên cân bằng, kết quả ít dao động giữa các lần chạy. Dữ liệu rất lớn hoặc phải huấn luyện lại thường xuyên thì LightGBM nhanh hơn nhiều lần và ăn ít bộ nhớ hơn, lại nhận biến phân loại trực tiếp — đổi lại cách mọc theo lá dễ overfit trên dữ liệu nhỏ nên phải chặn <code>num_leaves</code> cùng <code>min_data_in_leaf</code>. Nếu dữ liệu đầy biến phân loại nhiều giá trị như mã sản phẩm hay mã vùng thì cân nhắc CatBoost.</p></details>
+</section>
+
+<footer>Machine learning · Tree models · cơ chế nền ở <a href="../gradient-boosting/index.html">Gradient boosting</a>; bản tối ưu cho tốc độ là <a href="../lightgbm/index.html">LightGBM</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

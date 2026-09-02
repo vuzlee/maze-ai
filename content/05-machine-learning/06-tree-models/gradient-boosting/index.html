@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gradient boosting — MazeAI</title>
+<meta name="description" content="Cộng cây nông theo phần dư, learning_rate đổi lấy n_estimators, XGBoost/LightGBM, và vì sao vẫn thắng deep learning trên dữ liệu bảng.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/gradient-boosting/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Gradient boosting">
+<meta property="og:description" content="Cộng cây nông theo phần dư, learning_rate đổi lấy n_estimators, XGBoost/LightGBM, và vì sao vẫn thắng deep learning trên dữ liệu bảng.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/gradient-boosting/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-gb" data-title="Gradient boosting" data-tag="Ensemble" data-blurb="Cộng cây nông theo phần dư, learning_rate đổi lấy n_estimators, XGBoost/LightGBM, và vì sao vẫn thắng deep learning trên dữ liệu bảng.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Machine learning · nhánh cây</p>
+  <h1>Gradient <em>boosting</em></h1>
+  <p class="lede">Gộp cây theo hướng <b>tuần tự</b>: mỗi cây nông sửa phần còn sai của những cây trước. Bài này giải thích quan hệ bù trừ giữa <b>learning_rate</b> và <b>n_estimators</b>, khác biệt thật giữa XGBoost và LightGBM, và vì sao dữ liệu bảng vẫn thuộc về boosting.</p>
+</header>
+
+<section id="gb-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Bagging so với boosting</h2></div>
+
+  <p class="key">Chọn theo <em>hoàn cảnh</em>, không theo "cái nào mạnh hơn": nhiễu nhãn và ít thời gian → rừng; cần điểm cao nhất → boosting.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Chọn Random Forest khi</h5>
+      <p>cần <b>baseline nhanh</b>, chạy tốt ngay với mặc định</p>
+      <p>dữ liệu <b>có nhiễu nhãn</b></p>
+      <p>không có thời gian tinh chỉnh</p>
+      <p>muốn <b>OOB score miễn phí</b></p>
+    </div>
+    <div>
+      <h5>Chọn boosting khi</h5>
+      <p>cần <b>điểm cao nhất</b> có thể</p>
+      <p>có <b>tập validation tốt</b> để early stopping</p>
+      <p>có thời gian dò siêu tham số</p>
+      <p>nhãn <b>sạch</b> — cây sau sẽ cố học cả nhãn sai</p>
+    </div>
+  </div>
+
+  <table>
+    <tr><th></th><th>Random Forest</th><th>Gradient Boosting</th></tr>
+    <tr><td>Huấn luyện</td><td>Song song — các cây độc lập</td><td>Tuần tự — cây sau cần cây trước</td></tr>
+    <tr><td>Cây thành phần</td><td><strong>Sâu</strong>, variance cao</td><td><strong>Nông</strong>, bias cao</td></tr>
+    <tr><td>Giảm</td><td>Variance</td><td>Bias</td></tr>
+    <tr><td>Tăng số cây thì</td><td>Ổn định dần, không overfit</td><td><strong>Có thể overfit</strong> — cần early stopping</td></tr>
+    <tr><td>Nhạy siêu tham số</td><td>Thấp</td><td>Cao — cần tinh chỉnh</td></tr>
+    <tr><td>Nhạy nhiễu nhãn</td><td>Thấp</td><td>Cao — cây sau cố học cả nhãn sai</td></tr>
+    <tr><td>Hiệu năng đỉnh</td><td>Tốt</td><td><strong>Thường tốt hơn</strong></td></tr>
+  </table>
+
+  <div class="note key">
+    <h4>Cách trả lời khi được hỏi so sánh</h4>
+    "Random Forest gộp các cây <em>sâu</em> học song song để giảm variance; boosting cộng các cây <em>nông</em> học tuần tự để giảm bias. Hệ quả thực tế: tăng số cây của Random Forest thì an toàn, còn của boosting thì phải có early stopping. Em thường dựng Random Forest trước làm mốc vì nó chạy tốt ngay với mặc định, rồi mới sang LightGBM nếu cần điểm cao hơn."
+  </div>
+</section>
+
+<section id="gb-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Gradient boosting</h2></div>
+
+  <p class="key">Mỗi cây mới không học <code>y</code>. Nó học <em>phần dư</em> — thứ mà tổng các cây trước còn đang sai.</p>
+
+  <div class="stack">
+    <div class="s"><b>F₀ = trung bình của y</b><span>khởi tạo thô, sai gần như ở mọi mẫu</span></div>
+    <div class="s warn"><b>r = y − F₀</b><span>phần dư: model hiện tại còn sai bao nhiêu, ở mẫu nào</span></div>
+    <div class="s"><b>h₁ = cây nông fit trên r</b><span>cây mới học đúng phần sai đó, không học lại y</span></div>
+    <div class="s ok"><b>F₁ = F₀ + η · h₁</b><span>cộng vào một phần nhỏ · lặp lại M lần</span></div>
+  </div>
+
+  <ul class="why">
+    <li>Tên là <b>gradient</b> vì với MSE, phần dư <code>y − F(x)</code> <b>chính là</b> âm gradient của mất mát. Đổi loss function thì thay phần dư bằng gradient tương ứng, khung vẫn chạy.</li>
+    <li><code>learning_rate × n_estimators</code> gần như là <b>hằng số</b> cho cùng mức hiệu năng — giảm η mười lần thì cần khoảng mười lần số cây.</li>
+    <li>Cây phải <b>nông (3–8 tầng)</b>, khác hẳn Random Forest — cây sâu làm boosting overfit rất nhanh.</li>
+    <li>Boosting <b>CÓ overfit khi tăng số cây</b>. Bắt buộc phải có early stopping — đây là khác biệt then chốt so với Random Forest.</li>
+  </ul>
+
+  <pre><code>F₀(x) = giá trị khởi tạo (thường là trung bình của y)
+
+Lặp m = 1 .. M:
+    r = y - Fₘ₋₁(x)              ← phần dư: model hiện tại còn SAI bao nhiêu
+    hₘ = cây nông fit trên r      ← cây mới học chính phần sai đó
+    Fₘ = Fₘ₋₁ + η · hₘ            ← cộng vào, có nhân learning rate</code></pre>
+
+  <table>
+    <tr><th>Tham số</th><th>Tác dụng</th><th>Khoảng thường dùng</th></tr>
+    <tr><td><code>learning_rate</code> (η)</td><td>Mỗi cây được cộng vào bao nhiêu phần</td><td>0.01 – 0.1</td></tr>
+    <tr><td><code>n_estimators</code></td><td>Số cây</td><td>Càng nhỏ η càng cần nhiều cây</td></tr>
+    <tr><td><code>max_depth</code></td><td>Độ sâu mỗi cây</td><td><strong>3 – 8</strong> — nông, khác hẳn Random Forest</td></tr>
+  </table>
+
+  <div class="note key">
+    <h4>Chiến thuật chuẩn</h4>
+    Đặt η nhỏ, đặt <code>n_estimators</code> rất lớn, rồi để <strong>early stopping trên tập validation tự tìm điểm dừng</strong> — thay vì dò tay hai núm bù nhau.
+  </div>
+</section>
+
+<section id="gb-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>XGBoost và LightGBM</h2></div>
+
+  <p class="key">Hai thư viện thống trị thực tế. <em>Chúng không đổi ý tưởng boosting — chúng đổi hàm mục tiêu và cách đi tìm chỗ tách.</em></p>
+
+  <table>
+    <tr><th></th><th><a href="../xgboost/index.html">XGBoost</a></th><th><a href="../lightgbm/index.html">LightGBM</a></th></tr>
+    <tr><td>Đóng góp chính</td><td>Xấp xỉ Taylor <b>bậc hai</b> → công thức tính thẳng giá trị lá; regularization nằm trong objective</td><td>Giữ nguyên objective đó, tối ưu <b>cách tìm split</b></td></tr>
+    <tr><td>Cách mọc cây</td><td>Theo tầng — cây cân bằng, ổn định hơn</td><td>Theo lá — nhanh và chính xác hơn, dễ overfit trên dữ liệu nhỏ</td></tr>
+    <tr><td>Tham số hãm chính</td><td><code>max_depth</code>, <code>lambda</code>, <code>gamma</code></td><td><code>num_leaves</code> <b>cùng</b> <code>min_data_in_leaf</code></td></tr>
+    <tr><td>Biến phân loại</td><td>Phải mã hoá trước</td><td>Nhận trực tiếp</td></tr>
+    <tr><td>Chọn khi</td><td>Dữ liệu cỡ vừa, ưu tiên ổn định</td><td>Dữ liệu rất lớn, phải huấn luyện lại thường xuyên</td></tr>
+  </table>
+
+  <div class="note">
+    <h4>Còn CatBoost</h4>
+    Mạnh nhất khi có nhiều biến phân loại nhiều giá trị. Nó dùng <em>target encoding có thứ tự</em> để tránh rò rỉ nhãn — vấn đề mà mã hoá theo trung bình nhãn thông thường luôn gặp.
+  </div>
+</section>
+
+<section id="gb-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Vì sao boosting vẫn thắng deep learning trên dữ liệu bảng</h2></div>
+
+  <p class="key">Không phải vì cây mạnh hơn, mà vì dữ liệu bảng <em>thiếu đúng những thứ</em> mạng nơ-ron giỏi khai thác.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Mạng nơ-ron mạnh khi dữ liệu có</h5>
+      <p>cấu trúc <b>lân cận</b> — điểm ảnh cạnh nhau có liên quan</p>
+      <p><b>thứ tự</b> — từ trước ảnh hưởng từ sau</p>
+      <p>mọi đặc trưng <b>cùng một loại, cùng thang đo</b></p>
+      <p><b>rất nhiều dữ liệu</b> để học biểu diễn</p>
+    </div>
+    <div>
+      <h5>Nhưng dữ liệu bảng thì</h5>
+      <p>đổi thứ tự cột <b>không đổi ý nghĩa gì</b></p>
+      <p>đặc trưng <b>không đồng nhất</b>: tuổi, mã vùng, số lần mua</p>
+      <p>đầy quan hệ <b>bậc thang</b> — "trên 60 tuổi thì khác hẳn"</p>
+      <p>thường chỉ <b>vài nghìn tới vài triệu dòng</b></p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Cây biểu diễn một bậc thang bằng <b>một điểm chia</b>; mạng nơ-ron cần nhiều nơ-ron để xấp xỉ.</li>
+    <li>Có đặc trưng vô dụng thì cây <b>đơn giản không chọn</b>; mạng nơ-ron vẫn gán trọng số rồi phải học cách bỏ qua.</li>
+    <li>Deep learning thắng khi có <b>biến phân loại rất nhiều giá trị cần embedding</b> (id người dùng, id sản phẩm), khi kèm text/ảnh, hoặc khi cần huấn luyện tăng dần — đó là lý do hệ gợi ý quy mô lớn dùng mạng nơ-ron.</li>
+  </ul>
+
+</section>
+
+<section id="gb-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Boosting cho điểm cao nhất, nhưng cũng là thứ dễ dùng sai nhất trong nhánh cây.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Dùng cây sâu</h4><p>Boosting cần cây <em>nông</em>, 3–8 tầng. Cây sâu làm nó overfit rất nhanh.</p></div>
+    <div class="card bad"><h4>Không dùng early stopping</h4><p>Tăng số cây mãi thì bắt đầu học nhiễu. Khác hẳn Random Forest.</p></div>
+    <div class="card bad"><h4>Tăng n_estimators mà không hạ learning_rate</h4><p>Hai núm này bù nhau. Đổi một cái mà giữ nguyên cái kia là đổi luôn độ mạnh của model.</p></div>
+    <div class="card bad"><h4>Boosting trên nhãn nhiễu</h4><p>Mỗi vòng nó tập trung vào mẫu đang sai — mà nhãn sai thì luôn sai. Rừng hợp hơn.</p></div>
+    <div class="card bad"><h4>Dùng cây cho dữ liệu có xu hướng</h4><p>Cây không ngoại suy được. Chuỗi thời gian tăng dần thì phải khử xu hướng trước.</p></div>
+    <div class="card bad"><h4>Chuẩn hoá đặc trưng cho cây</h4><p>Không sai nhưng vô ích, chỉ thêm một bước có thể gây lỗi.</p></div>
+  </div>
+</section>
+
+<section id="gb-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary><code>learning_rate</code> và <code>n_estimators</code> quan hệ thế nào?</summary>
+  <p>Chúng <b>bù trừ nhau</b>: mỗi cây được cộng vào với hệ số <code>learning_rate</code>, nên hạ nó xuống một nửa thì cần khoảng gấp đôi số cây để đi được quãng đường cũ. Quy tắc thực dụng là <b>đặt learning_rate nhỏ</b> — 0.01 tới 0.1 — rồi để <b>early stopping tự chọn n_estimators</b> trên tập validation. Learning rate nhỏ cho mỗi bước sửa ít, model tổng quát hoá tốt hơn, đổi lại tốn thời gian huấn luyện.</p></details>
+
+  <details class="qa"><summary>Random Forest và Gradient Boosting khác nhau thế nào?</summary>
+  <p>Random Forest gộp các cây <b>sâu</b> học <b>song song</b> để giảm <b>variance</b>; boosting cộng các cây <b>nông</b> học <b>tuần tự</b> để giảm <b>bias</b>. Hệ quả thực tế: tăng số cây của Random Forest thì an toàn, còn của boosting thì phải có early stopping. Tôi thường dựng rừng trước làm mốc vì nó chạy tốt ngay với mặc định, rồi mới sang LightGBM nếu cần điểm cao hơn.</p></details>
+
+  <details class="qa"><summary>Vì sao boosting vẫn thắng deep learning trên dữ liệu bảng?</summary>
+  <p>Dữ liệu bảng <b>không có cấu trúc không gian hay thứ tự</b> để mạng nơ-ron khai thác — không có tính cục bộ như ảnh, không có tính tuần tự như văn bản. Cây xử lý thẳng đặc trưng phân loại và giá trị thiếu, bất biến với thang đo, và bắt tương tác dạng ngưỡng rất tự nhiên. Thêm nữa nó cần ít dữ liệu và ít tinh chỉnh hơn nhiều để đạt điểm tốt.</p></details>
+
+  <details class="qa"><summary>Boosting overfit thì xử lý thế nào?</summary>
+  <p>Theo thứ tự: bật <b>early stopping</b> trên tập validation trước đã — đây là núm hiệu quả nhất. Rồi <b>hạ learning_rate</b> và giảm độ sâu cây xuống 3–6. Sau đó tới lấy mẫu ngẫu nhiên: <code>subsample</code> theo dòng và <code>colsample</code> theo cột. Cuối cùng mới tới regularization <code>lambda</code>/<code>alpha</code> và <code>min_child_weight</code>. Nếu vẫn overfit thì nhiều khả năng nhãn có nhiễu — lúc đó Random Forest hợp hơn.</p></details>
+</section>
+
+<footer>Deep dive · gradient boosting · nhánh gộp cây theo hướng song song nằm ở bài <a href="../random-forest/index.html">Random forest &amp; bagging</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LightGBM — MazeAI</title>
+<meta name="description" content="Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa — ba mẹo đổi lấy tốc độ.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/lightgbm/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="LightGBM">
+<meta property="og:description" content="Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa — ba mẹo đổi lấy tốc độ.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/lightgbm/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-lgbm" data-title="LightGBM" data-tag="Ensemble" data-blurb="Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa — ba mẹo đổi lấy tốc độ.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Tree models</p>
+  <h1><em>LightGBM</em></h1>
+  <p class="lede">Cùng hàm mục tiêu bậc hai như <a href="../xgboost/index.html">XGBoost</a> — <b>khác ở cách đi tìm chỗ tách, không phải cách chấm điểm</b>. Ba mẹo cho tốc độ nhanh hơn vài lần, và cái giá của mẹo thứ nhất.</p>
+</header>
+
+<section id="lgbm-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vấn đề nó giải</h2></div>
+
+  <p class="key">XGBoost mở đều cả tầng — <em>nên tốn công như nhau cho nhánh đáng giá và nhánh chẳng cải thiện gì</em>.</p>
+
+  <p>Với dữ liệu vài chục triệu dòng, thời gian huấn luyện thành rào chắn thật: một vòng thử nghiệm mất nửa ngày thì không ai chỉnh được tham số. Và phần lớn thời gian đó tiêu vào hai chỗ lãng phí — mở những nhánh gần như không giảm loss, và quét mọi mẫu ở mọi lần tách dù đa số mẫu đã được model dự đoán đúng từ lâu.</p>
+
+  <ul class="why">
+    <li>LightGBM không đề xuất objective mới. Nó nhận nguyên công thức bậc hai của XGBoost rồi <b>tấn công vào chi phí đi tìm split</b> bằng ba mẹo độc lập nhau.</li>
+    <li>Vì cùng objective nên mọi thứ đã học ở XGBoost — <code>lambda</code>, <code>gamma</code>, gain, early stopping — chuyển sang đây gần như nguyên vẹn, chỉ đổi tên tham số.</li>
+  </ul>
+</section>
+
+<section id="lgbm-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Mọc theo lá</h2></div>
+
+  <p class="key">Bỏ luật "mở hết tầng này rồi mới xuống tầng sau". <em>Mỗi vòng, chia đúng chiếc lá đang hứa hẹn nhất, bất kể nó nằm ở tầng nào.</em></p>
+
+  <figure>
+    <svg viewBox="0 0 560 240" role="img" aria-label="So sánh cách mọc cây theo tầng và theo lá">
+      <text class="sv-l" x="140" y="14" text-anchor="middle" fill="#8CA9F2">XGBoost · mọc theo tầng</text>
+      <text class="sv-l" x="430" y="14" text-anchor="middle" fill="#EDB44A">LightGBM · mọc theo lá</text>
+
+      <line x1="140" y1="48" x2="90"  y2="100" stroke="#2E2822"></line>
+      <line x1="140" y1="48" x2="190" y2="100" stroke="#2E2822"></line>
+      <line x1="90"  y1="100" x2="60"  y2="152" stroke="#2E2822"></line>
+      <line x1="90"  y1="100" x2="120" y2="152" stroke="#2E2822"></line>
+      <line x1="190" y1="100" x2="160" y2="152" stroke="#2E2822"></line>
+      <line x1="190" y1="100" x2="220" y2="152" stroke="#2E2822"></line>
+      <circle cx="140" cy="48"  r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <circle cx="90"  cy="100" r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <circle cx="190" cy="100" r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <circle cx="60"  cy="152" r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <circle cx="120" cy="152" r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <circle cx="160" cy="152" r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <circle cx="220" cy="152" r="13" fill="rgba(140,169,242,.25)" stroke="#8CA9F2"></circle>
+      <text class="sv-l" x="140" y="200" text-anchor="middle">tầng nào cũng mở hết</text>
+      <text class="sv-l" x="140" y="228" text-anchor="middle" fill="#8CA9F2">cây cân bằng · ổn định hơn</text>
+
+      <line x1="430" y1="48"  x2="385" y2="100" stroke="#2E2822"></line>
+      <line x1="430" y1="48"  x2="475" y2="100" stroke="#2E2822"></line>
+      <line x1="475" y1="100" x2="445" y2="152" stroke="#2E2822"></line>
+      <line x1="475" y1="100" x2="510" y2="152" stroke="#2E2822"></line>
+      <line x1="510" y1="152" x2="485" y2="200" stroke="#2E2822"></line>
+      <line x1="510" y1="152" x2="535" y2="200" stroke="#2E2822"></line>
+      <circle cx="430" cy="48"  r="13" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <circle cx="385" cy="100" r="13" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="475" cy="100" r="13" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <circle cx="445" cy="152" r="13" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="510" cy="152" r="13" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <circle cx="485" cy="200" r="13" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="535" cy="200" r="13" fill="#241F1A" stroke="#2E2822"></circle>
+      <text class="sv-l" x="430" y="228" text-anchor="middle" fill="#EDB44A">đi sâu vào nhánh đáng giá · dễ overfit</text>
+    </svg>
+    <figcaption>Vàng là các lá được chọn chia tiếp vì gain lớn nhất. Cùng một số lá, LightGBM đặt chúng ở chỗ có ích hơn — nên nhanh và chính xác hơn, đổi lại dễ overfit trên dữ liệu nhỏ.</figcaption>
+  </figure>
+
+  <p>Cùng một ngân sách lá, cách này đặt chúng ở chỗ giảm loss nhiều nhất, nên vừa nhanh hơn vừa chính xác hơn ở cùng số lá. Nhưng cây mọc ra <b>lệch và sâu</b> — một nhánh có thể xuống rất sâu trong khi nhánh kia dừng sớm.</p>
+
+  <div class="note warn">
+    <h4>Hệ quả: <code>max_depth</code> không còn đủ để hãm</h4>
+    Cây lệch nên độ sâu không còn phản ánh độ phức tạp. Phải chặn bằng <code>num_leaves</code> — và <b>kèm theo</b> <code>min_data_in_leaf</code>, nếu không leaf-wise sẽ đào tới những chiếc lá chỉ còn vài mẫu, tức là học thuộc nhiễu. Quy tắc khởi đầu: <code>num_leaves</code> nhỏ hơn <code>2^max_depth</code> kha khá, thường 31 tới 127.
+  </div>
+
+  <ul class="why">
+    <li>Đây là lý do LightGBM <b>dễ overfit trên dữ liệu nhỏ</b> hơn XGBoost rõ rệt. Dưới vài chục nghìn dòng, cân nhắc XGBoost trước.</li>
+  </ul>
+</section>
+
+<section id="lgbm-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>GOSS và EFB</h2></div>
+
+  <p class="key">Hai mẹo còn lại cùng một tinh thần: <em>bớt việc phải làm mà giữ gần như nguyên độ chính xác</em> — một mẹo bớt hàng, một mẹo bớt cột.</p>
+
+  <div class="stack">
+    <div class="s"><b>GOSS — bớt hàng</b><span>Mẫu có gradient nhỏ nghĩa là model đã dự đoán đúng, không còn dạy được gì. Giữ hết mẫu gradient lớn, <b>lấy mẫu ngẫu nhiên</b> trong đám gradient nhỏ rồi nhân trọng số bù lại cho khỏi lệch phân phối.</span></div>
+    <div class="s"><b>EFB — bớt cột</b><span>Dữ liệu thưa sau one-hot có nhiều cột <b>loại trừ nhau</b> — hiếm khi cùng khác 0. Gộp chúng vào một cột duy nhất bằng cách dồn giá trị vào các khoảng không chồng lấn. Số cột giảm mạnh, thông tin gần như không mất.</span></div>
+    <div class="s ok"><b>Histogram</b><span>Gộp giá trị liên tục vào các thùng như XGBoost, nhưng đây là mặc định chứ không phải tuỳ chọn.</span></div>
+  </div>
+
+  <p>Ngoài ba mẹo trên, LightGBM còn nhận <b>biến phân loại trực tiếp</b>: khai báo cột nào là categorical, nó tự tìm cách chia tập giá trị thành hai nhóm theo gain thay vì bắt bạn one-hot trước. Với cột nhiều giá trị, cách này vừa nhanh hơn vừa thường chính xác hơn one-hot.</p>
+
+  <ul class="why">
+    <li>Cái giá của GOSS: nó là <b>xấp xỉ</b>. Trên dữ liệu nhỏ hoặc nhiễu nhiều, việc bỏ bớt mẫu làm ước lượng gain dao động — thêm một lý do nữa để dùng nó ở quy mô lớn.</li>
+    <li>EFB chỉ có ích khi dữ liệu <b>thật sự thưa</b>. Dữ liệu bảng toàn cột số dày đặc thì mẹo này không đóng góp gì.</li>
+  </ul>
+</section>
+
+<section id="lgbm-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Chọn XGBoost hay LightGBM</h2></div>
+
+  <table>
+    <tr><th></th><th>XGBoost</th><th>LightGBM</th></tr>
+    <tr><td>Mọc cây</td><td>Theo tầng — cây cân bằng</td><td>Theo lá — cây lệch, sâu</td></tr>
+    <tr><td>Tham số hãm chính</td><td><code>max_depth</code></td><td><code>num_leaves</code> <b>cùng</b> <code>min_data_in_leaf</code></td></tr>
+    <tr><td>Tốc độ trên dữ liệu lớn</td><td>Nhanh</td><td><b>Nhanh hơn nhiều</b>, ăn ít bộ nhớ hơn</td></tr>
+    <tr><td>Biến phân loại</td><td>Phải mã hoá trước</td><td>Nhận trực tiếp</td></tr>
+    <tr><td>Dữ liệu nhỏ</td><td>Ổn định hơn</td><td>Dễ overfit</td></tr>
+  </table>
+
+  <p>Chọn theo quy mô và nhịp làm việc, không theo "cái nào mạnh hơn": dưới vài chục nghìn dòng thì XGBoost; hàng triệu dòng hoặc phải huấn luyện lại hằng ngày thì LightGBM. Chênh lệch độ chính xác giữa hai cái sau khi chỉnh kỹ thường nhỏ hơn nhiều so với chênh lệch thời gian chạy.</p>
+
+  <div class="note">
+    <h4>Còn CatBoost</h4>
+    Đáng thử khi dữ liệu đầy biến phân loại nhiều giá trị — mã sản phẩm, mã vùng, ID người dùng. Nó dùng <b>target encoding có thứ tự</b>: mã hoá mỗi dòng chỉ bằng các dòng đứng trước, tránh đúng kiểu rò rỉ nhãn mà target encoding thông thường luôn mắc phải.
+  </div>
+</section>
+
+<section id="lgbm-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Chỉ đặt <code>max_depth</code></h4><p>Cây leaf-wise lệch nên độ sâu không phản ánh độ phức tạp. Phải chặn <code>num_leaves</code>.</p></div>
+    <div class="card bad"><h4>Để <code>min_data_in_leaf</code> mặc định trên dữ liệu nhỏ</h4><p>Leaf-wise đào tới lá chỉ còn vài mẫu và học thuộc nhiễu. Tăng lên khi ít dữ liệu.</p></div>
+    <div class="card bad"><h4><code>num_leaves</code> đặt bằng <code>2^max_depth</code></h4><p>Bằng đúng số lá của cây đầy đủ thì mất hết tác dụng hãm. Đặt thấp hơn rõ rệt.</p></div>
+    <div class="card bad"><h4>One-hot biến phân loại trước khi đưa vào</h4><p>Bỏ phí cơ chế xử lý categorical sẵn có, vốn thường tốt hơn với cột nhiều giá trị.</p></div>
+    <div class="card bad"><h4>Dùng cho dữ liệu nhỏ vì "nó nhanh hơn"</h4><p>Vài nghìn dòng thì tốc độ không phải vấn đề, còn rủi ro overfit thì có thật.</p></div>
+    <div class="card bad"><h4>Không dùng early stopping</h4><p>Giống mọi boosting, nó overfit dần theo số vòng lặp.</p></div>
+  </div>
+</section>
+
+<section id="lgbm-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>LightGBM khác XGBoost ở chỗ nào?</summary>
+  <p>Không khác ở hàm mục tiêu — nó dùng nguyên công thức bậc hai của XGBoost. Khác ở cách đi tìm chỗ tách. Thứ nhất là mọc theo lá thay vì theo tầng: mỗi vòng chia đúng chiếc lá có gain lớn nhất bất kể tầng nào, nên cùng số lá thì đặt chúng ở chỗ có ích hơn. Thứ hai là GOSS, bỏ bớt mẫu có gradient nhỏ vì model đã dự đoán đúng chúng rồi. Thứ ba là EFB, gộp các cột thưa loại trừ nhau thành một cột. Cộng lại cho tốc độ nhanh hơn vài lần và tốn ít bộ nhớ hơn.</p></details>
+
+  <details class="qa"><summary>Vì sao mọc theo lá dễ overfit hơn?</summary>
+  <p>Vì nó luôn đi sâu vào nhánh đang hứa hẹn nhất, nên cây mọc ra lệch: một nhánh xuống rất sâu trong khi nhánh khác dừng sớm. Đi sâu như vậy dễ dẫn tới những chiếc lá chỉ còn vài mẫu, và giá trị học từ vài mẫu thì phần lớn là nhiễu. Hệ quả thực dụng là <code>max_depth</code> không còn đủ để hãm vì độ sâu không phản ánh độ phức tạp nữa — phải chặn bằng <code>num_leaves</code> kèm <code>min_data_in_leaf</code>. Trên dữ liệu nhỏ, XGBoost thường là lựa chọn an toàn hơn.</p></details>
+
+  <details class="qa"><summary>GOSS hoạt động ra sao và cái giá là gì?</summary>
+  <p>Ý tưởng là mẫu có gradient nhỏ nghĩa là model đã dự đoán đúng, không còn dạy được gì thêm, nên không cần quét chúng ở mọi lần tách. GOSS giữ hết mẫu gradient lớn, lấy mẫu ngẫu nhiên trong đám gradient nhỏ, rồi nhân trọng số bù lại để phân phối không bị lệch. Cái giá là nó vẫn là xấp xỉ: trên dữ liệu nhỏ hoặc nhiễu nhiều, việc bỏ bớt mẫu làm ước lượng gain dao động — thêm một lý do nó hợp với quy mô lớn.</p></details>
+
+  <details class="qa"><summary>Khi nào chọn cái nào giữa ba thư viện boosting?</summary>
+  <p>Theo quy mô và nhịp làm việc chứ không theo "cái nào mạnh hơn", vì sau khi chỉnh kỹ thì chênh lệch độ chính xác thường nhỏ hơn nhiều so với chênh lệch thời gian chạy. Dưới vài chục nghìn dòng và cần ổn định thì XGBoost. Hàng triệu dòng hoặc phải huấn luyện lại thường xuyên thì LightGBM. Dữ liệu đầy biến phân loại nhiều giá trị như mã sản phẩm hay ID người dùng thì CatBoost, nhờ target encoding có thứ tự tránh được rò rỉ nhãn.</p></details>
+</section>
+
+<footer>Machine learning · Tree models · cùng hàm mục tiêu với <a href="../xgboost/index.html">XGBoost</a>; cơ chế nền ở <a href="../gradient-boosting/index.html">Gradient boosting</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

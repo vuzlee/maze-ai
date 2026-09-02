@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naive Bayes — MazeAI</title>
+<meta name="description" content="Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/05-classical-ml/naive-bayes/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Naive Bayes">
+<meta property="og:description" content="Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/05-classical-ml/naive-bayes/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-nb" data-title="Naive Bayes" data-tag="ML" data-blurb="Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Classical models</p>
+  <h1>Naive Bayes — <em>ngây thơ mà hiệu quả</em></h1>
+  <p class="lede">Model duy nhất trong kệ đi thẳng từ một công thức xác suất ra bộ phân loại, không cần tối ưu gì. Giả định của nó <b>gần như luôn sai</b> — và nó vẫn là baseline mạnh cho văn bản.</p>
+</header>
+
+<section id="nb-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Từ Bayes ra bộ phân loại</h2></div>
+
+  <p class="key">Câu hỏi phân loại viết lại bằng xác suất: <em>cho các đặc trưng đã thấy, lớp nào có khả năng cao nhất</em>.</p>
+
+  <p><a href="../../02-math-foundations/bayes-theorem/index.html">Định lý Bayes</a> cho phép lật ngược câu hỏi đó thành một câu dễ ước lượng hơn từ dữ liệu:</p>
+
+<pre><code>P(lớp | đặc trưng) = P(đặc trưng | lớp) · P(lớp) / P(đặc trưng)
+   ↑ cái cần biết      ↑ đếm được từ dữ liệu   ↑ tỉ lệ   ↑ giống nhau
+                          của từng lớp           mỗi lớp    mọi lớp → bỏ</code></pre>
+
+  <p>Mẫu số không phụ thuộc lớp nên khi chỉ cần <em>so sánh</em> giữa các lớp thì bỏ được. Còn lại đúng hai thứ phải đếm từ dữ liệu huấn luyện: tỉ lệ mỗi lớp, và khả năng thấy từng đặc trưng bên trong mỗi lớp.</p>
+
+  <div class="flow">
+    <div class="n"><h5>Đếm</h5><p>tần suất mỗi lớp và mỗi đặc trưng trong lớp</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Nhân</h5><p>tích các xác suất theo giả định độc lập</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>So</h5><p>lớp nào ra số lớn hơn thì chọn</p></div>
+  </div>
+
+  <ul class="why">
+    <li>Không có vòng lặp tối ưu, không có gradient, không có learning rate — <b>huấn luyện chỉ là đếm</b>, chạy một lượt qua dữ liệu là xong. Đây là model nhanh nhất trong cả kệ.</li>
+    <li>Cũng vì thế nó cập nhật được <b>tăng dần</b>: có thêm dữ liệu mới thì cộng vào bộ đếm, không phải huấn luyện lại từ đầu.</li>
+  </ul>
+</section>
+
+<section id="nb-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Giả định ngây thơ</h2></div>
+
+  <p class="key">Chữ <em>naive</em> nằm ở một dòng: coi các đặc trưng <b>độc lập với nhau khi đã biết lớp</b>.</p>
+
+  <p>Không có giả định đó thì phải ước lượng xác suất của mọi <em>tổ hợp</em> đặc trưng — với 1000 từ và mỗi từ có/không thì đó là 2¹⁰⁰⁰ tổ hợp, không bộ dữ liệu nào đủ. Giả định độc lập biến bài toán đó thành 1000 phép đếm rời rạc.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Giả định nói gì</h5>
+      <p>Trong thư rác, thấy chữ <em>trúng</em> không nói gì thêm về khả năng thấy chữ <em>thưởng</em>.</p>
+      <p>Rõ ràng <b>sai</b> — hai từ đó đi cùng nhau.</p>
+    </div>
+    <div>
+      <h5>Vì sao vẫn chạy được</h5>
+      <p>Xác suất ước lượng ra sai lệch nhiều.</p>
+      <p>Nhưng phân loại chỉ cần <b>đúng thứ tự</b> giữa các lớp, không cần đúng giá trị.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Đây là ví dụ rõ nhất cho chuyện <b>giả định sai vẫn ra quyết định đúng</b>: sai lệch do phụ thuộc thường đẩy điểm của mọi lớp cùng một hướng, nên thứ tự giữ nguyên.</li>
+    <li>Cái giá thật: <b>xác suất đầu ra không đáng tin</b>. Naive Bayes hay cho ra những con số cực đoan sát 0 hoặc 1 do nhân nhiều xác suất lại. Cần xác suất đúng thì phải hiệu chỉnh, hoặc dùng <a href="../logistic-regression/index.html">logistic regression</a>.</li>
+    <li>Giả định vỡ nặng nhất khi đặc trưng bị lặp: cùng một thông tin đưa vào ba cột tương quan thì nó được tính ba lần.</li>
+  </ul>
+</section>
+
+<section id="nb-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Làm mượt Laplace</h2></div>
+
+  <p class="key">Một đặc trưng chưa từng xuất hiện trong một lớp cho xác suất bằng 0 — <em>và số 0 nhân vào thì xoá sạch mọi bằng chứng khác</em>.</p>
+
+<pre><code>Không làm mượt:   P(từ | lớp) = đếm(từ, lớp) / đếm(lớp)
+                  từ mới chưa gặp → 0 / N = 0 → tích cả câu = 0
+
+Làm mượt (α=1):   P(từ | lớp) = (đếm(từ, lớp) + α) / (đếm(lớp) + α·V)
+                  V = kích thước từ điển · mọi từ có xác suất khác 0</code></pre>
+
+  <p>Cộng thêm <code>α</code> vào mọi bộ đếm là cách nói "trước khi nhìn dữ liệu, tôi giả vờ đã thấy mỗi từ α lần". Đó chính là một <b>prior</b> theo nghĩa Bayes, và <code>α</code> đóng vai trò regularization: α lớn thì kéo mọi xác suất về gần đều nhau, α nhỏ thì bám sát dữ liệu.</p>
+
+  <ul class="why">
+    <li><code>α = 1</code> là mặc định (Laplace smoothing). Giá trị nhỏ hơn như 0,1 thường tốt hơn khi từ điển rất lớn — quét bằng cross-validation.</li>
+    <li>Trong thực tế người ta cộng <b>log</b> các xác suất thay vì nhân, vì nhân hàng nghìn số nhỏ sẽ tràn xuống 0 do giới hạn dấu phẩy động.</li>
+  </ul>
+</section>
+
+<section id="nb-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Các biến thể</h2></div>
+
+  <p class="key">Cùng một khung Bayes, khác nhau ở <em>giả định về phân phối của đặc trưng</em>.</p>
+
+  <table>
+    <tr><th>Biến thể</th><th>Đặc trưng là</th><th>Dùng cho</th></tr>
+    <tr><td><b>Multinomial</b></td><td>Số đếm — từ này xuất hiện mấy lần</td><td>Phân loại văn bản với bag-of-words hoặc TF-IDF. Mặc định cho text</td></tr>
+    <tr><td><b>Bernoulli</b></td><td>Nhị phân — từ này có hoặc không</td><td>Văn bản ngắn, nơi việc <em>vắng mặt</em> một từ cũng là bằng chứng</td></tr>
+    <tr><td><b>Gaussian</b></td><td>Số liên tục, giả định phân phối chuẩn trong mỗi lớp</td><td>Dữ liệu bảng có cột số. Yếu hơn hẳn, ít khi là lựa chọn tốt nhất</td></tr>
+  </table>
+
+  <p>Chỗ Naive Bayes còn giá trị thật hôm nay: <b>baseline đầu tiên cho phân loại văn bản</b>. Nó chạy trong vài giây trên dữ liệu mà logistic regression cần vài phút và transformer cần vài giờ, nên là mốc để biết model phức tạp có thật sự đáng công không — đúng tinh thần "bắt đầu bằng model đơn giản nhất chạy được" ở <a href="../../01-overview/ml-overview/index.html">bản đồ kệ</a>.</p>
+
+  <ul class="why">
+    <li>Nó cũng hợp khi <b>dữ liệu rất ít</b>: chỉ đếm nên không cần nhiều mẫu để ổn định, trong khi các model phải ước lượng nhiều tham số thì lảo đảo.</li>
+    <li>Trên dữ liệu bảng nói chung, Gaussian Naive Bayes hầu như luôn thua <a href="../../06-tree-models/gradient-boosting/index.html">gradient boosting</a> — giả định vừa độc lập vừa phân phối chuẩn là quá nhiều thứ sai cùng lúc.</li>
+  </ul>
+</section>
+
+<section id="nb-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Quên làm mượt</h4><p>Một từ chưa gặp cho xác suất 0 và xoá sạch mọi bằng chứng khác trong câu.</p></div>
+    <div class="card bad"><h4>Nhân xác suất thay vì cộng log</h4><p>Nhân hàng nghìn số nhỏ tràn xuống 0. Luôn làm việc trên thang log.</p></div>
+    <div class="card bad"><h4>Tin xác suất đầu ra</h4><p>Chúng thường cực đoan sát 0 hoặc 1. Xếp hạng thì được, nhưng đừng dùng làm ngưỡng quyết định nếu chưa hiệu chỉnh.</p></div>
+    <div class="card bad"><h4>Đưa vào nhiều cột tương quan</h4><p>Cùng một thông tin bị tính nhiều lần, giả định độc lập vỡ nặng nhất ở đây.</p></div>
+    <div class="card bad"><h4>Chọn nhầm biến thể</h4><p>Gaussian cho dữ liệu đếm hoặc Multinomial cho dữ liệu liên tục đều làm model tệ hẳn.</p></div>
+    <div class="card bad"><h4>Dùng làm model cuối cùng</h4><p>Nó là baseline. Nếu nó thắng model phức tạp, thường là dấu hiệu model kia đang có lỗi.</p></div>
+  </div>
+</section>
+
+<section id="nb-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>Giả định "naive" là gì và vì sao cần nó?</summary>
+  <p>Là giả định các đặc trưng độc lập với nhau khi đã biết lớp. Cần nó vì không có nó thì phải ước lượng xác suất của mọi tổ hợp đặc trưng — với 1000 từ nhị phân là 2¹⁰⁰⁰ tổ hợp, không bộ dữ liệu nào đủ. Giả định độc lập biến bài toán đó thành 1000 phép đếm rời rạc, và đó là toàn bộ lý do model này chạy được.</p></details>
+
+  <details class="qa"><summary>Giả định đó sai rõ ràng, sao model vẫn dùng được?</summary>
+  <p>Vì phân loại chỉ cần đúng <em>thứ tự</em> giữa các lớp, không cần đúng giá trị xác suất. Sai lệch do bỏ qua phụ thuộc thường đẩy điểm của mọi lớp cùng một hướng nên thứ tự giữ nguyên, và lớp thắng vẫn là lớp thắng. Cái giá là xác suất đầu ra không đáng tin — hay cực đoan sát 0 hoặc 1 — nên nếu bài toán cần xác suất chứ không chỉ cần nhãn thì phải hiệu chỉnh hoặc đổi sang logistic regression.</p></details>
+
+  <details class="qa"><summary>Vì sao phải làm mượt Laplace?</summary>
+  <p>Vì một đặc trưng chưa từng xuất hiện trong một lớp sẽ cho xác suất bằng 0, mà 0 nhân vào tích thì xoá sạch mọi bằng chứng khác của câu — chỉ một từ lạ là phán quyết bị lật. Cộng thêm α vào mọi bộ đếm khiến không xác suất nào bằng 0. Về bản chất đó là gắn một prior: giả vờ đã thấy mỗi từ α lần trước khi nhìn dữ liệu, và α đóng vai trò regularization — lớn thì kéo mọi xác suất về gần đều, nhỏ thì bám sát dữ liệu.</p></details>
+
+  <details class="qa"><summary>Khi nào Naive Bayes vẫn là lựa chọn đúng?</summary>
+  <p>Ba trường hợp. Một, làm baseline cho phân loại văn bản — nó chạy vài giây trên dữ liệu mà model khác cần vài phút tới vài giờ, nên cho mốc để biết model phức tạp có đáng công không. Hai, khi dữ liệu rất ít: chỉ đếm nên ổn định sớm, trong khi model nhiều tham số thì lảo đảo. Ba, khi cần cập nhật tăng dần liên tục, vì thêm dữ liệu chỉ là cộng vào bộ đếm chứ không phải huấn luyện lại. Ngoài ba chỗ đó, trên dữ liệu bảng nói chung nó thua gradient boosting rõ rệt.</p></details>
+</section>
+
+<footer>Machine learning · Classical models · nền toán ở <a href="../../02-math-foundations/bayes-theorem/index.html">Bayes theorem</a>; model cho xác suất đáng tin hơn là <a href="../logistic-regression/index.html">Logistic regression</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

@@ -149,7 +149,33 @@ SELECT * FROM subordinates ORDER BY depth;</code></pre>
 </section>
 
 <section id="sqlcte-s5">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>05</b><h2>View và materialized view</h2></div>
+  <p class="key">CTE đặt tên cho một truy vấn <em>trong một câu lệnh</em>. <code>VIEW</code> đặt tên cho nó <em>vĩnh viễn</em> — cả đội dùng lại được thay vì mỗi người tự viết lại một bản hơi khác.</p>
+<pre><code><span class="cm">-- view: lưu lại CÂU TRUY VẤN, không lưu dữ liệu</span>
+CREATE VIEW paid_totals <span class="kw">AS</span>
+  SELECT customer_id, SUM(amount) <span class="kw">AS</span> tong
+  FROM orders WHERE status = <span class="st">'paid'</span> GROUP BY customer_id;
+
+SELECT * FROM paid_totals WHERE tong &gt; <span class="st">1000000</span>;   <span class="cm">-- chạy lại truy vấn gốc mỗi lần gọi</span>
+
+<span class="cm">-- materialized view: lưu KẾT QUẢ ra đĩa như một bảng thật</span>
+CREATE MATERIALIZED VIEW paid_totals_mv <span class="kw">AS</span> SELECT ...;
+REFRESH MATERIALIZED VIEW paid_totals_mv;        <span class="cm">-- phải tự làm mới, không tự đồng bộ</span></code></pre>
+  <table>
+    <tr><th></th><th>View</th><th>Materialized view</th></tr>
+    <tr><td>Lưu gì</td><td>Câu truy vấn</td><td>Kết quả đã tính</td></tr>
+    <tr><td>Độ mới</td><td>Luôn mới — đọc dữ liệu hiện tại</td><td>Cũ tới lần <code>REFRESH</code> gần nhất</td></tr>
+    <tr><td>Chi phí đọc</td><td>Bằng chi phí truy vấn gốc</td><td>Rẻ như đọc một bảng thường</td></tr>
+    <tr><td>Dùng khi</td><td>Đặt tên cho logic hay lặp lại, hoặc giấu bớt cột nhạy cảm</td><td>Truy vấn tổng hợp nặng, đọc nhiều lần, chấp nhận số cũ vài phút</td></tr>
+  </table>
+  <ul class="why">
+    <li>View <b>không</b> làm truy vấn nhanh hơn — nó chỉ thay chỗ dán đoạn SQL. Ai nghĩ "đưa vào view cho nhanh" là hiểu sai; thứ làm nhanh là materialized view, và cái giá là dữ liệu cũ.</li>
+    <li>View lồng view nhiều tầng là bẫy quen thuộc: nhìn thì gọn, nhưng planner phải bung hết ra và bạn mất khả năng đoán chi phí — xem <a href="../../04-sql-advanced/sql-index-query-plan/index.html">Index &amp; query plan</a>.</li>
+  </ul>
+</section>
+
+<section id="sqlcte-s6">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Correlated subquery trong bảng lớn</h4><p>Subquery tham chiếu bảng ngoài mà không có index phù hợp buộc database quét lại nhiều lần — chậm hẳn so với viết lại bằng <code>JOIN</code> hoặc CTE tổng hợp trước.</p></div>
     <div class="card bad"><h4>NOT IN gặp NULL</h4><p><code>WHERE id NOT IN (SELECT customer_id FROM orders)</code> trả về <b>rỗng hoàn toàn</b> nếu subquery có dù chỉ một dòng <code>customer_id IS NULL</code> — so sánh với NULL luôn ra UNKNOWN, làm cả điều kiện NOT IN thành UNKNOWN. Dùng <code>NOT EXISTS</code> thay thế, nó không dính bẫy này.</p></div>
@@ -157,8 +183,8 @@ SELECT * FROM subordinates ORDER BY depth;</code></pre>
   </div>
 </section>
 
-<section id="sqlcte-s6">
-  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+<section id="sqlcte-s7">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
 
   <details class="qa"><summary>Correlated và uncorrelated subquery khác nhau thế nào?</summary>
   <p>Uncorrelated subquery không tham chiếu gì tới bảng ngoài — nó tự đứng một mình, database chạy một lần rồi dùng kết quả cho toàn bộ câu lệnh ngoài. Correlated subquery tham chiếu tới cột của bảng ngoài, nên về mặt logic phải chạy lại cho mỗi dòng ngoài — đắt hơn hẳn trên bảng lớn, dù query planner hiện đại thường tối ưu lại bằng join.</p></details>

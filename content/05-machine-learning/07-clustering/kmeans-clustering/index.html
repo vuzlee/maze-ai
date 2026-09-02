@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K-means &amp; clustering — MazeAI</title>
+<meta name="description" content="Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/07-clustering/kmeans-clustering/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="K-means &amp; clustering">
+<meta property="og:description" content="Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/07-clustering/kmeans-clustering/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-kmeans" data-title="K-means &amp; clustering" data-tag="ML" data-blurb="Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Clustering</p>
+  <h1>K-means &amp; <em>clustering</em></h1>
+  <p class="lede">Thuật toán chạy trong mười dòng code. Câu hỏi thật là <b>chọn k thế nào</b> và <b>khi nào kết quả nó đưa ra là vô nghĩa</b>.</p>
+</header>
+
+<section id="kmeans-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vấn đề nó giải</h2></div>
+
+  <p class="key">Không ai gắn nhãn cho bạn. <em>Chỉ có một bảng số, và câu hỏi "trong đám này có mấy nhóm tự nhiên".</em></p>
+
+  <p>Mười nghìn khách hàng, mỗi người vài chục con số: tuổi, tần suất mua, giá trị đơn trung bình, số ngày kể từ lần mua cuối. Không có cột nào ghi <em>đây là khách trung thành</em> hay <em>đây là khách sắp bỏ đi</em> — nếu có thì đã là bài toán <a href="../../04-core-concepts/supervised-unsupervised/index.html">supervised</a> rồi. Việc phải làm là tự tìm ra: những ai giống nhau đủ để đối xử như một nhóm.</p>
+
+  <p>K-means trả lời bằng cách đơn giản nhất nghĩ ra được: <b>giả định mỗi nhóm có một điểm trung tâm</b>, và mỗi khách thuộc về tâm gần mình nhất. Toàn bộ thuật toán chỉ là đi tìm k cái tâm đó.</p>
+
+  <ul class="why">
+    <li>Đầu vào là <b>k</b> — số cụm — và người phải đặt trước. Đây vừa là điểm yếu lớn nhất vừa là lý do nó chạy nhanh.</li>
+    <li>Kết quả là <b>một nhãn cụm cho mỗi điểm</b>, cộng với k toạ độ tâm. Tâm chính là "khách hàng trung bình" của nhóm đó, và thường là thứ đáng đọc nhất.</li>
+    <li>Không có đáp án đúng để đối chiếu, nên <b>không có accuracy</b>. Mọi thước đo ở đây đều gián tiếp — xem mục 03.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Cơ chế — lặp hai bước</h2></div>
+
+  <p class="key">Gán điểm về tâm gần nhất, rồi dời tâm về giữa các điểm vừa nhận. <em>Lặp tới khi không ai đổi cụm nữa.</em></p>
+
+  <div class="flow">
+    <div class="n"><h5>Khởi tạo</h5><p>chọn <b>k</b> tâm ban đầu · k-means++ chọn khéo thay vì ngẫu nhiên</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Gán</h5><p>mỗi điểm về tâm <b>gần nhất</b> theo khoảng cách Euclid</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Dời</h5><p>mỗi tâm về <b>trung bình</b> các điểm vừa nhận</p></div>
+    <div class="a">↻</div>
+    <div class="n ok"><h5>Dừng</h5><p>không điểm nào đổi cụm · thường dưới 20 vòng</p></div>
+  </div>
+
+<pre><code>Inertia = Σ ‖ xᵢ − μ_c(i) ‖²        ← tổng bình phương khoảng cách tới tâm của mình
+
+Bước "gán" giữ nguyên μ, chọn c(i) làm inertia nhỏ đi
+Bước "dời" giữ nguyên c, chọn μ làm inertia nhỏ đi</code></pre>
+
+  <p>Vì mỗi bước đều chỉ làm inertia giảm hoặc giữ nguyên, và số cách chia là hữu hạn, thuật toán <b>chắc chắn dừng</b>. Nhưng chỗ nó dừng chỉ là một cực tiểu địa phương, không phải cách chia tốt nhất — đúng như bài <a href="../../02-math-foundations/gradient-optimization/index.html">tối ưu</a> đã nói về hàm không lồi.</p>
+
+  <ul class="why">
+    <li>Vì thế thư viện <b>chạy lại nhiều lần với khởi tạo khác nhau</b> rồi giữ lần có inertia thấp nhất — <code>n_init=10</code> là mặc định của sklearn, đừng hạ xuống 1 để chạy nhanh.</li>
+    <li><b>k-means++</b> chọn tâm ban đầu cách xa nhau thay vì bốc ngẫu nhiên. Rẻ, và giảm hẳn số lần rơi vào cực tiểu tồi — hiện là mặc định.</li>
+    <li>Chi phí mỗi vòng là <b>O(n · k · d)</b>. Rất nhanh, và đó là lý do k-means vẫn sống dù có nhiều thuật toán tốt hơn.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Chọn k</h2></div>
+
+  <p class="key">Inertia luôn giảm khi tăng k — tới k = n thì bằng 0. <em>Nên không thể chọn k bằng cách tìm inertia nhỏ nhất.</em></p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Elbow — nhìn chỗ gãy</h5>
+      <p>Vẽ inertia theo k. Chỗ đường cong <b>gãy khuỷu</b> là ứng viên.</p>
+      <p><b>Vấn đề:</b> rất nhiều dữ liệu thật cho đường cong trơn, không có khuỷu nào rõ. Lúc đó elbow không trả lời được gì.</p>
+    </div>
+    <div>
+      <h5>Silhouette — chấm điểm từng điểm</h5>
+      <p>Với mỗi điểm: <code>(b − a) / max(a, b)</code>, trong đó <b>a</b> là khoảng cách trung bình tới cụm mình, <b>b</b> tới cụm gần nhất khác.</p>
+      <p>Từ <b>−1 tới 1</b>. Gần 1 là nằm gọn trong cụm mình; âm là <b>đang bị xếp nhầm cụm</b>.</p>
+    </div>
+  </div>
+
+  <div class="bars">
+    <div class="b bad"><i>k = 2</i><u style="width:41%"></u><b>silhouette 0,41</b></div>
+    <div class="b hi"><i>k = 3</i><u style="width:68%"></u><b>0,68 ← cao nhất</b></div>
+    <div class="b"><i>k = 4</i><u style="width:52%"></u><b>0,52</b></div>
+    <div class="b"><i>k = 5</i><u style="width:44%"></u><b>0,44</b></div>
+  </div>
+  <p class="stripnote"><span>silhouette có đỉnh thật</span><span><em>chọn k ở đỉnh, không phải ở đuôi</em></span></p>
+
+  <ul class="why">
+    <li>Silhouette <b>có cực đại</b> nên chọn được bằng máy, khác hẳn inertia. Đây là thước đo mặc định nên dùng.</li>
+    <li>Nhưng nó vẫn <b>thiên vị cụm tròn</b> vì dựa trên khoảng cách — cụm hình vòng cung điểm thấp dù chia hoàn toàn đúng. Đừng dùng nó để so k-means với DBSCAN.</li>
+    <li>Thường thì <b>ràng buộc nghiệp vụ chọn k</b>, không phải thước đo: đội marketing chạy được ba chiến dịch thì k = 3, dù silhouette nói 7 đẹp hơn.</li>
+  </ul>
+
+  <div class="note key">
+    <h4>Ba thước đo nội tại hay gặp</h4>
+    <b>Silhouette</b> — cao là tốt, khoảng [−1, 1], dễ hiểu nhất.
+    <b>Davies–Bouldin</b> — thấp là tốt, tính nhanh hơn trên dữ liệu lớn.
+    <b>Calinski–Harabasz</b> — cao là tốt, nhưng tăng theo k nên phải nhìn hình dáng chứ không lấy giá trị lớn nhất. Cả ba đều đo <em>cụm có gọn và tách rời không</em>, không đo <em>cách chia này có ý nghĩa gì không</em>.
+  </div>
+</section>
+
+<section id="kmeans-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Giả định ngầm của k-means</h2></div>
+
+  <p class="key">K-means không bao giờ báo lỗi. <em>Cụm sai hình thì nó vẫn trả về một cách chia trông rất tự tin.</em></p>
+
+  <table>
+    <tr><th>Giả định</th><th>Vỡ khi nào</th><th>Kết quả</th></tr>
+    <tr><td>Cụm <b>tròn</b>, toả đều quanh tâm</td><td>Cụm dài hình bầu dục, hình chữ C, hai vòng đồng tâm</td><td>Cắt ngang qua cụm thật, chia đôi thứ đáng là một</td></tr>
+    <tr><td>Các cụm <b>cỡ xấp xỉ nhau</b></td><td>Một cụm 9.000 điểm, một cụm 200 điểm</td><td>Cụm lớn bị xé làm đôi, cụm nhỏ bị nuốt</td></tr>
+    <tr><td>Các cụm <b>mật độ xấp xỉ nhau</b></td><td>Một vùng dày đặc cạnh một vùng thưa</td><td>Ranh giới bị đẩy về phía vùng thưa</td></tr>
+    <tr><td><b>Mọi điểm thuộc về một cụm</b></td><td>Dữ liệu có ngoại lai thật</td><td>Ngoại lai kéo tâm lệch đi — không có khái niệm "điểm nhiễu"</td></tr>
+  </table>
+
+  <ul class="why">
+    <li><b>Bắt buộc chuẩn hoá thang đo trước.</b> Khoảng cách Euclid cộng chênh lệch mọi cột — cột lương tính bằng triệu sẽ át hết cột tuổi. Cùng lý do như <a href="../../05-classical-ml/knn/index.html">KNN</a>, xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</li>
+    <li>Nhiều chiều thì mọi khoảng cách <b>xích lại gần nhau</b> và "gần nhất" mất nghĩa. Giảm chiều bằng PCA trước khi phân cụm là phản xạ chuẩn.</li>
+    <li>Ba giả định đầu vỡ thì đổi họ thuật toán, không phải chỉnh tham số. <b>Cụm hình bất kỳ và có nhiễu → <a href="../dbscan/index.html">DBSCAN</a></b>; cụm chồng lấn cần xác suất → Gaussian Mixture.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Hầu hết lỗi không làm chương trình chạy sai — chúng làm ra một kết quả trông hợp lý nhưng vô nghĩa.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Không chuẩn hoá thang đo</h4><p>Cột đơn vị lớn quyết định toàn bộ cách chia. Lỗi phổ biến nhất, và im lặng nhất.</p></div>
+    <div class="card bad"><h4>Đưa biến phân loại đã one-hot vào thẳng</h4><p>Khoảng cách giữa hai giá trị one-hot luôn là √2, không mang thông tin gì. Cần k-prototypes hoặc mã hoá khác.</p></div>
+    <div class="card bad"><h4>Chọn k bằng inertia nhỏ nhất</h4><p>Luôn ra k lớn nhất đã thử. Inertia chỉ dùng để nhìn hình dáng đường cong.</p></div>
+    <div class="card bad"><h4>Đặt <code>n_init=1</code> cho nhanh</h4><p>Một lần khởi tạo tồi là ra một kết quả tồi, và không có gì báo cho bạn biết.</p></div>
+    <div class="card bad"><h4>Đặt tên cụm rồi tin luôn</h4><p>Gọi cụm 2 là "khách VIP" thì từ đó mọi người coi nó là sự thật. Phải kiểm bằng dữ liệu ngoài trước.</p></div>
+    <div class="card bad"><h4>So sánh cụm giữa hai lần chạy theo số hiệu</h4><p>Nhãn cụm là số tuỳ ý — cụm 0 lần này có thể là cụm 2 lần sau. Phải khớp theo tâm.</p></div>
+  </div>
+</section>
+
+<section id="kmeans-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>K-means có luôn hội tụ không? Hội tụ tới đâu?</summary>
+  <p>Luôn dừng, vì mỗi bước làm inertia giảm hoặc giữ nguyên và số cách chia là hữu hạn. Nhưng chỉ hội tụ tới <b>cực tiểu địa phương</b> — hàm mục tiêu không lồi. Vì vậy phải chạy nhiều lần với khởi tạo khác nhau, và dùng k-means++ để khởi tạo cho tốt.</p>
+  </details>
+
+  <details class="qa"><summary>Vì sao không chọn k bằng cách tìm inertia nhỏ nhất?</summary>
+  <p>Vì inertia giảm đơn điệu theo k: mỗi cụm thêm vào luôn làm tổng khoảng cách nhỏ đi, tới k = n thì bằng 0 — mỗi điểm là một cụm. Nên phải nhìn chỗ đường cong gãy khuỷu, hoặc dùng thước đo <b>có cực đại</b> như silhouette.</p>
+  </details>
+
+  <details class="qa"><summary>Silhouette đo cái gì, và bao nhiêu là tốt?</summary>
+  <p>Với mỗi điểm nó so <b>a</b> — khoảng cách trung bình tới các điểm cùng cụm — với <b>b</b> — tới cụm gần nhất khác, rồi lấy <code>(b − a) / max(a, b)</code>. Trên 0,5 là cấu trúc rõ, quanh 0,2 là mơ hồ, âm nghĩa là điểm đó đang bị xếp nhầm cụm. Nhưng nó thiên vị cụm tròn, nên đừng dùng để so hai thuật toán khác họ giả định.</p>
+  </details>
+
+  <details class="qa"><summary>Khi nào bạn không dùng k-means?</summary>
+  <p>Khi cụm không tròn, khi kích thước hoặc mật độ các cụm chênh nhau nhiều, khi dữ liệu có ngoại lai thật cần được đánh dấu là nhiễu thay vì ép vào một cụm, và khi không biết k là bao nhiêu mà cũng không có ràng buộc nghiệp vụ để đặt. Ba trường hợp đầu chuyển sang <a href="../dbscan/index.html">DBSCAN</a>; trường hợp cụm chồng lấn cần xác suất thuộc về thì dùng Gaussian Mixture.</p>
+  </details>
+
+  <details class="qa"><summary>Làm sao biết cách chia cụm có ý nghĩa hay không?</summary>
+  <p>Thước đo nội tại chỉ nói cụm gọn và tách rời, không nói có nghĩa. Cách kiểm thật là <b>đưa biến ngoài vào</b>: các cụm có khác nhau ở thứ mà thuật toán không hề thấy không — tỷ lệ rời bỏ, doanh thu tháng sau. Nếu không khác, cách chia đó chỉ là hình học đẹp.</p>
+  </details>
+</section>
+
+<footer>Machine learning · Clustering · bài nền của nhóm; cụm không tròn thì sang <a href="../dbscan/index.html">DBSCAN</a>, bản đồ bốn họ ở <a href="../clustering-overview/index.html">Clustering overview</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

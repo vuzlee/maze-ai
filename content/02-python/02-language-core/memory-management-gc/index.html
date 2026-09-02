@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory management &amp; GC — MazeAI</title>
+<meta name="description" content="Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/memory-management-gc/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Memory management &amp; GC">
+<meta property="og:description" content="Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/memory-management-gc/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-memgc" data-title="Memory management &amp; GC" data-tag="Python internals" data-blurb="Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Python internals · bộ nhớ</p>
+  <h1>Memory management &amp; <em>GC</em></h1>
+  <p class="lede">Bài trước trả lời <b>object là gì và ai đang trỏ tới nó</b>. Bài này trả lời câu tiếp theo: <b>khi nào object đó biến mất</b> — ai đếm, ai dọn, và vì sao có bộ dọn rác rồi mà service vẫn ăn RAM tăng dần.</p>
+</header>
+
+<section id="memgc-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Overview</h2></div>
+
+  <p class="key">Python dọn bộ nhớ bằng <em>hai cơ chế chồng lên nhau</em>, không phải một.</p>
+
+  <div class="flow">
+    <div class="n"><b>Đếm tham chiếu</b><span>mỗi object giữ một số đếm · về 0 là giải phóng <b>ngay</b></span></div>
+    <div class="n"><b>Bộ thu gom theo thế hệ</b><span>chạy định kỳ · dọn nốt những nhóm object <b>chỉ còn trỏ lẫn nhau</b></span></div>
+    <div class="n ok"><b>Của bạn</b><span>cả hai đều bó tay khi code còn giữ tham chiếu thật — đó là <b>rò rỉ</b></span></div>
+  </div>
+
+  <ul class="why">
+    <li>Cơ chế một giải thích vì sao Python trả bộ nhớ rất <b>kịp thời</b> — và vì sao có <a href="../../04-concurrency/thread-process-gil/index.html">GIL</a>.</li>
+    <li>Cơ chế hai tồn tại chỉ vì <b>một lỗ hổng duy nhất</b> của cơ chế một: vòng tham chiếu.</li>
+    <li>Rò rỉ trong Python gần như luôn là <b>lỗi thiết kế</b>, không phải lỗi của bộ dọn rác. Mục 04 liệt kê bốn nghi phạm quen mặt.</li>
+  </ul>
+
+  <p class="stripnote"><span>bài này nối tiếp <a href="../memory-model-mutability/index.html"><em>Memory model &amp; mutability</em></a></span><span>ở đó: tên, object, mutability, copy — <em>đọc trước bài này</em></span></p>
+</section>
+
+<section id="memgc-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Đếm tham chiếu</h2></div>
+<pre><code><span class="kw">import</span> sys
+a = [<span class="st">1</span>, <span class="st">2</span>]
+sys.getrefcount(a)     <span class="cm"># 2 — một từ a, một từ đối số tạm của hàm này</span>
+b = a
+sys.getrefcount(a)     <span class="cm"># 3</span>
+<span class="kw">del</span> b
+sys.getrefcount(a)     <span class="cm"># 2</span></code></pre>
+  <p>Cơ chế chính là <strong>đếm tham chiếu</strong>: mỗi object giữ một biến đếm, về 0 thì được giải phóng ngay lập tức. Đây là lý do Python giải phóng bộ nhớ rất kịp thời — và cũng là lý do có GIL, như đã nói ở bài trước.</p>
+  <h3>Vấn đề chu trình</h3>
+<pre><code>a = {}; b = {}
+a[<span class="st">"b"</span>] = b
+b[<span class="st">"a"</span>] = a          <span class="cm"># trỏ vòng vào nhau</span>
+<span class="kw">del</span> a, b            <span class="cm"># hai tên biến mất, nhưng mỗi dict vẫn còn 1 tham chiếu</span>
+                    <span class="cm"># → đếm tham chiếu không bao giờ về 0</span></code></pre>
+  <p>Vì vậy Python có thêm một <strong>bộ thu gom theo thế hệ</strong> chạy định kỳ để phát hiện những nhóm object chỉ còn trỏ lẫn nhau. Nó chỉ quét các object kiểu container, chạy theo ba thế hệ với tần suất giảm dần — object sống lâu thì bị quét ít hơn.</p>
+  <div class="note">
+    <h4>Khi nào chuyện này thành vấn đề thật</h4>
+    Với chương trình có nhiều object lồng nhau và vòng tham chiếu, lần chạy GC có thể gây ra khoảng dừng đáng chú ý. Dịch vụ độ trễ thấp đôi khi tắt GC tự động bằng <code>gc.disable()</code> rồi tự gọi <code>gc.collect()</code> vào lúc rảnh. Chỉ nên làm khi đã đo và thấy đúng nguyên nhân.
+  </div>
+</section>
+
+<section id="memgc-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Bộ nhớ thật của object</h2></div>
+
+  <p class="key">Biết khi nào object bị dọn rồi, còn một câu hỏi nữa: <em>mỗi object tốn bao nhiêu</em>.</p>
+<pre><code><span class="kw">import</span> sys
+sys.getsizeof(<span class="st">0</span>)            <span class="cm"># khoảng 28 byte — một int cũng là object đầy đủ</span>
+sys.getsizeof([])           <span class="cm"># khoảng 56 byte cho list rỗng</span>
+sys.getsizeof([<span class="st">1</span>,<span class="st">2</span>,<span class="st">3</span>])      <span class="cm"># khoảng 88 — chỉ tính con trỏ, KHÔNG tính các int bên trong</span>
+sys.getsizeof({})           <span class="cm"># khoảng 64 byte</span></code></pre>
+  <p><code>getsizeof</code> chỉ đo lớp ngoài. Một list một triệu số nguyên tốn khoảng 8 MB cho mảng con trỏ, cộng khoảng 28 MB cho các object int — tức khoảng 36 MB, so với 4 MB nếu dùng <code>array</code> hoặc NumPy. Đây là lý do NumPy tồn tại.</p>
+  <h3><code>__slots__</code> — cắt bộ nhớ của object tự viết</h3>
+<pre><code><span class="kw">class</span> Point:
+    <span class="kw">def</span> __init__(self, x, y): self.x, self.y = x, y
+<span class="cm"># mỗi instance có một __dict__ riêng: khoảng 100+ byte mỗi object</span>
+
+<span class="kw">class</span> PointSlim:
+    __slots__ = (<span class="st">"x"</span>, <span class="st">"y"</span>)      <span class="cm"># bỏ __dict__, lưu vào ô cố định</span>
+    <span class="kw">def</span> __init__(self, x, y): self.x, self.y = x, y
+<span class="cm"># tiết kiệm khoảng 40–50% bộ nhớ và truy cập thuộc tính nhanh hơn</span></code></pre>
+  <p>Cái mất: không thêm được thuộc tính động, và kế thừa phức tạp hơn. Chỉ đáng dùng khi tạo hàng triệu instance — ví dụ node của cây, điểm dữ liệu, bản ghi trong bộ đệm.</p>
+</section>
+
+<section id="memgc-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Rò rỉ bộ nhớ trong Python</h2></div>
+  <p>Có bộ thu gom rác không có nghĩa là không rò rỉ. Bốn nguồn thường gặp nhất:</p>
+  <table>
+    <tr><th>Nguồn</th><th>Vì sao</th><th>Cách chữa</th></tr>
+    <tr><td>Cache không giới hạn</td><td><code>lru_cache(maxsize=None)</code> giữ mọi đối số và kết quả mãi mãi</td><td>Đặt <code>maxsize</code>, hoặc dùng TTL cache</td></tr>
+    <tr><td><code>lru_cache</code> trên phương thức</td><td>Cache giữ <code>self</code> nên instance không bao giờ được giải phóng</td><td><code>cached_property</code>, hoặc cache theo instance</td></tr>
+    <tr><td>Biến toàn cục dồn dữ liệu</td><td>List hoặc dict ở cấp module chỉ thêm mà không xoá</td><td>Giới hạn kích thước, hoặc dùng <code>deque(maxlen=n)</code></td></tr>
+    <tr><td>Đăng ký callback / observer</td><td>Object bị giữ bởi danh sách listener sau khi đã hết dùng</td><td>Huỷ đăng ký, hoặc dùng <code>weakref</code></td></tr>
+  </table>
+<pre><code><span class="kw">import</span> weakref
+<span class="cm"># weakref: trỏ tới object mà KHÔNG tăng bộ đếm tham chiếu</span>
+r = weakref.ref(obj)
+r()          <span class="cm"># trả về obj, hoặc None nếu obj đã bị giải phóng</span></code></pre>
+  <div class="note">
+    <h4>Cách truy rò rỉ</h4>
+    <code>tracemalloc</code> có trong thư viện chuẩn: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết dòng code nào cấp phát thêm. Đó là câu trả lời nên nói khi bị hỏi "service của em ăn RAM tăng dần, làm sao tìm nguyên nhân".
+  </div>
+</section>
+
+<section id="memgc-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>Python quản lý bộ nhớ thế nào?</summary>
+  <p>Cơ chế chính là đếm tham chiếu: mỗi object giữ số tham chiếu tới nó, về 0 thì giải phóng ngay. Ưu điểm là kịp thời và dự đoán được; nhược điểm là không xử lý được chu trình tham chiếu, và việc phải cập nhật bộ đếm an toàn giữa nhiều luồng chính là lý do có GIL. Nên Python có thêm bộ thu gom theo thế hệ chạy định kỳ để tìm các nhóm object chỉ còn trỏ lẫn nhau.</p></details>
+
+  <details class="qa"><summary>Vì sao cần bộ thu gom khi đã đếm tham chiếu?</summary>
+  <p>Vì đếm tham chiếu không bao giờ đưa được về 0 với các object trỏ vòng vào nhau — hai dict cùng chứa nhau, hoặc cây có con trỏ ngược lên cha. Xoá hết tên biến bên ngoài rồi thì mỗi object vẫn còn đúng một tham chiếu đến từ object kia, nên không cái nào được giải phóng. Bộ thu gom quét các object kiểu container để phát hiện đúng những cụm đó. Nó chạy theo ba thế hệ với tần suất giảm dần, dựa trên quan sát rằng object sống qua vài lần quét thì thường sống lâu.</p></details>
+
+  <details class="qa"><summary>Service Python ăn RAM tăng dần — bạn tìm nguyên nhân thế nào?</summary>
+  <p>Dùng <code>tracemalloc</code>: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết dòng code nào đang cấp phát thêm. Bốn nghi phạm quen mặt là cache không giới hạn kích thước, <code>lru_cache</code> trên phương thức khiến instance không được giải phóng vì cache giữ <code>self</code>, biến toàn cục chỉ thêm mà không xoá, và callback đã đăng ký nhưng không huỷ. Với nhóm cuối thì <code>weakref</code> là cách chữa gọn.</p></details>
+
+  <details class="qa"><summary>Khi nào bạn dùng <code>__slots__</code>?</summary>
+  <p>Khi tạo rất nhiều instance của cùng một class nhỏ — node của cây, điểm dữ liệu, bản ghi trong bộ đệm. Nó bỏ <code>__dict__</code> của mỗi instance, tiết kiệm khoảng 40–50% bộ nhớ và truy cập thuộc tính cũng nhanh hơn một chút. Đổi lại thì không gắn thêm được thuộc tính động và kế thừa phức tạp hơn, nên với class thường thì không đáng.</p></details>
+
+  <details class="qa"><summary>Có nên tắt GC không?</summary>
+  <p>Chỉ khi đã đo và thấy đúng nguyên nhân. Với dịch vụ độ trễ thấp mà lần quét GC gây ra khoảng dừng thấy được, cách làm là <code>gc.disable()</code> rồi tự gọi <code>gc.collect()</code> vào lúc rảnh. Nhưng tắt GC không tắt đếm tham chiếu — phần lớn rác vẫn được dọn bình thường, chỉ những cụm trỏ vòng là tồn lại, nên phải chắc code không sinh ra nhiều cụm như vậy.</p></details>
+</section>
+
+<footer>Deep dive · quản lý bộ nhớ &amp; GC · nối tiếp <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a> · số liệu kích thước là mức điển hình của CPython 64-bit.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

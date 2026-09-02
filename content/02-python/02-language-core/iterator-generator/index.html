@@ -241,52 +241,28 @@ data = [(<span class="st">"a"</span>,<span class="st">1</span>), (<span class="s
 <span class="cm"># phải sort theo key trước, hoặc dùng defaultdict cho chắc</span></code></pre>
 </section>
 
-<section id="iter-s9">
+<section id="iter-s9" class="lesson">
   <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
-  <h3>1. Generator chỉ chạy một lần</h3>
-<pre><code>g = (x <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>))
-<span class="kw">sum</span>(g)    <span class="cm"># 3</span>
-<span class="kw">sum</span>(g)    <span class="cm"># 0  ← đã cạn, không có cảnh báo nào</span></code></pre>
-  <h3>2. Biến vòng lặp trong closure</h3>
-<pre><code>fs = [<span class="kw">lambda</span>: i <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>)]
-[f() <span class="kw">for</span> f <span class="kw">in</span> fs]        <span class="cm"># [2, 2, 2] — KHÔNG phải [0, 1, 2]</span>
-
-<span class="cm"># closure giữ tham chiếu tới BIẾN, không phải giá trị lúc tạo.</span>
-<span class="cm"># chữa: chốt giá trị bằng đối số mặc định</span>
-fs = [<span class="kw">lambda</span> i=i: i <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>)]   <span class="cm"># [0, 1, 2]</span></code></pre>
-  <h3>3. Đối số mặc định khả biến</h3>
-<pre><code><span class="kw">def</span> add(x, out=[]):        <span class="cm">← list được tạo MỘT LẦN lúc định nghĩa hàm</span>
-    out.append(x); <span class="kw">return</span> out
-
-add(<span class="st">1</span>)  <span class="cm"># [1]</span>
-add(<span class="st">2</span>)  <span class="cm"># [1, 2]  ← dùng lại cùng một list!</span>
-
-<span class="kw">def</span> add(x, out=<span class="kw">None</span>):      <span class="cm"># cách đúng</span>
-    <span class="kw">if</span> out <span class="kw">is</span> <span class="kw">None</span>: out = []
-    out.append(x); <span class="kw">return</span> out</code></pre>
-  <h3>4. lru_cache trên phương thức</h3>
-<pre><code><span class="kw">class</span> A:
-    @functools.lru_cache(maxsize=<span class="kw">None</span>)
-    <span class="kw">def</span> f(self, x): ...      <span class="cm">← cache giữ tham chiếu tới self → RÒ RỈ BỘ NHỚ</span>
-<span class="cm"># object không bao giờ được giải phóng vì cache còn trỏ tới nó.</span>
-<span class="cm"># Dùng functools.cached_property, hoặc cache theo instance.</span></code></pre>
-</section>
-
-<section id="iter-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Bốn lỗi này đều <em>im lặng</em> — không exception, chỉ ra kết quả sai hoặc thiếu.</p>
 
+  <h3>Generator chỉ chạy một lần</h3>
+<pre><code>g = (x <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>))
+<span class="kw">sum</span>(g)    <span class="cm"># 3</span>
+<span class="kw">sum</span>(g)    <span class="cm"># 0  ← đã cạn, không có cảnh báo nào</span></code></pre>
+  <p>Lỗi nguy hiểm nhất trong nhóm này vì nó không hỏng ngay: hàm nhận tham số rồi duyệt hai lần vẫn chạy đúng với <code>list</code>, chỉ sai khi có người truyền vào một generator. Hàm nào cần duyệt nhiều lần thì <code>list()</code> ngay ở đầu.</p>
+
   <div class="grid2">
-    <div class="card bad"><h4>Duyệt một generator hai lần</h4><p>Lượt hai rỗng, không có exception. Nếu hàm cần duyệt nhiều lần thì <code>list()</code> ở đầu.</p></div>
-    <div class="card bad"><h4>Dùng groupby mà chưa sắp xếp</h4><p>Nó chỉ gom nhóm kề nhau nên cùng một khoá xuất hiện nhiều lần.</p></div>
-    <div class="card bad"><h4>Để StopIteration lọt ra</h4><p>Vòng <code>for</code> bên ngoài hiểu nhầm là hết dữ liệu và dừng im lặng.</p></div>
-    <div class="card bad"><h4>tee để duyệt hai lần trên dữ liệu lớn</h4><p><code>tee</code> đệm ngầm mọi phần tử chưa được nhánh kia lấy — có thể tốn bằng cả một list.</p></div>
+    <div class="card bad"><h4>Dùng <code>groupby</code> mà chưa sắp xếp</h4><p>Nó chỉ gom các phần tử <b>kề nhau</b> nên cùng một khoá xuất hiện nhiều lần. Sắp xếp theo đúng khoá đó trước.</p></div>
+    <div class="card bad"><h4>Để <code>StopIteration</code> lọt ra</h4><p>Vòng <code>for</code> bên ngoài hiểu nhầm là hết dữ liệu và dừng im lặng. Trong generator, bắt nó lại hoặc dùng <code>next(it, default)</code>.</p></div>
+    <div class="card bad"><h4><code>tee</code> để duyệt hai lần trên dữ liệu lớn</h4><p><code>tee</code> đệm ngầm mọi phần tử chưa được nhánh kia lấy — có thể tốn bằng cả một list, tức mất đúng cái lợi của generator.</p></div>
   </div>
+
+  <p class="stripnote"><span>ba bẫy hay bị gộp nhầm vào đây</span><span>biến vòng lặp trong closure ở <a href="../decorator-context-manager/index.html"><em>decorator</em></a> · đối số mặc định khả biến và <code>lru_cache</code> giữ <code>self</code> ở <a href="../memory-model-mutability/index.html"><em>memory model</em></a></span></p>
 </section>
 
-<section id="iter-s11" class="lesson">
-  <div class="sh"><b>11</b><h2>Hỏi đáp phỏng vấn</h2></div>
+<section id="iter-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Hỏi đáp phỏng vấn</h2></div>
 
   <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
 

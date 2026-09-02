@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KNN — MazeAI</title>
+<meta name="description" content="Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/05-classical-ml/knn/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="KNN">
+<meta property="og:description" content="Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/05-classical-ml/knn/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-knn" data-title="KNN" data-tag="ML" data-blurb="Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Classical models</p>
+  <h1>KNN — <em>hàng xóm gần nhất</em></h1>
+  <p class="lede">Model đơn giản nhất trong cả kệ: <b>không học gì, chỉ nhớ</b>. Đáng học không phải vì hay dùng mà vì nó là chỗ ba khái niệm hiện ra rõ nhất — variance cao, tầm quan trọng của thang đo, và curse of dimensionality.</p>
+</header>
+
+<section id="knn-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Ý tưởng</h2></div>
+
+  <p class="key">Muốn đoán một điểm mới: <em>tìm k điểm giống nó nhất trong dữ liệu đã có, rồi lấy theo đa số</em>.</p>
+
+  <div class="flow">
+    <div class="n"><h5>Huấn luyện</h5><p>lưu lại toàn bộ dữ liệu — không tính gì cả</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Có điểm mới</h5><p>đo khoảng cách tới <b>mọi</b> điểm đã lưu</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>Dự đoán</h5><p>k điểm gần nhất bỏ phiếu (phân loại) hoặc lấy trung bình (hồi quy)</p></div>
+  </div>
+
+  <p>Nó đảo ngược chi phí so với mọi model khác: <b>huấn luyện gần như miễn phí, suy luận rất đắt</b>. Không có tham số nào được học, nên người ta gọi nó là model <em>phi tham số</em> hay <em>lazy learner</em> — mọi tính toán bị hoãn tới lúc phải trả lời.</p>
+
+  <ul class="why">
+    <li>Ranh giới quyết định của KNN không có hình dạng cố định — nó bám theo dữ liệu. Đó là điểm mạnh khi quan hệ thật ngoằn ngoèo, và là điểm yếu khi dữ liệu nhiễu.</li>
+    <li>Với n mẫu và d chiều, mỗi lần dự đoán tốn O(n·d). Trên tập lớn phải dựng chỉ mục — KD-tree ở ít chiều, hoặc <b>xấp xỉ</b> kiểu HNSW như trong vector database — chứ không quét thẳng.</li>
+  </ul>
+</section>
+
+<section id="knn-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Chọn k</h2></div>
+
+  <p class="key">k là <em>toàn bộ</em> núm điều chỉnh của model, và nó nằm đúng trên trục bias–variance.</p>
+
+  <div class="axis">
+    <div class="stop"><b>k = 1</b><span>bám từng điểm · học thuộc cả nhiễu</span></div>
+    <div class="stop on"><b>k vừa</b><span>chọn bằng cross-validation</span></div>
+    <div class="stop"><b>k lớn</b><span>ranh giới mượt dần</span></div>
+    <div class="stop"><b>k = n</b><span>luôn đoán lớp đa số</span></div>
+  </div>
+  <p class="axiscap"><span>variance cao, bias thấp</span><span><em>đổi độ chi tiết lấy độ ổn định</em></span><span>bias cao, variance thấp</span></p>
+
+  <p>Với <code>k = 1</code>, sai số trên tập train bằng <b>0</b> — mỗi điểm là hàng xóm gần nhất của chính nó. Con số đẹp đó hoàn toàn vô nghĩa, và nó là ví dụ sạch nhất cho lý do phải đo trên tập riêng: xem <a href="../../04-core-concepts/train-val-test-cv/index.html">Train, validation &amp; test</a>.</p>
+
+  <ul class="why">
+    <li>Bài toán hai lớp thì chọn <b>k lẻ</b> để tránh hoà phiếu.</li>
+    <li>Có thể cho phiếu <b>trọng số theo khoảng cách</b> — hàng xóm gần tính nặng hơn. Cách này làm k lớn bớt hại và thường tốt hơn phiếu đều.</li>
+    <li>k thường được quét trong khoảng 1–30 bằng cross-validation. Không có công thức, và mọi quy tắc kiểu <code>k = √n</code> chỉ là điểm khởi đầu.</li>
+  </ul>
+</section>
+
+<section id="knn-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Đo khoảng cách</h2></div>
+
+  <p class="key">"Gần nhau" không phải khái niệm sẵn có — <em>chọn thước đo chính là chọn model</em>.</p>
+
+  <table>
+    <tr><th>Thước đo</th><th>Đo cái gì</th><th>Hợp với</th></tr>
+    <tr><td><b>Euclidean</b> (L2)</td><td>Đường chim bay</td><td>Mặc định, đặc trưng số liên tục cùng bản chất</td></tr>
+    <tr><td><b>Manhattan</b> (L1)</td><td>Tổng chênh lệch từng chiều</td><td>Nhiều chiều, hoặc có ngoại lai — ít bị một chiều lệch át</td></tr>
+    <tr><td><b>Cosine</b></td><td>Góc giữa hai vector, bỏ qua độ dài</td><td>Văn bản, embedding — nơi hướng quan trọng hơn cường độ</td></tr>
+    <tr><td><b>Hamming</b></td><td>Số vị trí khác nhau</td><td>Đặc trưng phân loại đã mã hoá nhị phân</td></tr>
+  </table>
+
+  <div class="note warn">
+    <h4>Co giãn đặc trưng là bắt buộc, không phải tuỳ chọn</h4>
+    Cột <em>lương</em> tính bằng triệu và cột <em>tuổi</em> tính bằng năm: chênh lệch một triệu đồng lấn át chênh lệch ba mươi tuổi trong mọi phép Euclidean. Không chuẩn hoá thì KNN thực chất chỉ nhìn đúng một cột — cột có đơn vị lớn nhất. Cách chuẩn hoá xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.
+  </div>
+
+  <p>Đây cũng là chỗ KNN khác cây quyết định rõ nhất: <a href="../../06-tree-models/decision-tree/index.html">cây</a> so sánh từng cột riêng lẻ nên miễn nhiễm với thang đo, còn mọi model dựa trên khoảng cách — KNN, <a href="../svm/index.html">SVM</a>, k-means — đều phụ thuộc hoàn toàn vào nó.</p>
+</section>
+
+<section id="knn-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Curse of dimensionality</h2></div>
+
+  <p class="key">Số chiều tăng thì <em>mọi điểm đều cách nhau xa như nhau</em> — và "hàng xóm gần nhất" mất hết ý nghĩa.</p>
+
+  <p>Lý do dễ hình dung: để phủ kín một đoạn thẳng chia 10 khoảng cần 10 điểm; phủ kín hình vuông tương ứng cần 100; khối lập phương cần 1000. Ở 20 chiều, số điểm cần để dữ liệu còn "dày" vượt xa mọi bộ dữ liệu thật, nên mọi điểm đều nằm chơ vơ trong khoảng trống.</p>
+
+  <div class="bars">
+    <div class="b"><i>2 chiều</i><u style="width:12%"></u><b>gần nhất / xa nhất ≈ 0,12</b></div>
+    <div class="b hi"><i>20 chiều</i><u style="width:62%"></u><b>≈ 0,62</b></div>
+    <div class="b bad"><i>200 chiều</i><u style="width:94%"></u><b>≈ 0,94 — gần như bằng nhau</b></div>
+  </div>
+
+  <p>Cột trên là tỉ số giữa khoảng cách tới điểm gần nhất và tới điểm xa nhất. Khi tỉ số tiến về 1, khái niệm "gần" sụp đổ: điểm gần nhất chẳng gần hơn điểm xa nhất là bao, và phiếu bầu của k hàng xóm gần như là phiếu ngẫu nhiên.</p>
+
+  <ul class="why">
+    <li>Cách chữa: <b>giảm số chiều trước</b> (PCA, hoặc chọn lọc đặc trưng), hoặc đổi sang model không dựa trên khoảng cách toàn cục như cây.</li>
+    <li>Hiện tượng này không chỉ hại KNN — nó chạm mọi model dựa trên khoảng cách, k-means và SVM kernel RBF đều chịu chung.</li>
+    <li>Ngoại lệ đáng chú ý: embedding học được từ mạng nơ-ron vẫn tìm hàng xóm rất tốt ở hàng trăm chiều, vì dữ liệu thật nằm trên một mặt cong ít chiều hơn nhiều so với số chiều danh nghĩa.</li>
+  </ul>
+</section>
+
+<section id="knn-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Không co giãn đặc trưng</h4><p>Cột đơn vị lớn nhất quyết định toàn bộ khoảng cách. Lỗi phổ biến nhất và im lặng nhất của KNN.</p></div>
+    <div class="card bad"><h4>Chuẩn hoá trước khi chia dữ liệu</h4><p>Thống kê của tập test rò vào tập train. Đặt scaler vào <code>Pipeline</code> rồi mới cross-validate.</p></div>
+    <div class="card bad"><h4>Khoe sai số train bằng 0</h4><p>Với <code>k = 1</code> điều đó luôn đúng và không nói gì về khả năng tổng quát hoá.</p></div>
+    <div class="card bad"><h4>Dùng trên dữ liệu rất nhiều chiều</h4><p>Khoảng cách bão hoà, hàng xóm thành ngẫu nhiên. Giảm chiều trước hoặc đổi model.</p></div>
+    <div class="card bad"><h4>Quên chi phí suy luận</h4><p>Mỗi lần dự đoán quét cả tập train. Không hợp với hệ thống cần độ trễ thấp nếu chưa dựng chỉ mục.</p></div>
+    <div class="card bad"><h4>Bỏ qua lệch lớp</h4><p>Lớp đa số thắng phiếu ở mọi vùng. Dùng phiếu có trọng số hoặc cân bằng lại dữ liệu.</p></div>
+  </div>
+</section>
+
+<section id="knn-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>KNN học cái gì trong lúc huấn luyện?</summary>
+  <p>Không học gì cả — nó chỉ lưu lại toàn bộ dữ liệu. Không có tham số nào được ước lượng, nên nó là model phi tham số và người ta gọi là lazy learner: mọi tính toán bị hoãn tới lúc có điểm cần dự đoán. Hệ quả là chi phí bị đảo ngược so với mọi model khác — huấn luyện gần như miễn phí, còn mỗi lần suy luận phải đo khoảng cách tới mọi điểm đã lưu, tốn O(n·d).</p></details>
+
+  <details class="qa"><summary>k nhỏ và k lớn khác nhau thế nào?</summary>
+  <p>k là toàn bộ núm điều chỉnh, và nó nằm đúng trên trục bias–variance. k = 1 bám theo từng điểm nên học thuộc cả nhiễu: variance cao, bias thấp, sai số train bằng 0 một cách vô nghĩa. Tăng k thì ranh giới mượt dần, variance giảm, bias tăng, và ở cực k = n thì model luôn đoán lớp đa số. Không có công thức chọn k — quét khoảng 1–30 bằng cross-validation, và với bài toán hai lớp thì chọn số lẻ để tránh hoà phiếu.</p></details>
+
+  <details class="qa"><summary>Vì sao KNN bắt buộc phải co giãn đặc trưng?</summary>
+  <p>Vì nó ra quyết định hoàn toàn dựa trên khoảng cách, mà khoảng cách Euclidean cộng chênh lệch của mọi cột lại với nhau. Cột lương tính bằng triệu và cột tuổi tính bằng năm thì chênh lệch một triệu đồng át hẳn chênh lệch ba mươi tuổi — model thực chất chỉ nhìn đúng cột có đơn vị lớn nhất. Đây cũng là chỗ khác cây quyết định rõ nhất: cây so sánh từng cột riêng lẻ nên miễn nhiễm với thang đo, còn KNN, SVM và k-means thì phụ thuộc hoàn toàn.</p></details>
+
+  <details class="qa"><summary>Curse of dimensionality ảnh hưởng tới KNN ra sao?</summary>
+  <p>Số chiều tăng thì thể tích không gian tăng theo hàm mũ, dữ liệu trở nên thưa, và tỉ số giữa khoảng cách tới điểm gần nhất và tới điểm xa nhất tiến dần về 1. Khi đó khái niệm "hàng xóm gần" mất hết ý nghĩa: điểm gần nhất chẳng gần hơn điểm xa nhất bao nhiêu, phiếu bầu gần như ngẫu nhiên. Cách chữa là giảm số chiều trước bằng PCA hoặc chọn lọc đặc trưng, hoặc đổi sang model không dựa trên khoảng cách toàn cục. Ngoại lệ là embedding học từ mạng nơ-ron — dữ liệu thật ở đó nằm trên mặt cong ít chiều hơn số chiều danh nghĩa nên tìm hàng xóm vẫn tốt.</p></details>
+</section>
+
+<footer>Machine learning · Classical models · cùng phụ thuộc khoảng cách với <a href="../svm/index.html">SVM</a>; model miễn nhiễm thang đo là <a href="../../06-tree-models/decision-tree/index.html">Decision tree</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

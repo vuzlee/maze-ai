@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HDBSCAN — MazeAI</title>
+<meta name="description" content="Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/07-clustering/hdbscan/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="HDBSCAN">
+<meta property="og:description" content="Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/07-clustering/hdbscan/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-hdb" data-title="HDBSCAN" data-tag="ML" data-blurb="Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Clustering</p>
+  <h1><em>HDBSCAN</em></h1>
+  <p class="lede">Chữa đúng chỗ đau của <a href="../dbscan/index.html">DBSCAN</a>: <b>cụm khác mật độ</b>, và <code>eps</code> không biết đặt bao nhiêu. Cách chữa là không chọn <code>eps</code> nữa — chạy hết mọi giá trị rồi để dữ liệu tự nói.</p>
+</header>
+
+<section id="hdb-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Vấn đề nó giải</h2></div>
+
+  <p class="key">DBSCAN cắt mật độ ở <em>đúng một ngưỡng</em>. Dữ liệu thật thì cụm này dày, cụm kia thưa — và một ngưỡng không thể vừa cả hai.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Đặt <code>eps</code> nhỏ cho vừa cụm dày</h5>
+      <p>Cụm dày được chia đúng.</p>
+      <p>Cụm thưa <b>tan thành nhiễu</b> — mất hẳn khỏi kết quả, và không có gì báo cho bạn biết là đã mất.</p>
+    </div>
+    <div>
+      <h5>Đặt <code>eps</code> lớn cho vừa cụm thưa</h5>
+      <p>Cụm thưa hiện ra.</p>
+      <p>Các cụm dày ở gần nhau <b>dính lại thành một khối</b> — mất hết phân biệt bên trong.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Đây không phải lỗi cài đặt mà là <b>giới hạn của định nghĩa</b>: DBSCAN định nghĩa cụm bằng một ngưỡng mật độ tuyệt đối, nên chỉ đúng khi mọi cụm cùng mật độ.</li>
+    <li>Chọn <code>eps</code> vốn đã khó — đọc đồ thị k-distance chỉ cho một khoảng gợi ý. Với cụm khác mật độ thì đường cong có <b>nhiều khuỷu</b>, và chọn cái nào cũng hy sinh một phần dữ liệu.</li>
+    <li>HDBSCAN trả lời: <b>đừng chọn</b>. Chạy DBSCAN ở mọi mức <code>eps</code>, xem cụm nào sống sót lâu nhất qua các mức đó.</li>
+  </ul>
+</section>
+
+<section id="hdb-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Ý tưởng cốt lõi — độ bền</h2></div>
+
+  <p class="key">Tưởng tượng hạ dần ngưỡng mật độ. <em>Cụm thật thì giữ nguyên hình rất lâu; cụm giả thì vừa xuất hiện đã vỡ.</em></p>
+
+  <div class="axis">
+    <div class="stop"><b>ngưỡng cao</b><span>chỉ đỉnh dày nhất nổi lên</span></div>
+    <div class="stop on"><b>hạ dần</b><span>cụm xuất hiện, lớn lên, rồi tách hoặc nhập</span></div>
+    <div class="stop"><b>ngưỡng thấp</b><span>mọi thứ nối thành một khối</span></div>
+  </div>
+  <p class="axiscap"><span>DBSCAN chỉ chụp một khoảnh khắc trên trục này</span><span><em>HDBSCAN xem cả đoạn phim rồi chọn</em></span><span>cụm nào sống dai = cụm thật</span></p>
+
+  <p>Chạy DBSCAN với <code>eps</code> giảm dần cho ra một <b>cây phân cấp</b>: ở trên là những khối lớn, hạ ngưỡng thì mỗi khối tách dần thành các cụm con, tới cùng thì mỗi điểm là một lá. Câu hỏi còn lại chỉ là <em>cắt cây này ở đâu</em> — và điểm mới của HDBSCAN là nó <b>không cắt ngang một mức</b>.</p>
+
+  <ul class="why">
+    <li>Cắt ngang ở một mức chính là DBSCAN, với đúng nhược điểm cũ. HDBSCAN cắt <b>lồi lõm</b>: nhánh này lấy ở mức cao, nhánh kia lấy ở mức thấp.</li>
+    <li>Chọn nhánh nào bằng <b>độ bền</b> (stability) — cụm tồn tại được qua một khoảng ngưỡng càng rộng, với càng nhiều điểm, thì càng đáng giữ.</li>
+    <li>Hệ quả: <b>mỗi cụm được lấy ở mức mật độ riêng của nó</b>. Cụm dày và cụm thưa cùng hiện ra trong một lần chạy — đúng thứ DBSCAN không làm được.</li>
+  </ul>
+</section>
+
+<section id="hdb-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Cơ chế</h2></div>
+
+  <p class="key">Bốn bước, và bước đầu là mẹo làm cho mọi thứ sau đó chạy được: <em>đổi khoảng cách để vùng thưa bị đẩy ra xa.</em></p>
+
+  <div class="stack">
+    <div class="s"><b>1 · Mutual reachability distance</b><span>thay khoảng cách thật bằng <code>max(core_k(a), core_k(b), d(a,b))</code>, trong đó <code>core_k</code> là khoảng cách tới hàng xóm thứ k — điểm ở vùng thưa bị đẩy xa mọi thứ, điểm vùng dày giữ nguyên</span></div>
+    <div class="s"><b>2 · Minimum spanning tree</b><span>dựng cây khung nhỏ nhất trên khoảng cách vừa đổi — bỏ cạnh dài dần chính là hạ ngưỡng mật độ dần</span></div>
+    <div class="s"><b>3 · Cây phân cấp cụm</b><span>bỏ cạnh theo thứ tự dài giảm dần, ghi lại mỗi cụm sinh ra ở mức nào và vỡ ở mức nào</span></div>
+    <div class="s ok"><b>4 · Cắt theo độ bền</b><span>với mỗi nhánh, so độ bền của nó với tổng độ bền các cụm con; con thắng thì đi tiếp xuống, cha thắng thì dừng và lấy cha</span></div>
+  </div>
+
+<pre><code>core_k(a) = khoảng cách từ a tới hàng xóm thứ k của nó
+
+d_mreach(a, b) = max( core_k(a), core_k(b), d(a, b) )
+                       ↑ điểm thưa có core_k lớn → mọi khoảng cách của nó bị kéo dài ra</code></pre>
+
+  <ul class="why">
+    <li>Mutual reachability là chỗ <b>thông tin mật độ được nhét vào khoảng cách</b>. Nhờ đó bước sau chỉ cần làm việc trên đồ thị, không phải đếm hàng xóm nữa.</li>
+    <li>Tham số chính còn lại là <code>min_cluster_size</code> — <b>nhóm nhỏ hơn thế thì không được gọi là cụm</b>. Nó có nghĩa nghiệp vụ trực tiếp ("dưới 30 khách thì không đáng làm chiến dịch"), dễ đặt hơn <code>eps</code> nhiều.</li>
+    <li>Chi phí cỡ <b>O(n log n)</b> ở dữ liệu ít chiều nhờ chỉ mục không gian, nhưng nặng hơn DBSCAN vài lần và tốn bộ nhớ hơn. Nhiều chiều thì cả hai đều tụt về O(n²).</li>
+  </ul>
+</section>
+
+<section id="hdb-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Đánh đổi</h2></div>
+
+  <p class="key">Bỏ được tham số khó nhất và bắt được cụm khác mật độ. <em>Trả bằng tốc độ, bộ nhớ, và một cơ chế khó giải thích hơn hẳn.</em></p>
+
+  <table>
+    <tr><th></th><th><a href="../dbscan/index.html">DBSCAN</a></th><th>HDBSCAN</th></tr>
+    <tr><td>Tham số chính</td><td><code>eps</code> + <code>min_samples</code> — <code>eps</code> rất khó đặt</td><td><b><code>min_cluster_size</code></b> — có nghĩa nghiệp vụ</td></tr>
+    <tr><td>Cụm khác mật độ</td><td>Hỏng</td><td><b>Xử lý được</b> — mỗi cụm lấy ở mức riêng</td></tr>
+    <tr><td>Nhiễu</td><td>Nhãn <code>−1</code></td><td>Nhãn <code>−1</code> <b>kèm xác suất thuộc cụm</b></td></tr>
+    <tr><td>Kết quả trung gian</td><td>Chỉ nhãn cụm</td><td><b>Cả cây phân cấp</b> — xem được cụm nào tách ra từ cụm nào</td></tr>
+    <tr><td>Tốc độ &amp; bộ nhớ</td><td>Nhẹ hơn</td><td>Nặng hơn vài lần</td></tr>
+    <tr><td>Giải thích cho người khác</td><td>Hai câu là xong</td><td><b>Khó</b> — phải nói về cây và độ bền</td></tr>
+    <tr><td>Gán cụm cho điểm mới</td><td>Không làm được</td><td>Có <code>approximate_predict</code></td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Mặc định nó vẫn cho <b>khá nhiều nhiễu</b> — điểm nào không nằm gọn trong nhánh bền nào đều là <code>−1</code>. Muốn ép mọi điểm vào cụm thì nhìn <code>probabilities_</code> rồi tự đặt ngưỡng.</li>
+    <li>Không nằm trong scikit-learn lõi: cài riêng <code>hdbscan</code>, hoặc dùng <code>sklearn.cluster.HDBSCAN</code> có từ bản 1.3 trở đi.</li>
+    <li>Nó <b>không sửa được vấn đề nhiều chiều</b>. Mật độ trong không gian nhiều chiều vẫn mất nghĩa như cũ — giảm chiều trước vẫn là bắt buộc.</li>
+  </ul>
+</section>
+
+<section id="hdb-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Dùng ở đâu</h2></div>
+
+  <p class="key">Mặc định nên thử đầu tiên khi <em>không biết có bao nhiêu cụm và không tin dữ liệu có mật độ đồng đều</em>.</p>
+
+  <div class="stack">
+    <div class="s"><b>Phân cụm embedding</b><span>văn bản, ảnh, log — sau khi giảm chiều bằng PCA hoặc UMAP. Đây là cách dùng phổ biến nhất hiện nay</span></div>
+    <div class="s"><b>Khám phá dữ liệu chưa biết gì</b><span>không phải đoán k, không phải đoán <code>eps</code>; cây phân cấp cho thấy cả cấu trúc lồng nhau</span></div>
+    <div class="s"><b>Phát hiện bất thường</b><span>xác suất thuộc cụm thấp là tín hiệu tốt hơn nhãn nhiễu nhị phân của DBSCAN</span></div>
+    <div class="s warn"><b>Không hợp khi</b><span>dữ liệu rất lớn và cần chạy lại liên tục, hoặc khi phải giải thích cách chia cho người không làm kỹ thuật — lúc đó k-means dễ bảo vệ hơn nhiều</span></div>
+  </div>
+</section>
+
+<section id="hdb-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Ít tham số hơn không có nghĩa là ít cách dùng sai hơn.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Tưởng nó bỏ hết tham số</h4><p><code>min_cluster_size</code> vẫn quyết định kết quả rất mạnh. Nó chỉ dễ đặt hơn <code>eps</code>, không phải không cần đặt.</p></div>
+    <div class="card bad"><h4>Không chuẩn hoá thang đo</h4><p>Vẫn dựa trên khoảng cách như mọi thuật toán trong nhóm. Cột đơn vị lớn vẫn át hết.</p></div>
+    <div class="card bad"><h4>Chạy thẳng trên embedding vài trăm chiều</h4><p>Mật độ mất nghĩa ở nhiều chiều. Giảm chiều trước — UMAP là cặp đôi quen thuộc.</p></div>
+    <div class="card bad"><h4>Hoảng khi thấy nhiều nhiễu</h4><p>Nhiễu là kết quả có ý nghĩa, không phải lỗi. Cần ép hết vào cụm thì dùng <code>probabilities_</code>.</p></div>
+    <div class="card bad"><h4>Chấm bằng silhouette rồi kết luận nó tệ hơn k-means</h4><p>Thước đo thiên vị cụm tròn. So hai họ giả định khác nhau bằng nó là so sai.</p></div>
+    <div class="card bad"><h4>Dùng khi mọi cụm rõ ràng cùng mật độ</h4><p>Lúc đó DBSCAN đơn giản hơn, nhanh hơn và dễ giải thích hơn.</p></div>
+  </div>
+</section>
+
+<section id="hdb-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp phỏng vấn</h2></div>
+
+  <p class="key">Tự trả lời thành tiếng trước, rồi mới mở ra.</p>
+
+  <details class="qa"><summary>HDBSCAN chữa cái gì của DBSCAN?</summary>
+  <p>Chữa việc DBSCAN cắt mật độ ở <b>một ngưỡng <code>eps</code> duy nhất</b>. Khi các cụm khác mật độ nhau thì không ngưỡng nào đúng cho cả hai. HDBSCAN chạy qua mọi mức ngưỡng, dựng cây phân cấp, rồi giữ lại nhánh nào <b>bền</b> nhất — nên mỗi cụm được lấy ở đúng mức mật độ của nó.</p>
+  </details>
+
+  <details class="qa"><summary>"Độ bền" của một cụm nghĩa là gì?</summary>
+  <p>Là khoảng ngưỡng mật độ mà cụm đó tồn tại được mà không vỡ, có tính tới số điểm trong cụm. Cụm thật thì giữ nguyên hình qua một dải ngưỡng rộng; cụm ngẫu nhiên vừa xuất hiện đã tách ra. Thuật toán so độ bền của cụm cha với tổng độ bền các cụm con để quyết định dừng ở đâu — nên nhát cắt là <b>lồi lõm</b>, không phải nằm ngang một mức.</p>
+  </details>
+
+  <details class="qa"><summary>Mutual reachability distance để làm gì?</summary>
+  <p>Để nhét thông tin mật độ vào chính khoảng cách: <code>max(core_k(a), core_k(b), d(a,b))</code>. Điểm ở vùng thưa có <code>core_k</code> lớn nên bị đẩy xa mọi thứ, còn điểm trong vùng dày giữ nguyên khoảng cách thật. Sau bước này chỉ cần dựng cây khung nhỏ nhất là ra được cả cây phân cấp cụm.</p>
+  </details>
+
+  <details class="qa"><summary>Tham số nào còn phải đặt?</summary>
+  <p><code>min_cluster_size</code> là chính — nhóm nhỏ hơn thế không được coi là cụm; nó có nghĩa nghiệp vụ trực tiếp nên dễ đặt. Còn <code>min_samples</code> điều khiển mức độ khắt khe khi tính mật độ: tăng lên thì nhiều nhiễu hơn, cụm chắc hơn.</p>
+  </details>
+
+  <details class="qa"><summary>Khi nào bạn vẫn chọn k-means thay vì HDBSCAN?</summary>
+  <p>Khi đã biết số cụm cần có vì lý do nghiệp vụ, khi dữ liệu rất lớn và cần chạy lại liên tục, khi cần gán cụm cho điểm mới ngay lập tức, và khi phải giải thích cách chia cho người không làm kỹ thuật — "mỗi nhóm có một khách hàng trung bình, ai giống ai nhất thì vào nhóm đó" là câu ai cũng hiểu, còn cây độ bền thì không.</p>
+  </details>
+</section>
+
+<footer>Machine learning · Clustering · nối tiếp <a href="../dbscan/index.html">DBSCAN</a>; bản đồ bốn họ ở <a href="../clustering-overview/index.html">Clustering overview</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

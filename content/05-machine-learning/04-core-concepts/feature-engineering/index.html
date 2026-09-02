@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature engineering — MazeAI</title>
+<meta name="description" content="Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác — và khi nào để model tự lo.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/04-core-concepts/feature-engineering/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Feature engineering">
+<meta property="og:description" content="Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác — và khi nào để model tự lo.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/04-core-concepts/feature-engineering/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← Tất cả bài</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-feat" data-title="Feature engineering" data-tag="ML" data-blurb="Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác — và khi nào để model tự lo.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Core concepts</p>
+  <h1>Feature <em>engineering</em></h1>
+  <p class="lede">Với dữ liệu bảng, đây thường là chỗ <b>ăn điểm nhiều hơn đổi model</b>. Bốn việc phải làm — mã hoá, điền thiếu, co giãn, tạo biến mới — cộng một câu hỏi đi kèm mỗi việc: <em>model mình dùng có cần việc này không</em>.</p>
+</header>
+
+<section id="feat-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Biến phân loại</h2></div>
+
+  <p class="key">Model chỉ nhận số. Vấn đề là <em>biến chữ thành số mà không bịa ra thứ tự không có thật</em>.</p>
+
+  <table>
+    <tr><th>Cách</th><th>Cơ chế</th><th>Dùng khi</th><th>Cái giá</th></tr>
+    <tr><td><b>One-hot</b></td><td>Mỗi giá trị thành một cột 0/1</td><td>Ít giá trị khác nhau (dưới ~15), model tuyến tính</td><td>Số chiều nổ khi nhiều giá trị</td></tr>
+    <tr><td><b>Ordinal</b></td><td>Gán số nguyên theo thứ tự</td><td>Giá trị <em>thật sự</em> có thứ tự — nhỏ/vừa/lớn</td><td>Bịa ra thứ tự nếu dùng sai chỗ</td></tr>
+    <tr><td><b>Target encoding</b></td><td>Thay mỗi giá trị bằng trung bình nhãn của nhóm đó</td><td>Rất nhiều giá trị — mã bưu chính, mã sản phẩm</td><td><em>Rò rỉ nhãn</em> nếu không cẩn thận</td></tr>
+    <tr><td><b>Hashing</b></td><td>Băm giá trị vào n ô cố định</td><td>Số giá trị không biết trước, dữ liệu chảy liên tục</td><td>Va chạm băm, mất khả năng diễn giải</td></tr>
+  </table>
+
+  <p>Ordinal cho biến không có thứ tự là lỗi âm thầm nhất trong bảng này: gán Hà Nội = 1, Huế = 2, Đà Nẵng = 3 thì model tuyến tính hiểu rằng Huế nằm <em>giữa</em> hai thành phố kia theo một nghĩa nào đó. Với cây thì ít hại hơn vì cây chỉ cắt theo ngưỡng, nhưng vẫn buộc nó tốn nhiều nhát cắt để tách ra thứ lẽ ra tách một nhát.</p>
+
+  <div class="note warn">
+    <h4>Target encoding rò rỉ như thế nào</h4>
+    Nhãn của chính dòng đó tham gia vào trung bình dùng để mã hoá nó. Với một giá trị hiếm chỉ xuất hiện một lần, cột mã hoá <strong>chính là nhãn</strong> — model chỉ việc đọc lại. Kết quả: điểm validation đẹp không tưởng, production sụp. Cách chữa: tính trung bình <em>bên trong từng fold</em> và loại dòng hiện tại ra, cộng thêm làm mượt về trung bình toàn cục cho các nhóm ít mẫu.
+  </div>
+</section>
+
+<section id="feat-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Giá trị thiếu</h2></div>
+
+  <p class="key">Câu hỏi không phải "điền bằng gì" mà là <em>vì sao nó thiếu</em> — bản thân việc thiếu thường mang thông tin.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Thiếu ngẫu nhiên</h5>
+      <p>Cảm biến hỏng, lỗi ghi dữ liệu.</p>
+      <p><b>Xử lý</b> điền bằng trung vị (số) hoặc mốt (phân loại).</p>
+      <p>Không mất mát gì đáng kể.</p>
+    </div>
+    <div>
+      <h5>Thiếu có nghĩa</h5>
+      <p>Không điền thu nhập vì thu nhập thấp; không có lịch sử vì là khách mới.</p>
+      <p><b>Xử lý</b> điền <em>và</em> thêm cột cờ <code>đã_thiếu</code>.</p>
+      <p>Bỏ cột cờ là vứt đi tín hiệu mạnh.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Cây gradient boosting hiện đại — XGBoost, LightGBM — <b>xử lý giá trị thiếu ngay trong thuật toán</b>: mỗi nút học xem nên đẩy giá trị thiếu sang nhánh nào. Điền tay trước khi đưa vào chúng thường làm mất chính thông tin đó.</li>
+    <li>Xoá dòng có giá trị thiếu là lựa chọn nguy hiểm: nếu việc thiếu không ngẫu nhiên thì bạn vừa xoá đi một nhóm dân số cụ thể, và model không còn đại diện cho họ.</li>
+    <li>Mọi bước điền phải fit trên <b>tập train</b> rồi áp lên tập kiểm tra, không tính trên toàn bộ dữ liệu — xem <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</li>
+  </ul>
+</section>
+
+<section id="feat-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Co giãn</h2></div>
+
+  <p class="key">Không phải model nào cũng cần. <em>Cần hay không phụ thuộc model có dùng khoảng cách hoặc gradient hay không.</em></p>
+
+  <table>
+    <tr><th>Model</th><th>Cần co giãn?</th><th>Vì sao</th></tr>
+    <tr><td>Cây, Random Forest, Gradient Boosting</td><td><b>Không</b></td><td>Chỉ so sánh ngưỡng trong từng cột; đơn vị không ảnh hưởng</td></tr>
+    <tr><td>KNN, SVM, K-means</td><td><b>Bắt buộc</b></td><td>Dùng khoảng cách — cột đơn vị lớn sẽ át hết các cột khác</td></tr>
+    <tr><td>Hồi quy tuyến tính có regularization</td><td><b>Bắt buộc</b></td><td>Hình phạt L1/L2 áp lên trọng số, mà trọng số phụ thuộc đơn vị</td></tr>
+    <tr><td>Mạng nơ-ron</td><td><b>Bắt buộc</b></td><td>Gradient descent hội tụ chậm và không ổn định khi các chiều lệch thang</td></tr>
+    <tr><td>Hồi quy tuyến tính thường</td><td>Không bắt buộc</td><td>Nghiệm không đổi; chỉ giúp thuật toán lặp hội tụ nhanh hơn</td></tr>
+  </table>
+
+  <p>Hai cách thông dụng: <b>standardization</b> đưa về trung bình 0 độ lệch chuẩn 1 — mặc định tốt, chịu được giá trị ngoại lai vừa phải; <b>min-max</b> ép về khoảng [0,1] — dùng khi cần biên rõ ràng, nhưng một giá trị ngoại lai đủ lớn sẽ dồn toàn bộ phần còn lại về sát 0.</p>
+
+  <ul class="why">
+    <li>Đặc trưng lệch mạnh về một phía — thu nhập, số lượt xem — nên <b>lấy log trước khi co giãn</b>. Điều này thường có tác dụng lớn hơn việc chọn cách co giãn nào.</li>
+    <li>Với dữ liệu nhiều giá trị ngoại lai, <code>RobustScaler</code> dùng trung vị và khoảng tứ phân vị an toàn hơn hẳn hai cách trên.</li>
+  </ul>
+</section>
+
+<section id="feat-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Tạo đặc trưng mới</h2></div>
+
+  <p class="key">Model tuyến tính chỉ cộng các cột lại. <em>Muốn nó thấy quan hệ nhân hay quan hệ cong thì phải đưa sẵn cột đó vào.</em></p>
+
+  <table>
+    <tr><th>Kiểu</th><th>Ví dụ</th><th>Bắt được gì</th></tr>
+    <tr><td><b>Tỉ lệ</b></td><td><code>nợ / thu_nhập</code>, <code>giá / diện_tích</code></td><td>Quan hệ mà hai cột riêng lẻ không nói lên</td></tr>
+    <tr><td><b>Tương tác</b></td><td><code>tuổi × thu_nhập</code></td><td>Ảnh hưởng của cột này phụ thuộc cột kia</td></tr>
+    <tr><td><b>Phi tuyến</b></td><td><code>x²</code>, <code>log(x)</code></td><td>Quan hệ cong</td></tr>
+    <tr><td><b>Thời gian</b></td><td>Thứ trong tuần, giờ trong ngày, số ngày kể từ lần mua trước</td><td>Chu kỳ và độ mới — cột <code>timestamp</code> thô gần như vô dụng</td></tr>
+    <tr><td><b>Tổng hợp theo nhóm</b></td><td>Trung bình chi tiêu 30 ngày qua của khách</td><td>Bối cảnh lịch sử; <em>phải cắt tại mốc dự đoán</em></td></tr>
+  </table>
+
+  <p><b>Cây và ensemble tự tìm được tương tác</b> — mỗi đường đi từ gốc xuống lá chính là một tổ hợp điều kiện. Nên với dữ liệu bảng dùng boosting, công sức bỏ vào đặc trưng tương tác thường ít hiệu quả hơn hẳn so với công sức bỏ vào đặc trưng <em>mang thông tin nghiệp vụ mới</em>: một cột "số ngày kể từ lần khiếu nại gần nhất" không thuật toán nào tự nghĩ ra được.</p>
+
+  <ul class="why">
+    <li>Ranh giới chung: <b>dữ liệu bảng thì feature engineering quyết định phần lớn kết quả</b>; ảnh, âm thanh và văn bản thì để mạng nơ-ron tự học đặc trưng, người can thiệp thường làm tệ đi.</li>
+    <li>Nhiều đặc trưng hơn không phải luôn tốt hơn: thêm cột là thêm variance, và với ít dữ liệu thì đó là đường thẳng tới overfit — xem <a href="../overfitting-regularization/index.html">Overfitting &amp; regularization</a>.</li>
+    <li>Đặc trưng tổng hợp theo nhóm là <b>nguồn rò rỉ thời gian số một</b>: rất dễ vô tình tính trung bình trên cả dữ liệu nằm sau thời điểm dự đoán.</li>
+  </ul>
+</section>
+
+<section id="feat-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Target encoding tính trên toàn bộ dữ liệu</h4><p>Nhãn của chính dòng đó lọt vào cột mã hoá. Tính trong từng fold và loại dòng hiện tại ra.</p></div>
+    <div class="card bad"><h4>Fit scaler trước khi chia dữ liệu</h4><p>Trung bình và độ lệch chuẩn đã chứa thông tin tập kiểm tra. Dùng <code>Pipeline</code>.</p></div>
+    <div class="card bad"><h4>Ordinal cho biến không có thứ tự</h4><p>Bịa ra quan hệ lớn bé giữa các thành phố, các danh mục. Dùng one-hot.</p></div>
+    <div class="card bad"><h4>One-hot cho cột hàng nghìn giá trị</h4><p>Số chiều nổ, ma trận thưa, model chậm và overfit. Dùng target encoding hoặc hashing.</p></div>
+    <div class="card bad"><h4>Điền giá trị thiếu rồi bỏ cột cờ</h4><p>Vứt đi thông tin "vì sao thiếu", thường là tín hiệu mạnh hơn chính giá trị được điền.</p></div>
+    <div class="card bad"><h4>Đặc trưng tổng hợp không cắt theo thời gian</h4><p>Trung bình tính trên cả dữ liệu tương lai. Điểm offline đẹp, production sụp.</p></div>
+  </div>
+</section>
+
+<section id="feat-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+
+  <details class="qa"><summary>Mã hoá biến phân loại có hàng nghìn giá trị thế nào?</summary>
+  <p>One-hot là không dùng được vì số chiều nổ. Hai lựa chọn: target encoding — thay mỗi giá trị bằng trung bình nhãn của nhóm, nhưng phải tính trong từng fold, loại dòng hiện tại ra, và làm mượt về trung bình toàn cục cho nhóm ít mẫu, nếu không là rò rỉ nhãn thẳng. Hoặc hashing khi số giá trị không biết trước và dữ liệu chảy liên tục, đổi lại chấp nhận va chạm băm và mất khả năng diễn giải. Với LightGBM thì còn cách thứ ba là khai báo thẳng cột phân loại để nó tự xử lý.</p></details>
+
+  <details class="qa"><summary>Model nào cần co giãn đặc trưng, model nào không?</summary>
+  <p>Cần khi model dùng khoảng cách hoặc gradient: KNN, SVM, K-means, mạng nơ-ron, và hồi quy tuyến tính có regularization — vì hình phạt áp lên trọng số mà trọng số phụ thuộc đơn vị. Không cần với cây và mọi ensemble của cây, vì chúng chỉ so sánh ngưỡng bên trong từng cột nên đổi đơn vị không thay đổi gì. Hồi quy tuyến tính thường thì nghiệm không đổi, co giãn chỉ giúp thuật toán lặp hội tụ nhanh hơn.</p></details>
+
+  <details class="qa"><summary>Giá trị thiếu — bạn xử lý thế nào?</summary>
+  <p>Trước hết tìm hiểu vì sao thiếu, vì bản thân việc thiếu thường mang thông tin: không điền thu nhập có thể vì thu nhập thấp. Nên tôi điền bằng trung vị hoặc mốt <em>và</em> thêm một cột cờ đánh dấu đã thiếu — bỏ cột cờ là vứt đi tín hiệu. Nếu dùng XGBoost hay LightGBM thì thường để nguyên, vì chúng học được nên đẩy giá trị thiếu sang nhánh nào. Điều tôi tránh là xoá dòng: nếu việc thiếu không ngẫu nhiên thì xoá đi cả một nhóm dân số.</p></details>
+
+  <details class="qa"><summary>Khi nào feature engineering đáng bỏ công, khi nào để model tự lo?</summary>
+  <p>Dữ liệu bảng thì đáng, và thường ăn điểm nhiều hơn đổi model — nhưng phải đúng loại: cây tự tìm được tương tác giữa các cột, nên tạo cột tích hay tỉ lệ ít hiệu quả; thứ đáng làm là đặc trưng mang thông tin nghiệp vụ mới mà dữ liệu thô chưa có, như số ngày kể từ lần khiếu nại gần nhất. Với ảnh, âm thanh, văn bản thì để mạng tự học đặc trưng — can thiệp tay hầu như luôn làm tệ đi.</p></details>
+</section>
+
+<footer>Machine learning · Core concepts · chuẩn bị đặc trưng. Gọi tên bài toán ở <a href="../supervised-unsupervised/index.html">Supervised, unsupervised &amp; reinforcement</a>; tránh rò rỉ ở <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

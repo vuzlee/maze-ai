@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Memory model &amp; mutability — MazeAI</title>
-<meta name="description" content="Biến là cái tên, không phải ô nhớ. Gán, shallow, deep copy, bốn cái bẫy, đếm tham chiếu và rò rỉ bộ nhớ.">
+<meta name="description" content="Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/memory-model-mutability/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Memory model &amp; mutability">
-<meta property="og:description" content="Biến là cái tên, không phải ô nhớ. Gán, shallow, deep copy, bốn cái bẫy, đếm tham chiếu và rò rỉ bộ nhớ.">
+<meta property="og:description" content="Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,13 +39,12 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-memory" data-title="Memory model &amp; mutability" data-tag="Python internals" data-blurb="Biến là cái tên, không phải ô nhớ. Gán, shallow, deep copy, bốn cái bẫy, đếm tham chiếu và rò rỉ bộ nhớ.">
+      <article class="doc" id="art-memory" data-title="Memory model &amp; mutability" data-tag="Python internals" data-blurb="Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.">
         <header class="hero">
   <p class="eyebrow">Deep dive · Python internals · bộ nhớ</p>
   <h1>Memory model &amp; <em>mutability</em></h1>
-  <p class="lede">Trong Python, biến <b>không chứa</b> giá trị — nó là một cái tên dán lên object. Hiểu đúng một câu đó xoá sạch cả một họ bug: gán tưởng là sao chép, sửa list trong hàm làm bẩn dữ liệu ngoài, đối số mặc định sống dai, và <code>[[0]*3]*3</code> chỉ có một dòng thật.</p>
+  <p class="lede">Trong Python, biến <b>không chứa</b> giá trị — nó là một cái tên dán lên object. Hiểu đúng một câu đó xoá sạch cả một họ bug: gán tưởng là sao chép, sửa list trong hàm làm bẩn dữ liệu ngoài, đối số mặc định sống dai, và <code>[[0]*3]*3</code> chỉ có một dòng thật. Object bị dọn đi lúc nào thì ở bài tiếp theo, <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>.</p>
 </header>
-
 
 <section id="memory-s1">
   <div class="sh"><b>01</b><h2>Overview</h2></div>
@@ -193,6 +192,7 @@ f2(a); a              <span class="cm"># [1, 2, 3, 4] — không đổi thêm</s
 
 <section id="memory-s8">
   <div class="sh"><b>08</b><h2>Lỗi hay gặp</h2></div>
+  <p class="key">Bốn bẫy dưới đây <em>đều mọc ra từ đúng một câu</em> ở mục 01: gán chỉ dán tên, không sao chép.</p>
   <h3>1. Đối số mặc định khả biến</h3>
 <pre><code><span class="kw">def</span> add(x, out=[]):       <span class="cm">← list này tạo MỘT LẦN, lúc định nghĩa hàm</span>
     out.append(x)
@@ -225,33 +225,15 @@ k = [<span class="st">1</span>, <span class="st">2</span>]
 d[k] = <span class="st">"x"</span>               <span class="cm"># TypeError: unhashable type: 'list'</span>
 d[<span class="kw">tuple</span>(k)] = <span class="st">"x"</span>        <span class="cm"># được — tuple hashable</span></code></pre>
   <p>Python chặn từ đầu vì nếu khoá đổi giá trị sau khi lưu thì hash đổi theo, và dict sẽ đi tìm ở ô mới trong khi dữ liệu nằm ở ô cũ. Chi tiết đầy đủ nằm ở bài <em>Python dict &amp; hash table</em>.</p>
-</section>
-
-<section id="memory-s9">
-  <div class="sh"><b>09</b><h2>Đếm tham chiếu và bộ thu gom rác</h2></div>
-<pre><code><span class="kw">import</span> sys
-a = [<span class="st">1</span>, <span class="st">2</span>]
-sys.getrefcount(a)     <span class="cm"># 2 — một từ a, một từ đối số tạm của hàm này</span>
-b = a
-sys.getrefcount(a)     <span class="cm"># 3</span>
-<span class="kw">del</span> b
-sys.getrefcount(a)     <span class="cm"># 2</span></code></pre>
-  <p>Cơ chế chính là <strong>đếm tham chiếu</strong>: mỗi object giữ một biến đếm, về 0 thì được giải phóng ngay lập tức. Đây là lý do Python giải phóng bộ nhớ rất kịp thời — và cũng là lý do có GIL, như đã nói ở bài trước.</p>
-  <h3>Vấn đề chu trình</h3>
-<pre><code>a = {}; b = {}
-a[<span class="st">"b"</span>] = b
-b[<span class="st">"a"</span>] = a          <span class="cm"># trỏ vòng vào nhau</span>
-<span class="kw">del</span> a, b            <span class="cm"># hai tên biến mất, nhưng mỗi dict vẫn còn 1 tham chiếu</span>
-                    <span class="cm"># → đếm tham chiếu không bao giờ về 0</span></code></pre>
-  <p>Vì vậy Python có thêm một <strong>bộ thu gom theo thế hệ</strong> chạy định kỳ để phát hiện những nhóm object chỉ còn trỏ lẫn nhau. Nó chỉ quét các object kiểu container, chạy theo ba thế hệ với tần suất giảm dần — object sống lâu thì bị quét ít hơn.</p>
-  <div class="note">
-    <h4>Khi nào chuyện này thành vấn đề thật</h4>
-    Với chương trình có nhiều object lồng nhau và vòng tham chiếu, lần chạy GC có thể gây ra khoảng dừng đáng chú ý. Dịch vụ độ trễ thấp đôi khi tắt GC tự động bằng <code>gc.disable()</code> rồi tự gọi <code>gc.collect()</code> vào lúc rảnh. Chỉ nên làm khi đã đo và thấy đúng nguyên nhân.
+  <div class="grid2">
+    <div class="card bad"><h4>Tưởng <code>b = a</code> là sao chép</h4><p>Sửa <code>b</code> làm đổi cả <code>a</code>. Bug thường xuất hiện xa chỗ gán nên rất khó truy.</p></div>
+    <div class="card bad"><h4>Shallow copy cho dữ liệu lồng nhau</h4><p><code>a[:]</code> chỉ chép lớp ngoài, không bảo vệ được các list bên trong.</p></div>
+    <div class="card bad"><h4>Dùng <code>is</code> để so số hoặc chuỗi</h4><p>Đúng trong test nhờ interning, sai trên production. Xem mục 09.</p></div>
   </div>
 </section>
 
-<section id="memory-s10">
-  <div class="sh"><b>10</b><h2>Interning — vì sao <code>a is b</code> có lúc True</h2></div>
+<section id="memory-s9">
+  <div class="sh"><b>09</b><h2>Interning — vì sao <code>a is b</code> có lúc True</h2></div>
 <pre><code>a = <span class="st">256</span>; b = <span class="st">256</span>
 a <span class="kw">is</span> b            <span class="cm"># True  — int nhỏ được cache sẵn</span>
 
@@ -270,70 +252,20 @@ a <span class="kw">is</span> b            <span class="cm"># thường False —
   </div>
 </section>
 
-<section id="memory-s11">
-  <div class="sh"><b>11</b><h2>Bộ nhớ thật của object</h2></div>
-<pre><code><span class="kw">import</span> sys
-sys.getsizeof(<span class="st">0</span>)            <span class="cm"># khoảng 28 byte — một int cũng là object đầy đủ</span>
-sys.getsizeof([])           <span class="cm"># khoảng 56 byte cho list rỗng</span>
-sys.getsizeof([<span class="st">1</span>,<span class="st">2</span>,<span class="st">3</span>])      <span class="cm"># khoảng 88 — chỉ tính con trỏ, KHÔNG tính các int bên trong</span>
-sys.getsizeof({})           <span class="cm"># khoảng 64 byte</span></code></pre>
-  <p><code>getsizeof</code> chỉ đo lớp ngoài. Một list một triệu số nguyên tốn khoảng 8 MB cho mảng con trỏ, cộng khoảng 28 MB cho các object int — tức khoảng 36 MB, so với 4 MB nếu dùng <code>array</code> hoặc NumPy. Đây là lý do NumPy tồn tại.</p>
-  <h3><code>__slots__</code> — cắt bộ nhớ của object tự viết</h3>
-<pre><code><span class="kw">class</span> Point:
-    <span class="kw">def</span> __init__(self, x, y): self.x, self.y = x, y
-<span class="cm"># mỗi instance có một __dict__ riêng: khoảng 100+ byte mỗi object</span>
-
-<span class="kw">class</span> PointSlim:
-    __slots__ = (<span class="st">"x"</span>, <span class="st">"y"</span>)      <span class="cm"># bỏ __dict__, lưu vào ô cố định</span>
-    <span class="kw">def</span> __init__(self, x, y): self.x, self.y = x, y
-<span class="cm"># tiết kiệm khoảng 40–50% bộ nhớ và truy cập thuộc tính nhanh hơn</span></code></pre>
-  <p>Cái mất: không thêm được thuộc tính động, và kế thừa phức tạp hơn. Chỉ đáng dùng khi tạo hàng triệu instance — ví dụ node của cây, điểm dữ liệu, bản ghi trong bộ đệm.</p>
-</section>
-
-<section id="memory-s12">
-  <div class="sh"><b>12</b><h2>Rò rỉ bộ nhớ trong Python</h2></div>
-  <p>Có bộ thu gom rác không có nghĩa là không rò rỉ. Bốn nguồn thường gặp nhất:</p>
-  <table>
-    <tr><th>Nguồn</th><th>Vì sao</th><th>Cách chữa</th></tr>
-    <tr><td>Cache không giới hạn</td><td><code>lru_cache(maxsize=None)</code> giữ mọi đối số và kết quả mãi mãi</td><td>Đặt <code>maxsize</code>, hoặc dùng TTL cache</td></tr>
-    <tr><td><code>lru_cache</code> trên phương thức</td><td>Cache giữ <code>self</code> nên instance không bao giờ được giải phóng</td><td><code>cached_property</code>, hoặc cache theo instance</td></tr>
-    <tr><td>Biến toàn cục dồn dữ liệu</td><td>List hoặc dict ở cấp module chỉ thêm mà không xoá</td><td>Giới hạn kích thước, hoặc dùng <code>deque(maxlen=n)</code></td></tr>
-    <tr><td>Đăng ký callback / observer</td><td>Object bị giữ bởi danh sách listener sau khi đã hết dùng</td><td>Huỷ đăng ký, hoặc dùng <code>weakref</code></td></tr>
-  </table>
-<pre><code><span class="kw">import</span> weakref
-<span class="cm"># weakref: trỏ tới object mà KHÔNG tăng bộ đếm tham chiếu</span>
-r = weakref.ref(obj)
-r()          <span class="cm"># trả về obj, hoặc None nếu obj đã bị giải phóng</span></code></pre>
-  <div class="note">
-    <h4>Cách truy rò rỉ</h4>
-    <code>tracemalloc</code> có trong thư viện chuẩn: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết dòng code nào cấp phát thêm. Đó là câu trả lời nên nói khi bị hỏi "service của em ăn RAM tăng dần, làm sao tìm nguyên nhân".
-  </div>
-</section>
-
-<section id="memory-s13">
-  <div class="sh"><b>13</b><h2>Bốn quy tắc mang đi</h2></div>
+<section id="memory-s10">
+  <div class="sh"><b>10</b><h2>Bốn quy tắc mang đi</h2></div>
   <ul>
     <li><strong>Gán là dán tên, không phải sao chép.</strong> Cần bản độc lập thì nói rõ ra: <code>list(a)</code> cho một tầng, <code>deepcopy</code> cho mọi tầng.</li>
     <li><strong>Đừng bao giờ để giá trị mặc định là object khả biến.</strong> Dùng <code>None</code> rồi khởi tạo trong thân hàm.</li>
     <li><strong>Trong một hàm, chọn một phong cách và giữ nó:</strong> hoặc trả về object mới, hoặc sửa tại chỗ và trả về <code>None</code>. Đừng làm cả hai.</li>
     <li><strong><code>is</code> chỉ dành cho <code>None</code> và sentinel.</strong> Mọi so sánh giá trị dùng <code>==</code>.</li>
   </ul>
+
+  <p class="stripnote"><span>còn một câu chưa trả lời: <em>object hết được trỏ tới thì biến mất lúc nào</em></span><span>đọc tiếp <a href="../memory-management-gc/index.html"><em>Memory management &amp; GC</em></a></span></p>
 </section>
 
-<section id="memory-s14">
-  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
-  <div class="grid2">
-    <div class="card bad"><h4>Tưởng <code>b = a</code> là sao chép</h4><p>Sửa <code>b</code> làm đổi cả <code>a</code>. Bug thường xuất hiện xa chỗ gán nên rất khó truy.</p></div>
-    <div class="card bad"><h4><code>[[0]*n]*m</code></h4><p>Chỉ có một dòng thật. Dùng comprehension.</p></div>
-    <div class="card bad"><h4>Shallow copy cho dữ liệu lồng nhau</h4><p><code>a[:]</code> không bảo vệ được các list bên trong.</p></div>
-    <div class="card bad"><h4>Đối số mặc định là list hoặc dict</h4><p>Tích luỹ giữa các lần gọi. Dùng <code>None</code>.</p></div>
-    <div class="card bad"><h4>Xoá phần tử trong lúc duyệt</h4><p>Nhảy qua phần tử, không báo lỗi. Tạo list mới bằng comprehension.</p></div>
-    <div class="card bad"><h4>Dùng <code>is</code> để so số hoặc chuỗi</h4><p>Đúng trong test nhờ interning, sai trên production.</p></div>
-  </div>
-</section>
-
-<section id="memory-s15">
-  <div class="sh"><b>15</b><h2>Hỏi đáp phỏng vấn</h2></div>
+<section id="memory-s11">
+  <div class="sh"><b>11</b><h2>Hỏi đáp phỏng vấn</h2></div>
 
   <details class="qa"><summary>Python truyền tham số theo giá trị hay theo tham chiếu?</summary>
   <p>Cả hai đều không chính xác. Python truyền theo cách gọi là <em>pass by assignment</em>: tham số trong hàm là một tên mới được dán lên cùng object mà người gọi truyền vào. Nên nếu hàm <b>sửa</b> object khả biến thì người gọi thấy; nếu hàm <b>gán lại</b> tên đó thì người gọi không thấy. Đó là lý do <code>lst.append(4)</code> ảnh hưởng ra ngoài còn <code>lst = [9]</code> thì không.</p></details>
@@ -347,14 +279,9 @@ r()          <span class="cm"># trả về obj, hoặc None nếu obj đã bị 
   <details class="qa"><summary>is và == khác nhau thế nào, khi nào dùng is?</summary>
   <p><code>==</code> so giá trị qua <code>__eq__</code>; <code>is</code> so danh tính, tức có phải cùng một object trong bộ nhớ. Chỉ dùng <code>is</code> cho <code>None</code>, <code>True</code>, <code>False</code> và sentinel do mình tạo — vì đó là những object duy nhất. Không dùng <code>is</code> để so số hay chuỗi: nó có thể trả về True nhờ interning của CPython nhưng đó là chi tiết cài đặt, thay đổi theo phiên bản và theo ngữ cảnh code.</p></details>
 
-  <details class="qa"><summary>Python quản lý bộ nhớ thế nào?</summary>
-  <p>Cơ chế chính là đếm tham chiếu: mỗi object giữ số tham chiếu tới nó, về 0 thì giải phóng ngay. Ưu điểm là kịp thời và dự đoán được; nhược điểm là không xử lý được chu trình tham chiếu, và việc phải cập nhật bộ đếm an toàn chính là lý do có GIL. Nên Python có thêm bộ thu gom theo thế hệ chạy định kỳ để tìm các nhóm object chỉ còn trỏ lẫn nhau.</p></details>
-
-  <details class="qa"><summary>Service Python ăn RAM tăng dần — bạn tìm nguyên nhân thế nào?</summary>
-  <p>Dùng <code>tracemalloc</code>: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết dòng code nào đang cấp phát thêm. Bốn nghi phạm quen mặt là cache không giới hạn kích thước, <code>lru_cache</code> trên phương thức khiến instance không được giải phóng vì cache giữ <code>self</code>, biến toàn cục chỉ thêm mà không xoá, và callback đã đăng ký nhưng không huỷ. Với nhóm cuối thì <code>weakref</code> là cách chữa gọn.</p></details>
 </section>
 
-<footer>Deep dive · mô hình bộ nhớ &amp; mutability · số liệu kích thước là mức điển hình của CPython 64-bit.</footer>
+<footer>Deep dive · mô hình bộ nhớ &amp; mutability · bài tiếp theo: <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>
