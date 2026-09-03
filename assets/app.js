@@ -341,6 +341,18 @@
       b.textContent = open ? "đóng tất cả" : "mở tất cả";
     };
     sh.appendChild(b);
+
+    /* cùng bộ câu hỏi này còn nằm trong trang ôn tập, ở dạng thẻ lật */
+    var me = null;
+    CAT.forEach(function (c) { c.groups.forEach(function (g) { g.books.forEach(function (bk) {
+      if (bk.slug === doc.id.replace("art-", "")) me = bk; }); }); });
+    if (me) {
+      var a = document.createElement("a");
+      a.className = "tool";
+      a.href = BASE + "quiz.html?b=" + encodeURIComponent(me.path);
+      a.textContent = "ôn bằng thẻ lật";
+      sh.appendChild(a);
+    }
   });
 
   /* ---------------- đánh dấu đã học ---------------- */

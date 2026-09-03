@@ -5,19 +5,6 @@
 
   var mode = "front";
 
-  var guess = el("aguess"), ans = guess.querySelector(".ans");
-  [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (b) {
-    b.onclick = function () {
-      [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (x) { x.classList.remove("pick"); });
-      b.classList.add("pick");
-      var v = b.getAttribute("data-v");
-      ans.hidden = false;
-      ans.innerHTML = (v === "50000000" ? "<b>Đúng — khoảng 50 triệu.</b> " : "<b>Đáp án: khoảng 50 triệu.</b> ") +
-        "Lần chèn thứ i phải dịch i phần tử, nên tổng là <b>n(n−1)/2</b> ≈ 50 triệu với n = 10.000. " +
-        "Chèn vào cuối thì tổng số phép dịch là <b>0</b>.";
-    };
-  });
-
   el("amode").innerHTML =
     '<button data-m="front" class="on">insert(0, x) — chèn đầu</button>' +
     '<button data-m="back">append(x) — chèn cuối</button>';

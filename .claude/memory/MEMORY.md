@@ -10,6 +10,8 @@ Quy ước ghi/đọc nằm ở cuối file này.
 - [Soát kệ 02-python](soat-ke-02-python.md) — kết quả review 2026-09-02: chỗ đã ổn, mục trùng, hai lỗ hổng nội dung
 - [Soát kệ 04-database](soat-ke-04-database.md) — review 2026-09-02: 2 khung cuối đã viết, 2 chỗ trùng đã gỡ, 4 lỗ hổng đã bù
 - [Tách bài overfitting → Core concepts](tach-bai-overfitting-core-concepts.md) — đọc bài đã viết trước khi viết khung cạnh nó; trùng thì tách, đừng viết mới
+- [Cách trả lời: thật ngắn](cach-tra-loi-ngan-gon.md) — phần giao diện/CSS nói kết quả nhìn thấy, đừng kể thuật ngữ
+- [Khuôn .eq cho công thức](khuon-eq-cong-thuc.md) — chọn HTML thay KaTeX; ranh giới .eq vs <pre>; quy ước vẽ đường cong bằng SVG; đã áp dụng xong 14 khối
 
 ## Cách dùng thư mục này
 

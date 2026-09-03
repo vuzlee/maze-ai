@@ -355,9 +355,14 @@ tự đúng bảng màu.
 | `.axis` | thứ có thứ tự: mức cô lập, mức nén, độ trễ |
 | `.seq` | trình tự qua lại: bắt tay TCP, giao thức hai bên |
 | `.bars` | so sánh đại lượng chênh nhau nhiều lần |
+| `.eq` | công thức display: mỗi số hạng một nhãn nằm dưới |
 
 Ba quy tắc khi soạn: mỗi mục **một** hình (cần hai hình thường là dấu hiệu mục đó nên tách đôi);
 hình phải **thay được** đoạn văn chứ không minh hoạ thêm cho nó; chữ trong hình càng ít càng tốt.
+
+Công thức đứng riêng dùng `.eq` chứ không phải `<pre>`: trình duyệt gióng lề thay mình, nên
+không còn cảnh đếm cột rồi lệch (`f̂` là hai codepoint nhưng một ô). `<pre><code>` vẫn là chỗ của
+**dẫn giải** — chú thích tiếng Việt, bảng số, suy luận nhiều dòng.
 
 Chỉ dùng SVG khi hình có đường cong, đường chéo hoặc trục toạ độ thật — mẫu ở
 [mục mảng xoay](content/01-dsa/04-algorithms/binary-search/index.html#binsearch-s9):

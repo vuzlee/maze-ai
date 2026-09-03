@@ -17,7 +17,8 @@ window.CATALOG = [
       "blurb": "DSA là gì, kệ này gồm hai phần nào, và học theo thứ tự nào cho nhanh vào việc.",
       "n": 3,
       "path": "content/01-dsa/01-overview/dsa-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -33,7 +34,8 @@ window.CATALOG = [
       "blurb": "Bảng tra n → thuật toán được phép, ba quy tắc đếm, chi phí ẩn của Python, và cách nói complexity trong phỏng vấn.",
       "n": 9,
       "path": "content/01-dsa/02-foundations/big-o-complexity/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -49,7 +51,8 @@ window.CATALOG = [
       "blurb": "Tám cách cất dữ liệu trên một bảng: chọn khi nào, và chi phí từng thao tác.",
       "n": 2,
       "path": "content/01-dsa/03-data-structures/data-structures-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "array-string",
@@ -59,7 +62,8 @@ window.CATALOG = [
       "blurb": "Bộ nhớ liên tục, chi phí thật của chèn/xoá, chuỗi bất biến, và vì sao nối chuỗi trong vòng lặp là O(n²).",
       "n": 7,
       "path": "content/01-dsa/03-data-structures/array-string/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 6
      },
      {
       "dir": "linked-list",
@@ -69,7 +73,8 @@ window.CATALOG = [
       "blurb": "Khi nào con trỏ thắng mảng, khuôn đảo danh sách, con trỏ giả, và ba dạng đề hay ra.",
       "n": 6,
       "path": "content/01-dsa/03-data-structures/linked-list/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 8
      },
      {
       "dir": "hash-map",
@@ -79,7 +84,8 @@ window.CATALOG = [
       "blurb": "Vì sao O(1) trung bình, va chạm xử lý thế nào, khi nào tụt về O(n), và ba pattern đổi thời gian lấy bộ nhớ.",
       "n": 6,
       "path": "content/01-dsa/03-data-structures/hash-map/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 8
      },
      {
       "dir": "stack-monotonic-queue",
@@ -89,7 +95,8 @@ window.CATALOG = [
       "blurb": "Một mẫu code biến O(n²) thành O(n), ba bẫy, và 5 pattern kèm 19 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/03-data-structures/stack-monotonic-queue/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 17
      },
      {
       "dir": "heap-priority-queue",
@@ -99,7 +106,8 @@ window.CATALOG = [
       "blurb": "Cây nằm trong mảng phẳng, một mẫu code, ba bẫy, và 5 pattern kèm 15 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/03-data-structures/heap-priority-queue/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 14
      },
      {
       "dir": "tree-bst-traversal",
@@ -109,7 +117,8 @@ window.CATALOG = [
       "blurb": "Khung đệ quy sáu dòng, ba kiểu duyệt, ba bẫy, và 5 pattern kèm 19 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/03-data-structures/tree-bst-traversal/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 19
      },
      {
       "dir": "trie",
@@ -119,7 +128,8 @@ window.CATALOG = [
       "blurb": "Cây tiền tố: tra theo tiền tố trong O(độ dài), đánh đổi bộ nhớ, và khi nào nó thắng hash map.",
       "n": 6,
       "path": "content/01-dsa/03-data-structures/trie/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 5
      },
      {
       "dir": "union-find",
@@ -129,7 +139,8 @@ window.CATALOG = [
       "blurb": "Hai tối ưu bắt buộc, một mẫu code 8 dòng, ba bẫy, và 5 pattern kèm 14 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/03-data-structures/union-find/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 12
      }
     ]
    },
@@ -145,7 +156,8 @@ window.CATALOG = [
       "blurb": "Đọc đề thấy chữ gì thì nghĩ tới pattern nào, và dữ liệu lớn cỡ nào thì được dùng cách nào.",
       "n": 2,
       "path": "content/01-dsa/04-algorithms/algorithms-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sorting",
@@ -153,9 +165,10 @@ window.CATALOG = [
       "title": "Sorting",
       "tag": "Technique",
       "blurb": "Sáu thuật toán sort kèm code Python và complexity, vì sao O(n log n) là chặn dưới, và stable sort.",
-      "n": 8,
+      "n": 9,
       "path": "content/01-dsa/04-algorithms/sorting/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 6
      },
      {
       "dir": "two-pointers",
@@ -165,7 +178,8 @@ window.CATALOG = [
       "blurb": "Hai mẫu code, ba bẫy, và 2 pattern kèm 9 bài LeetCode có link.",
       "n": 7,
       "path": "content/01-dsa/04-algorithms/two-pointers/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 9
      },
      {
       "dir": "sliding-window",
@@ -175,7 +189,8 @@ window.CATALOG = [
       "blurb": "Một mẫu code co giãn phủ gần hết đề, ba bẫy, và 3 pattern kèm 12 bài LeetCode có link.",
       "n": 8,
       "path": "content/01-dsa/04-algorithms/sliding-window/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 12
      },
      {
       "dir": "prefix-sum",
@@ -185,7 +200,8 @@ window.CATALOG = [
       "blurb": "Tiền xử lý một lần để trả lời truy vấn đoạn trong O(1), mẹo hash cho tổng bằng k, và mảng hiệu cho cập nhật đoạn.",
       "n": 6,
       "path": "content/01-dsa/04-algorithms/prefix-sum/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 8
      },
      {
       "dir": "binary-search",
@@ -195,7 +211,8 @@ window.CATALOG = [
       "blurb": "Một mẫu code phủ mọi đề, ba bẫy, và 5 pattern kèm 20 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/04-algorithms/binary-search/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 19
      },
      {
       "dir": "greedy",
@@ -205,7 +222,8 @@ window.CATALOG = [
       "blurb": "Cách chứng minh một lựa chọn tham lam là đúng, ba dạng đề kinh điển, và vì sao greedy sai lại khó phát hiện.",
       "n": 6,
       "path": "content/01-dsa/04-algorithms/greedy/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 8
      },
      {
       "dir": "intervals",
@@ -215,7 +233,8 @@ window.CATALOG = [
       "blurb": "Sắp xếp theo đầu hay theo cuối, gộp đoạn, đếm đoạn chồng nhau bằng đường quét, và lịch phòng họp.",
       "n": 6,
       "path": "content/01-dsa/04-algorithms/intervals/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 7
      },
      {
       "dir": "backtracking",
@@ -225,7 +244,8 @@ window.CATALOG = [
       "blurb": "Khung sáu dòng cho mọi bài liệt kê, ba bẫy, và 5 pattern kèm 18 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/04-algorithms/backtracking/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 16
      },
      {
       "dir": "graph-bfs-dfs-topo",
@@ -235,7 +255,8 @@ window.CATALOG = [
       "blurb": "Hai mẫu code, ba bẫy, và 5 pattern kèm 22 bài LeetCode có link.",
       "n": 10,
       "path": "content/01-dsa/04-algorithms/graph-bfs-dfs-topo/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 20
      },
      {
       "dir": "shortest-path",
@@ -245,7 +266,8 @@ window.CATALOG = [
       "blurb": "Dijkstra là BFS đổi hàng đợi thành heap, khi nào cần Bellman-Ford, và Floyd-Warshall cho mọi cặp.",
       "n": 7,
       "path": "content/01-dsa/04-algorithms/shortest-path/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 6
      },
      {
       "dir": "dynamic-programming",
@@ -255,7 +277,8 @@ window.CATALOG = [
       "blurb": "Bốn câu hỏi để dựng lời giải, ba bẫy, và 5 pattern kèm 21 bài LeetCode có link.",
       "n": 11,
       "path": "content/01-dsa/04-algorithms/dynamic-programming/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 21
      }
     ]
    }
@@ -278,7 +301,8 @@ window.CATALOG = [
       "blurb": "Python được thiết kế quanh vài quy tắc nhất quán — nắm chúng thì phần còn lại tự suy ra được.",
       "n": 6,
       "path": "content/02-python/01-overview/python-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -294,7 +318,8 @@ window.CATALOG = [
       "blurb": "Các quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.",
       "n": 5,
       "path": "content/02-python/02-language-core/language-core-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "memory-model-mutability",
@@ -304,7 +329,8 @@ window.CATALOG = [
       "blurb": "Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.",
       "n": 11,
       "path": "content/02-python/02-language-core/memory-model-mutability/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "memory-management-gc",
@@ -314,7 +340,8 @@ window.CATALOG = [
       "blurb": "Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.",
       "n": 5,
       "path": "content/02-python/02-language-core/memory-management-gc/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "scope-legb",
@@ -324,7 +351,8 @@ window.CATALOG = [
       "blurb": "Python tra một cái tên ở đâu: bốn tầng LEGB, global và nonlocal, và cách hàm nhận đối số qua *args, **kwargs.",
       "n": 6,
       "path": "content/02-python/02-language-core/scope-legb/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "data-model-dunder",
@@ -334,7 +362,8 @@ window.CATALOG = [
       "blurb": "Vì sao len(x) chứ không phải x.len(), giao thức phía sau toán tử, và cách một object tự nhập vai list hay dict.",
       "n": 5,
       "path": "content/02-python/02-language-core/data-model-dunder/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "iterator-generator",
@@ -344,7 +373,8 @@ window.CATALOG = [
       "blurb": "Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.",
       "n": 10,
       "path": "content/02-python/02-language-core/iterator-generator/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "decorator-context-manager",
@@ -354,7 +384,8 @@ window.CATALOG = [
       "blurb": "Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.",
       "n": 7,
       "path": "content/02-python/02-language-core/decorator-context-manager/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "exception-handling",
@@ -364,7 +395,8 @@ window.CATALOG = [
       "blurb": "try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.",
       "n": 6,
       "path": "content/02-python/02-language-core/exception-handling/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -380,7 +412,8 @@ window.CATALOG = [
       "blurb": "Chi phí thật của từng thao tác, vì sao tuple làm khoá được mà list thì không, và set là hash table không giá trị.",
       "n": 6,
       "path": "content/02-python/03-builtin-structures/list-tuple-set/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "dict-hash-table",
@@ -390,7 +423,8 @@ window.CATALOG = [
       "blurb": "Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.",
       "n": 22,
       "path": "content/02-python/03-builtin-structures/dict-hash-table/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -406,7 +440,8 @@ window.CATALOG = [
       "blurb": "Process và thread khác nhau ở bộ nhớ và chi phí chuyển ngữ cảnh — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.",
       "n": 10,
       "path": "content/02-python/04-concurrency/thread-process-gil/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "asyncio",
@@ -416,7 +451,8 @@ window.CATALOG = [
       "blurb": "Vì sao 1000 kết nối thì async chứ không thread, ba lỗi async kinh điển, chi phí thật của từng mô hình, và bảng chọn.",
       "n": 8,
       "path": "content/02-python/04-concurrency/asyncio/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -432,7 +468,8 @@ window.CATALOG = [
       "blurb": "bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.",
       "n": 6,
       "path": "content/02-python/05-toolkit/leetcode-toolkit/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -448,7 +485,8 @@ window.CATALOG = [
       "blurb": "Bốn trụ OOP mà Python hỗ trợ trực tiếp qua cú pháp: encapsulation, abstraction, inheritance, polymorphism — và MRO khi đa kế thừa.",
       "n": 8,
       "path": "content/02-python/06-oop/oop-python/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -464,7 +502,8 @@ window.CATALOG = [
       "blurb": "Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.",
       "n": 7,
       "path": "content/02-python/07-typing/typing-dataclass/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -480,7 +519,8 @@ window.CATALOG = [
       "blurb": "Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.",
       "n": 5,
       "path": "content/02-python/08-performance/performance-profiling/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    }
@@ -503,7 +543,8 @@ window.CATALOG = [
       "blurb": "Từ một lệnh gọi hàm tới một request đi qua nửa vòng trái đất — các tầng trừu tượng và tầng nào hỏng thì thấy gì.",
       "n": 3,
       "path": "content/03-cs-fundamentals/01-overview/cs-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -519,7 +560,8 @@ window.CATALOG = [
       "blurb": "Hệ điều hành chia một máy cho nhiều việc thế nào: tiến trình, bộ nhớ, và đồng bộ.",
       "n": 2,
       "path": "content/03-cs-fundamentals/02-os/os-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "process-thread-scheduling",
@@ -529,7 +571,8 @@ window.CATALOG = [
       "blurb": "Ranh giới cô lập, chi phí context switch, và bộ lập lịch quyết định ai chạy tiếp.",
       "n": 6,
       "path": "content/03-cs-fundamentals/02-os/process-thread-scheduling/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "memory-virtual-paging",
@@ -539,7 +582,8 @@ window.CATALOG = [
       "blurb": "Địa chỉ ảo tới địa chỉ vật lý, page fault, và vì sao chương trình tưởng mình có cả bộ nhớ máy.",
       "n": 5,
       "path": "content/03-cs-fundamentals/02-os/memory-virtual-paging/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "lock-deadlock-race",
@@ -549,7 +593,8 @@ window.CATALOG = [
       "blurb": "Bốn điều kiện gây deadlock, mutex khác semaphore, và vì sao một phép cộng cũng có thể hỏng.",
       "n": 5,
       "path": "content/03-cs-fundamentals/02-os/lock-deadlock-race/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -565,7 +610,8 @@ window.CATALOG = [
       "blurb": "Một request đi qua những bước nào, và năm bài của nhóm rút ngắn khúc nào.",
       "n": 2,
       "path": "content/03-cs-fundamentals/03-networking/networking-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "dns-tls",
@@ -575,7 +621,8 @@ window.CATALOG = [
       "blurb": "Hai chặng đầu tiên trước khi byte dữ liệu đầu tiên chạy, và chúng tốn bao nhiêu vòng khứ hồi.",
       "n": 5,
       "path": "content/03-cs-fundamentals/03-networking/dns-tls/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "tcp-http",
@@ -585,7 +632,8 @@ window.CATALOG = [
       "blurb": "Đếm vòng khứ hồi, TCP bắt tay, HTTP/1.1 tới HTTP/3, idempotency, backoff có jitter, timeout và circuit breaker.",
       "n": 11,
       "path": "content/03-cs-fundamentals/03-networking/tcp-http/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "caching",
@@ -595,7 +643,8 @@ window.CATALOG = [
       "blurb": "Cache HTTP, năm tầng cache, ba chiến lược vô hiệu hoá, thundering herd, và khác biệt giữa no-cache với no-store.",
       "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/caching/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "rest-api-design",
@@ -605,7 +654,8 @@ window.CATALOG = [
       "blurb": "Tài nguyên và động từ, mã trạng thái, phân trang, phiên bản, và hợp đồng giữa hai bên.",
       "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/rest-api-design/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "load-balancing",
@@ -615,7 +665,8 @@ window.CATALOG = [
       "blurb": "Bốn thuật toán phân phối, sticky session, health check, và tầng 4 khác tầng 7 ở đâu.",
       "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/load-balancing/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -631,7 +682,8 @@ window.CATALOG = [
       "blurb": "Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.",
       "n": 7,
       "path": "content/03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "consensus-leader-election",
@@ -641,7 +693,8 @@ window.CATALOG = [
       "blurb": "Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.",
       "n": 4,
       "path": "content/03-cs-fundamentals/04-distributed/consensus-leader-election/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -657,7 +710,8 @@ window.CATALOG = [
       "blurb": "Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.",
       "n": 7,
       "path": "content/03-cs-fundamentals/05-messaging/messaging-queue-pubsub/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    }
@@ -680,7 +734,8 @@ window.CATALOG = [
       "blurb": "Database giải bài toán gì, có mấy loại, và học theo thứ tự nào.",
       "n": 3,
       "path": "content/04-database/01-overview/db-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -696,7 +751,8 @@ window.CATALOG = [
       "blurb": "Bảng nối nhau bằng khoá thế nào, và bốn bài của nhóm học theo thứ tự nào.",
       "n": 2,
       "path": "content/04-database/02-relational-basics/relational-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "relational-model",
@@ -706,7 +762,8 @@ window.CATALOG = [
       "blurb": "Bảng, hàng, cột, miền giá trị, khoá chính và khoá ngoại — bộ từ vựng mọi câu hỏi SQL đứng trên.",
       "n": 7,
       "path": "content/04-database/02-relational-basics/relational-model/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "constraints-integrity",
@@ -716,7 +773,8 @@ window.CATALOG = [
       "blurb": "NOT NULL, UNIQUE, CHECK, DEFAULT, khoá ngoại và hành vi khi xoá — để database tự chặn dữ liệu sai.",
       "n": 6,
       "path": "content/04-database/02-relational-basics/constraints-integrity/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "db-normalization",
@@ -726,7 +784,8 @@ window.CATALOG = [
       "blurb": "1NF tới 3NF bằng ví dụ, BCNF khi nào cần, và vì sao hệ thống thật lại cố tình phá chuẩn.",
       "n": 6,
       "path": "content/04-database/02-relational-basics/db-normalization/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "er-modeling",
@@ -736,7 +795,8 @@ window.CATALOG = [
       "blurb": "Từ một đoạn mô tả nghiệp vụ ra sơ đồ thực thể — quan hệ, rồi ra bảng: quan hệ 1-n, n-n, bảng nối.",
       "n": 6,
       "path": "content/04-database/02-relational-basics/er-modeling/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -752,7 +812,8 @@ window.CATALOG = [
       "blurb": "SQL chạy theo thứ tự nào chứ không theo thứ tự viết, và bốn bài của nhóm.",
       "n": 2,
       "path": "content/04-database/03-sql-basics/sql-basics-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sql-select-filter",
@@ -762,7 +823,8 @@ window.CATALOG = [
       "blurb": "Thứ tự thực thi logic của một câu truy vấn — thứ giải thích gần hết lỗi SQL của người mới.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-select-filter/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sql-join",
@@ -772,7 +834,8 @@ window.CATALOG = [
       "blurb": "Bốn loại join bằng hình, vì sao join sai làm số hàng phình lên, và self join.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-join/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sql-group-aggregate",
@@ -782,7 +845,8 @@ window.CATALOG = [
       "blurb": "Gom nhóm, WHERE khác HAVING ở đâu, COUNT(*) khác COUNT(cột), và bẫy NULL trong hàm tổng hợp.",
       "n": 6,
       "path": "content/04-database/03-sql-basics/sql-group-aggregate/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sql-subquery-cte",
@@ -792,7 +856,8 @@ window.CATALOG = [
       "blurb": "Truy vấn con tương quan và không tương quan, WITH cho dễ đọc, và CTE đệ quy để duyệt cây.",
       "n": 7,
       "path": "content/04-database/03-sql-basics/sql-subquery-cte/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -808,7 +873,8 @@ window.CATALOG = [
       "blurb": "Ba thứ mà cú pháp SQL đúng không cứu được, và bốn bài của nhóm chữa cái nào.",
       "n": 2,
       "path": "content/04-database/04-sql-advanced/sql-advanced-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sql-window-functions",
@@ -818,7 +884,8 @@ window.CATALOG = [
       "blurb": "Khác GROUP BY ở đâu, vì sao WHERE không lọc được, ba hàm xếp hạng, top-N mỗi nhóm, và bẫy frame mặc định.",
       "n": 15,
       "path": "content/04-database/04-sql-advanced/sql-window-functions/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sql-index-query-plan",
@@ -828,7 +895,8 @@ window.CATALOG = [
       "blurb": "Đọc EXPLAIN, vì sao planner bỏ qua index, leftmost prefix, ba thuật toán join, và bài toán N+1.",
       "n": 14,
       "path": "content/04-database/04-sql-advanced/sql-index-query-plan/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "transaction-isolation",
@@ -838,7 +906,8 @@ window.CATALOG = [
       "blurb": "Bốn hiện tượng dị thường, mức nào chặn gì, MVCC, ba cách chữa lost update, deadlock và retry.",
       "n": 15,
       "path": "content/04-database/04-sql-advanced/transaction-isolation/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "query-tuning",
@@ -848,7 +917,8 @@ window.CATALOG = [
       "blurb": "Quy trình khi một truy vấn chậm: đọc plan, tìm chỗ quét toàn bảng, sửa index hay sửa câu lệnh.",
       "n": 8,
       "path": "content/04-database/04-sql-advanced/query-tuning/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -864,7 +934,8 @@ window.CATALOG = [
       "blurb": "Key-value, document, column-family, graph: mỗi họ bỏ ràng buộc gì của mô hình quan hệ để đổi lấy gì, và khi nào polyglot persistence là hợp lý.",
       "n": 6,
       "path": "content/04-database/05-beyond-sql/nosql-landscape/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "sharding-replication",
@@ -874,7 +945,8 @@ window.CATALOG = [
       "blurb": "Bản sao đọc, độ trễ sao chép, ba chiến lược chia mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.",
       "n": 7,
       "path": "content/04-database/05-beyond-sql/sharding-replication/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -890,7 +962,8 @@ window.CATALOG = [
       "blurb": "Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.",
       "n": 6,
       "path": "content/04-database/06-data-systems/oltp-vs-olap/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "data-warehouse-lake",
@@ -900,7 +973,8 @@ window.CATALOG = [
       "blurb": "Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.",
       "n": 6,
       "path": "content/04-database/06-data-systems/data-warehouse-lake/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "etl-elt",
@@ -910,7 +984,8 @@ window.CATALOG = [
       "blurb": "Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.",
       "n": 6,
       "path": "content/04-database/06-data-systems/etl-elt/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "batch-stream-processing",
@@ -920,7 +995,8 @@ window.CATALOG = [
       "blurb": "Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.",
       "n": 6,
       "path": "content/04-database/06-data-systems/batch-stream-processing/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "data-quality",
@@ -930,7 +1006,8 @@ window.CATALOG = [
       "blurb": "Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.",
       "n": 6,
       "path": "content/04-database/06-data-systems/data-quality/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    }
@@ -953,7 +1030,8 @@ window.CATALOG = [
       "blurb": "Máy học luật từ ví dụ thay vì được viết luật: ba kiểu bài toán, các họ model, và học theo thứ tự nào.",
       "n": 5,
       "path": "content/05-machine-learning/01-overview/ml-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -969,7 +1047,8 @@ window.CATALOG = [
       "blurb": "Sáu mảnh toán thật sự dùng trong ML, mỗi mảnh trả lời câu hỏi nào và xuất hiện lại ở bài model nào.",
       "n": 3,
       "path": "content/05-machine-learning/02-math-foundations/math-foundations-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "probability-basics",
@@ -979,7 +1058,8 @@ window.CATALOG = [
       "blurb": "Biến ngẫu nhiên, xác suất có điều kiện, độc lập, và các phân phối hay gặp trong ML.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/probability-basics/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "expectation-variance",
@@ -989,7 +1069,8 @@ window.CATALOG = [
       "blurb": "Tuyến tính của kỳ vọng, phương sai của tổng, hiệp phương sai, và luật số lớn với CLT.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/expectation-variance/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "bayes-theorem",
@@ -999,7 +1080,8 @@ window.CATALOG = [
       "blurb": "Tiên nghiệm, khả năng, hậu nghiệm; nghịch lý xét nghiệm y tế; và Bayes trong Naive Bayes.",
       "n": 4,
       "path": "content/05-machine-learning/02-math-foundations/bayes-theorem/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "linear-algebra-ml",
@@ -1009,7 +1091,8 @@ window.CATALOG = [
       "blurb": "Vector, ma trận, nhân ma trận đọc thế nào, hạng, eigenvalue và eigenvector — chỉ phần thật sự dùng.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/linear-algebra-ml/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "gradient-optimization",
@@ -1019,7 +1102,8 @@ window.CATALOG = [
       "blurb": "Đạo hàm riêng, gradient chỉ hướng nào, quy tắc chuỗi, hàm lồi, và gradient descent hội tụ ra sao.",
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/gradient-optimization/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "mle-map",
@@ -1029,7 +1113,8 @@ window.CATALOG = [
       "blurb": "Vì sao chọn loss function chính là chọn giả định phân phối, và regularization chính là tiên nghiệm.",
       "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/mle-map/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1045,7 +1130,8 @@ window.CATALOG = [
       "blurb": "Định nghĩa chính xác của p-value, bốn đại lượng gắn nhau, sample size và power, confidence interval, so sánh nhiều lần, và tương quan với nhân quả.",
       "n": 10,
       "path": "content/05-machine-learning/03-statistics/statistics/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "ab-testing",
@@ -1055,7 +1141,8 @@ window.CATALOG = [
       "blurb": "Thiết kế thí nghiệm, vấn đề nhìn sớm, năm cái bẫy thực tế, ý nghĩa thống kê so với ý nghĩa thực tiễn, và checklist trước khi triển khai.",
       "n": 8,
       "path": "content/05-machine-learning/03-statistics/ab-testing/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1071,7 +1158,8 @@ window.CATALOG = [
       "blurb": "Năm khái niệm dùng lại ở mọi model: gọi tên bài toán, phân rã sai số, chia dữ liệu, chống quá khớp, chuẩn bị đặc trưng.",
       "n": 3,
       "path": "content/05-machine-learning/04-core-concepts/core-concepts-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "supervised-unsupervised",
@@ -1081,7 +1169,8 @@ window.CATALOG = [
       "blurb": "Gọi tên bài toán cho đúng: nhãn tới từ đâu, khi nào hồi quy khi nào phân loại, và bốn cách xoay xở khi nhãn quá đắt.",
       "n": 5,
       "path": "content/05-machine-learning/04-core-concepts/supervised-unsupervised/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "bias-variance-tradeoff",
@@ -1091,7 +1180,8 @@ window.CATALOG = [
       "blurb": "Phân rã sai số thành ba phần, đường cong đánh đổi, và kỹ thuật nào đánh vào phần nào.",
       "n": 7,
       "path": "content/05-machine-learning/04-core-concepts/bias-variance-tradeoff/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "train-val-test-cv",
@@ -1101,7 +1191,8 @@ window.CATALOG = [
       "blurb": "Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, sáu nguồn rò rỉ dữ liệu, và nested CV.",
       "n": 8,
       "path": "content/05-machine-learning/04-core-concepts/train-val-test-cv/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "overfitting-regularization",
@@ -1111,7 +1202,8 @@ window.CATALOG = [
       "blurb": "Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.",
       "n": 7,
       "path": "content/05-machine-learning/04-core-concepts/overfitting-regularization/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "feature-engineering",
@@ -1121,7 +1213,8 @@ window.CATALOG = [
       "blurb": "Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác — và khi nào để model tự lo.",
       "n": 6,
       "path": "content/05-machine-learning/04-core-concepts/feature-engineering/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1137,7 +1230,8 @@ window.CATALOG = [
       "blurb": "Sáu model kinh điển trên một bảng: mỗi cái giả định một hình dạng khác nhau cho dữ liệu, và giả định đó quyết định khi nào chọn cái nào.",
       "n": 3,
       "path": "content/05-machine-learning/05-classical-ml/classical-models-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "linear-regression",
@@ -1147,7 +1241,8 @@ window.CATALOG = [
       "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
       "n": 9,
       "path": "content/05-machine-learning/05-classical-ml/linear-regression/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "logistic-regression",
@@ -1157,7 +1252,8 @@ window.CATALOG = [
       "blurb": "Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.",
       "n": 9,
       "path": "content/05-machine-learning/05-classical-ml/logistic-regression/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "ridge-lasso-elasticnet",
@@ -1167,7 +1263,8 @@ window.CATALOG = [
       "blurb": "Ba cách regularize model tuyến tính: L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở hình dạng vùng phạt.",
       "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "svm",
@@ -1177,7 +1274,8 @@ window.CATALOG = [
       "blurb": "Lề lớn nhất, support vector, tham số C và gamma, kernel trick — và vì sao nó từng thắng trước khi deep learning tới.",
       "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/svm/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "knn",
@@ -1187,7 +1285,8 @@ window.CATALOG = [
       "blurb": "Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.",
       "n": 6,
       "path": "content/05-machine-learning/05-classical-ml/knn/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "naive-bayes",
@@ -1197,7 +1296,8 @@ window.CATALOG = [
       "blurb": "Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.",
       "n": 6,
       "path": "content/05-machine-learning/05-classical-ml/naive-bayes/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1213,7 +1313,8 @@ window.CATALOG = [
       "blurb": "Bài đầu tiên của nhánh: người ta đang cố giải quyết vấn đề gì, lịch sử 40 năm của nhánh này, hai hướng bagging và boosting, và học theo thứ tự nào.",
       "n": 8,
       "path": "content/05-machine-learning/06-tree-models/tree-family-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "decision-tree",
@@ -1223,7 +1324,8 @@ window.CATALOG = [
       "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba núm để hãm nó lại.",
       "n": 12,
       "path": "content/05-machine-learning/06-tree-models/decision-tree/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "random-forest",
@@ -1233,7 +1335,8 @@ window.CATALOG = [
       "blurb": "Vì sao trung bình nhiều cây giảm variance, tập con đặc trưng, OOB score miễn phí, và cái bẫy của feature importance.",
       "n": 6,
       "path": "content/05-machine-learning/06-tree-models/random-forest/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "gradient-boosting",
@@ -1243,7 +1346,8 @@ window.CATALOG = [
       "blurb": "Cộng cây nông theo phần dư, learning_rate đổi lấy n_estimators, XGBoost/LightGBM, và vì sao vẫn thắng deep learning trên dữ liệu bảng.",
       "n": 6,
       "path": "content/05-machine-learning/06-tree-models/gradient-boosting/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "xgboost",
@@ -1253,7 +1357,8 @@ window.CATALOG = [
       "blurb": "Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.",
       "n": 7,
       "path": "content/05-machine-learning/06-tree-models/xgboost/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "lightgbm",
@@ -1263,7 +1368,8 @@ window.CATALOG = [
       "blurb": "Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa — ba mẹo đổi lấy tốc độ.",
       "n": 6,
       "path": "content/05-machine-learning/06-tree-models/lightgbm/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1279,7 +1385,8 @@ window.CATALOG = [
       "blurb": "Bốn họ phân cụm — theo tâm, theo mật độ, theo tầng, theo phân phối — cụm hình gì thì họ nào bắt được, và chấm điểm bằng gì khi không có đáp án.",
       "n": 4,
       "path": "content/05-machine-learning/07-clustering/clustering-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "kmeans-clustering",
@@ -1289,7 +1396,8 @@ window.CATALOG = [
       "blurb": "Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.",
       "n": 6,
       "path": "content/05-machine-learning/07-clustering/kmeans-clustering/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "dbscan",
@@ -1299,7 +1407,8 @@ window.CATALOG = [
       "blurb": "Cụm là vùng đông đúc nối nhau: không cần biết k trước, bắt được cụm hình bất kỳ, và tự đánh dấu điểm nhiễu.",
       "n": 8,
       "path": "content/05-machine-learning/07-clustering/dbscan/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "hdbscan",
@@ -1309,7 +1418,8 @@ window.CATALOG = [
       "blurb": "Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.",
       "n": 7,
       "path": "content/05-machine-learning/07-clustering/hdbscan/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1325,7 +1435,8 @@ window.CATALOG = [
       "blurb": "Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.",
       "n": 6,
       "path": "content/05-machine-learning/08-dimensionality/pca-dimensionality/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1341,7 +1452,8 @@ window.CATALOG = [
       "blurb": "Ba câu hỏi độc lập về một model — xếp hạng, quyết định, xác suất — và bảng tra chọn metric theo bài toán và theo tỉ lệ lớp.",
       "n": 3,
       "path": "content/05-machine-learning/09-evaluation/evaluation-overview/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "metrics-confusion-matrix",
@@ -1351,7 +1463,8 @@ window.CATALOG = [
       "blurb": "Bốn ô sinh ra mọi chỉ số: precision với recall chọn theo chi phí lỗi, vì sao accuracy nói dối khi dữ liệu lệch, và chốt ngưỡng bằng tiền thay vì bằng F1.",
       "n": 12,
       "path": "content/05-machine-learning/09-evaluation/metrics-confusion-matrix/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "roc-auc-pr",
@@ -1361,7 +1474,8 @@ window.CATALOG = [
       "blurb": "Hai đường cong khi ngưỡng chưa cố định: ý nghĩa xác suất của AUC, vì sao lớp dương hiếm thì ROC nói dối, và mức cơ sở của PR-AUC không phải 0.5.",
       "n": 6,
       "path": "content/05-machine-learning/09-evaluation/roc-auc-pr/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "calibration",
@@ -1371,7 +1485,8 @@ window.CATALOG = [
       "blurb": "Model xếp hạng đúng vẫn có thể nói 0.9 khi thực tế là 0.6: biểu đồ tin cậy, model nào lệch sẵn, Platt scaling và isotonic regression.",
       "n": 7,
       "path": "content/05-machine-learning/09-evaluation/calibration/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    }
@@ -1394,7 +1509,8 @@ window.CATALOG = [
       "blurb": "Perceptron 1958 → mùa đông AI → backpropagation → 2012 AlexNet → Transformer: mỗi mốc gỡ đúng một nút thắt.",
       "n": 8,
       "path": "content/06-deep-learning/01-overview/dl-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1410,7 +1526,8 @@ window.CATALOG = [
       "blurb": "Sáu thứ phải có để một mạng sâu học được, và mỗi thứ chữa đúng một chỗ hỏng khi mạng sâu dần.",
       "n": 8,
       "path": "content/06-deep-learning/02-neural-network/neural-network-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "perceptron-mlp",
@@ -1420,7 +1537,8 @@ window.CATALOG = [
       "blurb": "Một nơ-ron làm gì, vì sao XOR giết chết perceptron, và thêm một lớp ẩn thì thay đổi cái gì.",
       "n": 5,
       "path": "content/06-deep-learning/02-neural-network/perceptron-mlp/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "activation-functions",
@@ -1430,7 +1548,8 @@ window.CATALOG = [
       "blurb": "Sigmoid, tanh, ReLU và họ hàng: vì sao ReLU thắng, vấn đề nơ-ron chết, và GELU trong Transformer.",
       "n": 5,
       "path": "content/06-deep-learning/02-neural-network/activation-functions/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "backpropagation",
@@ -1440,7 +1559,8 @@ window.CATALOG = [
       "blurb": "Mạng 2-2-1 với số thật, vì sao softmax + CE cho gradient p − y, gradient teo và nổ, và checklist debug.",
       "n": 15,
       "path": "content/06-deep-learning/02-neural-network/backpropagation/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "weight-initialization",
@@ -1450,7 +1570,8 @@ window.CATALOG = [
       "blurb": "Vì sao công thức có căn 1/n, Xavier so với He, và vì sao khởi tạo bằng 0 thì mạng không học được gì.",
       "n": 7,
       "path": "content/06-deep-learning/02-neural-network/weight-initialization/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "normalization",
@@ -1460,7 +1581,8 @@ window.CATALOG = [
       "blurb": "BatchNorm phụ thuộc batch size ra sao, vì sao Transformer dùng LayerNorm, Pre-LN so với Post-LN, và cách chẩn đoán bằng thống kê activation.",
       "n": 11,
       "path": "content/06-deep-learning/02-neural-network/normalization/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "optimizer-sgd-adam",
@@ -1470,7 +1592,8 @@ window.CATALOG = [
       "blurb": "Momentum, learning rate thích ứng, Adam ghép hai thứ đó, và vì sao AdamW mới là mặc định.",
       "n": 6,
       "path": "content/06-deep-learning/02-neural-network/optimizer-sgd-adam/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "dropout-regularization",
@@ -1480,7 +1603,8 @@ window.CATALOG = [
       "blurb": "Dropout làm gì lúc huấn luyện và lúc suy luận, early stopping, data augmentation, và weight decay.",
       "n": 5,
       "path": "content/06-deep-learning/02-neural-network/dropout-regularization/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1496,7 +1620,8 @@ window.CATALOG = [
       "blurb": "Kernel, stride, padding, receptive field, và vì sao chia sẻ trọng số làm giảm tham số hàng nghìn lần.",
       "n": 5,
       "path": "content/06-deep-learning/03-cnn/convolution-basics/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "cnn-mobilenet",
@@ -1506,7 +1631,8 @@ window.CATALOG = [
       "blurb": "Công thức shape và chi phí, vì sao depthwise separable rẻ 8–9 lần, inverted residual, linear bottleneck, lượng tử hoá.",
       "n": 15,
       "path": "content/06-deep-learning/03-cnn/cnn-mobilenet/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1522,7 +1648,8 @@ window.CATALOG = [
       "blurb": "Trạng thái ẩn, chia sẻ trọng số qua thời gian, và vì sao gradient tắt dần trên chuỗi dài.",
       "n": 8,
       "path": "content/06-deep-learning/04-sequence/rnn/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "lstm-gru",
@@ -1532,7 +1659,8 @@ window.CATALOG = [
       "blurb": "Cổng và đường trạng thái chữa gradient tắt dần thế nào; GRU gọn hơn mà gần bằng.",
       "n": 8,
       "path": "content/06-deep-learning/04-sequence/lstm-gru/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1548,7 +1676,8 @@ window.CATALOG = [
       "blurb": "Learning rate schedule, warmup, batch size, gradient clipping, mixed precision — bộ núm cần biết.",
       "n": 5,
       "path": "content/06-deep-learning/05-training/training-recipe/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "debug-training",
@@ -1558,7 +1687,8 @@ window.CATALOG = [
       "blurb": "Quy trình theo thứ tự khi loss không giảm, thành NaN, hay chỉ tốt trên tập huấn luyện.",
       "n": 5,
       "path": "content/06-deep-learning/05-training/debug-training/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1574,7 +1704,8 @@ window.CATALOG = [
       "blurb": "Nén rồi khôi phục để học representation — bước đệm dẫn tới VAE, không phải mô hình sinh thật sự.",
       "n": 5,
       "path": "content/06-deep-learning/06-generative/autoencoder/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "vae",
@@ -1584,7 +1715,8 @@ window.CATALOG = [
       "blurb": "Ép latent space có phân phối biết trước để sinh được mẫu mới — và vì sao ảnh VAE sinh ra thường mờ hơn diffusion.",
       "n": 6,
       "path": "content/06-deep-learning/06-generative/vae/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "gan",
@@ -1594,7 +1726,8 @@ window.CATALOG = [
       "blurb": "Hai mạng đấu nhau tới khi generator giả không phân biệt được — nhận diện ý tưởng, không đào sâu vì diffusion đã thay thế ở hầu hết ứng dụng.",
       "n": 4,
       "path": "content/06-deep-learning/06-generative/gan/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    }
@@ -1617,7 +1750,8 @@ window.CATALOG = [
       "blurb": "Từ RNN tới attention tới SSM: mỗi kiến trúc gỡ được nút thắt nào của kiến trúc trước.",
       "n": 8,
       "path": "content/07-transformer/01-overview/architecture-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1633,7 +1767,8 @@ window.CATALOG = [
       "blurb": "Năm mảnh ghép của một Transformer và thứ tự dữ liệu đi qua chúng.",
       "n": 8,
       "path": "content/07-transformer/02-transformer-core/transformer-core-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "tokenization",
@@ -1643,7 +1778,8 @@ window.CATALOG = [
       "blurb": "BPE hoạt động thế nào, vì sao tiếng Việt tốn nhiều token hơn, và token quyết định chi phí ra sao.",
       "n": 5,
       "path": "content/07-transformer/02-transformer-core/tokenization/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "embedding",
@@ -1653,7 +1789,8 @@ window.CATALOG = [
       "blurb": "Từ id token tới vector, vì sao khoảng cách trong không gian đó mang nghĩa, và embedding cho tra cứu.",
       "n": 5,
       "path": "content/07-transformer/02-transformer-core/embedding/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "positional-encoding",
@@ -1663,7 +1800,8 @@ window.CATALOG = [
       "blurb": "Vì sao attention mù thứ tự, sin/cos, học được, và RoPE — thứ mọi model hiện nay dùng.",
       "n": 5,
       "path": "content/07-transformer/02-transformer-core/positional-encoding/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "self-attention",
@@ -1673,7 +1811,8 @@ window.CATALOG = [
       "blurb": "Q/K/V là gì, vì sao chia căn d_k, hai loại mask đừng nhầm, multi-head, complexity bậc hai, và KV cache quyết định chi phí phục vụ.",
       "n": 13,
       "path": "content/07-transformer/02-transformer-core/self-attention/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "transformer-architecture",
@@ -1683,7 +1822,8 @@ window.CATALOG = [
       "blurb": "Tokenization, embedding, positional encoding, residual và LayerNorm, FFN chứa phần lớn tham số, một block hoàn chỉnh, và encoder hay decoder.",
       "n": 12,
       "path": "content/07-transformer/02-transformer-core/transformer-architecture/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1699,7 +1839,8 @@ window.CATALOG = [
       "blurb": "Cùng một khối Transformer, ba cách xếp — và mỗi cách hợp với loại tác vụ nào.",
       "n": 8,
       "path": "content/07-transformer/03-model-families/families-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "bert",
@@ -1709,7 +1850,8 @@ window.CATALOG = [
       "blurb": "Masked language modelling, attention hai chiều, và vì sao BERT không sinh chữ được.",
       "n": 8,
       "path": "content/07-transformer/03-model-families/bert/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "gpt",
@@ -1719,7 +1861,8 @@ window.CATALOG = [
       "blurb": "Causal mask, dự đoán token kế tiếp, và vì sao kiến trúc đơn giản nhất lại thắng khi scale.",
       "n": 8,
       "path": "content/07-transformer/03-model-families/gpt/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "encoder-decoder",
@@ -1729,7 +1872,8 @@ window.CATALOG = [
       "blurb": "Cross-attention nối hai nửa, và vì sao dạng này vẫn thắng ở dịch máy và tóm tắt.",
       "n": 8,
       "path": "content/07-transformer/03-model-families/encoder-decoder/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1745,7 +1889,8 @@ window.CATALOG = [
       "blurb": "Attention tốn bậc hai theo độ dài — ba hướng thoát và hướng nào đang thắng.",
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/beyond-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "ssm",
@@ -1755,7 +1900,8 @@ window.CATALOG = [
       "blurb": "Từ phương trình trạng thái tới S4: tuyến tính theo độ dài chuỗi, và huấn luyện song song được.",
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/ssm/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "mamba",
@@ -1765,7 +1911,8 @@ window.CATALOG = [
       "blurb": "Selective SSM: cho tham số phụ thuộc đầu vào, cộng một thuật toán quét nhận biết phần cứng.",
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/mamba/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "hybrid-hymba",
@@ -1775,7 +1922,8 @@ window.CATALOG = [
       "blurb": "Ghép head attention và head SSM song song trong cùng một lớp, cộng meta token.",
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/hybrid-hymba/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1791,7 +1939,8 @@ window.CATALOG = [
       "blurb": "Attention chuẩn tốn O(n²) bộ nhớ — FlashAttention không đổi kết quả, chỉ đổi cách tính; sparse/linear attention đổi cả công thức.",
       "n": 6,
       "path": "content/07-transformer/05-efficient/efficient-attention/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    }
@@ -1814,7 +1963,8 @@ window.CATALOG = [
       "blurb": "Từ word2vec tới GPT tới model có suy luận: mỗi bước mở khoá được gì, và vòng đời một model từ pretrain tới phục vụ.",
       "n": 8,
       "path": "content/08-llm/01-overview/llm-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1830,7 +1980,8 @@ window.CATALOG = [
       "blurb": "Bốn giai đoạn từ dữ liệu thô tới model biết nghe lời, và mỗi giai đoạn tốn bao nhiêu.",
       "n": 8,
       "path": "content/08-llm/02-training/training-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "pretraining",
@@ -1840,7 +1991,8 @@ window.CATALOG = [
       "blurb": "Mục tiêu dự đoán token kế, dữ liệu và cách lọc, scaling law, và vì sao pretrain đắt tới vậy.",
       "n": 5,
       "path": "content/08-llm/02-training/pretraining/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "scaling-law",
@@ -1850,7 +2002,8 @@ window.CATALOG = [
       "blurb": "Quan hệ giữa tham số, dữ liệu và tính toán; Chinchilla đổi cách chia ngân sách thế nào.",
       "n": 8,
       "path": "content/08-llm/02-training/scaling-law/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "sft-alignment",
@@ -1860,7 +2013,8 @@ window.CATALOG = [
       "blurb": "Khi nào fine-tune thay vì RAG, che mất mát trên prompt, RLHF ba bước, DPO bỏ hẳn reward model, và cách đánh giá sau fine-tune.",
       "n": 11,
       "path": "content/08-llm/02-training/sft-alignment/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "peft-lora-qlora",
@@ -1870,7 +2024,8 @@ window.CATALOG = [
       "blurb": "Vì sao ma trận hạng thấp đủ dùng, chọn r và alpha thế nào, QLoRA nén 4-bit ra sao, và LoRA giảm quên kiến thức cũ tới đâu.",
       "n": 7,
       "path": "content/08-llm/02-training/peft-lora-qlora/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1886,7 +2041,8 @@ window.CATALOG = [
       "blurb": "Ba nhóm kỹ thuật làm model rẻ hơn, nhớ xa hơn, và suy luận tốt hơn — kỹ thuật nào ở model nào.",
       "n": 8,
       "path": "content/08-llm/03-techniques/techniques-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "moe",
@@ -1896,7 +2052,8 @@ window.CATALOG = [
       "blurb": "Router chọn vài expert cho mỗi token: nhiều tham số mà chi phí mỗi token gần như không đổi.",
       "n": 8,
       "path": "content/08-llm/03-techniques/moe/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "long-context",
@@ -1906,7 +2063,8 @@ window.CATALOG = [
       "blurb": "Vì sao context dài đắt, và bốn hướng chữa: nội suy vị trí, attention thưa, FlashAttention, nén KV.",
       "n": 8,
       "path": "content/08-llm/03-techniques/long-context/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "chain-of-thought",
@@ -1916,7 +2074,8 @@ window.CATALOG = [
       "blurb": "Bắt model viết ra các bước trung gian, self-consistency, và ranh giới giữa prompting và huấn luyện suy luận.",
       "n": 8,
       "path": "content/08-llm/03-techniques/chain-of-thought/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -1932,7 +2091,8 @@ window.CATALOG = [
       "blurb": "Chi phí phục vụ nằm ở đâu, và ba nhóm đòn bẩy: giảm bit, giảm bước, giảm bộ nhớ.",
       "n": 8,
       "path": "content/08-llm/04-inference/inference-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "decoding-strategies",
@@ -1942,7 +2102,8 @@ window.CATALOG = [
       "blurb": "Greedy, beam search, temperature, top-k và top-p — mỗi núm đổi cái gì lấy cái gì.",
       "n": 6,
       "path": "content/08-llm/04-inference/decoding-strategies/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "quantization",
@@ -1952,7 +2113,8 @@ window.CATALOG = [
       "blurb": "INT8, NF4, sau huấn luyện hay lúc huấn luyện, và mất chất lượng bao nhiêu để đổi lấy bao nhiêu VRAM.",
       "n": 5,
       "path": "content/08-llm/04-inference/quantization/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "inference-optimization",
@@ -1962,7 +2124,8 @@ window.CATALOG = [
       "blurb": "Prefill so với decode, tính KV cache, GQA, continuous batching, speculative decoding, bảng giảm chi phí.",
       "n": 15,
       "path": "content/08-llm/04-inference/inference-optimization/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -1978,7 +2141,8 @@ window.CATALOG = [
       "blurb": "Bốn bước của một hệ RAG, chỗ nào hay hỏng nhất, và khi nào RAG thắng fine-tune.",
       "n": 8,
       "path": "content/08-llm/05-rag/rag-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "rag-end-to-end",
@@ -1988,7 +2152,8 @@ window.CATALOG = [
       "blurb": "Chunking, hybrid search, reranking, lost-in-the-middle, cây debug năm bước và cách đánh giá tách hai tầng.",
       "n": 15,
       "path": "content/08-llm/05-rag/rag-end-to-end/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      },
      {
       "dir": "chunking-strategy",
@@ -1998,7 +2163,8 @@ window.CATALOG = [
       "blurb": "Kích thước đoạn, chồng lấn, chia theo cấu trúc, và vì sao chia sai thì mọi bước sau vô nghĩa.",
       "n": 5,
       "path": "content/08-llm/05-rag/chunking-strategy/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "vector-database",
@@ -2008,7 +2174,8 @@ window.CATALOG = [
       "blurb": "Tìm láng giềng gần đúng, HNSW và IVF, lọc kết hợp metadata, và khi nào chưa cần vector DB.",
       "n": 6,
       "path": "content/08-llm/05-rag/vector-database/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "reranking",
@@ -2018,7 +2185,8 @@ window.CATALOG = [
       "blurb": "Bi-encoder khác cross-encoder, BM25 ghép với vector, và vì sao thêm một bước xếp lại rẻ mà lãi.",
       "n": 5,
       "path": "content/08-llm/05-rag/reranking/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2034,7 +2202,8 @@ window.CATALOG = [
       "blurb": "Vòng lặp suy nghĩ–hành động–quan sát, mô tả công cụ, quản lý ngữ cảnh, và vì sao agent hay chạy vòng vô tận.",
       "n": 5,
       "path": "content/08-llm/06-agents/agent-tool-use/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2050,7 +2219,8 @@ window.CATALOG = [
       "blurb": "Bảng tra ngược: model nào của lab nào dùng kỹ thuật nào, và lab nào công bố đủ để học được kiến trúc.",
       "n": 8,
       "path": "content/08-llm/07-model-labs/model-labs-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "llama",
@@ -2060,7 +2230,8 @@ window.CATALOG = [
       "blurb": "Model mở đặt chuẩn cho cả ngành: RMSNorm, SwiGLU, RoPE, GQA — và bài học Chinchilla.",
       "n": 7,
       "path": "content/08-llm/07-model-labs/llama/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "qwen",
@@ -2070,7 +2241,8 @@ window.CATALOG = [
       "blurb": "Dòng model mở của Alibaba: đa ngôn ngữ, bản MoE, và hệ sinh thái model theo kích thước.",
       "n": 7,
       "path": "content/08-llm/07-model-labs/qwen/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "deepseek",
@@ -2080,7 +2252,8 @@ window.CATALOG = [
       "blurb": "MLA nén KV cache, MoE tỉ lệ kích hoạt rất thấp, và GRPO huấn luyện suy luận bằng RL.",
       "n": 7,
       "path": "content/08-llm/07-model-labs/deepseek/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "mixtral",
@@ -2090,7 +2263,8 @@ window.CATALOG = [
       "blurb": "Sliding window attention và bản MoE thưa đầu tiên được mở trọng số ở quy mô lớn.",
       "n": 7,
       "path": "content/08-llm/07-model-labs/mixtral/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "closed-models",
@@ -2100,7 +2274,8 @@ window.CATALOG = [
       "blurb": "Ba dòng model đóng: học được gì từ system card, và chỗ nào bắt buộc phải dừng ở suy đoán.",
       "n": 6,
       "path": "content/08-llm/07-model-labs/closed-models/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2116,7 +2291,8 @@ window.CATALOG = [
       "blurb": "Retrieval đúng không có nghĩa câu trả lời đúng — Recall@K đo retrieval, faithfulness đo answer, hai lớp đo khác nhau hoàn toàn.",
       "n": 6,
       "path": "content/08-llm/08-rag-evaluation/rag-evaluation/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2132,7 +2308,8 @@ window.CATALOG = [
       "blurb": "Học chung một không gian embedding cho ảnh và chữ bằng contrastive loss — nền cho hầu hết mô hình multimodal sau này.",
       "n": 5,
       "path": "content/08-llm/09-multimodal/clip/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "vlm",
@@ -2142,7 +2319,8 @@ window.CATALOG = [
       "blurb": "Ghép vision encoder vào LLM để mô hình đọc được ảnh — điểm ghép ở đâu quyết định model mạnh hay yếu.",
       "n": 5,
       "path": "content/08-llm/09-multimodal/vlm/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "diffusion-models",
@@ -2152,7 +2330,8 @@ window.CATALOG = [
       "blurb": "Học cách khử nhiễu từng bước nhỏ thay vì sinh trực tiếp — vì sao cách này ổn định và sinh ảnh nét hơn GAN, VAE.",
       "n": 6,
       "path": "content/08-llm/09-multimodal/diffusion-models/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "audio-models",
@@ -2162,7 +2341,8 @@ window.CATALOG = [
       "blurb": "Speech-to-text, text-to-speech và audio embedding — cùng chung một câu hỏi: âm thanh liên tục biến thành token rời rạc thế nào.",
       "n": 5,
       "path": "content/08-llm/09-multimodal/audio-models/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    }
@@ -2185,7 +2365,8 @@ window.CATALOG = [
       "blurb": "Vòng này chấm cái gì, khung sáu bước, và những câu hỏi làm rõ phải hỏi trước khi vẽ bất cứ thứ gì.",
       "n": 8,
       "path": "content/09-ml-system-design/01-overview/mlsd-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2201,7 +2382,8 @@ window.CATALOG = [
       "blurb": "Khung bảy bước, vì sao luôn hai tầng, ngân sách độ trễ và số máy, vòng phản hồi, ví dụ phát hiện gian lận.",
       "n": 15,
       "path": "content/09-ml-system-design/02-frameworks/ml-system-design/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -2217,7 +2399,8 @@ window.CATALOG = [
       "blurb": "Truy hồi rồi xếp hạng, lọc cộng tác so với dựa trên nội dung, khởi đầu lạnh, và đo bằng gì.",
       "n": 6,
       "path": "content/09-ml-system-design/03-case-studies/recommendation-system/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "search-ranking",
@@ -2227,7 +2410,8 @@ window.CATALOG = [
       "blurb": "Từ truy vấn tới danh sách kết quả: hiểu truy vấn, truy hồi, đặc trưng xếp hạng, và learning to rank.",
       "n": 6,
       "path": "content/09-ml-system-design/03-case-studies/search-ranking/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "llm-rag-system",
@@ -2237,7 +2421,8 @@ window.CATALOG = [
       "blurb": "Thiết kế một trợ lý hỏi đáp trên tài liệu nội bộ: nạp dữ liệu, truy hồi, sinh, đánh giá, chi phí và bảo vệ.",
       "n": 6,
       "path": "content/09-ml-system-design/03-case-studies/llm-rag-system/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    }
@@ -2260,7 +2445,8 @@ window.CATALOG = [
       "blurb": "Vì sao hệ thống ML khó vận hành hơn phần mềm thường, và vòng đời từ thí nghiệm tới giám sát.",
       "n": 8,
       "path": "content/10-mlops/01-overview/mlops-overview/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2276,7 +2462,8 @@ window.CATALOG = [
       "blurb": "Mô hình dữ liệu của Git, nhánh và merge, rebase khác merge, và cách gỡ khi rối.",
       "n": 5,
       "path": "content/10-mlops/02-engineering/git-workflow/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "docker-container",
@@ -2286,7 +2473,8 @@ window.CATALOG = [
       "blurb": "Image khác container, tầng và cache, dựng nhiều tầng, và vì sao image ML hay nặng vài GB.",
       "n": 5,
       "path": "content/10-mlops/02-engineering/docker-container/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "linux-shell",
@@ -2296,7 +2484,8 @@ window.CATALOG = [
       "blurb": "Bộ lệnh thật sự hay dùng, đường ống, quyền, tiến trình, và điều tra khi máy chậm.",
       "n": 5,
       "path": "content/10-mlops/02-engineering/linux-shell/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "fastapi-service",
@@ -2306,7 +2495,8 @@ window.CATALOG = [
       "blurb": "FastAPI, kiểm tra đầu vào, gộp lô, đồng bộ hay bất đồng bộ, và health check cho service ML.",
       "n": 5,
       "path": "content/10-mlops/02-engineering/fastapi-service/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2322,7 +2512,8 @@ window.CATALOG = [
       "blurb": "Ghi lại cái gì để tái lập được, đánh phiên bản dữ liệu và model, và model registry.",
       "n": 4,
       "path": "content/10-mlops/03-lifecycle/experiment-tracking/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "ci-cd-ml",
@@ -2332,7 +2523,8 @@ window.CATALOG = [
       "blurb": "Kiểm thử cái gì trong hệ ML, kiểm thử dữ liệu, huấn luyện lại tự động, và các chiến lược phát hành.",
       "n": 5,
       "path": "content/10-mlops/03-lifecycle/ci-cd-ml/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "mlops-serving",
@@ -2342,7 +2534,8 @@ window.CATALOG = [
       "blurb": "Ba thứ thay đổi, bốn chiến lược triển khai kèm bán kính rủi ro, phát hiện drift bằng PSI, point-in-time correctness.",
       "n": 15,
       "path": "content/10-mlops/03-lifecycle/mlops-serving/index.html",
-      "skeleton": false
+      "skeleton": false,
+      "lc": 0
      }
     ]
    },
@@ -2358,7 +2551,8 @@ window.CATALOG = [
       "blurb": "Bộ nhớ GPU đi đâu, giới hạn băng thông hay tính toán, gộp lô, và chọn phần cứng.",
       "n": 5,
       "path": "content/10-mlops/04-infra/gpu-inference/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2374,7 +2568,8 @@ window.CATALOG = [
       "blurb": "Ba serving engine cùng giải bài toán serve LLM nhanh — khác nhau ở đâu, và tên nào hay bị hỏi thẳng trong phỏng vấn hạ tầng.",
       "n": 6,
       "path": "content/10-mlops/05-serving-engines/serving-engines-comparison/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2390,7 +2585,8 @@ window.CATALOG = [
       "blurb": "Model không biết nó không biết — vì sao hallucination là hệ quả tự nhiên của next-token prediction, không phải lỗi cần vá.",
       "n": 5,
       "path": "content/10-mlops/06-ai-reliability/hallucination/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "guardrails-reliability",
@@ -2400,7 +2596,8 @@ window.CATALOG = [
       "blurb": "Guardrail chặn input/output xấu, fallback chặn khi model down, human-in-the-loop chặn khi guardrail không chắc — ba lớp phòng thủ khác nhau.",
       "n": 6,
       "path": "content/10-mlops/06-ai-reliability/guardrails-reliability/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    },
@@ -2416,7 +2613,8 @@ window.CATALOG = [
       "blurb": "Injection nhắm vào dữ liệu model đọc, jailbreak nhắm vào chính chỉ dẫn hệ thống — hai cách khác nhau để lái model đi khỏi ý định gốc.",
       "n": 5,
       "path": "content/10-mlops/07-ai-security/prompt-injection/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      },
      {
       "dir": "ai-security-threats",
@@ -2426,7 +2624,8 @@ window.CATALOG = [
       "blurb": "Ba mối đe doạ nhắm vào ba giai đoạn khác nhau của vòng đời model — dữ liệu train, model đã deploy, và quyền truy cập.",
       "n": 4,
       "path": "content/10-mlops/07-ai-security/ai-security-threats/index.html",
-      "skeleton": true
+      "skeleton": true,
+      "lc": 0
      }
     ]
    }

@@ -1,30 +1,8 @@
 /* Lab binary search — kể chuyện thay vì bảng điều khiển.
-   Bốn phần: đoán trước → kịch bản → chạy từng bước có tô dòng code → câu chốt. */
+   Ba phần: kịch bản → chạy từng bước có tô dòng code → câu chốt. */
 (function () {
   var el = function (id) { return document.getElementById(id); };
   if (!el("bslab")) return;
-
-  /* ---------- phần 1: đoán trước khi chạy ---------- */
-  var guess = el("bguess");
-  var ans = guess.querySelector(".ans");
-  [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (b) {
-    b.onclick = function () {
-      [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (x) { x.classList.remove("pick"); });
-      b.classList.add("pick");
-      var v = b.getAttribute("data-v");
-      ans.hidden = false;
-      ans.innerHTML = (v === "20"
-        ? "<b>Đúng — 20 bước.</b> "
-        : "<b>Đáp án là 20 bước.</b> ") +
-        "Mỗi bước bỏ đi một nửa, nên số bước là log₂(1.000.000) ≈ 20." +
-        '<div class="bars" style="margin:14px 0 6px">' +
-        '<div class="b bad"><i>quét thẳng</i><u style="width:100%"></u><b>1.000.000 bước</b></div>' +
-        '<div class="b hi"><i>binary search</i><u style="width:0.5%"></u><b>20 bước</b></div>' +
-        '<div class="b"><i>mảng 1 tỉ</i><u style="width:0.7%"></u><b>30 bước</b></div>' +
-        "</div>" +
-        "Tăng dữ liệu gấp nghìn lần chỉ thêm 10 bước — đó là lý do log n gần như miễn phí.";
-    };
-  });
 
   /* ---------- kịch bản ---------- */
   var A = [1, 3, 4, 4, 4, 7, 9, 11, 15, 20];

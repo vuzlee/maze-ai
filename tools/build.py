@@ -4,6 +4,7 @@ Quét cây content/ rồi sinh lại hai file:
 
   assets/catalog.js       — danh mục kệ → nhóm → bài (trang chủ và nút bài trước/sau đọc file này)
   assets/search-index.js  — chỉ mục tìm kiếm toàn văn
+  assets/quiz-index.js    — bộ thẻ ôn, bóc từ chính các <details class="qa"> trong bài
 
 đồng thời ghi lại khối meta chuẩn trong <head> của mọi trang (mô tả, favicon, thẻ chia sẻ)
 — xem sync_head(). Khối này sinh từ data-title/data-blurb nên sửa bài là nó tự khớp theo.
@@ -30,6 +31,8 @@ THEME = "#14110E"          # --bg, để thanh trình duyệt trên mobile khôn
 HOME_DESC = ("Kiến thức nền cho kỹ sư data, machine learning và AI, viết bằng tiếng Việt: "
              "mười kệ từ cấu trúc dữ liệu và SQL tới Transformer, LLM và MLOps. Mỗi bài đi từ "
              "cơ chế bên dưới tới hệ quả thực tế, kèm code, sơ đồ và lab bấm được.")
+QUIZ_DESC = ("Ôn lại bằng thẻ lật: câu hỏi ở mặt trước, ý trả lời ở mặt sau, "
+             "bóc thẳng từ mục Hỏi đáp của từng bài trong MazeAI.")
 KIT_DESC = ("Bộ khuôn hình dùng chung của MazeAI — chép đoạn HTML, thay chữ, "
             "tự co giãn và tự đúng bảng màu.")
 
@@ -99,8 +102,29 @@ def attr(tag: str, name: str) -> str:
     return html.unescape(m.group(1)) if m else ""
 
 
+QA = re.compile(r'<details class="qa">\s*<summary>(.*?)</summary>(.*?)</details>', re.S)
+LC = re.compile(r'<a href="(https://leetcode\.com/[^"]+)"')
+
+def qa_cards(sec_id: str, body: str, rel: str, book: str, cat: str) -> list:
+    """Bóc các thẻ Hỏi đáp của một mục thành thẻ ôn.
+
+    Nguồn là chính bài viết, nên sửa bài xong chạy lại build là bộ thẻ tự khớp —
+    không có bản sao câu hỏi nào phải bảo trì riêng.
+    """
+    out = []
+    for i, (q, a) in enumerate(QA.findall(body)):
+        out.append({
+            "id": f"{rel}#{sec_id}:{i}",
+            "u": f"{rel}#{sec_id}",
+            "b": book,
+            "c": cat,
+            "q": text_of(q),
+            "a": a.strip(),
+        })
+    return out
+
 def read_book(page: pathlib.Path, rel: str, index: list, problems: list,
-              touched: list, urls: list):
+              touched: list, urls: list, cards: list, cat_name: str):
     """Đọc một bài: trả về metadata cho catalog, đồng thời nạp các mục vào chỉ mục tìm kiếm."""
     src = page.read_text(encoding="utf-8")
     m = re.search(r"<article class=\"doc\"[^>]*>", src)
@@ -134,6 +158,7 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list,
             "t": text_of(h2.group(2)),
             "x": text_of(body),
         })
+        cards.extend(qa_cards(sec_id, body, rel, title, cat_name))
 
     return {
         "dir": page.parent.name,
@@ -144,11 +169,12 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list,
         "n": len(secs),
         "path": rel,
         "skeleton": bool(attr(tag, "data-skeleton")),
+        "lc": len(set(LC.findall(src))),      # số bài LeetCode bài này trỏ tới, quiz dùng để mời thực hành
     }
 
 
 def main() -> int:
-    catalog, index, problems, touched, urls = [], [], [], [], []
+    catalog, index, problems, touched, urls, cards = [], [], [], [], [], []
 
     for cat_dir in sorted(p for p in CONTENT.iterdir() if p.is_dir()):
         meta_file = cat_dir / "category.json"
@@ -185,7 +211,7 @@ def main() -> int:
                     problems.append(f"{cat_dir.name}/{g['dir']}/{name}/: thiếu index.html — bỏ qua")
                     continue
                 book = read_book(page, f"content/{cat_dir.name}/{g['dir']}/{name}/index.html",
-                                 index, problems, touched, urls)
+                                 index, problems, touched, urls, cards, meta["name"])
                 if book:
                     books.append(book)
             groups.append({"dir": g["dir"], "name": g["name"], "books": books})
@@ -198,6 +224,7 @@ def main() -> int:
         })
 
     for name, canon, desc, manifest in (("index.html", "", HOME_DESC, True),
+                                        ("quiz.html", "quiz.html", QUIZ_DESC, False),
                                         ("kit.html", "kit.html", KIT_DESC, False)):
         f = ROOT / name
         if not f.exists():
@@ -208,6 +235,7 @@ def main() -> int:
         if sync_head(f, src, "", canon, html.unescape(title), desc, "website", manifest, problems):
             touched.append(name)
     urls.insert(0, "")            # trang chủ đứng đầu sitemap; kit.html là tài liệu nội bộ nên không liệt kê
+    urls.insert(1, "quiz.html")
 
     banner = "/* SINH TỰ ĐỘNG bởi tools/build.py — đừng sửa tay. */\n"
     (ROOT / "assets" / "catalog.js").write_text(
@@ -215,6 +243,9 @@ def main() -> int:
         encoding="utf-8")
     (ROOT / "assets" / "search-index.js").write_text(
         banner + "window.SEARCH_INDEX = " + json.dumps(index, ensure_ascii=False, separators=(",", ":")) + ";\n",
+        encoding="utf-8")
+    (ROOT / "assets" / "quiz-index.js").write_text(
+        banner + "window.QUIZ = " + json.dumps(cards, ensure_ascii=False, separators=(",", ":")) + ";\n",
         encoding="utf-8")
 
     if SITE_URL:
@@ -236,6 +267,7 @@ def main() -> int:
     nbooks = sum(len(g["books"]) for c in catalog for g in c["groups"])
     print(f"catalog.js      : {len(catalog)} kệ · {ngroups} nhóm · {nbooks} bài")
     print(f"search-index.js : {len(index)} mục")
+    print(f"quiz-index.js   : {len(cards)} thẻ ôn từ {len(set(c['u'] for c in cards))} mục Hỏi đáp")
     print(f"meta trong head : {len(touched)} trang được ghi lại" if touched else "meta trong head : đã khớp")
     for p in problems:
         print("  ! " + p)

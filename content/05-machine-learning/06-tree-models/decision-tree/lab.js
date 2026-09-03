@@ -35,26 +35,6 @@
     return a + " × A · " + (g.length - a) + " × B";
   }
 
-  /* ---------- đoán trước ---------- */
-  var guess = el("sguess"), ans = guess.querySelector(".ans");
-  [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (b) {
-    b.onclick = function () {
-      [].slice.call(guess.querySelectorAll(".opts button")).forEach(function (x) { x.classList.remove("pick"); });
-      b.classList.add("pick");
-      var v = parseFloat(b.getAttribute("data-v"));
-      cut = v; found = false;
-      ans.hidden = false;
-      ans.innerHTML = (v === 6.5
-        ? "<b>Đúng — ngưỡng 6,5.</b> "
-        : "<b>Chưa phải.</b> Ngưỡng " + fmt(v).replace(/,000$/, "") + " cho gain " + fmt(gainAt(v)) +
-          ", còn ngưỡng <b>6,5</b> cho " + fmt(gainAt(6.5)) + ". ") +
-        "Nó cắt đúng chỗ đa số A đổi sang đa số B. Để ý cột gain bên dưới: " +
-        "<b>không tăng dần</b> mà nhảy bậc — 3,5 tốt, 4,5 tụt hẳn, 6,5 lại vọt lên. " +
-        "Đó là lý do thuật toán phải <b>thử mọi ngưỡng</b> chứ không tối ưu bằng gradient được.";
-      draw();
-    };
-  });
-
   /* ---------- tiêu chí ---------- */
   el("scrit").innerHTML =
     '<button data-c="gini" class="on">Gini</button><button data-c="entropy">Entropy</button>';
