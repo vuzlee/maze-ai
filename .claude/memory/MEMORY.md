@@ -8,7 +8,7 @@ Hai thư mục, phân theo tuổi thọ:
 
 ## chuan/ — luật viết bài
 
-- [Bài mẫu: Random forest & bagging](chuan/chuan-bai-mau.md) — **đọc đầu tiên**; tám luật + số đo cụ thể để so
+- [Bài mẫu: Random forest & bagging](chuan/chuan-bai-mau.md) — **đọc đầu tiên**; chín luật + số đo cụ thể để so
 - [Ít chữ, nhiều hình](chuan/it-chu-nhieu-hinh.md) — đo bằng chữ/hình; chỉ số "tỉ lệ văn xuôi" cũ là sai hướng
 - [Thuật ngữ chuẩn & nguồn tham khảo](chuan/thuat-ngu-chuan-va-nguon-tham-khao.md) — tên tiếng Anh chuẩn dán lên hình, mỗi tầng một màu; rút gọn được cắt câu, không cắt tên
 - [Quy ước viết bài overview](chuan/quy-uoc-viet-overview.md) — macro→micro, không ép khuôn, không nhồi timeline

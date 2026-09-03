@@ -79,3 +79,58 @@ nên sau 8 lượt là **256 lá vs 9 lá** và cây level-wise lại *sâu hơn
 được kết quả đúng: 9 lá vs 9 lá, bên leaf-wise sâu 6 tầng còn level-wise 4, gain 41,3 vs 36,1.
 
 Kiểm bằng Chrome headless: 6 bài, 0 lỗi JS, `scrollWidth` 480 ≤ 490 (không tràn ngang), auto-run chạy.
+
+### Hình mở bài cho cả nhóm tree-models
+
+Sáu bài của `06-tree-models` giờ đều có một `figure.gist` ngay dưới lede — xem luật 9 ở
+[[chuan-bai-mau]]. Mỗi hình vẽ lại đúng câu lede của bài đó:
+
+| Bài | Hình nói gì |
+|---|---|
+| tree-family-overview | một cây hay sai → rẽ hai hướng: song song lấy số đông, tuần tự chữa lỗi |
+| decision-tree | cây yes/no ba tầng + bảng chấm điểm ngưỡng, ngưỡng thắng tô amber |
+| random-forest | ba cột song song: mẫu bootstrap → Train → cây sâu → Predict → phiếu → gộp lại |
+| gradient-boosting | ba cột nối nhau: dữ liệu → Train → cây nông → Predict → phần còn sai, phần sai vòng xuống làm dữ liệu cột sau; MSE 32,44 → 20,48 → 11,85 → 0,06 |
+| xgboost | **cùng khung ba tầng như gradient-boosting**, cùng bộ 8 căn nhà, cùng mốc cây 1·2·20 — khác mỗi ô cây: hai lá ra thẳng từ `w* = − G / (H + λ)` |
+| lightgbm | cột trái là vòng lặp boosting làm mờ, **chỉ ô cây tô sáng**, mũi tên "phóng to" sang hai cách mọc cây cùng 8 lá + khung "cái giá phải trả" |
+
+Script sinh nằm ở `/tmp/gist_*.py` dùng chung `/tmp/gist_lib.py` — không commit, viết lại được
+từ luật 9 nếu cần. CSS: `figure.gist` trong `assets/style.css`.
+
+### Sửa lần hai: hình phải vẽ *cơ chế đang chạy*, không phải ba khung tĩnh
+
+Người dùng đưa hình tham khảo (kiểu sơ đồ boosting hay gặp trên blog/sách): ba tầng
+**dữ liệu → Train → cây → Predict → phần còn sai**, rồi mũi tên vòng phần còn sai xuống làm dữ
+liệu cho cây kế tiếp. Bản đầu của hai hình `gradient-boosting` và `random-forest` chỉ là mấy khung
+đặt cạnh nhau — thấy *kết quả* thay đổi nhưng không thấy *cái gì chảy đi đâu*, nên không nhớ được.
+
+Rút ra, áp cho mọi hình mở bài sau này:
+
+- **Vẽ đường đi của dữ liệu, đừng vẽ ảnh chụp từng chặng.** Có mũi tên đặt tên (`Train`,
+  `Predict`) và có vòng hồi tiếp thì người đọc mới thấy được vòng lặp.
+- **Bố cục phải khác nhau khi cơ chế khác nhau.** Boosting = chuỗi nối tiếp (mũi tên xanh vòng
+  sang cột sau); random forest = ba cột song song không nối nhau, chỉ gặp nhau ở ô gộp phiếu.
+  Nhìn hai hình cạnh nhau là thấy ngay khác biệt bagging vs boosting, không cần đọc chữ.
+- **Cột cuối phải là lúc đã hội tụ.** Bản đầu vẽ cây 1·2·3, phần dư gần như không đổi nên hình vô
+  nghĩa. Đổi cột ba thành **cây 20** (MSE 0,06, các vạch phẳng và xanh) thì mới thấy được kết quả.
+  Số lấy từ chính lab của bài chạy lại bằng Python.
+- **Nhãn trong hình phải ngắn.** "mọc hết cỡ · mỗi nút bốc ngẫu nhiên vài feature" tràn sang cột
+  bên cạnh; tách phần giải thích ra cột chú thích bên phải.
+
+### Sửa lần ba: bốn bài boosting phải dùng chung một khung hình
+
+Người dùng: *"sao hình không còn tương đồng với gradient, tôi cần tương đồng cho có cảm giác cùng
+style"*. Đúng — XGBoost và LightGBM **cũng là boosting**, mà hình lại vẽ theo bố cục riêng, nên đọc
+xong không thấy chúng cùng một họ.
+
+Cách chữa, dùng lại được cho mọi nhóm mà các bài là biến thể của nhau:
+
+- **Cùng cơ chế thì cùng khung hình.** Ba bài boosting giờ dùng đúng một bố cục ba tầng
+  (dữ liệu → Train → cây → Predict → phần còn sai), cùng toạ độ, cùng cỡ chữ. Random forest cố ý
+  *khác* bố cục (ba cột song song) vì cơ chế nó khác thật.
+- **Cùng dữ liệu, cùng mốc.** XGBoost chạy lại trên **đúng 8 căn nhà** của gradient-boosting, cùng
+  ba mốc cây 1 · 2 · 20 (`g = F − y`, `h = 1`, `λ = 1`, `η = 0,3`, MSE 32,44 → 22,74 → 15,80 → 0,15).
+  Đặt hai hình cạnh nhau là so được từng con số — không so được thì "cùng style" chỉ là trang trí.
+- **Chỗ khác nhau thì tô sáng, phần giống thì làm mờ.** Hình LightGBM giữ nguyên vòng lặp nhưng
+  bôi xám hết, chỉ ô *cây* để màu, rồi mũi tên "phóng to" kéo sang phần so sánh hai cách mọc.
+  Người đọc thấy ngay: mọi thứ y hệt XGBoost, khác đúng một ô.

@@ -57,6 +57,40 @@ dài nhất 24 · 13 mục · **0 khối `<pre>`**.
    bullet ngắn. Không mất kiến thức nào, mà quét mắt vẫn nhanh.
    Mốc: **không đoạn văn mặt bài nào quá 33 từ** (trần của bài mẫu).
 
+## Luật 9 — hình mở bài: nhìn phát hiểu bài nói gì
+
+Ngay dưới lede, trước mục 01, đặt **đúng một** `figure.gist`: hình vẽ lại chính câu lede,
+kèm `figcaption` một câu. Tiêu chí người dùng đặt ra: **nhìn phát hiểu luôn**, không phải đọc
+mới hiểu. Nó không thay mục *Tổng kết một hình* ở cuối — đầu bài là lời hứa, cuối bài là chốt lại.
+
+Cả nhóm dùng **chung một bộ từ vựng hình**: cùng kiểu khung bo góc, cùng mũi tên có nhãn, cùng
+glyph cây, cùng bốn màu ngữ nghĩa. Học đọc một hình mở bài là đọc được cả năm cái còn lại —
+đúng tinh thần luật 1.
+
+**Hình phải vẽ cơ chế đang chạy, không phải ảnh chụp từng chặng.** Ba tầng dọc
+*dữ liệu → Train → cây/model → Predict → kết quả*, mũi tên có tên, và vòng hồi tiếp nếu thuật
+toán có lặp. Bố cục tự nó phải nói lên cơ chế: tuần tự thì các cột nối nhau, song song thì các cột
+rời nhau rồi mới gặp ở ô gộp. Cột cuối luôn là **lúc đã hội tụ** — vẽ ba bước đầu mà chưa thấy
+kết quả thì hình vô nghĩa.
+
+**Các bài cùng cơ chế phải dùng chung một khung hình**, cùng dữ liệu và cùng các mốc, để đặt cạnh
+nhau là so được từng con số. Bài nào chỉ khác một chi tiết thì **giữ nguyên khung, làm mờ phần
+giống, tô sáng đúng ô khác** rồi phóng to ô đó ra — đọc phát thấy ngay "y hệt bài kia, khác mỗi
+chỗ này". Ngược lại, cơ chế khác thật thì bố cục phải khác thật.
+
+Ba thứ dễ hỏng, đã dính đủ cả ba ở nhóm tree-models:
+
+- **Nhãn mũi tên đè lên khung bên cạnh.** Chỉ lộ ra khi render thật; phải chụp màn hình soát,
+  đọc markup không thấy.
+- **Hình nói dối.** Bản đầu của hình LightGBM vẽ hai cây khác số lá trong khi cả bài nói "cùng
+  ngân sách lá". Số nào hình khoe thì phải `assert` trong script sinh, hoặc tính lại từ chính
+  thuật toán của lab.
+- **Chữ trong hình quá dài.** Nhãn dài tràn khỏi khung ở màn hẹp. Nhãn là *nhãn*, không phải câu
+  văn — câu văn để `figcaption`.
+
+Sinh bằng script Python dùng chung (`box/txt/arrow/tree/put`), `put()` phải idempotent (xoá
+`figure.gist` cũ trước khi chèn) để chỉnh toạ độ rồi chạy lại thoải mái.
+
 **Áp dụng thế nào.** Trước khi sửa một bài, đo bằng script ở [[it-chu-nhieu-hinh]] và script đếm
 bullet dưới đây; sau khi sửa đo lại. Thứ tự việc: (1) bullet dài → cắt; (2) `<pre>` khái niệm →
 bỏ hoặc đổi thành hình; (3) hình lạ → đưa về hình dạng chính của bài; (4) công thức trần → `.eq`;
