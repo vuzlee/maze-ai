@@ -86,7 +86,7 @@
 
   <ul class="why">
     <li>Cách ly hoàn toàn: process này <b>không đọc được bộ nhớ</b> của process kia, và <b>sập cũng không kéo theo</b> cái kia.</li>
-    <li>Muốn trao đổi dữ liệu thì phải đi qua <b>kênh của hệ điều hành</b>: pipe, socket, bộ nhớ chia sẻ — nghĩa là phải đóng gói và sao chép.</li>
+    <li>Trao đổi dữ liệu phải qua <b>kênh của hệ điều hành</b> (pipe, socket) — tức phải đóng gói và sao chép.</li>
     <li>Tạo một process tốn <b>vài chục MB</b> và vài chục mili giây, vì phải dựng cả không gian địa chỉ mới.</li>
   </ul>
 </section>
@@ -124,7 +124,7 @@
 
   <ul class="why">
     <li>Trao đổi dữ liệu <b>không tốn gì</b>: chỉ cần cùng trỏ vào một object trên heap.</li>
-    <li>Đổi lại <b>không có cách ly</b>: một thread ghi đè bậy là mọi thread cùng hỏng, và một thread crash có thể kéo cả process.</li>
+    <li>Đổi lại <b>không có cách ly</b>: một thread ghi bậy là mọi thread cùng hỏng.</li>
     <li>Tạo thread rẻ hơn process khoảng <b>một bậc</b> — vài MB thay vì vài chục MB.</li>
   </ul>
 </section>
@@ -203,8 +203,8 @@
   </figure>
 
   <ul class="why">
-    <li>Vì sao có nó: bộ đếm tham chiếu của CPython <b>không an toàn với nhiều luồng</b>. Một khoá lớn là cách rẻ nhất để giữ mọi thứ đúng.</li>
-    <li>GIL <b>được nhả ra</b> khi thread ngồi chờ I/O, hoặc khi vào thư viện C tính toán (NumPy). Đó là lý do mục 06 tồn tại.</li>
+    <li>Bộ đếm tham chiếu của CPython <b>không an toàn với nhiều luồng</b> — một khoá lớn là cách rẻ nhất để giữ đúng.</li>
+    <li>GIL <b>được nhả ra</b> khi thread chờ I/O, hoặc khi vào thư viện C tính toán như NumPy.</li>
     <li>Hệ quả trực tiếp của mục 01: GIL thuộc về <b>một process</b>, nên <code>multiprocessing</code> né được — mỗi process một GIL riêng.</li>
     <li>Python 3.13 có bản thử nghiệm <b>không GIL</b>, nhưng chưa mặc định và thư viện C phải sửa lại.</li>
   </ul>
@@ -291,7 +291,77 @@
 </section>
 
 <section id="gil-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>09</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Một câu hỏi duy nhất — <em>đang chờ hay đang tính</em> — và mọi lựa chọn còn lại rơi ra từ đó.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 360" role="img" aria-label="Tổng kết thread, process và GIL: GIL nằm ở mức process, chờ thì dùng thread hoặc async, tính thì dùng process">
+      <text class="sv-h" x="16" y="26">&#9312; GIL NẰM Ở MỨC PROCESS</text>
+
+      <rect x="16" y="42" width="298" height="118" rx="8" fill="rgba(140,169,242,.08)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-d" x="36" y="64">1 process · 4 thread</text>
+      <rect x="36" y="74" width="122" height="28" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="97" y="93" text-anchor="middle" fill="#5BCFA0">T1 chạy</text>
+      <rect x="168" y="74" width="122" height="28" rx="5" fill="rgba(242,113,138,.12)" stroke="#F2718A" stroke-width="2"></rect>
+      <text class="sv-l" x="229" y="93" text-anchor="middle" fill="#F2718A">T2 chờ khoá</text>
+      <rect x="36" y="108" width="122" height="28" rx="5" fill="rgba(242,113,138,.12)" stroke="#F2718A" stroke-width="2"></rect>
+      <text class="sv-l" x="97" y="127" text-anchor="middle" fill="#F2718A">T3 chờ khoá</text>
+      <rect x="168" y="108" width="122" height="28" rx="5" fill="rgba(242,113,138,.12)" stroke="#F2718A" stroke-width="2"></rect>
+      <text class="sv-l" x="229" y="127" text-anchor="middle" fill="#F2718A">T4 chờ khoá</text>
+      <text class="sv-l" x="36" y="152" fill="#EDB44A">một GIL — 3 lõi ngồi không</text>
+
+      <text class="sv-h" x="340" y="26">MỖI PROCESS MỘT GIL RIÊNG</text>
+      <rect x="340" y="42" width="504" height="118" rx="8" fill="rgba(91,207,160,.08)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <rect x="360" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="414" y="100" text-anchor="middle" fill="#5BCFA0">P1</text>
+      <text class="sv-d" x="414" y="118" text-anchor="middle">lõi 1</text>
+      <rect x="478" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="532" y="100" text-anchor="middle" fill="#5BCFA0">P2</text>
+      <text class="sv-d" x="532" y="118" text-anchor="middle">lõi 2</text>
+      <rect x="596" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="650" y="100" text-anchor="middle" fill="#5BCFA0">P3</text>
+      <text class="sv-d" x="650" y="118" text-anchor="middle">lõi 3</text>
+      <rect x="714" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="768" y="100" text-anchor="middle" fill="#5BCFA0">P4</text>
+      <text class="sv-d" x="768" y="118" text-anchor="middle">lõi 4</text>
+      <text class="sv-l" x="360" y="152" fill="#8EE0BE">bộ nhớ tách rời — trao đổi phải qua pickle</text>
+
+      <text class="sv-h" x="16" y="192">&#9313; CÂU HỎI DUY NHẤT</text>
+      <rect x="16" y="204" width="404" height="112" rx="8" fill="rgba(237,180,74,.08)" stroke="#EDB44A" stroke-width="2"></rect>
+      <text class="sv-l" x="36" y="228" fill="#EDB44A">ĐANG CHỜ — I/O-bound</text>
+      <text class="sv-d" x="36" y="246">gọi API · đọc file · truy vấn database</text>
+      <text class="sv-d" x="36" y="264">thread nhả GIL khi chờ → chờ song song được</text>
+      <rect x="36" y="274" width="176" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="52" y="293" fill="#8EE0BE">asyncio · ~vài KB</text>
+      <rect x="222" y="274" width="180" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="238" y="293" fill="#8EE0BE">threading · ~vài MB</text>
+
+      <rect x="440" y="204" width="404" height="112" rx="8" fill="rgba(242,113,138,.08)" stroke="#F2718A" stroke-width="2"></rect>
+      <text class="sv-l" x="460" y="228" fill="#F2718A">ĐANG TÍNH — CPU-bound</text>
+      <text class="sv-d" x="460" y="246">vòng lặp lớn · xử lý ảnh · nén dữ liệu</text>
+      <text class="sv-d" x="460" y="264">thread tranh nhau GIL → thêm thread còn chậm hơn</text>
+      <rect x="460" y="274" width="188" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="476" y="293" fill="#8EE0BE">multiprocessing · ~vài chục MB</text>
+      <rect x="658" y="274" width="168" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="674" y="293" fill="#8EE0BE">đẩy xuống NumPy / C</text>
+
+      <line x1="16" y1="330" x2="844" y2="330" stroke="#2E2822"></line>
+      <text class="sv-l" x="16" y="352" fill="#7A6F63">&#9312; GIL <tspan fill="#EDB44A">không phải khoá dữ liệu của bạn</tspan> — race condition vẫn xảy ra, vẫn phải tự khoá</text>
+    </svg>
+    <figcaption>Hàng trên nói vì sao thêm thread không nhanh hơn; hàng dưới nói lấy gì thay vào, tuỳ tác vụ đang chờ hay đang tính.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>GIL <b>được nhả</b> khi chờ I/O hoặc khi vào thư viện C — đó là lý do cột trái &#9313; vẫn dùng thread được.</li>
+    <li>Cột phải &#9313; chạy được nhiều lõi vì mỗi process có GIL riêng, nhưng trả giá bằng bộ nhớ và chi phí pickle.</li>
+    <li>Một thao tác trông như một dòng vẫn tách thành nhiều bytecode, nên vẫn cần <code>Lock</code> — xem <a href="../../../03-cs-fundamentals/02-os/lock-deadlock-race/index.html">Lock, deadlock &amp; race condition</a>.</li>
+    <li>Cột <code>asyncio</code> rẻ hơn thread hai bậc vì không có stack riêng cho mỗi tác vụ — chi tiết ở <a href="../asyncio/index.html">Asyncio</a>.</li>
+  </ul>
+</section>
+
+<section id="gil-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Bẫy đầu tiên là <em>câu trả lời sai phổ biến nhất</em> khi được hỏi về GIL.</p>
 
@@ -302,8 +372,8 @@
   </div>
 </section>
 
-<section id="gil-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Hỏi đáp</h2></div>
+<section id="gil-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

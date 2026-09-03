@@ -48,7 +48,18 @@
 
 <section id="batch-stream-processing-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="key">Bài <a href="../etl-elt/index.html">ETL/ELT</a> nói về thứ tự transform và load. Còn một trục nữa: pipeline đó chạy <em>khi nào</em>? Dữ liệu (đơn hàng mới, click, log) tới liên tục suốt ngày — có thể gom lại rồi xử lý một lần theo lịch, hoặc xử lý ngay từng sự kiện khi nó vừa tới. Lựa chọn này quyết định trực tiếp độ trễ giữa "sự kiện xảy ra" và "kết quả sẵn sàng để dùng".</p>
+  <p class="key">Bài <a href="../etl-elt/index.html">ETL/ELT</a> nói về <em>thứ tự</em> transform và load. Còn một trục nữa: pipeline đó chạy <em>khi nào</em>? Dữ liệu tới liên tục suốt ngày, và có hai cách đón nó.</p>
+  <div class="cmp two">
+    <div><h5>Gom lại, chạy theo lịch</h5>
+      <p><b>Nhịp</b> mỗi đêm một lần</p>
+      <p><b>Kết quả sẵn sàng sau</b> vài giờ</p></div>
+    <div><h5>Xử lý ngay từng sự kiện</h5>
+      <p><b>Nhịp</b> liên tục, không nghỉ</p>
+      <p><b>Kết quả sẵn sàng sau</b> vài giây</p></div>
+  </div>
+  <ul class="why">
+    <li>Chọn cái nào quyết định trực tiếp <b>độ trễ</b> giữa "sự kiện xảy ra" và "kết quả dùng được".</li>
+  </ul>
 </section>
 
 <section id="batch-stream-processing-s2" class="lesson">
@@ -60,9 +71,9 @@
     <div class="s ok"><b>Sáng hôm sau — bảng báo cáo sẵn sàng</b><span>độ trễ đo bằng <b>giờ hoặc ngày</b></span></div>
   </div>
   <ul class="why">
-    <li>Ví dụ điển hình: job Spark chạy lúc 2 giờ sáng, đọc toàn bộ đơn hàng trong ngày, tính doanh thu theo sản phẩm, ghi vào bảng báo cáo.</li>
-    <li>Độ trễ đo bằng <b>giờ hoặc ngày</b> — chấp nhận được vì không ai cần xem báo cáo doanh thu hôm qua ngay lập tức trong đêm.</li>
-    <li>Đơn giản để viết, dễ debug (chạy lại toàn bộ lô nếu sai), throughput cao vì xử lý theo khối lớn tận dụng tốt tài nguyên.</li>
+    <li>Điển hình: job Spark chạy 2 giờ sáng, đọc đơn hàng cả ngày, tính doanh thu theo sản phẩm, ghi vào bảng báo cáo.</li>
+    <li>Độ trễ đo bằng <b>giờ hoặc ngày</b> — không ai cần xem báo cáo hôm qua ngay trong đêm.</li>
+    <li>Dễ viết, dễ debug (sai thì chạy lại cả lô), throughput cao vì xử lý theo khối lớn.</li>
   </ul>
 </section>
 
@@ -75,9 +86,9 @@
     <div class="s ok"><b>Vài mili-giây tới vài giây sau — có kết quả</b><span>đổi lại: hạ tầng chạy 24/7, chi phí vận hành cao hơn batch nhiều</span></div>
   </div>
   <ul class="why">
-    <li>Ví dụ điển hình: Kafka đưa từng sự kiện thanh toán vào một topic, Flink đọc liên tục và tính điểm gian lận ngay trong mili-giây tới vài giây.</li>
-    <li>Phức tạp hơn batch đáng kể vì phải xử lý <b>state</b> (nhớ giá trị tích luỹ giữa các sự kiện), <b>windowing</b> (gộp sự kiện trong một khung thời gian trượt, ví dụ "số lượt click trong 5 phút gần nhất"), và dữ liệu đến <b>không đúng thứ tự</b> (out-of-order — sự kiện có thể tới trễ do mạng).</li>
-    <li>Đổi lại độ trễ thấp — <b>giây hoặc mili-giây</b> — nhưng hạ tầng chạy liên tục 24/7, chi phí vận hành và giám sát cao hơn batch nhiều.</li>
+    <li>Điển hình: Kafka đưa từng sự kiện thanh toán vào topic, Flink đọc liên tục và tính điểm gian lận trong vài giây.</li>
+    <li>Phức tạp hơn batch vì ba thứ: <b>state</b> (nhớ giá trị tích luỹ), <b>windowing</b> (gộp theo khung trượt), sự kiện tới <b>out-of-order</b>.</li>
+    <li>Đổi lại độ trễ <b>giây hoặc mili-giây</b>, nhưng hạ tầng chạy 24/7 nên vận hành và giám sát đắt hơn batch.</li>
   </ul>
 </section>
 
@@ -90,8 +101,8 @@
   </div>
   <p class="axiscap"><span>đơn giản, rẻ, trễ</span><span><em>đổi độ trễ lấy độ phức tạp hạ tầng</em></span><span>tức thời, đắt, phức tạp</span></p>
   <ul class="why">
-    <li><b>Cần streaming thật</b> khi giá trị của việc <em>biết ngay</em> lớn hơn chi phí vận hành: fraud detection (chặn giao dịch gian lận trước khi tiền đi), dashboard real-time (giám sát hệ thống), cảnh báo sự cố.</li>
-    <li><b>Batch là đủ</b> cho phần lớn báo cáo nghiệp vụ: doanh thu hằng ngày, huấn luyện lại một model ML theo tuần, đối soát dữ liệu cuối ngày — không ai mất gì nếu số liệu này chậm vài giờ.</li>
+    <li><b>Cần streaming thật</b> khi giá trị của việc <em>biết ngay</em> lớn hơn chi phí vận hành: fraud detection, dashboard real-time, cảnh báo sự cố.</li>
+    <li><b>Batch là đủ</b> cho phần lớn báo cáo: doanh thu hằng ngày, huấn luyện lại model theo tuần. Chậm vài giờ không ai mất gì.</li>
   </ul>
   <div class="note">
     <h4>Lambda và Kappa architecture</h4>
@@ -100,7 +111,82 @@
 </section>
 
 <section id="batch-stream-processing-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Cùng một pipeline, chỉ khác nhịp chạy — nhưng đổi nhịp từ giờ xuống giây kéo theo state, windowing và sự kiện tới sai thứ tự.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 500" role="img" aria-label="Tổng kết batch vs stream processing: hai nhịp chạy, trục độ trễ ba mức, ba thứ khiến streaming phức tạp hơn, và hai kiến trúc kết hợp">
+    <text class="sv-h" x="0" y="12">&#9312; HAI NHỊP ĐÓN CÙNG MỘT DÒNG DỮ LIỆU</text>
+
+    <rect x="8" y="24" width="410" height="82" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="44" fill="#8EE0BE">Batch — gom lại, chạy theo lịch</text>
+    <text class="sv-d" x="20" y="62">suốt ngày đơn hàng dồn vào bảng nguồn, chưa ai xử lý</text>
+    <text class="sv-d" x="20" y="78">2 giờ sáng job Spark chạy MỘT lần, đọc cả ngày</text>
+    <text class="sv-d" x="20" y="94">sáng hôm sau bảng báo cáo sẵn sàng</text>
+
+    <rect x="442" y="24" width="410" height="82" rx="5" fill="#EDB44A" fill-opacity="0.08" stroke="#EDB44A"/>
+    <text class="sv-l" x="454" y="44" fill="#EDB44A">Stream — xử lý ngay từng sự kiện</text>
+    <text class="sv-d" x="454" y="62">thanh toán vừa xảy ra &#8594; Kafka đẩy vào topic</text>
+    <text class="sv-d" x="454" y="78">Flink đọc liên tục, tính điểm gian lận</text>
+    <text class="sv-d" x="454" y="94">vài giây sau đã có kết quả</text>
+
+    <text class="sv-h" x="0" y="140">&#9313; TRỤC ĐỘ TRỄ — BA MỨC, KHÔNG PHẢI HAI</text>
+    <line x1="20" y1="176" x2="840" y2="176" stroke="#3D352C" stroke-width="1.5"/>
+    <circle cx="110" cy="176" r="5" fill="#5BCFA0"/>
+    <circle cx="430" cy="176" r="5" fill="#8CA9F2"/>
+    <circle cx="750" cy="176" r="5" fill="#EDB44A"/>
+    <text class="sv-l" x="110" y="164" text-anchor="middle" fill="#8EE0BE">Batch</text>
+    <text class="sv-l" x="430" y="164" text-anchor="middle" fill="#A8BEF6">Micro-batch</text>
+    <text class="sv-l" x="750" y="164" text-anchor="middle" fill="#EDB44A">Streaming</text>
+    <text class="sv-d" x="110" y="196" text-anchor="middle">giờ / ngày</text>
+    <text class="sv-d" x="430" y="196" text-anchor="middle">phút</text>
+    <text class="sv-d" x="750" y="196" text-anchor="middle">giây / mili-giây</text>
+    <text class="sv-d" x="110" y="212" text-anchor="middle">đơn giản, rẻ</text>
+    <text class="sv-d" x="430" y="212" text-anchor="middle">Spark Structured Streaming</text>
+    <text class="sv-d" x="750" y="212" text-anchor="middle">đắt, hạ tầng 24/7</text>
+    <text class="sv-d" x="0" y="240">câu hỏi để chọn: nếu kết quả trễ một giờ thay vì một giây, có ai bị ảnh hưởng THẬT không</text>
+
+    <text class="sv-h" x="0" y="274">&#9314; BA THỨ CHỈ STREAM MỚI PHẢI LO</text>
+
+    <rect x="8" y="286" width="272" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="20" y="306" fill="#F79BAB">State</text>
+    <text class="sv-d" x="20" y="324">phải tự nhớ giá trị tích luỹ</text>
+    <text class="sv-d" x="20" y="342">giữa các sự kiện, qua cả lần crash</text>
+
+    <rect x="292" y="286" width="272" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="304" y="306" fill="#F79BAB">Windowing</text>
+    <text class="sv-d" x="304" y="324">dữ liệu không có điểm kết thúc</text>
+    <text class="sv-d" x="304" y="342">tumbling &#183; sliding &#183; session</text>
+
+    <rect x="576" y="286" width="276" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="588" y="306" fill="#F79BAB">Out-of-order events</text>
+    <text class="sv-d" x="588" y="324">sự kiện tới trễ, sai thứ tự thời gian</text>
+    <text class="sv-d" x="588" y="342">bỏ qua thì window sai ÂM THẦM</text>
+
+    <text class="sv-d" x="0" y="382">batch không cần ba thứ này vì dữ liệu vốn đã là một khối trọn vẹn, và sai thì chạy lại cả lô</text>
+
+    <text class="sv-h" x="0" y="414">&#9315; KHÔNG PHẢI LÚC NÀO CŨNG CHỌN HẲN MỘT BÊN</text>
+    <rect x="8" y="426" width="410" height="52" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="446" fill="#A8BEF6">Lambda — chạy song song cả hai đường</text>
+    <text class="sv-d" x="20" y="464">gộp kết quả lúc trả lời &#183; giá: hai bộ logic dễ lệch nhau</text>
+    <rect x="442" y="426" width="410" height="52" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="454" y="446" fill="#A8BEF6">Kappa — xử lý mọi thứ như stream</text>
+    <text class="sv-d" x="454" y="464">cần kết quả kiểu batch thì chạy lại toàn bộ lịch sử sự kiện</text>
+  </svg>
+  <figcaption>&#9312; hai nhịp trên cùng dòng dữ liệu, &#9313; ba mức độ trễ để chọn, &#9314; cái giá của mức nhanh nhất, &#9315; và hai cách ghép cả hai.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Micro-batch</b> — ở &#9313;: về kỹ thuật vẫn là batch, nhưng lô đủ nhỏ và đủ thường xuyên để đóng vai streaming.</li>
+    <li><b>Windowing</b> — ở &#9314;: khái niệm chỉ tồn tại ở stream, vì dòng dữ liệu không có điểm kết thúc để tính.</li>
+    <li><b>Out-of-order events</b> — ở &#9314;: thứ làm kết quả sai mà không báo lỗi, nên là lỗi khó phát hiện nhất.</li>
+    <li><b>Lambda &amp; Kappa</b> — ở &#9315;: hai kiến trúc cho khi cần cả độ chính xác lẫn độ trễ thấp.</li>
+  </ul>
+</section>
+
+<section id="batch-stream-processing-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Dùng streaming khi batch là đủ</h4><p>Xây hạ tầng Kafka + Flink cho một báo cáo chạy mỗi ngày một lần — chi phí vận hành và độ phức tạp không tương xứng với lợi ích, trong khi một cron job đơn giản đã giải quyết xong.</p></div>
     <div class="card bad"><h4>Bỏ qua out-of-order events</h4><p>Giả định sự kiện luôn tới đúng thứ tự thời gian, tính window sai khi có sự kiện tới trễ vài giây do mạng chậm — kết quả streaming sai một cách âm thầm.</p></div>
@@ -109,8 +195,8 @@
   </div>
 </section>
 
-<section id="batch-stream-processing-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="batch-stream-processing-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
   <details class="qa"><summary>Làm sao chọn giữa batch và stream cho một bài toán cụ thể?</summary>
   <p>Hỏi một câu: nếu kết quả trễ một giờ thay vì một giây, có ai bị ảnh hưởng thật không? Nếu không (báo cáo nội bộ, huấn luyện lại model định kỳ) thì batch luôn rẻ và đơn giản hơn. Nếu có (chặn gian lận, cảnh báo sự cố) thì mới đáng trả chi phí vận hành streaming.</p></details>
   <details name="dq" class="qa"><summary>Windowing trong stream processing là gì?</summary>

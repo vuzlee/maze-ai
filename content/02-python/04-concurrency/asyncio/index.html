@@ -181,7 +181,79 @@ results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="k
 </section>
 
 <section id="async-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>07</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Async đổi đơn vị chờ từ luồng hệ điều hành sang object vài KB — nên nó rẻ, và nên <em>một</em> lệnh chặn cũng đủ treo tất cả.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 372" role="img" aria-label="So chi phí ba mô hình, event loop nhường quyền tại await, ba lỗi async hay gặp, và cách chọn mô hình">
+
+      <text class="sv-h" x="8" y="16">&#9312; ĐƠN VỊ CHỜ RẺ ĐI BAO NHIÊU LẦN</text>
+      <rect x="8" y="26" width="400" height="20" rx="3" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
+      <text class="sv-t" x="18" y="41" fill="#F79BAB">Process &#183; ~30 MB</text>
+      <text class="sv-d" x="416" y="41" fill="#7A6F63">tạo mất hàng chục ms &#183; chỉ chạy được bằng số lõi</text>
+      <rect x="8" y="52" width="110" height="20" rx="3" fill="rgba(237,180,74,.18)" stroke="#EDB44A"/>
+      <text class="sv-t" x="18" y="67" fill="#EDB44A">Thread &#183; ~8 MB</text>
+      <text class="sv-d" x="126" y="67" fill="#7A6F63">tạo dưới 1 ms &#183; chuyển qua kernel &#183; hàng trăm là hết</text>
+      <rect x="8" y="78" width="14" height="20" rx="3" fill="rgba(91,207,160,.20)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="30" y="93" fill="#8EE0BE">Async task &#183; vài KB</text>
+      <text class="sv-d" x="180" y="93" fill="#7A6F63">tạo mất micro giây &#183; chuyển là gọi hàm &#183; hàng chục nghìn</text>
+      <text class="sv-l" x="8" y="118">10.000 kết nối đồng thời: thread cần khoảng 80 GB RAM, async cần vài chục MB</text>
+
+      <text class="sv-h" x="8" y="148">&#9313; MỘT LUỒNG, NHIỀU TÁC VỤ — NHƯỜNG QUYỀN TẠI ĐIỂM AWAIT</text>
+      <rect x="8" y="158" width="140" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-t" x="18" y="178" fill="#A8BEF6">async def</text>
+      <text class="sv-d" x="8" y="204" fill="#7A6F63">gọi vào không chạy gì</text>
+      <path d="M148 173 h20" stroke="#7A6F63"/><path d="M168 173 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="170" y="158" width="150" height="30" rx="4" fill="rgba(237,180,74,.12)" stroke="#EDB44A"/>
+      <text class="sv-t" x="180" y="178" fill="#EDB44A">await</text>
+      <text class="sv-d" x="170" y="204" fill="#7A6F63">tôi chờ, cứ chạy việc khác</text>
+      <path d="M320 173 h20" stroke="#7A6F63"/><path d="M340 173 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="342" y="158" width="150" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-t" x="352" y="178" fill="#A8BEF6">event loop</text>
+      <text class="sv-d" x="342" y="204" fill="#7A6F63">chạy cái nào đã sẵn sàng</text>
+      <path d="M492 173 h20" stroke="#7A6F63"/><path d="M512 173 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="514" y="158" width="150" height="30" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="524" y="178" fill="#8EE0BE">gather</text>
+      <text class="sv-d" x="514" y="204" fill="#7A6F63">phát hết rồi chờ chung</text>
+      <text class="sv-l" x="686" y="172">hợp tác, không</text>
+      <text class="sv-l" x="686" y="188">phải cưỡng chế —</text>
+      <text class="sv-l" x="686" y="204">tự nguyện nhường</text>
+
+      <rect x="8" y="222" width="840" height="86" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
+      <text class="sv-h" x="20" y="242" fill="#F79BAB">&#9314; BA LỖI — ĐỀU KHÔNG NÉM EXCEPTION Ở ĐÚNG CHỖ GÂY RA</text>
+      <rect x="20" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="30" y="268" fill="#F79BAB">1 &#183; gọi hàm chặn trong loop</text>
+      <text class="sv-l" x="30" y="284">time.sleep &#183; requests &#183; driver DB</text>
+      <text class="sv-d" x="30" y="296" fill="#7A6F63">chậm dưới tải mà CPU vẫn thấp</text>
+      <rect x="296" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="306" y="268" fill="#F79BAB">2 &#183; quên await</text>
+      <text class="sv-l" x="306" y="284">result là coroutine object</text>
+      <text class="sv-d" x="306" y="296" fill="#7A6F63">cảnh báo hiện muộn, ở chỗ khác</text>
+      <rect x="572" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="582" y="268" fill="#F79BAB">3 &#183; tuần tự hoá vô tình</text>
+      <text class="sv-l" x="582" y="284">await trong vòng lặp &#8594; nối đuôi</text>
+      <text class="sv-d" x="582" y="296" fill="#7A6F63">300 ms thay vì 100 ms</text>
+
+      <text class="sv-h" x="8" y="330">&#9315; CHỌN MÔ HÌNH NÀO</text>
+      <text class="sv-l" x="8" y="348" fill="#8EE0BE">chờ I/O, có thư viện async &#8594; asyncio</text>
+      <text class="sv-l" x="300" y="348">chờ I/O, chỉ có SDK đồng bộ &#8594; thread pool hoặc to_thread</text>
+      <text class="sv-l" x="8" y="364" fill="#EDB44A">tính nặng bằng Python thuần &#8594; multiprocessing</text>
+      <text class="sv-l" x="300" y="364">vừa chờ vừa tính &#8594; async lo chờ, process lo tính</text>
+    </svg>
+    <figcaption>Đọc theo số: async rẻ hơn thread và process nhiều bậc &#9312;, cơ chế là nhường quyền tại <code>await</code> &#9313;, ba lỗi đều xuất phát từ việc phá vỡ sự nhường đó &#9314;, và cách chọn giữa ba mô hình &#9315;.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><strong><code>to_thread</code></strong> là cầu nối giữa &#9314;-1 và &#9315;: đẩy một hàm chặn sang luồng riêng để nó không giữ event loop.</li>
+    <li><strong><code>return_exceptions=True</code></strong> đổi hành vi của <code>gather</code> ở &#9313; — lỗi thành một giá trị kết quả thay vì làm sập cả nhóm.</li>
+    <li><strong>Task</strong> là coroutine đã giao cho event loop chạy nền, khác một coroutine chưa được await ở &#9314;-2 vốn chưa chạy dòng nào.</li>
+    <li><strong>GIL</strong> là lý do &#9315; vẫn cần multiprocessing — async không giúp gì khi tác vụ bị chặn bởi CPU chứ không phải I/O.</li>
+  </ul>
+</section>
+
+<section id="async-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Ba lỗi này làm code async chạy đúng nhưng <em>chậm như tuần tự</em>, hoặc mất task im lặng.</p>
 
@@ -192,8 +264,8 @@ results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="k
   </div>
 </section>
 
-<section id="async-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+<section id="async-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

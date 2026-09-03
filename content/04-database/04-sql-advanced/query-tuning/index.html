@@ -46,7 +46,7 @@
   <p class="lede">Câu hỏi vận hành hay gặp nhất: <b>truy vấn này chậm, bạn làm gì trước</b>. Bài này không dạy cơ chế mới — nó ráp lại <a href="../sql-index-query-plan/index.html">index &amp; query plan</a> và <a href="../transaction-isolation/index.html">transaction &amp; isolation</a> thành một <b>quy trình thực chiến</b>: đọc <code>EXPLAIN ANALYZE</code> đúng cách, nhận ra N+1, và né các bẫy kinh điển như <code>SELECT *</code>, hàm bọc cột, và <code>OFFSET</code> lớn.</p>
 </header>
 
-<section id="tuning-s1">
+<section id="tuning-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Quy trình sáu bước</h2></div>
   <p>Đây chính là checklist đã nêu ở cuối bài <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>, viết lại thành quy trình đầy đủ để dùng trực tiếp khi có báo cáo "trang này load chậm".</p>
 <div class="stack">
@@ -63,7 +63,7 @@
   </div>
 </section>
 
-<section id="tuning-s2">
+<section id="tuning-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Đọc plan — tìm ba dấu hiệu này trước</h2></div>
   <p>Cơ chế đọc <code>EXPLAIN</code> đã học kỹ ở <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>. Ở đây là thứ tự tìm khi <em>không biết</em> plan có gì — quét theo đúng ba dấu hiệu này trước khi đọc chi tiết từng nút.</p>
 <div class="stack">
@@ -78,7 +78,7 @@
   </div>
 </section>
 
-<section id="tuning-s3">
+<section id="tuning-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Sửa câu lệnh hay sửa index</h2></div>
   <p>Cùng một triệu chứng "chậm" có thể cần hai loại sửa hoàn toàn khác nhau. Bảng dưới giúp quyết định nhanh cái nào trước.</p>
 <div class="cmp two">
@@ -106,7 +106,7 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
   </div>
 </section>
 
-<section id="tuning-s4">
+<section id="tuning-s4" class="lesson">
   <div class="sh"><b>04</b><h2>N+1 query — dấu hiệu và cách gộp</h2></div>
   <p>Không phải mọi truy vấn chậm là <em>một</em> câu SQL chậm. Rất thường xuyên, mỗi câu SQL riêng lẻ chạy dưới 1ms nhưng ứng dụng gọi nó <strong>hàng trăm lần</strong> trong một request — đây là bài toán N+1, nguyên nhân chậm phổ biến nhất khi dùng ORM.</p>
 <div class="bars">
@@ -125,7 +125,7 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
   </div>
 </section>
 
-<section id="tuning-s5">
+<section id="tuning-s5" class="lesson">
   <div class="sh"><b>05</b><h2>OFFSET lớn và keyset pagination</h2></div>
   <p>Một bẫy hiệu năng riêng, đủ phổ biến để tách mục: phân trang bằng <code>OFFSET</code> chậm dần khi trang càng sâu, vì cơ sở dữ liệu vẫn phải <strong>đếm và bỏ qua</strong> hết số dòng ở các trang trước.</p>
 <div class="cmp two">
@@ -143,7 +143,7 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
   </div>
 </section>
 
-<section id="tuning-s6">
+<section id="tuning-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Connection pooling — sơ lược</h2></div>
   <p>Một góc dễ bị bỏ quên khi "truy vấn tự nó đã nhanh mà cả hệ thống vẫn chậm": mở một kết nối TCP mới tới database tốn vài đến vài chục ms, đắt hơn nhiều truy vấn thật sự cần. <strong>Connection pool</strong> giữ sẵn một số kết nối đã mở, ứng dụng mượn rồi trả lại thay vì mở mới mỗi lần.</p>
   <table>
@@ -153,8 +153,103 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
   <p>Kích thước pool hợp lý gắn với số CPU core của database và độ dài trung bình một transaction — không phải con số càng lớn càng an toàn. Đây là lý do một transaction mở quá lâu (nhắc ở bài <a href="../transaction-isolation/index.html">transaction &amp; isolation</a>) không chỉ gây khoá mà còn giữ chết một kết nối trong pool, làm cạn pool nhanh hơn tưởng.</p>
 </section>
 
-<section id="tuning-s7">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+<section id="tuning-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Cả bài là một vòng đo → đọc → phân loại → sửa đúng chỗ → đo lại; ba nhánh sửa nằm ở ba chỗ khác hẳn nhau.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 536" role="img" aria-label="Tổng kết query tuning: vòng sáu bước, ba dấu hiệu đọc plan, phân loại sửa index hay sửa câu lệnh, N+1, OFFSET lớn và connection pool">
+    <text class="sv-h" x="0" y="12">&#9312; VÒNG SÁU BƯỚC — KHÔNG ĐOÁN, ĐO</text>
+
+    <rect x="8" y="26" width="122" height="32" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
+    <text class="sv-l" x="69" y="46" text-anchor="middle" fill="#A8BEF6">1 · đo trước</text>
+    <line x1="134" y1="42" x2="152" y2="42" stroke="#3D352C" stroke-width="1.5"/>
+    <rect x="156" y="26" width="122" height="32" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
+    <text class="sv-l" x="217" y="46" text-anchor="middle" fill="#A8BEF6">2 · đọc plan</text>
+    <line x1="282" y1="42" x2="300" y2="42" stroke="#3D352C" stroke-width="1.5"/>
+    <rect x="304" y="26" width="150" height="32" rx="5" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
+    <text class="sv-l" x="379" y="46" text-anchor="middle" fill="#EDB44A">3 · estimate vs actual</text>
+    <line x1="458" y1="42" x2="476" y2="42" stroke="#3D352C" stroke-width="1.5"/>
+    <rect x="480" y="26" width="134" height="32" rx="5" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
+    <text class="sv-l" x="547" y="46" text-anchor="middle" fill="#EDB44A">4 · loại vấn đề</text>
+    <line x1="618" y1="42" x2="636" y2="42" stroke="#3D352C" stroke-width="1.5"/>
+    <rect x="640" y="26" width="112" height="32" rx="5" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="696" y="46" text-anchor="middle" fill="#8EE0BE">5 · sửa</text>
+    <line x1="756" y1="42" x2="774" y2="42" stroke="#3D352C" stroke-width="1.5"/>
+    <rect x="778" y="26" width="74" height="32" rx="5" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="815" y="46" text-anchor="middle" fill="#8EE0BE">6 · đo lại</text>
+    <path d="M 815 62 L 815 76 L 69 76 L 69 62" fill="none" stroke="#3D352C" stroke-dasharray="3 3"/>
+    <text class="sv-d" x="430" y="92" text-anchor="middle">EXPLAIN ANALYZE là bước ĐẦU, không phải bước cuối khi mọi cách khác đã thử</text>
+
+    <text class="sv-h" x="0" y="126">&#9313; ĐỌC PLAN — QUÉT BA DẤU HIỆU NÀY TRƯỚC</text>
+
+    <rect x="8" y="138" width="272" height="60" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="20" y="158" fill="#EDB44A">Seq Scan trên bảng lớn</text>
+    <text class="sv-d" x="20" y="176">chỉ đáng lo nếu điều kiện lọc</text>
+    <text class="sv-d" x="20" y="190">chọn lọc — bảng nhỏ thì đó là plan ĐÚNG</text>
+
+    <rect x="294" y="138" width="272" height="60" rx="5" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="306" y="158" fill="#F79BAB">rows=5 vs actual rows=48000</text>
+    <text class="sv-d" x="306" y="176">thống kê cũ — chạy ANALYZE table</text>
+    <text class="sv-d" x="306" y="190">TRƯỚC, đừng vội đổi gì khác</text>
+
+    <rect x="580" y="138" width="272" height="60" rx="5" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="592" y="158" fill="#F79BAB">Nested Loop · loops=12000</text>
+    <text class="sv-d" x="592" y="176">thiếu index trên cột join —</text>
+    <text class="sv-d" x="592" y="190">nút bên trong bị quét lại 12.000 lần</text>
+
+    <text class="sv-d" x="0" y="216">khoanh được nút nghi vấn rồi thì nhân actual time × loops — sửa nút chiếm phần lớn thời gian, không sửa nút &quot;nhìn đáng ngờ&quot;</text>
+
+    <text class="sv-h" x="0" y="250">&#9314; SỬA INDEX HAY SỬA CÂU LỆNH</text>
+
+    <rect x="8" y="262" width="410" height="102" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="282" fill="#A8BEF6">SỬA INDEX</text>
+    <text class="sv-d" x="20" y="300">cột lọc/join chưa có index, selectivity đủ cao</text>
+    <text class="sv-d" x="20" y="316">phải quay lại bảng lấy vài cột → INCLUDE</text>
+    <text class="sv-d" x="20" y="332">index tổ hợp sai thứ tự — leftmost prefix</text>
+    <text class="sv-d" x="20" y="348">thống kê cũ → ANALYZE</text>
+
+    <rect x="442" y="262" width="410" height="102" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="454" y="282" fill="#8EE0BE">SỬA CÂU LỆNH</text>
+    <text class="sv-d" x="454" y="300">hàm bọc cột — YEAR(created_at) = 2024</text>
+    <text class="sv-d" x="454" y="316">SELECT * rồi lọc ở tầng ứng dụng</text>
+    <text class="sv-d" x="454" y="332">cấu trúc truy vấn tự nó gây N+1</text>
+    <text class="sv-d" x="454" y="348">OFFSET quá lớn</text>
+
+    <text class="sv-h" x="0" y="392">&#9315; N+1 — CHẬM MÀ KHÔNG CÂU NÀO TRÔNG ĐÁNG NGỜ</text>
+
+    <rect x="8" y="404" width="150" height="24" rx="4" fill="#EDB44A" fill-opacity="0.22" stroke="#EDB44A"/>
+    <text class="sv-l" x="166" y="421" fill="#EDB44A">1 × 200 ms — dễ thấy trong log</text>
+    <rect x="8" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
+    <rect x="22" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
+    <rect x="36" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
+    <rect x="50" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
+    <rect x="64" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
+    <rect x="78" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
+    <text class="sv-l" x="166" y="451" fill="#F79BAB">100 × 3 ms = 300 ms — mỗi câu 1–2 ms, không câu nào bị chú ý</text>
+    <text class="sv-d" x="480" y="421">chữa: IN (…) &#183; JOIN &#183; eager loading</text>
+    <text class="sv-d" x="480" y="451">phát hiện: đếm SỐ LƯỢNG query trên một request</text>
+
+    <text class="sv-h" x="0" y="486">&#9316; HAI GÓC DỄ QUÊN</text>
+    <rect x="8" y="496" width="410" height="26" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="20" y="513">OFFSET 100000 → keyset: WHERE id &gt; 100020</text>
+    <rect x="442" y="496" width="410" height="26" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="454" y="513">connection pool — mở kết nối mới tốn hơn truy vấn</text>
+  </svg>
+  <figcaption>Đọc từ trên xuống: &#9312; quy trình chung, &#9313; nhìn plan thấy gì, &#9314; kết luận sửa ở đâu, &#9315; loại chậm không nằm trong một câu SQL nào, &#9316; hai bẫy cấu trúc riêng.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Đo trước khi sửa</b> — ở &#9312;: trực giác về truy vấn nào chậm thường sai, nên vòng mở và đóng bằng EXPLAIN ANALYZE.</li>
+    <li><b>Selectivity &amp; thống kê</b> — ở &#9313;: Seq Scan không tự động là thủ phạm; estimate lệch xa actual thì chạy ANALYZE trước.</li>
+    <li><b>Hàm bọc cột</b> — ở &#9314;: ranh giới thật giữa hai nhánh sửa — không index nào cứu được một cột bị hàm bọc.</li>
+    <li><b>N+1 &amp; keyset pagination</b> — ở &#9315;&#9316;: hai kiểu chậm do cấu trúc truy vấn, chữa bằng viết lại chứ không bằng thêm index.</li>
+  </ul>
+</section>
+
+<section id="tuning-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>SELECT * theo phản xạ</h4><p>Lấy thừa cột, tăng băng thông, và mất luôn cơ hội Index Only Scan nếu chỉ cần vài cột đã nằm trong index.</p></div>
     <div class="card bad"><h4>Thiếu index trên cột JOIN hoặc WHERE hay dùng</h4><p>Dấu hiệu rõ nhất: Nested Loop với Seq Scan bên trong, <code>loops</code> bằng đúng số dòng bảng ngoài.</p></div>
@@ -165,8 +260,8 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
   </div>
 </section>
 
-<section id="tuning-s8">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+<section id="tuning-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Hỏi đáp</h2></div>
 
   <details class="qa"><summary>Một truy vấn được báo là chậm trong production. Bạn làm gì đầu tiên?</summary>
   <p>Đo trước khi sửa: chạy <code>EXPLAIN ANALYZE</code> với đúng tham số và dữ liệu thật, không đoán. Tìm nút tốn thời gian nhất, nhớ nhân <code>actual time</code> với <code>loops</code>. So <code>rows</code> ước lượng với thực tế — lệch nhiều thì chạy <code>ANALYZE</code> trước khi nghĩ tới việc đổi index hay viết lại câu lệnh, vì rất nhiều "plan xấu" chỉ do thống kê cũ.</p></details>

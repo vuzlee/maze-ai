@@ -12,8 +12,7 @@ nói từ trước: **ít chữ, hình minh hoạ đẹp để dễ học, nội
 
 **Vì sao.** Tôi đã chẩn đoán ngược. "Khó đọc" không phải vì thiếu văn xuôi — thêm văn xuôi làm bài
 dài thêm và khó hơn. Người dùng học bằng **hình**: một `.stack`, `.cmp two`, `.strip` hay `.flow`
-thay được cả đoạn văn và nhìn phát hiểu. Chỉ số cũ (tỉ lệ văn xuôi) **sai hướng — đừng dùng lại**;
-đoạn ghi "Đã sửa xong" trong [[soat-ke-05-machine-learning]] khen nhầm việc tăng văn xuôi.
+thay được cả đoạn văn và nhìn phát hiểu. Chỉ số cũ (tỉ lệ văn xuôi) **sai hướng — đừng dùng lại**.
 
 **Áp dụng thế nào.** Chỉ số đúng là **số chữ trên mỗi hình** (bỏ qua bài khung):
 
@@ -23,7 +22,8 @@ t = re.sub(r'<svg.*?</svg>', '', s, flags=re.S); t = re.sub(r'<[^>]+>', ' ', t)
 ratio = len(t.split()) / max(v, 1)
 ```
 
-Mốc: `decision-tree` ~136 chữ/hình là bài mẫu; trên **300 là đáng soát**, trên **350 là phải sửa**.
+Mốc: bài mẫu [[chuan-bai-mau]] `random-forest` **123 chữ/hình**; trên **250 là đáng soát**, trên
+**300 là phải sửa**. Trung vị cả kho (kệ 01→05) hiện là **260** — tức quá nửa kho cần soát.
 Cách sửa, theo thứ tự ưu tiên:
 
 1. **Bảng so sánh văn xuôi → khuôn hình** (`.cmp two` cho hai cột, `.stack` cho danh sách nhiều

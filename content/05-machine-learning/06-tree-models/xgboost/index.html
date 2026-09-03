@@ -51,8 +51,6 @@
 
   <p class="key"><a href="../gradient-boosting/index.html">Gradient boosting</a> gốc có hai chỗ để ngỏ: <em>nó chỉ nhìn độ dốc, và nó không biết gì về độ phức tạp của cây mình vừa mọc</em>.</p>
 
-  <p>Nhắc lại cơ chế gốc: mỗi vòng tính phần dư — thực chất là gradient âm của loss — rồi mọc một cây khớp vào phần dư đó. Cách này chạy được, nhưng cây mọc ra theo tiêu chí quen thuộc của cây quyết định (Gini, MSE), tức là <b>tiêu chí mọc cây và hàm mục tiêu của boosting không phải một thứ</b>. Chống overfit thì làm sau, bằng cắt tỉa và <code>learning_rate</code>.</p>
-
   <div class="cmp two">
     <div>
       <h5>Gradient boosting gốc</h5>
@@ -67,8 +65,17 @@
   </div>
 
   <ul class="why">
-    <li>Chỗ này là điểm mới thật sự. Nhiều thứ khác người ta hay gán cho XGBoost — histogram, chạy song song, xử lý dữ liệu thưa — là <b>kỹ thuật</b>, quan trọng cho tốc độ nhưng không đổi bài toán.</li>
+    <li>Ở bản gốc, <b>tiêu chí mọc cây và hàm mục tiêu của boosting không phải một thứ</b>: cây tách theo Gini hay MSE.</li>
+    <li>Chống overfit ở bản gốc là <b>hậu xử lý</b> — cắt tỉa sau khi cây mọc xong, cộng thêm <code>learning_rate</code>.</li>
+    <li>Đây mới là điểm mới thật sự. Histogram hay chạy song song chỉ là <b>kỹ thuật</b>: nhanh hơn, không đổi bài toán.</li>
   </ul>
+
+  <details class="deep">
+    <summary>Nhắc lại cơ chế gốc để thấy chỗ hở</summary>
+    <div class="body">
+      <p>Mỗi vòng tính phần dư — thực chất là gradient âm của loss — rồi mọc một cây khớp vào phần dư đó. Cách này chạy được, nhưng cây mọc ra theo tiêu chí quen thuộc của cây quyết định (Gini, MSE), tức là tiêu chí mọc cây và hàm mục tiêu của boosting không phải một thứ. Chống overfit thì làm sau, bằng cắt tỉa và <code>learning_rate</code>.</p>
+    </div>
+  </details>
 </section>
 
 <section id="xgb-s2" class="lesson">
@@ -104,11 +111,11 @@
     <figcaption>Khai triển Taylor bậc hai: <code>L(ŷ + f) ≈ L(ŷ) + g·f + ½·h·f²</code> — <code>g</code> là độ dốc, <code>h</code> là độ cong. Bỏ hằng số <code>L(ŷ)</code> thì còn lại đúng một hàm bậc hai theo <code>f</code>.</figcaption>
   </figure>
 
-  <p>Đây là chỗ mọi thứ mở ra: hàm bậc hai có đỉnh, và đỉnh tìm bằng công thức chứ không phải mò từng bước. Biết mỗi mẫu rơi vào lá nào là <b>tính thẳng được giá trị tối ưu của lá đó</b>.</p>
-
   <ul class="why">
-    <li>Cái giá phải trả: loss buộc phải <b>khả vi hai lần</b>. Hầu hết loss thông dụng — MSE, log loss — đều thoả, nên trong thực tế đây không phải hạn chế đáng kể.</li>
-    <li><code>g</code> và <code>h</code> tính riêng cho <em>từng mẫu</em> và chỉ phụ thuộc vào dự đoán hiện tại. Nên đổi bài toán chỉ là đổi công thức <code>g</code>, <code>h</code> — phần mọc cây giữ nguyên. Đó là lý do XGBoost dùng chung một lõi cho hồi quy, phân loại và xếp hạng.</li>
+    <li>Hàm bậc hai <b>có đỉnh</b>, và đỉnh tìm bằng công thức chứ không phải mò từng bước.</li>
+    <li>Biết mỗi mẫu rơi vào lá nào là <b>tính thẳng được giá trị tối ưu của lá đó</b>.</li>
+    <li>Cái giá: loss buộc phải <b>khả vi hai lần</b>. Hầu hết loss thông dụng đều thoả nên thực tế không vướng.</li>
+    <li><code>g</code> và <code>h</code> tính riêng cho <em>từng mẫu</em>. Đổi bài toán chỉ là đổi <code>g</code>, <code>h</code> — phần mọc cây giữ nguyên.</li>
   </ul>
 </section>
 
@@ -143,7 +150,31 @@
     </div>
   </div>
 
-  <p>Hai siêu tham số phạt nằm ngay trong công thức, không phải bước sau: <code>λ</code> đứng ở mẫu số nên kéo mọi giá trị lá về gần 0 — đúng là <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">L2</a> áp lên giá trị lá. <code>γ</code> tính tiền cho mỗi chiếc lá tồn tại, nên cây chỉ mọc thêm khi lợi ích vượt được cái giá đó.</p>
+  <ul class="why">
+    <li><code>λ</code> ở mẫu số kéo mọi giá trị lá về gần 0 — đúng là <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">L2</a> áp lên giá trị lá.</li>
+    <li><code>γ</code> tính tiền cho mỗi chiếc lá tồn tại, nên cây <b>chỉ mọc thêm khi lợi ích vượt cái giá đó</b>.</li>
+    <li>Cả hai nằm <b>ngay trong công thức</b>, không phải một bước xử lý sau.</li>
+  </ul>
+
+  <p>Bấm thử — chỉnh <code>λ</code> và <code>γ</code> rồi xem chính công thức trên quyết định tách hay dừng:</p>
+
+  <div class="lab" id="xgblab">
+    <div class="bar">
+      <div><label>λ — phạt giá trị lá</label><div class="scen" id="xlam"></div></div>
+      <div><label>γ — tiền cho mỗi chiếc lá</label><div class="scen" id="xgam"></div></div>
+    </div>
+
+    <div id="xview"></div>
+
+    <p class="labsay" id="xexp"></p>
+
+    <div class="labbar">
+      <button class="ghost" id="xrst">Đặt lại</button>
+      <span id="xstat"></span>
+    </div>
+
+    <p class="verdict" id="xverdict" hidden></p>
+  </div>
 
   <div class="note key">
     <h4>Gain — chia hay không chia</h4>
@@ -151,8 +182,8 @@
   </div>
 
   <ul class="why">
-    <li><code>Hⱼ</code> ở mẫu số có tác dụng phụ rất hữu ích: lá chứa ít mẫu thì <code>Hⱼ</code> nhỏ, giá trị trả về bị <code>λ</code> ghìm mạnh hơn. Model <b>tự nghi ngờ những lá mỏng</b> mà không cần luật riêng nào.</li>
-    <li>Vẫn cần <code>learning_rate</code> (còn gọi là <code>eta</code>): nhân giá trị lá với một số nhỏ trước khi cộng vào model. Nó khác λ — λ hãm <em>từng cây</em>, <code>eta</code> hãm <em>tốc độ tích luỹ</em> qua nhiều cây.</li>
+    <li><code>Hⱼ</code> ở mẫu số có tác dụng phụ: lá ít mẫu thì <code>Hⱼ</code> nhỏ, bị <code>λ</code> ghìm mạnh — <b>tự nghi ngờ lá mỏng</b>.</li>
+    <li>Vẫn cần <code>learning_rate</code> (<code>eta</code>): λ hãm <em>từng cây</em>, <code>eta</code> hãm <em>tốc độ tích luỹ</em>.</li>
   </ul>
 </section>
 
@@ -180,29 +211,108 @@
   </div>
   <p class="stripnote"><span>"thiếu" được coi là một tín hiệu</span><span><em>điền bằng trung bình là xoá mất tín hiệu đó</em></span></p>
 
-  <p>Chi tiết đầy đủ về giá trị thiếu ở <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</p>
+  <ul class="why">
+    <li>Ba mẹo này <b>không đổi hàm mục tiêu</b> — chúng chỉ làm nó tính được ở quy mô thật.</li>
+    <li>Giá trị thiếu để nguyên <code>NaN</code>, <b>đừng điền trước</b>: điền là xoá mất tín hiệu.</li>
+    <li>Chi tiết đầy đủ về giá trị thiếu: <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</li>
+  </ul>
 </section>
 
 <section id="xgb-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Đánh đổi và khi nào chọn nó</h2></div>
 
+  <p class="key">Đổi <em>công sức tinh chỉnh</em> lấy <em>độ chính xác và sự ổn định</em>. Mặc định hiếm khi là cấu hình tốt nhất.</p>
+
   <table>
     <tr><th>Mạnh</th><th>Yếu</th></tr>
     <tr><td>Chính xác hàng đầu trên dữ liệu bảng; cực ổn định giữa các lần chạy</td><td>Chậm hơn <a href="../lightgbm/index.html">LightGBM</a> rõ rệt trên dữ liệu rất lớn</td></tr>
     <tr><td>Không cần co giãn đặc trưng, xử lý giá trị thiếu sẵn</td><td>Biến phân loại <b>phải mã hoá trước</b>, không nhận trực tiếp</td></tr>
-    <tr><td>Nhiều núm điều chỉnh, kiểm soát overfit tốt</td><td>Chính vì nhiều núm nên tinh chỉnh tốn công; mặc định hiếm khi là tốt nhất</td></tr>
+    <tr><td>Nhiều hyperparameter, kiểm soát overfit tốt</td><td>Chính vì nhiều hyperparameter nên tinh chỉnh tốn công; mặc định hiếm khi là tốt nhất</td></tr>
   </table>
 
-  <p>Nơi nó thống trị: <b>dữ liệu bảng cỡ vừa</b> — vài nghìn tới vài triệu dòng. Đây là lựa chọn mặc định ở Kaggle suốt gần một thập kỷ và ở nhiều hệ xếp hạng production, vì trên loại dữ liệu này nó vẫn thường thắng mạng nơ-ron; lý do nằm ở <a href="../gradient-boosting/index.html">Gradient boosting</a>.</p>
+  <p>Nơi nó thống trị: <b>dữ liệu bảng cỡ vừa</b> — vài nghìn tới vài triệu dòng. Là lựa chọn mặc định ở Kaggle gần một thập kỷ, vì ở đây nó vẫn thắng mạng nơ-ron (<a href="../gradient-boosting/index.html">Gradient boosting</a>).</p>
 
   <ul class="why">
-    <li>Thứ tự chỉnh tham số đáng theo: <code>n_estimators</code> đặt cao rồi dùng <b>early stopping</b> → <code>max_depth</code> (3–8) → <code>learning_rate</code> (0,01–0,3, giảm thì tăng số cây) → <code>subsample</code> và <code>colsample_bytree</code> → cuối cùng mới tới <code>lambda</code> và <code>gamma</code>.</li>
+    <li>Thứ tự chỉnh: <code>n_estimators</code> cao kèm <b>early stopping</b> → <code>max_depth</code> (3–8) → <code>learning_rate</code> (0,01–0,3) → <code>subsample</code>, <code>colsample_bytree</code> → <code>lambda</code>, <code>gamma</code>.</li>
     <li>Chỉnh bằng random search chứ đừng grid: xem <a href="../../04-core-concepts/overfitting-regularization/index.html">Overfitting &amp; regularization</a>.</li>
   </ul>
 </section>
 
 <section id="xgb-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Một chuỗi bốn bước, và ba bước đầu chỉ là biến đổi đại số của cùng một hàm mục tiêu.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 338" role="img" aria-label="Tổng kết XGBoost: xấp xỉ Taylor bậc hai, gộp theo lá ra công thức giá trị lá, gain quyết định tách, ba mẹo kỹ thuật để chạy được ở quy mô thật">
+      <text class="sv-h" x="16" y="26">&#9312; XẤP XỈ</text>
+      <text class="sv-h" x="238" y="26">&#9313; GỘP THEO LÁ</text>
+      <text class="sv-h" x="470" y="26">&#9314; TÁCH HAY DỪNG</text>
+      <text class="sv-h" x="690" y="26">&#9315; CHẠY ĐƯỢC</text>
+
+      <rect x="16" y="42" width="200" height="128" rx="8" fill="rgba(140,169,242,.08)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="36" y="66" fill="#A8BEF6">L(ŷ + f) ≈ g·f + ½h·f²</text>
+      <path d="M40 148 C86 84 146 84 192 130" fill="none" stroke="#3D352C" stroke-width="2"></path>
+      <circle cx="60" cy="120" r="4" fill="#8CA9F2"></circle>
+      <circle cx="116" cy="93" r="5" fill="#EDB44A"></circle>
+      <text class="sv-l" x="36" y="164" fill="#7A6F63">mỗi mẫu một cặp (g, h)</text>
+
+      <line x1="216" y1="106" x2="232" y2="106" stroke="#3D352C"></line>
+      <polygon points="238,106 230,102 230,110" fill="#3D352C"></polygon>
+
+      <rect x="238" y="42" width="210" height="128" rx="8" fill="rgba(237,180,74,.08)" stroke="#EDB44A" stroke-width="2"></rect>
+      <text class="sv-t" x="343" y="72" text-anchor="middle" fill="#EDB44A">w* = −G / (H + λ)</text>
+      <text class="sv-l" x="258" y="100" fill="#7A6F63">G, H = tổng g, tổng h trong lá</text>
+      <text class="sv-l" x="258" y="120" fill="#8EE0BE">giá trị lá <tspan fill="#7A6F63">tính thẳng, không mò</tspan></text>
+      <text class="sv-l" x="258" y="140" fill="#F79BAB">λ ở mẫu số → ghìm lá mỏng</text>
+      <text class="sv-l" x="258" y="160" fill="#F79BAB">γ·T → tính tiền mỗi chiếc lá</text>
+
+      <line x1="448" y1="106" x2="464" y2="106" stroke="#3D352C"></line>
+      <polygon points="470,106 462,102 462,110" fill="#3D352C"></polygon>
+
+      <rect x="470" y="42" width="192" height="128" rx="8" fill="rgba(91,207,160,.08)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="490" y="68" fill="#8EE0BE">gain = điểm sau − trước − γ</text>
+      <rect x="490" y="82" width="70" height="26" rx="5" fill="rgba(91,207,160,.16)" stroke="#5BCFA0"></rect>
+      <text class="sv-l" x="525" y="99" text-anchor="middle" fill="#5BCFA0">&gt; 0 · tách</text>
+      <rect x="572" y="82" width="70" height="26" rx="5" fill="rgba(242,113,138,.16)" stroke="#F2718A"></rect>
+      <text class="sv-l" x="607" y="99" text-anchor="middle" fill="#F2718A">≤ 0 · lá</text>
+      <text class="sv-l" x="490" y="132" fill="#7A6F63">mọc cây và chống overfit</text>
+      <text class="sv-l" x="490" y="150" fill="#7A6F63">là <tspan fill="#EDB44A">một</tspan> việc, không phải hai</text>
+
+      <line x1="662" y1="106" x2="678" y2="106" stroke="#3D352C"></line>
+      <polygon points="684,106 676,102 676,110" fill="#3D352C"></polygon>
+
+      <rect x="684" y="42" width="160" height="128" rx="8" fill="rgba(140,169,242,.06)" stroke="#3D352C" stroke-width="2"></rect>
+      <text class="sv-l" x="704" y="70" fill="#A8BEF6">histogram · 256 thùng</text>
+      <text class="sv-l" x="704" y="94" fill="#A8BEF6">sparsity-aware</text>
+      <text class="sv-l" x="704" y="118" fill="#A8BEF6">block nén theo cột</text>
+      <text class="sv-l" x="704" y="152" fill="#7A6F63">không đổi bài toán</text>
+
+      <path d="M566 186 C500 214 300 214 118 190" fill="none" stroke="#3D352C" stroke-width="1.5" stroke-dasharray="5 4"></path>
+      <polygon points="112,188 121,185 119,194" fill="#3D352C"></polygon>
+      <text class="sv-l" x="340" y="228" text-anchor="middle" fill="#7A6F63">cây xong → cộng vào model với hệ số <tspan fill="#EDB44A">eta</tspan> → tính lại (g, h) → lặp</text>
+
+      <line x1="16" y1="252" x2="844" y2="252" stroke="#2E2822"></line>
+      <text class="sv-l" x="16" y="276" fill="#7A6F63">&#9312; cái giá của bậc hai: loss phải <tspan fill="#A8BEF6">khả vi hai lần</tspan> — đổi bài toán chỉ là đổi (g, h)</text>
+      <text class="sv-l" x="16" y="294" fill="#7A6F63">&#9313; <tspan fill="#F79BAB">λ</tspan> và <tspan fill="#F79BAB">γ</tspan> nằm trong objective, không phải bước cắt tỉa sau</text>
+      <text class="sv-l" x="16" y="312" fill="#7A6F63">&#9314; tách theo chính hàm mục tiêu, khác cây quyết định tách theo <tspan fill="#A8BEF6">Gini</tspan></text>
+      <text class="sv-l" x="16" y="330" fill="#7A6F63">&#9315; ba mẹo này là <tspan fill="#EDB44A">kỹ thuật</tspan>, không phải điểm mới về thuật toán</text>
+    </svg>
+    <figcaption>Ba ô đầu là <strong>cùng một công thức viết ba lần</strong>: xấp xỉ → giải ra đỉnh → so sánh hai đỉnh. Ô thứ tư đứng riêng, và bỏ nó đi thì XGBoost vẫn đúng, chỉ là chậm.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Đạo hàm bậc hai</b> ở &#9312; là thứ khiến &#9313; giải được bằng công thức — bỏ nó thì lùi về <a href="../gradient-boosting/index.html">Gradient boosting</a> gốc.</li>
+    <li><b>λ</b> ở &#9313; là đúng L2 của <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">Ridge</a>, áp lên giá trị lá thay vì lên hệ số.</li>
+    <li><b>Gain</b> ở &#9314; sinh thẳng từ công thức ở &#9313;, nên nó không phải một tiêu chí thứ hai cần chỉnh riêng.</li>
+    <li><b>Sparsity-aware</b> ở &#9315; là lý do không nên điền khuyết trước — xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</li>
+  </ul>
+</section>
+
+<section id="xgb-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Nhiều hyperparameter nên cũng nhiều chỗ chỉnh sai — <em>phần lớn lỗi tới từ việc đối xử với nó như Random forest</em>.</p>
 
   <div class="grid2">
     <div class="card bad"><h4>Điền giá trị thiếu trước khi đưa vào</h4><p>Xoá mất tín hiệu mà sparsity-aware split đang khai thác. Cứ để nguyên <code>NaN</code>.</p></div>
@@ -214,8 +324,10 @@
   </div>
 </section>
 
-<section id="xgb-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+<section id="xgb-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+
+  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
   <details class="qa"><summary>XGBoost khác gradient boosting gốc ở chỗ nào?</summary>
   <p>Điểm mới thật sự là hàm mục tiêu. Gradient boosting gốc chỉ dùng đạo hàm bậc nhất và mọc cây theo tiêu chí quen thuộc của cây quyết định, rồi chống overfit bằng cắt tỉa sau. XGBoost khai triển Taylor tới bậc hai nên có thêm thông tin về độ cong, từ đó viết ra công thức tính thẳng giá trị tối ưu của mỗi lá thay vì mò theo gradient. Và nó đưa hai số hạng phạt — lambda cho độ lớn giá trị lá, gamma cho số lá — vào ngay trong objective, nên tiêu chí tách nút chính là hàm mục tiêu đang tối ưu: mọc cây và chống overfit trở thành một việc.</p></details>
@@ -246,5 +358,6 @@
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
 </body>
 </html>

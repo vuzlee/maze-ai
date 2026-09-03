@@ -76,11 +76,18 @@
   <div class="sh"><b>02</b><h2>OLTP — Online Transaction Processing</h2></div>
   <p class="key">Hệ vận hành: bán hàng, đặt vé, chuyển khoản. Mỗi request chạm một vài dòng, và phải <em>đúng ngay lúc đó</em>.</p>
   <ul class="why">
-    <li><b>Row-oriented:</b> dữ liệu lưu theo từng dòng liền nhau trên đĩa, vì thao tác điển hình là đọc/ghi <em>trọn một dòng</em> (một đơn hàng, một tài khoản).</li>
-    <li><b>Index B-Tree</b> cho tra cứu điểm — <code>WHERE order_id = 12345</code> — đã học ở nhóm SQL nâng cao, vẫn là công cụ chính ở đây.</li>
-    <li><b>ACID chặt</b> — transaction và isolation level (đã học ở <code>transaction-isolation</code>) tồn tại chính vì OLTP: nhiều giao dịch nhỏ chạy đồng thời không được phép làm sai số dư, sai tồn kho.</li>
+    <li><b>Row-oriented:</b> lưu theo từng dòng liền nhau, vì thao tác điển hình là đọc/ghi <em>trọn một dòng</em>.</li>
+    <li><b>Index B-Tree</b> cho tra cứu điểm — <code>WHERE order_id = 12345</code> — vẫn là công cụ chính.</li>
+    <li><b>ACID chặt</b> — transaction và isolation level tồn tại chính vì OLTP: nhiều giao dịch nhỏ chạy song song không được làm sai số dư.</li>
     <li><b>Schema chuẩn hoá (normalized)</b> — nối lại <code>db-normalization</code>: tách bảng để tránh trùng lặp và dị thường khi ghi, vì OLTP ghi liên tục.</li>
   </ul>
+  <table>
+    <tr><th>Đo cái gì</th><th>Giá trị điển hình của OLTP</th></tr>
+    <tr><td>Số dòng một truy vấn chạm</td><td>1 tới vài chục</td></tr>
+    <tr><td>Độ trễ mong đợi</td><td>dưới 10 ms</td></tr>
+    <tr><td>Số truy vấn mỗi giây</td><td>hàng nghìn tới hàng chục nghìn</td></tr>
+    <tr><td>Tỷ lệ ghi</td><td>cao — ghi liên tục suốt ngày</td></tr>
+  </table>
   <p>Ví dụ: PostgreSQL/MySQL phục vụ trực tiếp app bán hàng, mỗi request một transaction ngắn.</p>
 </section>
 
@@ -88,8 +95,8 @@
   <div class="sh"><b>03</b><h2>OLAP — Online Analytical Processing</h2></div>
   <p class="key">Hệ báo cáo: "doanh thu quý này theo từng ngành hàng". Ít truy vấn, nhưng mỗi truy vấn quét gần hết bảng.</p>
   <ul class="why">
-    <li><b>Column-oriented:</b> dữ liệu lưu theo từng cột liền nhau. Truy vấn <code>SUM(revenue)</code> chỉ cần đọc cột <code>revenue</code>, không phải đọc cả dòng — nhanh hơn nhiều lần so với row-oriented khi bảng có hàng trăm cột nhưng câu hỏi chỉ cần vài cột.</li>
-    <li><b>Schema thường denormalized</b> — <em>star schema</em> hoặc <em>snowflake schema</em> (một bảng fact trung tâm nối tới các bảng dimension), tối ưu cho việc gộp (aggregate) nhanh hơn là tránh trùng lặp. Xem chi tiết ở bài kế tiếp, <a href="../data-warehouse-lake/index.html">Data warehouse &amp; data lake</a>.</li>
+    <li><b>Column-oriented:</b> lưu theo từng cột liền nhau. <code>SUM(revenue)</code> chỉ đọc cột <code>revenue</code> — bảng trăm cột thì nhanh hơn nhiều lần.</li>
+    <li><b>Schema denormalized</b> — <em>star schema</em>, <em>snowflake schema</em>: ưu tiên gộp nhanh hơn tránh trùng lặp. Chi tiết ở <a href="../data-warehouse-lake/index.html">bài kế tiếp</a>.</li>
     <li>Chấp nhận đọc dữ liệu <em>hơi cũ</em> (cập nhật theo lô, không real-time từng dòng) để đổi lấy tốc độ quét khối lớn.</li>
   </ul>
 <figure>
@@ -149,16 +156,110 @@
 <section id="oltp-vs-olap-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Vì sao tách ra hai hệ</h2></div>
   <p class="key">Chạy thẳng báo cáo OLAP trên database OLTP production là cách nhanh nhất để gây sự cố cho khách hàng thật.</p>
+  <div class="flow">
+    <div class="n"><h5>Một câu báo cáo</h5><p>quét 50 triệu dòng</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Chiếm CPU, IO, snapshot</h5><p>giữ lâu hàng phút</p></div>
+    <div class="a">→</div>
+    <div class="n no"><h5>Giao dịch thật chậm</h5><p>khách hàng thấy timeout</p></div>
+  </div>
   <ul class="why">
     <li><b>Tranh tài nguyên:</b> một câu <code>SELECT</code> quét 50 triệu dòng chiếm hết CPU/IO mà các giao dịch nhỏ đang cần để trả lời trong mili-giây.</li>
     <li><b>Tranh khoá:</b> quét lớn giữ snapshot lâu (nhớ lại <code>transaction-isolation</code>), cản <code>VACUUM</code>, làm bảng phình, làm mọi transaction khác chậm dần.</li>
-    <li><b>Schema lệch mục tiêu:</b> schema chuẩn hoá tốt cho ghi lại rất tệ cho gộp — một câu báo cáo phải <code>JOIN</code> qua chục bảng thay vì đọc thẳng vài cột.</li>
+    <li><b>Schema lệch mục tiêu:</b> chuẩn hoá tốt cho ghi lại tệ cho gộp — báo cáo phải <code>JOIN</code> chục bảng thay vì đọc vài cột.</li>
   </ul>
   <p>Lời giải chuẩn: tách dữ liệu ra một hệ riêng, sao chép và tổ chức lại cho mục đích phân tích — đó là lý do tồn tại của <a href="../data-warehouse-lake/index.html">data warehouse</a>, và dữ liệu chảy từ OLTP sang đó qua các pipeline <a href="../etl-elt/index.html">ETL/ELT</a>.</p>
 </section>
 
 <section id="oltp-vs-olap-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Hai kiểu tải kéo thiết kế về hai hướng ngược nhau — nên lời giải không phải chỉnh cho khéo, mà là tách ra hai hệ và nối bằng một pipeline.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 508" role="img" aria-label="Tổng kết OLTP vs OLAP: hai kiểu tải, ba trục thiết kế đi ngược nhau, chuỗi sự cố khi chạy báo cáo trên hệ giao dịch, và lời giải tách hai hệ nối bằng pipeline">
+    <text class="sv-h" x="0" y="12">&#9312; HAI KIỂU TẢI TRÊN CÙNG MỘT TẬP DỮ LIỆU</text>
+
+    <rect x="8" y="26" width="410" height="82" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="46" fill="#8EE0BE">OLTP — giao dịch</text>
+    <text class="sv-d" x="20" y="64">rất nhiều lệnh &#183; mỗi lệnh chạm 1 tới vài chục dòng</text>
+    <text class="sv-d" x="20" y="80">phải trả lời dưới 10 ms &#183; ghi liên tục suốt ngày</text>
+    <text class="sv-d" x="20" y="96">trừ kho 1 đơn vị &#183; ghi 1 dòng log đăng nhập</text>
+
+    <rect x="442" y="26" width="410" height="82" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="454" y="46" fill="#A8BEF6">OLAP — phân tích</text>
+    <text class="sv-d" x="454" y="64">rất ít lệnh &#183; mỗi lệnh chạm hàng triệu dòng</text>
+    <text class="sv-d" x="454" y="80">giây tới phút cũng chấp nhận được &#183; đọc là chính</text>
+    <text class="sv-d" x="454" y="96">tổng doanh thu theo tháng theo vùng</text>
+
+    <text class="sv-h" x="0" y="142">&#9313; BA TRỤC THIẾT KẾ — MỖI TRỤC HAI ĐẦU NGƯỢC NHAU</text>
+
+    <rect x="8" y="154" width="410" height="24" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="171" fill="#8EE0BE">row-oriented — một dòng nằm liền nhau</text>
+    <rect x="442" y="154" width="410" height="24" rx="4" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
+    <text class="sv-l" x="454" y="171" fill="#A8BEF6">column-oriented — một cột nằm liền nhau</text>
+
+    <rect x="8" y="184" width="410" height="24" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="201" fill="#8EE0BE">schema chuẩn hoá — tránh trùng lặp khi ghi</text>
+    <rect x="442" y="184" width="410" height="24" rx="4" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
+    <text class="sv-l" x="454" y="201" fill="#A8BEF6">star / snowflake schema — ít JOIN khi gộp</text>
+
+    <rect x="8" y="214" width="410" height="24" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="231" fill="#8EE0BE">ACID chặt, index B-Tree tra cứu điểm</text>
+    <rect x="442" y="214" width="410" height="24" rx="4" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
+    <text class="sv-l" x="454" y="231" fill="#A8BEF6">throughput quét lớn, dữ liệu hơi cũ cũng được</text>
+
+    <text class="sv-d" x="0" y="258">ba trục cùng đi ngược — nên hiếm khi một hệ làm tốt cả hai, và thêm index không đổi được điều đó</text>
+
+    <text class="sv-h" x="0" y="292">&#9314; CHẠY BÁO CÁO THẲNG TRÊN HỆ GIAO DỊCH</text>
+
+    <rect x="8" y="304" width="232" height="52" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="20" y="324" fill="#EDB44A">một câu quét 50 triệu dòng</text>
+    <text class="sv-d" x="20" y="342">chỉ là một câu SELECT bình thường</text>
+    <path d="M248 330 L286 330" stroke="#3D352C" stroke-width="1.5" marker-end="url(#oltpa)"/>
+    <defs><marker id="oltpa" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="#3D352C"/></marker></defs>
+
+    <rect x="294" y="304" width="252" height="52" rx="5" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="306" y="324" fill="#F79BAB">chiếm CPU/IO &#183; giữ snapshot lâu</text>
+    <text class="sv-d" x="306" y="342">snapshot lâu còn cản VACUUM, làm bảng phình</text>
+    <path d="M554 330 L592 330" stroke="#3D352C" stroke-width="1.5" marker-end="url(#oltpa)"/>
+
+    <rect x="600" y="304" width="252" height="52" rx="5" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="612" y="324" fill="#F79BAB">giao dịch thật chậm dần &#8594; timeout</text>
+    <text class="sv-d" x="612" y="342">khách hàng thật là người chịu</text>
+
+    <text class="sv-h" x="0" y="392">&#9315; LỜI GIẢI — TÁCH RA, NỐI BẰNG PIPELINE</text>
+
+    <rect x="8" y="404" width="232" height="48" rx="5" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="424" fill="#8EE0BE">OLTP — PostgreSQL, MySQL</text>
+    <text class="sv-d" x="20" y="442">phục vụ app, không ai chạy báo cáo lên đây</text>
+    <path d="M248 428 L286 428" stroke="#3D352C" stroke-width="1.5" marker-end="url(#oltpa)"/>
+
+    <rect x="294" y="404" width="252" height="48" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="306" y="424" fill="#EDB44A">pipeline ETL/ELT</text>
+    <text class="sv-d" x="306" y="442">chép và tổ chức lại cho mục đích phân tích</text>
+    <path d="M554 428 L592 428" stroke="#3D352C" stroke-width="1.5" marker-end="url(#oltpa)"/>
+
+    <rect x="600" y="404" width="252" height="48" rx="5" fill="#8CA9F2" fill-opacity="0.10" stroke="#8CA9F2"/>
+    <text class="sv-l" x="612" y="424" fill="#A8BEF6">OLAP — Snowflake, BigQuery</text>
+    <text class="sv-d" x="612" y="442">data warehouse, nơi báo cáo được phép quét lớn</text>
+
+    <line x1="0" y1="474" x2="860" y2="474" stroke="#2E2822"/>
+    <text class="sv-l" x="0" y="494">HTAP (TiDB, SingleStore) lưu song song cả hai cách xếp trong một engine — hợp khi độ trễ giữa &quot;giao dịch xảy ra&quot; và &quot;thấy trong báo cáo&quot; phải rất ngắn, không phải mặc định.</text>
+  </svg>
+  <figcaption>&#9312; hai tải, &#9313; ba trục kéo ngược nhau vì hai tải đó, &#9314; chuyện xảy ra khi ép chung một hệ, &#9315; và hình dạng kiến trúc chuẩn.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Row-oriented vs column-oriented</b> — ở &#9313;: cách xếp dữ liệu lên đĩa, thứ quyết định một lần chạm đĩa đọc được gì.</li>
+    <li><b>Tranh tài nguyên và tranh khoá</b> — ở &#9314;: hai lý do tách hệ, lý do thứ hai hay bị bỏ sót.</li>
+    <li><b>Star / snowflake schema</b> — ở &#9313;: không phải chuẩn thay thế 3NF mà là lựa chọn cho tải đọc gộp.</li>
+    <li><b>Data warehouse</b> — ở &#9315;: đích của pipeline, và là chủ đề của bài kế tiếp.</li>
+  </ul>
+</section>
+
+<section id="oltp-vs-olap-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
   <details class="qa"><summary>Vì sao không thêm index rồi chạy báo cáo thẳng trên OLTP?</summary>
   <p>Index B-Tree giúp tra cứu điểm, không giúp quét gộp hàng triệu dòng — bản chất bài toán đọc khác nhau (row-oriented vs column-oriented), thêm index không đổi được bản chất lưu trữ. Ngoài ra vấn đề lớn hơn không phải tốc độ mà là <b>tranh tài nguyên và khoá</b> với giao dịch thật đang chạy.</p></details>
   <details class="qa"><summary>Star schema và snowflake schema khác gì normalized schema đã học?</summary>

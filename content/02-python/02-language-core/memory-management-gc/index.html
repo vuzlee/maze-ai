@@ -60,7 +60,7 @@
   <ul class="why">
     <li>Cơ chế một giải thích vì sao Python trả bộ nhớ rất <b>kịp thời</b> — và vì sao có <a href="../../04-concurrency/thread-process-gil/index.html">GIL</a>.</li>
     <li>Cơ chế hai tồn tại chỉ vì <b>một lỗ hổng duy nhất</b> của cơ chế một: vòng tham chiếu.</li>
-    <li>Rò rỉ trong Python gần như luôn là <b>lỗi thiết kế</b>, không phải lỗi của bộ dọn rác. Mục 04 liệt kê bốn nghi phạm quen mặt.</li>
+    <li>Rò rỉ trong Python gần như luôn là <b>lỗi thiết kế</b>, không phải lỗi bộ dọn rác.</li>
   </ul>
 
   <p class="stripnote"><span>bài này nối tiếp <a href="../memory-model-mutability/index.html"><em>Memory model &amp; mutability</em></a></span><span>ở đó: tên, object, mutability, copy — <em>đọc trước bài này</em></span></p>
@@ -144,7 +144,94 @@ r()          <span class="cm"># trả về obj, hoặc None nếu obj đã bị 
 </section>
 
 <section id="memgc-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Hai cơ chế chồng lên nhau dọn được gần hết, và đúng cái chúng không dọn được — tham chiếu thật mà code còn giữ — mới là chỗ rò rỉ.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 530" role="img" aria-label="Tổng kết memory management và GC: đếm tham chiếu, vòng tham chiếu và bộ thu gom theo thế hệ, kích thước object thật, và bốn nguồn rò rỉ">
+    <text class="sv-h" x="0" y="12">&#9312; HAI CƠ CHẾ CHỒNG LÊN NHAU — VÀ MỘT VÙNG KHÔNG CƠ CHẾ NÀO CHẠM TỚI</text>
+
+    <rect x="8" y="24" width="272" height="76" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="44" fill="#8EE0BE">Đếm tham chiếu — cơ chế CHÍNH</text>
+    <text class="sv-d" x="20" y="62">mỗi object giữ một số đếm</text>
+    <text class="sv-d" x="20" y="78">về 0 là giải phóng NGAY</text>
+    <text class="sv-d" x="20" y="94">kịp thời, dự đoán được — và là lý do có GIL</text>
+
+    <rect x="292" y="24" width="272" height="76" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="304" y="44" fill="#A8BEF6">Bộ thu gom theo thế hệ</text>
+    <text class="sv-d" x="304" y="62">chạy định kỳ, chỉ quét object CONTAINER</text>
+    <text class="sv-d" x="304" y="78">ba thế hệ, tần suất giảm dần</text>
+    <text class="sv-d" x="304" y="94">tồn tại chỉ vì MỘT lỗ hổng — xem &#9313;</text>
+
+    <rect x="576" y="24" width="276" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="588" y="44" fill="#F79BAB">Của bạn — cả hai đều bó tay</text>
+    <text class="sv-d" x="588" y="62">khi code còn giữ tham chiếu THẬT</text>
+    <text class="sv-d" x="588" y="78">đó là rò rỉ — xem &#9315;</text>
+    <text class="sv-d" x="588" y="94">lỗi thiết kế, không phải lỗi bộ dọn rác</text>
+
+    <text class="sv-h" x="0" y="138">&#9313; LỖ HỔNG DUY NHẤT CỦA ĐẾM THAM CHIẾU — VÒNG THAM CHIẾU</text>
+
+    <rect x="120" y="152" width="180" height="52" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="132" y="172" fill="#EDB44A">dict A</text>
+    <text class="sv-d" x="132" y="190">refcount = 1</text>
+    <rect x="460" y="152" width="180" height="52" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="472" y="172" fill="#EDB44A">dict B</text>
+    <text class="sv-d" x="472" y="190">refcount = 1</text>
+    <path d="M300 168 L456 168" stroke="#3D352C" stroke-width="1.5" marker-end="url(#gca)"/>
+    <defs><marker id="gca" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="#3D352C"/></marker></defs>
+    <path d="M460 192 L304 192" stroke="#3D352C" stroke-width="1.5" marker-end="url(#gca)"/>
+    <text class="sv-d" x="330" y="162">a[&quot;b&quot;] = b</text>
+    <text class="sv-d" x="330" y="210">b[&quot;a&quot;] = a</text>
+
+    <text class="sv-d" x="0" y="232">del a, b &#8594; hai cái TÊN biến mất, nhưng mỗi dict vẫn còn đúng 1 tham chiếu từ dict kia &#8594; bộ đếm không bao giờ về 0</text>
+
+    <text class="sv-h" x="0" y="266">&#9314; MỖI OBJECT TỐN BAO NHIÊU — CPYTHON 64-BIT</text>
+    <rect x="8" y="278" width="204" height="46" rx="4" fill="#8CA9F2" fill-opacity="0.10" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="296" fill="#A8BEF6">một int</text>
+    <text class="sv-d" x="20" y="314">~28 byte — cũng là object đầy đủ</text>
+    <rect x="220" y="278" width="204" height="46" rx="4" fill="#8CA9F2" fill-opacity="0.10" stroke="#8CA9F2"/>
+    <text class="sv-l" x="232" y="296" fill="#A8BEF6">list rỗng</text>
+    <text class="sv-d" x="232" y="314">~56 byte</text>
+    <rect x="432" y="278" width="204" height="46" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="444" y="296" fill="#F79BAB">object thường</text>
+    <text class="sv-d" x="444" y="314">~152 byte — có __dict__ riêng</text>
+    <rect x="644" y="278" width="208" height="46" rx="4" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
+    <text class="sv-l" x="656" y="296" fill="#8EE0BE">object có __slots__</text>
+    <text class="sv-d" x="656" y="314">~56 byte — bỏ __dict__</text>
+
+    <text class="sv-d" x="0" y="344">getsizeof chỉ đo LỚP NGOÀI: list một triệu int tốn ~8 MB con trỏ + ~28 MB các object int &#8594; ~36 MB, so với ~4 MB nếu dùng NumPy</text>
+    <text class="sv-d" x="0" y="360">__slots__ tiết kiệm 40&#8211;50% và truy cập nhanh hơn &#183; cái mất: không thêm thuộc tính động, kế thừa phức tạp hơn &#8594; chỉ đáng khi có HÀNG TRIỆU instance</text>
+
+    <text class="sv-h" x="0" y="394">&#9315; BỐN NGUỒN RÒ RỈ — ĐỀU LÀ THAM CHIẾU THẬT MÀ CODE QUÊN BỎ</text>
+    <rect x="8" y="406" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="20" y="424" fill="#F79BAB">Cache không giới hạn</text>
+    <text class="sv-d" x="20" y="442">lru_cache(maxsize=None) &#8594; đặt maxsize, hoặc TTL cache</text>
+    <rect x="442" y="406" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="454" y="424" fill="#F79BAB">lru_cache đặt trên phương thức</text>
+    <text class="sv-d" x="454" y="442">cache giữ luôn self &#8594; dùng cached_property</text>
+    <rect x="8" y="458" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="20" y="476" fill="#F79BAB">Biến toàn cục dồn dữ liệu</text>
+    <text class="sv-d" x="20" y="494">chỉ thêm không xoá &#8594; giới hạn, hoặc deque(maxlen=n)</text>
+    <rect x="442" y="458" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="454" y="476" fill="#F79BAB">Callback / observer đã hết dùng</text>
+    <text class="sv-d" x="454" y="494">còn nằm trong danh sách listener &#8594; huỷ đăng ký, hoặc weakref</text>
+
+    <text class="sv-l" x="0" y="522" fill="#8EE0BE">truy nguyên nhân bằng tracemalloc: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết DÒNG nào đang cấp phát thêm</text>
+  </svg>
+  <figcaption>&#9312; ai dọn cái gì, &#9313; thứ cơ chế một không dọn được, &#9314; mỗi object đáng giá bao nhiêu, &#9315; và thứ không cơ chế nào dọn hộ.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Đếm tham chiếu</b> — ở &#9312;: dọn kịp thời và dự đoán được, đổi lại là GIL.</li>
+    <li><b>Bộ thu gom theo thế hệ</b> — ở &#9313;: tồn tại chỉ để dọn các cụm object chỉ còn trỏ lẫn nhau.</li>
+    <li><b>__slots__</b> — ở &#9314;: bỏ __dict__ của instance, chỉ đáng khi số instance đủ lớn.</li>
+    <li><b>weakref &amp; tracemalloc</b> — ở &#9315;: một cái để không giữ object, một cái để tìm ra ai đang giữ.</li>
+  </ul>
+</section>
+
+<section id="memgc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

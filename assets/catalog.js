@@ -338,7 +338,7 @@ window.CATALOG = [
       "title": "Memory management & GC",
       "tag": "Python internals",
       "blurb": "Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.",
-      "n": 5,
+      "n": 6,
       "path": "content/02-python/02-language-core/memory-management-gc/index.html",
       "skeleton": false,
       "lc": 0
@@ -349,7 +349,7 @@ window.CATALOG = [
       "title": "Scope & LEGB",
       "tag": "Language core",
       "blurb": "Python tra một cái tên ở đâu: bốn tầng LEGB, global và nonlocal, và cách hàm nhận đối số qua *args, **kwargs.",
-      "n": 6,
+      "n": 7,
       "path": "content/02-python/02-language-core/scope-legb/index.html",
       "skeleton": false,
       "lc": 0
@@ -360,7 +360,7 @@ window.CATALOG = [
       "title": "Data model & dunder",
       "tag": "Language core",
       "blurb": "Vì sao len(x) chứ không phải x.len(), giao thức phía sau toán tử, và cách một object tự nhập vai list hay dict.",
-      "n": 5,
+      "n": 6,
       "path": "content/02-python/02-language-core/data-model-dunder/index.html",
       "skeleton": false,
       "lc": 0
@@ -371,7 +371,7 @@ window.CATALOG = [
       "title": "Iterator & generator",
       "tag": "Python",
       "blurb": "Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.",
-      "n": 10,
+      "n": 11,
       "path": "content/02-python/02-language-core/iterator-generator/index.html",
       "skeleton": false,
       "lc": 0
@@ -382,7 +382,7 @@ window.CATALOG = [
       "title": "Decorator & context manager",
       "tag": "Python",
       "blurb": "Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.",
-      "n": 7,
+      "n": 8,
       "path": "content/02-python/02-language-core/decorator-context-manager/index.html",
       "skeleton": false,
       "lc": 0
@@ -393,7 +393,7 @@ window.CATALOG = [
       "title": "Exception handling",
       "tag": "Language core",
       "blurb": "try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.",
-      "n": 6,
+      "n": 7,
       "path": "content/02-python/02-language-core/exception-handling/index.html",
       "skeleton": false,
       "lc": 0
@@ -421,7 +421,7 @@ window.CATALOG = [
       "title": "Python dict & hash table",
       "tag": "Python internals",
       "blurb": "Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.",
-      "n": 22,
+      "n": 23,
       "path": "content/02-python/03-builtin-structures/dict-hash-table/index.html",
       "skeleton": false,
       "lc": 0
@@ -438,7 +438,7 @@ window.CATALOG = [
       "title": "Thread, process & GIL",
       "tag": "Concurrency",
       "blurb": "Process và thread khác nhau ở bộ nhớ và chi phí chuyển ngữ cảnh — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.",
-      "n": 10,
+      "n": 11,
       "path": "content/02-python/04-concurrency/thread-process-gil/index.html",
       "skeleton": false,
       "lc": 0
@@ -449,7 +449,7 @@ window.CATALOG = [
       "title": "Async / asyncio",
       "tag": "Python",
       "blurb": "Vì sao 1000 kết nối thì async chứ không thread, ba lỗi async kinh điển, chi phí thật của từng mô hình, và bảng chọn.",
-      "n": 8,
+      "n": 9,
       "path": "content/02-python/04-concurrency/asyncio/index.html",
       "skeleton": false,
       "lc": 0
@@ -483,7 +483,7 @@ window.CATALOG = [
       "title": "OOP trong Python",
       "tag": "OOP",
       "blurb": "Bốn trụ OOP mà Python hỗ trợ trực tiếp qua cú pháp: encapsulation, abstraction, inheritance, polymorphism — và MRO khi đa kế thừa.",
-      "n": 8,
+      "n": 9,
       "path": "content/02-python/06-oop/oop-python/index.html",
       "skeleton": false,
       "lc": 0
@@ -500,7 +500,7 @@ window.CATALOG = [
       "title": "Type hints & dataclass",
       "tag": "Typing",
       "blurb": "Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.",
-      "n": 7,
+      "n": 8,
       "path": "content/02-python/07-typing/typing-dataclass/index.html",
       "skeleton": false,
       "lc": 0
@@ -517,7 +517,7 @@ window.CATALOG = [
       "title": "Profiling & performance",
       "tag": "Performance",
       "blurb": "Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.",
-      "n": 5,
+      "n": 6,
       "path": "content/02-python/08-performance/performance-profiling/index.html",
       "skeleton": false,
       "lc": 0
@@ -569,7 +569,7 @@ window.CATALOG = [
       "title": "Process, thread & scheduling",
       "tag": "CS",
       "blurb": "Ranh giới cô lập, chi phí context switch, và bộ lập lịch quyết định ai chạy tiếp.",
-      "n": 6,
+      "n": 7,
       "path": "content/03-cs-fundamentals/02-os/process-thread-scheduling/index.html",
       "skeleton": false,
       "lc": 0
@@ -580,7 +580,7 @@ window.CATALOG = [
       "title": "Virtual memory & paging",
       "tag": "CS",
       "blurb": "Địa chỉ ảo tới địa chỉ vật lý, page fault, và vì sao chương trình tưởng mình có cả bộ nhớ máy.",
-      "n": 5,
+      "n": 6,
       "path": "content/03-cs-fundamentals/02-os/memory-virtual-paging/index.html",
       "skeleton": false,
       "lc": 0
@@ -591,7 +591,7 @@ window.CATALOG = [
       "title": "Lock, deadlock & race condition",
       "tag": "CS",
       "blurb": "Bốn điều kiện gây deadlock, mutex khác semaphore, và vì sao một phép cộng cũng có thể hỏng.",
-      "n": 5,
+      "n": 6,
       "path": "content/03-cs-fundamentals/02-os/lock-deadlock-race/index.html",
       "skeleton": false,
       "lc": 0
@@ -619,7 +619,7 @@ window.CATALOG = [
       "title": "DNS & TLS",
       "tag": "Networking",
       "blurb": "Hai chặng đầu tiên trước khi byte dữ liệu đầu tiên chạy, và chúng tốn bao nhiêu vòng khứ hồi.",
-      "n": 5,
+      "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/dns-tls/index.html",
       "skeleton": false,
       "lc": 0
@@ -630,7 +630,7 @@ window.CATALOG = [
       "title": "TCP & HTTP",
       "tag": "Networking",
       "blurb": "Đếm vòng khứ hồi, TCP bắt tay, HTTP/1.1 tới HTTP/3, idempotency, backoff có jitter, timeout và circuit breaker.",
-      "n": 11,
+      "n": 12,
       "path": "content/03-cs-fundamentals/03-networking/tcp-http/index.html",
       "skeleton": false,
       "lc": 0
@@ -641,7 +641,7 @@ window.CATALOG = [
       "title": "Caching",
       "tag": "Networking",
       "blurb": "Cache HTTP, năm tầng cache, ba chiến lược vô hiệu hoá, thundering herd, và khác biệt giữa no-cache với no-store.",
-      "n": 7,
+      "n": 8,
       "path": "content/03-cs-fundamentals/03-networking/caching/index.html",
       "skeleton": false,
       "lc": 0
@@ -652,7 +652,7 @@ window.CATALOG = [
       "title": "REST API design",
       "tag": "CS",
       "blurb": "Tài nguyên và động từ, mã trạng thái, phân trang, phiên bản, và hợp đồng giữa hai bên.",
-      "n": 6,
+      "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/rest-api-design/index.html",
       "skeleton": false,
       "lc": 0
@@ -663,7 +663,7 @@ window.CATALOG = [
       "title": "Load balancing & scaling",
       "tag": "CS",
       "blurb": "Bốn thuật toán phân phối, sticky session, health check, và tầng 4 khác tầng 7 ở đâu.",
-      "n": 6,
+      "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/load-balancing/index.html",
       "skeleton": false,
       "lc": 0
@@ -680,7 +680,7 @@ window.CATALOG = [
       "title": "CAP & consistency",
       "tag": "Distributed",
       "blurb": "Chọn 2 trong 3 không phải luật cứng — CAP thật ra nói gì, và các mức consistency giữa strong và eventual.",
-      "n": 7,
+      "n": 8,
       "path": "content/03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html",
       "skeleton": false,
       "lc": 0
@@ -691,7 +691,7 @@ window.CATALOG = [
       "title": "Consensus & leader election",
       "tag": "Distributed",
       "blurb": "Nhiều node phải đồng thuận một giá trị dù có node chết — Raft và ZooKeeper giải bài này thế nào, ở mức nhận diện.",
-      "n": 4,
+      "n": 5,
       "path": "content/03-cs-fundamentals/04-distributed/consensus-leader-election/index.html",
       "skeleton": false,
       "lc": 0
@@ -708,7 +708,7 @@ window.CATALOG = [
       "title": "Message queue & Pub/Sub",
       "tag": "Messaging",
       "blurb": "Queue và Pub/Sub giải hai bài toán khác nhau — cùng với idempotency và delivery semantics, thứ hay bị hỏi nhất khi có Kafka trong đề.",
-      "n": 7,
+      "n": 8,
       "path": "content/03-cs-fundamentals/05-messaging/messaging-queue-pubsub/index.html",
       "skeleton": false,
       "lc": 0
@@ -760,7 +760,7 @@ window.CATALOG = [
       "title": "Relational model",
       "tag": "Database",
       "blurb": "Bảng, hàng, cột, miền giá trị, khoá chính và khoá ngoại — bộ từ vựng mọi câu hỏi SQL đứng trên.",
-      "n": 7,
+      "n": 8,
       "path": "content/04-database/02-relational-basics/relational-model/index.html",
       "skeleton": false,
       "lc": 0
@@ -771,7 +771,7 @@ window.CATALOG = [
       "title": "Constraints & integrity",
       "tag": "Database",
       "blurb": "NOT NULL, UNIQUE, CHECK, DEFAULT, khoá ngoại và hành vi khi xoá — để database tự chặn dữ liệu sai.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/02-relational-basics/constraints-integrity/index.html",
       "skeleton": false,
       "lc": 0
@@ -782,7 +782,7 @@ window.CATALOG = [
       "title": "Normalization & denormalization",
       "tag": "Database",
       "blurb": "1NF tới 3NF bằng ví dụ, BCNF khi nào cần, và vì sao hệ thống thật lại cố tình phá chuẩn.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/02-relational-basics/db-normalization/index.html",
       "skeleton": false,
       "lc": 0
@@ -793,7 +793,7 @@ window.CATALOG = [
       "title": "Schema design",
       "tag": "Database",
       "blurb": "Từ một đoạn mô tả nghiệp vụ ra sơ đồ thực thể — quan hệ, rồi ra bảng: quan hệ 1-n, n-n, bảng nối.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/02-relational-basics/er-modeling/index.html",
       "skeleton": false,
       "lc": 0
@@ -821,7 +821,7 @@ window.CATALOG = [
       "title": "SELECT, WHERE & ORDER BY",
       "tag": "PostgreSQL",
       "blurb": "Thứ tự thực thi logic của một câu truy vấn — thứ giải thích gần hết lỗi SQL của người mới.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/03-sql-basics/sql-select-filter/index.html",
       "skeleton": false,
       "lc": 0
@@ -832,7 +832,7 @@ window.CATALOG = [
       "title": "JOIN",
       "tag": "PostgreSQL",
       "blurb": "Bốn loại join bằng hình, vì sao join sai làm số hàng phình lên, và self join.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/03-sql-basics/sql-join/index.html",
       "skeleton": false,
       "lc": 0
@@ -843,7 +843,7 @@ window.CATALOG = [
       "title": "GROUP BY & aggregate",
       "tag": "PostgreSQL",
       "blurb": "Gom nhóm, WHERE khác HAVING ở đâu, COUNT(*) khác COUNT(cột), và bẫy NULL trong hàm tổng hợp.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/03-sql-basics/sql-group-aggregate/index.html",
       "skeleton": false,
       "lc": 0
@@ -854,7 +854,7 @@ window.CATALOG = [
       "title": "Subquery & CTE",
       "tag": "PostgreSQL",
       "blurb": "Truy vấn con tương quan và không tương quan, WITH cho dễ đọc, và CTE đệ quy để duyệt cây.",
-      "n": 7,
+      "n": 8,
       "path": "content/04-database/03-sql-basics/sql-subquery-cte/index.html",
       "skeleton": false,
       "lc": 0
@@ -882,7 +882,7 @@ window.CATALOG = [
       "title": "SQL — window functions",
       "tag": "PostgreSQL",
       "blurb": "Khác GROUP BY ở đâu, vì sao WHERE không lọc được, ba hàm xếp hạng, top-N mỗi nhóm, và bẫy frame mặc định.",
-      "n": 15,
+      "n": 16,
       "path": "content/04-database/04-sql-advanced/sql-window-functions/index.html",
       "skeleton": false,
       "lc": 0
@@ -893,7 +893,7 @@ window.CATALOG = [
       "title": "SQL — index & query plan",
       "tag": "PostgreSQL",
       "blurb": "Đọc EXPLAIN, vì sao planner bỏ qua index, leftmost prefix, ba thuật toán join, và bài toán N+1.",
-      "n": 14,
+      "n": 15,
       "path": "content/04-database/04-sql-advanced/sql-index-query-plan/index.html",
       "skeleton": false,
       "lc": 0
@@ -904,7 +904,7 @@ window.CATALOG = [
       "title": "Transaction & isolation level",
       "tag": "PostgreSQL",
       "blurb": "Bốn hiện tượng dị thường, mức nào chặn gì, MVCC, ba cách chữa lost update, deadlock và retry.",
-      "n": 15,
+      "n": 16,
       "path": "content/04-database/04-sql-advanced/transaction-isolation/index.html",
       "skeleton": false,
       "lc": 0
@@ -915,7 +915,7 @@ window.CATALOG = [
       "title": "Query tuning",
       "tag": "PostgreSQL",
       "blurb": "Quy trình khi một truy vấn chậm: đọc plan, tìm chỗ quét toàn bảng, sửa index hay sửa câu lệnh.",
-      "n": 8,
+      "n": 9,
       "path": "content/04-database/04-sql-advanced/query-tuning/index.html",
       "skeleton": false,
       "lc": 0
@@ -932,7 +932,7 @@ window.CATALOG = [
       "title": "NoSQL — four families",
       "tag": "Database",
       "blurb": "Key-value, document, column-family, graph: mỗi họ bỏ ràng buộc gì của mô hình quan hệ để đổi lấy gì, và khi nào polyglot persistence là hợp lý.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/05-beyond-sql/nosql-landscape/index.html",
       "skeleton": false,
       "lc": 0
@@ -943,7 +943,7 @@ window.CATALOG = [
       "title": "Replication & sharding",
       "tag": "Database",
       "blurb": "Bản sao đọc, độ trễ sao chép, ba chiến lược chia mảnh, mảnh nóng, và vì sao join qua nhiều mảnh lại đắt.",
-      "n": 7,
+      "n": 8,
       "path": "content/04-database/05-beyond-sql/sharding-replication/index.html",
       "skeleton": false,
       "lc": 0
@@ -960,7 +960,7 @@ window.CATALOG = [
       "title": "OLTP vs OLAP",
       "tag": "Data systems",
       "blurb": "Một hệ tối ưu cho giao dịch, một hệ tối ưu cho phân tích — vì sao không dùng chung một database cho cả hai.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/06-data-systems/oltp-vs-olap/index.html",
       "skeleton": false,
       "lc": 0
@@ -971,7 +971,7 @@ window.CATALOG = [
       "title": "Data warehouse & data lake",
       "tag": "Data systems",
       "blurb": "Warehouse ép schema trước khi lưu, lake lưu trước hỏi sau — chọn sai thì trả giá ở đâu.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/06-data-systems/data-warehouse-lake/index.html",
       "skeleton": false,
       "lc": 0
@@ -982,7 +982,7 @@ window.CATALOG = [
       "title": "ETL & ELT",
       "tag": "Data systems",
       "blurb": "Transform trước khi load, hay load trước rồi transform sau — thứ tự đổi vì kho đích đổi từ warehouse sang lake.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/06-data-systems/etl-elt/index.html",
       "skeleton": false,
       "lc": 0
@@ -993,7 +993,7 @@ window.CATALOG = [
       "title": "Batch vs stream processing",
       "tag": "Data systems",
       "blurb": "Xử lý theo lô định kỳ, hay xử lý từng sự kiện ngay khi tới — độ trễ chấp nhận được quyết định chọn cái nào.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/06-data-systems/batch-stream-processing/index.html",
       "skeleton": false,
       "lc": 0
@@ -1004,7 +1004,7 @@ window.CATALOG = [
       "title": "Data quality",
       "tag": "Data systems",
       "blurb": "Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.",
-      "n": 6,
+      "n": 7,
       "path": "content/04-database/06-data-systems/data-quality/index.html",
       "skeleton": false,
       "lc": 0
@@ -1056,7 +1056,7 @@ window.CATALOG = [
       "title": "Probability",
       "tag": "Math",
       "blurb": "Biến ngẫu nhiên, xác suất có điều kiện, độc lập, và các phân phối hay gặp trong ML.",
-      "n": 5,
+      "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/probability-basics/index.html",
       "skeleton": false,
       "lc": 0
@@ -1067,7 +1067,7 @@ window.CATALOG = [
       "title": "Expectation & variance",
       "tag": "Math",
       "blurb": "Tuyến tính của kỳ vọng, phương sai của tổng, hiệp phương sai, và luật số lớn với CLT.",
-      "n": 5,
+      "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/expectation-variance/index.html",
       "skeleton": false,
       "lc": 0
@@ -1078,7 +1078,7 @@ window.CATALOG = [
       "title": "Bayes' theorem",
       "tag": "Math",
       "blurb": "Tiên nghiệm, khả năng, hậu nghiệm; nghịch lý xét nghiệm y tế; và Bayes trong Naive Bayes.",
-      "n": 4,
+      "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/bayes-theorem/index.html",
       "skeleton": false,
       "lc": 0
@@ -1089,7 +1089,7 @@ window.CATALOG = [
       "title": "Linear algebra for ML",
       "tag": "Math",
       "blurb": "Vector, ma trận, nhân ma trận đọc thế nào, hạng, eigenvalue và eigenvector — chỉ phần thật sự dùng.",
-      "n": 5,
+      "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/linear-algebra-ml/index.html",
       "skeleton": false,
       "lc": 0
@@ -1100,7 +1100,7 @@ window.CATALOG = [
       "title": "Gradient & optimization",
       "tag": "Math",
       "blurb": "Đạo hàm riêng, gradient chỉ hướng nào, quy tắc chuỗi, hàm lồi, và gradient descent hội tụ ra sao.",
-      "n": 5,
+      "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/gradient-optimization/index.html",
       "skeleton": false,
       "lc": 0
@@ -1111,7 +1111,7 @@ window.CATALOG = [
       "title": "MLE & MAP",
       "tag": "Math",
       "blurb": "Vì sao chọn loss function chính là chọn giả định phân phối, và regularization chính là tiên nghiệm.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/02-math-foundations/mle-map/index.html",
       "skeleton": false,
       "lc": 0
@@ -1128,7 +1128,7 @@ window.CATALOG = [
       "title": "Statistics",
       "tag": "Statistics",
       "blurb": "Định nghĩa chính xác của p-value, bốn đại lượng gắn nhau, sample size và power, confidence interval, so sánh nhiều lần, và tương quan với nhân quả.",
-      "n": 10,
+      "n": 11,
       "path": "content/05-machine-learning/03-statistics/statistics/index.html",
       "skeleton": false,
       "lc": 0
@@ -1139,7 +1139,7 @@ window.CATALOG = [
       "title": "A/B testing",
       "tag": "Statistics",
       "blurb": "Thiết kế thí nghiệm, vấn đề nhìn sớm, năm cái bẫy thực tế, ý nghĩa thống kê so với ý nghĩa thực tiễn, và checklist trước khi triển khai.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/03-statistics/ab-testing/index.html",
       "skeleton": false,
       "lc": 0
@@ -1167,7 +1167,7 @@ window.CATALOG = [
       "title": "Supervised, unsupervised & reinforcement",
       "tag": "ML",
       "blurb": "Gọi tên bài toán cho đúng: nhãn tới từ đâu, khi nào hồi quy khi nào phân loại, và bốn cách xoay xở khi nhãn quá đắt.",
-      "n": 5,
+      "n": 6,
       "path": "content/05-machine-learning/04-core-concepts/supervised-unsupervised/index.html",
       "skeleton": false,
       "lc": 0
@@ -1178,7 +1178,7 @@ window.CATALOG = [
       "title": "Bias–variance tradeoff",
       "tag": "Generalization",
       "blurb": "Phân rã sai số thành ba phần, đường cong đánh đổi, và kỹ thuật nào đánh vào phần nào.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/04-core-concepts/bias-variance-tradeoff/index.html",
       "skeleton": false,
       "lc": 0
@@ -1189,7 +1189,7 @@ window.CATALOG = [
       "title": "Train/val/test & cross-validation",
       "tag": "Generalization",
       "blurb": "Vì sao cần ba tập, k-fold, chia theo nhóm và theo thời gian, sáu nguồn rò rỉ dữ liệu, và nested CV.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/04-core-concepts/train-val-test-cv/index.html",
       "skeleton": false,
       "lc": 0
@@ -1200,7 +1200,7 @@ window.CATALOG = [
       "title": "Overfitting & regularization",
       "tag": "Generalization",
       "blurb": "Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/04-core-concepts/overfitting-regularization/index.html",
       "skeleton": false,
       "lc": 0
@@ -1211,7 +1211,7 @@ window.CATALOG = [
       "title": "Feature engineering",
       "tag": "ML",
       "blurb": "Mã hoá biến phân loại, xử lý giá trị thiếu, co giãn, biến tương tác — và khi nào để model tự lo.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/04-core-concepts/feature-engineering/index.html",
       "skeleton": false,
       "lc": 0
@@ -1239,7 +1239,7 @@ window.CATALOG = [
       "title": "Linear regression",
       "tag": "ML",
       "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
-      "n": 9,
+      "n": 10,
       "path": "content/05-machine-learning/05-classical-ml/linear-regression/index.html",
       "skeleton": false,
       "lc": 0
@@ -1250,7 +1250,7 @@ window.CATALOG = [
       "title": "Logistic regression",
       "tag": "ML",
       "blurb": "Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.",
-      "n": 9,
+      "n": 10,
       "path": "content/05-machine-learning/05-classical-ml/logistic-regression/index.html",
       "skeleton": false,
       "lc": 0
@@ -1261,7 +1261,7 @@ window.CATALOG = [
       "title": "Ridge, Lasso & Elastic Net",
       "tag": "ML",
       "blurb": "Ba cách regularize model tuyến tính: L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở hình dạng vùng phạt.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
       "skeleton": false,
       "lc": 0
@@ -1272,7 +1272,7 @@ window.CATALOG = [
       "title": "SVM",
       "tag": "ML",
       "blurb": "Lề lớn nhất, support vector, tham số C và gamma, kernel trick — và vì sao nó từng thắng trước khi deep learning tới.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/svm/index.html",
       "skeleton": false,
       "lc": 0
@@ -1283,7 +1283,7 @@ window.CATALOG = [
       "title": "KNN",
       "tag": "ML",
       "blurb": "Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/knn/index.html",
       "skeleton": false,
       "lc": 0
@@ -1294,7 +1294,7 @@ window.CATALOG = [
       "title": "Naive Bayes",
       "tag": "ML",
       "blurb": "Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/naive-bayes/index.html",
       "skeleton": false,
       "lc": 0
@@ -1321,8 +1321,8 @@ window.CATALOG = [
       "slug": "dtree",
       "title": "Decision tree",
       "tag": "ML",
-      "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba núm để hãm nó lại.",
-      "n": 13,
+      "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba hyperparameter để hãm nó lại.",
+      "n": 14,
       "path": "content/05-machine-learning/06-tree-models/decision-tree/index.html",
       "skeleton": false,
       "lc": 0
@@ -1333,7 +1333,7 @@ window.CATALOG = [
       "title": "Random forest & bagging",
       "tag": "Ensemble",
       "blurb": "Hỏi một cây thì hay sai — random forest trồng hàng trăm cây rồi cho bỏ phiếu. Ba bước của thuật toán, vì sao nó chạy được, và cái bẫy của bảng feature importance.",
-      "n": 12,
+      "n": 13,
       "path": "content/05-machine-learning/06-tree-models/random-forest/index.html",
       "skeleton": false,
       "lc": 0
@@ -1343,8 +1343,8 @@ window.CATALOG = [
       "slug": "gb",
       "title": "Gradient boosting",
       "tag": "Ensemble",
-      "blurb": "Cộng cây nông theo phần dư, vì sao gọi là gradient, hai núm bù nhau learning_rate và n_estimators, và vì sao dữ liệu bảng vẫn thuộc về boosting.",
-      "n": 9,
+      "blurb": "Cộng cây nông theo phần dư, vì sao gọi là gradient, learning_rate bù trừ với n_estimators, và vì sao dữ liệu bảng vẫn thuộc về boosting.",
+      "n": 10,
       "path": "content/05-machine-learning/06-tree-models/gradient-boosting/index.html",
       "skeleton": false,
       "lc": 0
@@ -1355,7 +1355,7 @@ window.CATALOG = [
       "title": "XGBoost",
       "tag": "Ensemble",
       "blurb": "Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/06-tree-models/xgboost/index.html",
       "skeleton": false,
       "lc": 0
@@ -1366,7 +1366,7 @@ window.CATALOG = [
       "title": "LightGBM",
       "tag": "Ensemble",
       "blurb": "Mọc cây theo lá thay vì theo tầng, GOSS bỏ bớt mẫu gradient nhỏ, EFB gộp đặc trưng thưa — ba mẹo đổi lấy tốc độ.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/06-tree-models/lightgbm/index.html",
       "skeleton": false,
       "lc": 0
@@ -1394,7 +1394,7 @@ window.CATALOG = [
       "title": "K-means & clustering",
       "tag": "ML",
       "blurb": "Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/07-clustering/kmeans-clustering/index.html",
       "skeleton": false,
       "lc": 0
@@ -1405,7 +1405,7 @@ window.CATALOG = [
       "title": "DBSCAN",
       "tag": "ML",
       "blurb": "Cụm là vùng đông đúc nối nhau: không cần biết k trước, bắt được cụm hình bất kỳ, và tự đánh dấu điểm nhiễu.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/07-clustering/dbscan/index.html",
       "skeleton": false,
       "lc": 0
@@ -1416,7 +1416,7 @@ window.CATALOG = [
       "title": "HDBSCAN",
       "tag": "ML",
       "blurb": "Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/07-clustering/hdbscan/index.html",
       "skeleton": false,
       "lc": 0
@@ -1433,7 +1433,7 @@ window.CATALOG = [
       "title": "PCA & dimensionality reduction",
       "tag": "ML",
       "blurb": "Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/08-dimensionality/pca-dimensionality/index.html",
       "skeleton": false,
       "lc": 0
@@ -1461,7 +1461,7 @@ window.CATALOG = [
       "title": "Metric & confusion matrix",
       "tag": "Evaluation",
       "blurb": "Bốn ô sinh ra mọi chỉ số: precision với recall chọn theo chi phí lỗi, vì sao accuracy nói dối khi dữ liệu lệch, và chốt ngưỡng bằng tiền thay vì bằng F1.",
-      "n": 12,
+      "n": 13,
       "path": "content/05-machine-learning/09-evaluation/metrics-confusion-matrix/index.html",
       "skeleton": false,
       "lc": 0
@@ -1472,7 +1472,7 @@ window.CATALOG = [
       "title": "ROC-AUC & PR curve",
       "tag": "Evaluation",
       "blurb": "Hai đường cong khi ngưỡng chưa cố định: ý nghĩa xác suất của AUC, vì sao lớp dương hiếm thì ROC nói dối, và mức cơ sở của PR-AUC không phải 0.5.",
-      "n": 6,
+      "n": 7,
       "path": "content/05-machine-learning/09-evaluation/roc-auc-pr/index.html",
       "skeleton": false,
       "lc": 0
@@ -1483,7 +1483,7 @@ window.CATALOG = [
       "title": "Probability calibration",
       "tag": "Evaluation",
       "blurb": "Model xếp hạng đúng vẫn có thể nói 0.9 khi thực tế là 0.6: biểu đồ tin cậy, model nào lệch sẵn, Platt scaling và isotonic regression.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/09-evaluation/calibration/index.html",
       "skeleton": false,
       "lc": 0

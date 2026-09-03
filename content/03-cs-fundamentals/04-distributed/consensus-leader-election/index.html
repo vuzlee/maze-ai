@@ -49,9 +49,16 @@
 <section id="consensus-leader-election-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
   <p class="key">Nhiều node phải <b>đồng thuận</b> (consensus) về một giá trị hoặc một quyết định chung — ai đang là leader, giá trị nào được ghi vào log — ngay cả khi một số node chết, chậm, hoặc mạng giữa chúng gián đoạn tạm thời.</p>
+  <div class="cmp two">
+    <div><h5>Node B im lặng — nó chết?</h5>
+      <p><b>Nếu chờ tiếp</b> hệ thống treo</p></div>
+    <div><h5>…hay chỉ đang chậm?</h5>
+      <p><b>Nếu quyết vội</b> hai node cùng làm leader</p></div>
+  </div>
+
   <ul class="why">
-    <li>Cái khó không phải là "hỏi ý kiến từng node" — mà là <b>không node nào biết chắc</b> một node khác đã chết hẳn hay chỉ đang chậm/mất kết nối tạm thời. Chờ mãi thì hệ thống treo, quyết định vội thì có thể sai.</li>
-    <li>Bài <a href="../cap-theorem-consistency/index.html">CAP &amp; consistency</a> đã nói tới replication kiểu leader-follower ở mục 04 — bài này trả lời <em>ai/cái gì chọn ra leader đó</em>.</li>
+    <li>Cái khó là <b>không node nào biết chắc</b> node khác chết hẳn hay chỉ chậm.</li>
+    <li><a href="../cap-theorem-consistency/index.html">CAP &amp; consistency</a> nói tới leader–follower; bài này trả lời <em>ai chọn ra leader đó</em>.</li>
   </ul>
 </section>
 
@@ -73,11 +80,96 @@
 <section id="consensus-leader-election-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Leader election</h2></div>
   <p class="key">Nhiều hệ thống phân tán cần đúng <b>một</b> node điều phối tại một thời điểm, để tránh <b>split-brain</b> — hai node cùng tưởng mình là leader và ra quyết định mâu thuẫn.</p>
-  <p><b>ZooKeeper</b> và <b>etcd</b> là hai công cụ phổ biến chuyên cung cấp dịch vụ coordination/consensus (dựa trên họ thuật toán Paxos/Raft) để các hệ thống khác — Kafka, Kubernetes... — dùng làm nền tảng bầu leader, khoá phân tán (distributed lock), và lưu cấu hình dùng chung. Ở mức này chỉ cần nhận diện được vai trò của chúng, không cần biết cách cài đặt bên trong.</p>
+  <div class="stack">
+    <div class="s"><b>ZooKeeper · etcd</b><span>dịch vụ coordination, dựng trên Paxos/Raft</span></div>
+    <div class="s"><b>Cho ai dùng</b><span>Kafka, Kubernetes… không tự cài consensus</span></div>
+    <div class="s ok"><b>Dùng để</b><span>bầu leader · distributed lock · lưu cấu hình dùng chung</span></div>
+  </div>
+
+  <ul class="why">
+    <li>Mức phỏng vấn chỉ cần <b>nhận ra vai trò</b> của chúng, không cần cách cài đặt bên trong.</li>
+  </ul>
 </section>
 
 <section id="consensus-leader-election-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>04</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Cái khó không phải bầu cử mà là không node nào biết chắc node kia đã chết hay chỉ đang chậm — Raft chữa bằng quy tắc đa số, và ZooKeeper/etcd bán lại quy tắc đó thành dịch vụ.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 424" role="img" aria-label="Tổng kết consensus và leader election: vấn đề node im lặng, bốn bước của Raft, và vai trò của ZooKeeper cùng etcd">
+    <text class="sv-h" x="0" y="12">&#9312; VẤN ĐỀ — NODE B IM LẶNG, KHÔNG AI BIẾT VÌ SAO</text>
+
+    <rect x="8" y="24" width="410" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="20" y="44" fill="#F79BAB">Nếu chờ tiếp</text>
+    <text class="sv-d" x="20" y="62">coi như B chỉ đang chậm</text>
+    <text class="sv-d" x="20" y="82">B chết thật &#8594; hệ thống TREO</text>
+
+    <rect x="442" y="24" width="410" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="454" y="44" fill="#F79BAB">Nếu quyết vội</text>
+    <text class="sv-d" x="454" y="62">coi như B đã chết</text>
+    <text class="sv-d" x="454" y="82">B còn sống &#8594; HAI node cùng làm leader (split-brain)</text>
+
+    <text class="sv-h" x="0" y="140">&#9313; RAFT — MỘT LEADER MỖI TERM, CHỐT THEO ĐA SỐ</text>
+
+    <rect x="8" y="152" width="196" height="72" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="172" fill="#A8BEF6">1 &#183; Bầu leader</text>
+    <text class="sv-d" x="20" y="190">các node bỏ phiếu</text>
+    <text class="sv-d" x="20" y="208">một node thắng trong một term</text>
+    <path d="M212 188 L230 188" stroke="#3D352C" stroke-width="1.5" marker-end="url(#csa)"/>
+    <defs><marker id="csa" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="#3D352C"/></marker></defs>
+
+    <rect x="238" y="152" width="196" height="72" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="250" y="172" fill="#A8BEF6">2 &#183; Ghi log</text>
+    <text class="sv-d" x="250" y="190">leader nhận lệnh ghi</text>
+    <text class="sv-d" x="250" y="208">ghi vào log của mình trước</text>
+    <path d="M442 188 L460 188" stroke="#3D352C" stroke-width="1.5" marker-end="url(#csa)"/>
+
+    <rect x="468" y="152" width="196" height="72" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="480" y="172" fill="#A8BEF6">3 &#183; Sao chép</text>
+    <text class="sv-d" x="480" y="190">leader gửi log đó</text>
+    <text class="sv-d" x="480" y="208">sang các follower</text>
+    <path d="M672 188 L690 188" stroke="#3D352C" stroke-width="1.5" marker-end="url(#csa)"/>
+
+    <rect x="698" y="152" width="154" height="72" rx="5" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
+    <text class="sv-l" x="710" y="172" fill="#8EE0BE">4 &#183; Committed</text>
+    <text class="sv-d" x="710" y="190">ĐA SỐ (quorum) đã có</text>
+    <text class="sv-d" x="710" y="208">&#8594; coi là chốt</text>
+
+    <rect x="8" y="236" width="844" height="52" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-d" x="20" y="256">Chốt theo đa số nên hệ thống vẫn đúng dù THIỂU SỐ node chết — đó là chỗ &#9312; được chữa</text>
+    <text class="sv-d" x="20" y="276">Leader ngừng gửi heartbeat &#8594; follower đợi hết timeout rồi tự tổ chức bầu lại &#183; Raft giải cùng bài toán với Paxos nhưng dễ hiểu hơn</text>
+
+    <text class="sv-h" x="0" y="322">&#9314; KHÔNG AI TỰ CÀI — DÙNG DỊCH VỤ COORDINATION</text>
+
+    <rect x="8" y="334" width="272" height="76" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="354" fill="#A8BEF6">ZooKeeper &#183; etcd</text>
+    <text class="sv-d" x="20" y="372">dịch vụ coordination</text>
+    <text class="sv-d" x="20" y="392">dựng trên Paxos/Raft</text>
+
+    <rect x="294" y="334" width="272" height="76" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="306" y="354" fill="#A8BEF6">Cho ai dùng</text>
+    <text class="sv-d" x="306" y="372">Kafka, Kubernetes…</text>
+    <text class="sv-d" x="306" y="392">không tự cài consensus</text>
+
+    <rect x="580" y="334" width="272" height="76" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="592" y="354" fill="#8EE0BE">Dùng để</text>
+    <text class="sv-d" x="592" y="372">bầu leader &#183; distributed lock</text>
+    <text class="sv-d" x="592" y="392">lưu cấu hình dùng chung</text>
+  </svg>
+  <figcaption>&#9312; hai đường đều sai khi không biết node kia còn sống không, &#9313; Raft chữa bằng quorum, &#9314; và ở mức thực tế thì gọi dịch vụ có sẵn.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Split-brain</b> — ở &#9312;: cái giá của việc quyết vội, và là thứ leader election tồn tại để tránh.</li>
+    <li><b>Term</b> — ở &#9313;: một nhiệm kỳ có đúng một leader, nên không có hai leader cùng term.</li>
+    <li><b>Quorum</b> — ở &#9313;: chốt theo đa số là lý do thiểu số node chết không làm hỏng hệ thống.</li>
+    <li><b>Heartbeat</b> — ở &#9313;: leader im lặng quá timeout thì follower bầu lại, không cần ai can thiệp.</li>
+  </ul>
+</section>
+
+<section id="consensus-leader-election-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
   <details class="qa"><summary>Vì sao hệ phân tán cần thuật toán consensus?</summary>

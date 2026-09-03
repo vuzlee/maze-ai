@@ -234,7 +234,68 @@
 </section>
 
 <section id="http-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>10</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Đếm vòng khứ hồi trước, rồi mới bàn tới chuyện gì xảy ra khi một vòng không về.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 386" role="img" aria-label="Tổng kết TCP và HTTP: bốn chặng bắt tay, cách giảm số RTT, và ba lớp phòng thủ khi lời gọi hỏng">
+      <text class="sv-h" x="16" y="26">&#9312; TRƯỚC KHI SERVER LÀM VIỆC — BỐN CHẶNG</text>
+
+      <rect x="16" y="38" width="180" height="34" rx="6" fill="rgba(140,169,242,.12)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="36" y="60" fill="#8CA9F2">DNS · 1 RTT</text>
+      <rect x="204" y="38" width="180" height="34" rx="6" fill="rgba(140,169,242,.12)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="224" y="60" fill="#8CA9F2">TCP · 1 RTT</text>
+      <rect x="392" y="38" width="180" height="34" rx="6" fill="rgba(140,169,242,.12)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="412" y="60" fill="#8CA9F2">TLS · 1–2 RTT</text>
+      <rect x="580" y="38" width="180" height="34" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A" stroke-width="2"></rect>
+      <text class="sv-l" x="600" y="60" fill="#EDB44A">HTTP · 1 RTT</text>
+      <text class="sv-d" x="16" y="90">RTT 100 ms → một kết nối mới tốn 400–500 ms trước khi server bắt đầu</text>
+
+      <text class="sv-h" x="16" y="122">&#9313; CẮT SỐ VÒNG — THEO ĐÚNG THỨ TỰ LỢI ÍCH</text>
+      <rect x="16" y="134" width="828" height="76" rx="8" fill="rgba(91,207,160,.06)" stroke="#3D352C" stroke-width="2"></rect>
+      <rect x="36" y="148" width="330" height="14" rx="3" fill="#F2718A"></rect>
+      <rect x="36" y="170" width="66" height="14" rx="3" fill="#EDB44A"></rect>
+      <rect x="36" y="192" width="6" height="14" rx="3" fill="#5BCFA0"></rect>
+      <text class="sv-l" x="386" y="160" fill="#F79BAB">kết nối mới · 5 RTT — client mới cho từng request</text>
+      <text class="sv-l" x="386" y="182" fill="#EDB44A">tái dùng kết nối · 1 RTT — keep-alive, connection pool</text>
+      <text class="sv-l" x="386" y="204" fill="#8EE0BE">cache còn hạn · 0 RTT — không ra mạng</text>
+
+      <text class="sv-h" x="16" y="242">&#9314; KHI MỘT VÒNG KHÔNG VỀ — BA LỚP</text>
+      <rect x="16" y="254" width="268" height="86" rx="8" fill="rgba(242,113,138,.08)" stroke="#F2718A" stroke-width="2"></rect>
+      <text class="sv-l" x="36" y="276" fill="#F2718A">timeout ≠ thất bại</text>
+      <text class="sv-d" x="36" y="294">chỉ có nghĩa là không biết</text>
+      <text class="sv-l" x="36" y="316" fill="#8EE0BE">→ Idempotency-Key</text>
+      <text class="sv-d" x="36" y="332">server thấy khoá cũ thì trả kết quả cũ</text>
+
+      <rect x="296" y="254" width="268" height="86" rx="8" fill="rgba(237,180,74,.08)" stroke="#EDB44A" stroke-width="2"></rect>
+      <text class="sv-l" x="316" y="276" fill="#EDB44A">thử lại đúng cách</text>
+      <text class="sv-d" x="316" y="294">backoff hàm mũ CỘNG jitter</text>
+      <text class="sv-d" x="316" y="312">giới hạn 3 lần · ngân sách 10%</text>
+      <text class="sv-d" x="316" y="330">không retry lồng nhau: 3×3×3 = 27</text>
+
+      <rect x="576" y="254" width="268" height="86" rx="8" fill="rgba(91,207,160,.08)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="596" y="276" fill="#5BCFA0">thất bại nhanh</text>
+      <text class="sv-d" x="596" y="294">timeout giảm dần theo chiều gọi</text>
+      <text class="sv-d" x="596" y="312">gateway 3s → A 2s → B 1s → DB 500ms</text>
+      <text class="sv-d" x="596" y="330">circuit breaker: CLOSED → OPEN → HALF-OPEN</text>
+
+      <line x1="16" y1="356" x2="844" y2="356" stroke="#2E2822"></line>
+      <text class="sv-l" x="16" y="378" fill="#7A6F63">&#9314; ba lớp cùng chặn một thứ: <tspan fill="#F79BAB">hiệu ứng nhân tải</tspan> — service yếu đi thì mọi client cùng thử lại, biến sự cố nhỏ thành sập hệ thống</text>
+    </svg>
+    <figcaption>Hai hàng trên là chuyện lúc mọi thứ chạy tốt; hàng dưới là chuyện lúc không, và cả ba ô đều tồn tại để chặn cùng một vòng xoáy.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>&#9313; là lý do connection pool dùng chung là tối ưu rẻ nhất — nâng TLS hay đổi HTTP/3 chỉ cắt được một hai vòng.</li>
+    <li>&#9314; ô trái là chỗ <code>POST</code> khác mọi method còn lại: thử lại nó có thể tạo đơn thứ hai, nên phải có khoá idempotency.</li>
+    <li>HTTP/2 dọn head-of-line ở tầng HTTP nhưng TCP vẫn giữ thứ tự byte, nên nghẽn chỉ chuyển xuống dưới — HTTP/3 mới dọn hết.</li>
+    <li>Cache ở dòng 0 RTT có bài riêng: <a href="../caching/index.html">Caching</a>; phần bắt tay TLS ở <a href="../dns-tls/index.html">DNS &amp; TLS</a>.</li>
+  </ul>
+</section>
+
+<section id="http-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Bốn lỗi này gây phần lớn sự cố độ trễ và trùng dữ liệu ở tầng gọi mạng.</p>
 
@@ -246,8 +307,8 @@
   </div>
 </section>
 
-<section id="http-s11" class="lesson">
-  <div class="sh"><b>11</b><h2>Hỏi đáp</h2></div>
+<section id="http-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

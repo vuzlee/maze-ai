@@ -51,11 +51,20 @@
 
   <p class="key">XGBoost mở đều cả tầng — <em>nên tốn công như nhau cho nhánh đáng giá và nhánh chẳng cải thiện gì</em>.</p>
 
-  <p>Với dữ liệu vài chục triệu dòng, thời gian huấn luyện thành rào chắn thật: một vòng thử nghiệm mất nửa ngày thì không ai chỉnh được tham số. Và phần lớn thời gian đó tiêu vào hai chỗ lãng phí — mở những nhánh gần như không giảm loss, và quét mọi mẫu ở mọi lần tách dù đa số mẫu đã được model dự đoán đúng từ lâu.</p>
+  <p>Với vài chục triệu dòng, một vòng thử nghiệm mất nửa ngày thì không ai chỉnh được tham số. Thời gian đó tiêu vào hai chỗ lãng phí:</p>
+
+  <div class="cmp two">
+    <div><h5>Lãng phí theo chiều rộng</h5>
+      <p>Mở đều cả tầng nên nhánh <b>gần như không giảm loss</b> vẫn tốn đúng công như nhánh đáng giá.</p>
+      <p><b>Chữa bằng</b> mọc theo lá.</p></div>
+    <div><h5>Lãng phí theo chiều sâu</h5>
+      <p>Mỗi lần tách <b>quét lại mọi mẫu</b>, kể cả mẫu model đã dự đoán đúng từ lâu.</p>
+      <p><b>Chữa bằng</b> GOSS và EFB.</p></div>
+  </div>
 
   <ul class="why">
-    <li>LightGBM không đề xuất objective mới. Nó nhận nguyên công thức bậc hai của XGBoost rồi <b>tấn công vào chi phí đi tìm split</b> bằng ba mẹo độc lập nhau.</li>
-    <li>Vì cùng objective nên mọi thứ đã học ở XGBoost — <code>lambda</code>, <code>gamma</code>, gain, early stopping — chuyển sang đây gần như nguyên vẹn, chỉ đổi tên tham số.</li>
+    <li>LightGBM không đổi objective: giữ nguyên công thức bậc hai của XGBoost rồi <b>tấn công chi phí đi tìm split</b> bằng ba mẹo.</li>
+    <li>Cùng objective nên mọi thứ đã học ở XGBoost — <code>lambda</code>, <code>gamma</code>, gain, early stopping — chuyển sang gần như nguyên vẹn.</li>
   </ul>
 </section>
 
@@ -103,7 +112,28 @@
     <figcaption>Vàng là các lá được chọn chia tiếp vì gain lớn nhất. Cùng một số lá, LightGBM đặt chúng ở chỗ có ích hơn — nên nhanh và chính xác hơn, đổi lại dễ overfit trên dữ liệu nhỏ.</figcaption>
   </figure>
 
-  <p>Cùng một ngân sách lá, cách này đặt chúng ở chỗ giảm loss nhiều nhất, nên vừa nhanh hơn vừa chính xác hơn ở cùng số lá. Nhưng cây mọc ra <b>lệch và sâu</b> — một nhánh có thể xuống rất sâu trong khi nhánh kia dừng sớm.</p>
+  <p>Bấm thử — cùng số lượt như nhau, xem hai cách mọc rẽ đi đâu:</p>
+
+  <div class="lab" id="lgblab">
+    <div id="lview"></div>
+    <div class="slider" id="lslider"></div>
+
+    <p class="labsay" id="lexp"></p>
+
+    <div class="labbar">
+      <button id="lstep">Mọc một lượt</button>
+      <button id="lauto">Mọc hết ngân sách</button>
+      <button class="ghost" id="lrst">Làm lại</button>
+      <span id="lstat"></span>
+    </div>
+
+    <p class="verdict" id="lverdict" hidden></p>
+  </div>
+
+  <ul class="why">
+    <li>Cùng một ngân sách lá, cách này đặt chúng ở <b>chỗ giảm loss nhiều nhất</b>.</li>
+    <li>Đổi lại, cây mọc ra <b>lệch và sâu</b>: một nhánh xuống rất sâu trong khi nhánh kia dừng sớm.</li>
+  </ul>
 
   <div class="note warn">
     <h4>Hệ quả: <code>max_depth</code> không còn đủ để hãm</h4>
@@ -126,16 +156,24 @@
     <div class="s ok"><b>Histogram</b><span>Gộp giá trị liên tục vào các thùng như XGBoost, nhưng đây là mặc định chứ không phải tuỳ chọn.</span></div>
   </div>
 
-  <p>Ngoài ba mẹo trên, LightGBM còn nhận <b>biến phân loại trực tiếp</b>: khai báo cột nào là categorical, nó tự tìm cách chia tập giá trị thành hai nhóm theo gain thay vì bắt bạn one-hot trước. Với cột nhiều giá trị, cách này vừa nhanh hơn vừa thường chính xác hơn one-hot.</p>
-
   <ul class="why">
-    <li>Cái giá của GOSS: nó là <b>xấp xỉ</b>. Trên dữ liệu nhỏ hoặc nhiễu nhiều, việc bỏ bớt mẫu làm ước lượng gain dao động — thêm một lý do nữa để dùng nó ở quy mô lớn.</li>
-    <li>EFB chỉ có ích khi dữ liệu <b>thật sự thưa</b>. Dữ liệu bảng toàn cột số dày đặc thì mẹo này không đóng góp gì.</li>
+    <li>LightGBM còn nhận <b>biến phân loại trực tiếp</b>: khai báo cột là categorical, nó tự chia tập giá trị theo gain.</li>
+    <li>Cái giá của GOSS: nó là <b>xấp xỉ</b>. Dữ liệu nhỏ hoặc nhiễu nhiều thì bỏ bớt mẫu làm ước lượng gain dao động.</li>
+    <li>EFB chỉ có ích khi dữ liệu <b>thật sự thưa</b>. Bảng toàn cột số dày đặc thì mẹo này không đóng góp gì.</li>
   </ul>
+
+  <details class="deep">
+    <summary>Vì sao nhận categorical trực tiếp lại hơn one-hot</summary>
+    <div class="body">
+      <p>Khai báo cột nào là categorical thì LightGBM tự tìm cách chia tập giá trị thành hai nhóm theo gain, thay vì bắt bạn one-hot trước. Với cột nhiều giá trị, cách này vừa nhanh hơn vừa thường chính xác hơn: one-hot đẻ ra hàng trăm cột nhị phân, mỗi cột chỉ tách được đúng một giá trị ra khỏi phần còn lại.</p>
+    </div>
+  </details>
 </section>
 
 <section id="lgbm-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Đánh đổi và khi nào chọn nó</h2></div>
+
+  <p class="key">Đổi <em>sự an toàn trên dữ liệu nhỏ</em> lấy <em>tốc độ ở quy mô lớn</em>. Cùng một objective, chỉ khác cách đi tìm chỗ tách.</p>
 
   <div class="cmp two">
     <div><h5>Mạnh</h5>
@@ -148,11 +186,88 @@
       <p>GOSS là xấp xỉ, nên ước lượng gain dao động khi dữ liệu ít hoặc nhiễu nhiều</p></div>
   </div>
 
-  <p>Nơi nó thống trị: <b>dữ liệu bảng rất lớn hoặc phải huấn luyện lại thường xuyên</b> — hàng triệu dòng, pipeline chạy hằng ngày. Sau khi chỉnh kỹ, chênh lệch độ chính xác so với XGBoost thường nhỏ hơn nhiều so với chênh lệch thời gian chạy, nên chọn theo quy mô và nhịp làm việc chứ không theo "cái nào mạnh hơn". Bảng đối chiếu đầy đủ ba thư viện — kể cả CatBoost — nằm ở <a href="../tree-family-overview/index.html#treeintro-s6">Bản đồ nhánh cây</a>.</p>
+  <p>Nơi nó thống trị: <b>dữ liệu bảng rất lớn hoặc phải huấn luyện lại thường xuyên</b> — hàng triệu dòng, pipeline chạy hằng ngày.</p>
+
+  <ul class="why">
+    <li>Sau khi chỉnh kỹ, chênh lệch độ chính xác với XGBoost <b>nhỏ hơn nhiều</b> so với chênh lệch thời gian chạy.</li>
+    <li>Nên chọn theo <b>quy mô và nhịp làm việc</b>, không theo "cái nào mạnh hơn".</li>
+    <li>Bảng đối chiếu ba thư viện, kể cả CatBoost: <a href="../tree-family-overview/index.html#treeintro-s6">Bản đồ nhánh cây</a>.</li>
+  </ul>
 </section>
 
 <section id="lgbm-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Cùng objective với XGBoost, ba mẹo cắt chi phí, một cái giá phải trả. Hết bài.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 340" role="img" aria-label="Tổng kết LightGBM: giữ nguyên objective của XGBoost, cắt chi phí bằng mọc theo lá, GOSS bớt hàng và EFB bớt cột, đổi lại dễ overfit trên dữ liệu nhỏ">
+      <rect x="16" y="34" width="828" height="34" rx="8" fill="rgba(140,169,242,.06)" stroke="#3D352C" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+      <text class="sv-l" x="430" y="55" text-anchor="middle" fill="#A8BEF6">objective giữ nguyên của XGBoost — lambda · gamma · gain · early stopping chuyển sang nguyên vẹn</text>
+
+      <text class="sv-h" x="16" y="96">&#9312; MỌC THEO LÁ</text>
+      <text class="sv-d" x="16" y="114">bớt nhánh vô ích</text>
+      <text class="sv-h" x="304" y="96">&#9313; GOSS · BỚT HÀNG</text>
+      <text class="sv-d" x="304" y="114">bỏ mẫu đã học xong</text>
+      <text class="sv-h" x="596" y="96">&#9314; EFB · BỚT CỘT</text>
+      <text class="sv-d" x="596" y="114">gộp cột loại trừ nhau</text>
+
+      <rect x="16" y="128" width="266" height="126" rx="8" fill="rgba(237,180,74,.08)" stroke="#EDB44A" stroke-width="2"></rect>
+      <line x1="120" y1="152" x2="86" y2="184" stroke="#2E2822"></line>
+      <line x1="120" y1="152" x2="154" y2="184" stroke="#2E2822"></line>
+      <line x1="154" y1="184" x2="128" y2="214" stroke="#2E2822"></line>
+      <line x1="154" y1="184" x2="184" y2="214" stroke="#2E2822"></line>
+      <circle cx="120" cy="152" r="11" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <circle cx="86" cy="184" r="11" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="154" cy="184" r="11" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <circle cx="128" cy="214" r="11" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="184" cy="214" r="11" fill="rgba(237,180,74,.22)" stroke="#EDB44A"></circle>
+      <text class="sv-l" x="204" y="158" fill="#7A6F63">chia đúng lá</text>
+      <text class="sv-l" x="204" y="174" fill="#7A6F63">gain lớn nhất</text>
+      <text class="sv-l" x="204" y="196" fill="#F79BAB">cây lệch và sâu</text>
+      <text class="sv-l" x="36" y="244" fill="#7A6F63">hãm bằng <tspan fill="#EDB44A">num_leaves</tspan> + <tspan fill="#EDB44A">min_data_in_leaf</tspan></text>
+
+      <rect x="304" y="128" width="266" height="126" rx="8" fill="rgba(91,207,160,.08)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <rect x="324" y="150" width="120" height="16" rx="3" fill="rgba(242,113,138,.35)" stroke="#F2718A"></rect>
+      <text class="sv-l" x="454" y="163" fill="#F2718A">gradient lớn → giữ hết</text>
+      <rect x="324" y="176" width="120" height="16" rx="3" fill="rgba(122,111,99,.28)"></rect>
+      <rect x="324" y="176" width="34" height="16" rx="3" fill="rgba(91,207,160,.35)" stroke="#5BCFA0"></rect>
+      <text class="sv-l" x="454" y="189" fill="#5BCFA0">gradient nhỏ → lấy mẫu</text>
+      <text class="sv-l" x="324" y="216" fill="#7A6F63">nhân trọng số bù lại cho khỏi lệch</text>
+      <text class="sv-l" x="324" y="240" fill="#F79BAB">là xấp xỉ — dữ liệu nhỏ thì gain dao động</text>
+
+      <rect x="596" y="128" width="248" height="126" rx="8" fill="rgba(140,169,242,.08)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <rect x="616" y="150" width="22" height="46" rx="3" fill="rgba(140,169,242,.3)" stroke="#8CA9F2"></rect>
+      <rect x="644" y="150" width="22" height="46" rx="3" fill="rgba(140,169,242,.3)" stroke="#8CA9F2"></rect>
+      <rect x="672" y="150" width="22" height="46" rx="3" fill="rgba(140,169,242,.3)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="702" y="164" fill="#7A6F63">hiếm khi</text>
+      <text class="sv-l" x="702" y="180" fill="#7A6F63">cùng khác 0</text>
+      <line x1="700" y1="196" x2="700" y2="196" stroke="#3D352C"></line>
+      <polygon points="760,172 748,166 748,178" fill="#3D352C"></polygon>
+      <rect x="774" y="150" width="22" height="46" rx="3" fill="rgba(91,207,160,.3)" stroke="#5BCFA0"></rect>
+      <text class="sv-l" x="616" y="220" fill="#7A6F63">dồn vào khoảng không chồng lấn</text>
+      <text class="sv-l" x="616" y="242" fill="#F79BAB">bảng số dày đặc → không đóng góp gì</text>
+
+      <line x1="16" y1="272" x2="844" y2="272" stroke="#2E2822"></line>
+      <text class="sv-l" x="16" y="296" fill="#7A6F63">&#9312; là chỗ đổi <tspan fill="#EDB44A">thuật toán</tspan>; &#9313;&#9314; chỉ bớt việc — không mẹo nào đổi hàm mục tiêu</text>
+      <text class="sv-l" x="16" y="314" fill="#7A6F63">cái giá gộp lại: <tspan fill="#F79BAB">dễ overfit trên dữ liệu nhỏ</tspan> — dưới vài chục nghìn dòng thì cân nhắc XGBoost</text>
+      <text class="sv-l" x="16" y="332" fill="#7A6F63">thêm: nhận <tspan fill="#8EE0BE">biến phân loại trực tiếp</tspan>, không phải one-hot trước</text>
+    </svg>
+    <figcaption>Dải gạch đứt ở trên là thứ <strong>không đổi</strong> — mọi mẹo bên dưới đều chỉ tấn công chi phí đi tìm split.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Mọc theo lá</b> ở &#9312; vừa là nguồn tốc độ vừa là nguồn overfit — <code>max_depth</code> hết tác dụng vì cây không còn cân.</li>
+    <li><b>GOSS</b> ở &#9313; dựa trên chính gradient của <a href="../xgboost/index.html">XGBoost</a>: gradient nhỏ = model đã đúng = không còn dạy được gì.</li>
+    <li><b>EFB</b> ở &#9314; chỉ có nghĩa khi dữ liệu thưa, tức sau one-hot — đúng loại dữ liệu mà biến phân loại giúp tránh.</li>
+    <li>Vì objective không đổi, mọi thứ chỉnh ở <a href="../xgboost/index.html">XGBoost</a> chuyển sang được; chỉ thay <code>max_depth</code> bằng <code>num_leaves</code>.</li>
+  </ul>
+</section>
+
+<section id="lgbm-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Cây mọc theo lá đổi luôn ý nghĩa của các hyperparameter quen thuộc — <em>đó là gốc của gần như mọi lỗi ở đây</em>.</p>
 
   <div class="grid2">
     <div class="card bad"><h4>Chỉ đặt <code>max_depth</code></h4><p>Cây leaf-wise lệch nên độ sâu không phản ánh độ phức tạp. Phải chặn <code>num_leaves</code>.</p></div>
@@ -164,8 +279,10 @@
   </div>
 </section>
 
-<section id="lgbm-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="lgbm-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+
+  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
   <details class="qa"><summary>LightGBM khác XGBoost ở chỗ nào?</summary>
   <p>Không khác ở hàm mục tiêu — nó dùng nguyên công thức bậc hai của XGBoost. Khác ở cách đi tìm chỗ tách. Thứ nhất là mọc theo lá thay vì theo tầng: mỗi vòng chia đúng chiếc lá có gain lớn nhất bất kể tầng nào, nên cùng số lá thì đặt chúng ở chỗ có ích hơn. Thứ hai là GOSS, bỏ bớt mẫu có gradient nhỏ vì model đã dự đoán đúng chúng rồi. Thứ ba là EFB, gộp các cột thưa loại trừ nhau thành một cột. Cộng lại cho tốc độ nhanh hơn vài lần và tốn ít bộ nhớ hơn.</p></details>
@@ -193,5 +310,6 @@
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
 </body>
 </html>

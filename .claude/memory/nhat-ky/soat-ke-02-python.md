@@ -11,12 +11,12 @@ Soát ngày 2026-09-02 rồi sửa luôn trong cùng phiên. Kệ 02 giờ **17 
 
 **Đã sửa:**
 
-1. Tách [memory-model-mutability](../../content/02-python/02-language-core/memory-model-mutability/index.html)
+1. Tách [memory-model-mutability](../../../content/02-python/02-language-core/memory-model-mutability/index.html)
    (15 mục, gánh ba chủ đề) thành hai: bài gốc còn 11 mục về tên/object/copy/truyền tham số, và
    bài mới **memory-management-gc** nhận refcount, `__slots__`, rò rỉ. Link chéo hai chiều ở hero,
    footer và một `stripnote` cuối bài gốc. Lab ở lại bài gốc, bài mới không tham chiếu `lab.js`.
 2. Gộp hai mục "Lỗi hay gặp" trùng trong bài memory (§08 + §14) và trong
-   [iterator-generator](../../content/02-python/02-language-core/iterator-generator/index.html)
+   [iterator-generator](../../../content/02-python/02-language-core/iterator-generator/index.html)
    (§09 + §10). Ba bẫy vốn không thuộc bài iterator (biến vòng lặp trong closure, đối số mặc định
    khả biến, `lru_cache` giữ `self`) được trỏ về bài chủ thay vì chép lại.
 3. Thêm **scope-legb** (LEGB, `global`/`nonlocal`, `UnboundLocalError`, `*args`/`**kwargs`) và

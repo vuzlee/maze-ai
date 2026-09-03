@@ -113,7 +113,65 @@
 </section>
 
 <section id="osproc-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Một ranh giới cô lập quyết định tất cả: chia sẻ bộ nhớ hay không &#8212; nó định giá lần chuyển luồng, và định luôn ba lỗi cuối bài.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 372" role="img" aria-label="Ranh giới chia sẻ bộ nhớ giữa process và thread, giá của context switch, vòng lập lịch và trạng thái tiến trình">
+
+      <text class="sv-h" x="8" y="16">&#9312; RANH GIỚI CÔ LẬP &#8212; CHIA SẺ BỘ NHỚ HAY KHÔNG</text>
+      <rect x="8" y="26" width="404" height="80" rx="6" fill="rgba(140,169,242,.06)" stroke="#8CA9F2"/>
+      <text class="sv-t" x="20" y="44" fill="#A8BEF6">Process &#8212; không gian địa chỉ riêng</text>
+      <text class="sv-l" x="20" y="62">không chia sẻ gì &#183; muốn trao đổi phải qua IPC</text>
+      <text class="sv-l" x="20" y="78">tạo mới đắt: nhân bản bộ nhớ, bảng trang</text>
+      <text class="sv-d" x="20" y="96" fill="#7A6F63">crash một process không kéo process khác chết theo</text>
+      <rect x="424" y="26" width="424" height="80" rx="6" fill="rgba(237,180,74,.06)" stroke="#EDB44A"/>
+      <text class="sv-t" x="436" y="44" fill="#EDB44A">Thread &#8212; nằm trong một process</text>
+      <text class="sv-l" x="436" y="62">CHUNG: heap, biến global, file descriptor</text>
+      <text class="sv-l" x="436" y="78">RIÊNG: stack, register, program counter</text>
+      <text class="sv-d" x="436" y="96" fill="#7A6F63">chính phần dùng chung là nguồn của race condition &#8594; cần lock</text>
+
+      <text class="sv-h" x="8" y="136">&#9313; GIÁ CỦA MỘT LẦN CHUYỂN &#8212; LƯU RỒI NẠP LẠI TRẠNG THÁI REGISTER</text>
+      <rect x="8" y="146" width="16" height="18" rx="3" fill="rgba(91,207,160,.20)" stroke="#5BCFA0"/>
+      <text class="sv-l" x="32" y="160" fill="#8EE0BE">gọi hàm thường &#183; vài ns</text>
+      <rect x="8" y="170" width="126" height="18" rx="3" fill="rgba(237,180,74,.18)" stroke="#EDB44A"/>
+      <text class="sv-l" x="142" y="184" fill="#EDB44A">thread switch, cùng process &#183; 1&#8211;4 &#181;s &#8212; address space giữ nguyên</text>
+      <rect x="8" y="194" width="420" height="18" rx="3" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
+      <text class="sv-l" x="436" y="208" fill="#F79BAB">process switch &#183; 5&#8211;15 &#181;s &#8212; đổi address space, có thể phải flush TLB</text>
+      <text class="sv-d" x="8" y="230" fill="#7A6F63">thêm thread quá số core cho tác vụ CPU-bound: CPU tốn thời gian lưu/khôi phục hơn là làm việc thật</text>
+
+      <text class="sv-h" x="8" y="262">&#9314; VÒNG LẬP LỊCH &#8212; PREEMPTIVE: HỆ ĐIỀU HÀNH NGẮT, KHÔNG CẦN XIN PHÉP</text>
+      <rect x="8" y="272" width="170" height="30" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
+      <text class="sv-l" x="18" y="291" fill="#8EE0BE">chạy hết time slice</text>
+      <path d="M182 287 h18" stroke="#7A6F63"/><path d="M200 287 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="204" y="272" width="170" height="30" rx="4" fill="rgba(237,180,74,.12)" stroke="#EDB44A"/>
+      <text class="sv-l" x="214" y="291" fill="#EDB44A">bị ngắt ngang</text>
+      <path d="M378 287 h18" stroke="#7A6F63"/><path d="M396 287 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="400" y="272" width="180" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-l" x="410" y="291" fill="#A8BEF6">xếp lại hàng theo ưu tiên</text>
+      <path d="M490 306 v14 h-400 v-40" stroke="#3D352C" fill="none"/>
+      <text class="sv-l" x="600" y="284">cooperative thì tiến trình phải tự nhường</text>
+      <text class="sv-d" x="600" y="298" fill="#7A6F63">một cái treo là khoá cả hệ thống</text>
+
+      <text class="sv-h" x="8" y="342">&#9315; TRẠNG THÁI TIẾN TRÌNH</text>
+      <text class="sv-l" x="8" y="360" fill="#A8BEF6">New &#8594; Ready &#8594; Running &#8594; Terminated</text>
+      <text class="sv-l" x="300" y="360" fill="#EDB44A">Running &#8594; Ready khi hết time slice</text>
+      <text class="sv-l" x="580" y="360" fill="#F79BAB">Running &#8594; Waiting khi chờ I/O, xong thì về Ready</text>
+    </svg>
+    <figcaption>Đọc theo số: chia sẻ bộ nhớ hay không là ranh giới gốc &#9312;, nó quyết định lần chuyển luồng đắt hay rẻ &#9313;, hệ điều hành ngắt ngang theo time slice chứ không đợi xin phép &#9314;, và một tiến trình chỉ đi qua vài trạng thái cố định &#9315;.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><strong>IPC</strong> là cái giá của cột trái &#9312;: pipe, socket, shared memory &#8212; process muốn trao đổi phải đi qua kênh tường minh.</li>
+    <li><strong>Flush TLB</strong> là lý do cột dài nhất ở &#9313; dài đến vậy — chi tiết ở <a href="../memory-virtual-paging/index.html">Virtual memory &amp; paging</a>.</li>
+    <li><strong>Priority inversion</strong> là bẫy của &#9314;: tiến trình ưu tiên thấp giữ lock mà tiến trình ưu tiên cao cần, ưu tiên bị đảo.</li>
+    <li><strong>Contention</strong> nối &#9312; với ba lỗi ngay dưới: tranh lock nhiều thì đa luồng chậm hơn — xem <a href="../lock-deadlock-race/index.html">Lock, deadlock &amp; race condition</a>.</li>
+  </ul>
+</section>
+
+<section id="osproc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Cả ba đều bắt nguồn từ một ngộ nhận: coi thread là thứ gần như miễn phí.</p>
 
@@ -124,8 +182,8 @@
   </div>
 </section>
 
-<section id="osproc-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="osproc-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

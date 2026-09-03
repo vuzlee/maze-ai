@@ -104,10 +104,12 @@ trong `category.json`. Kệ chỉ có đúng một nhóm thì trang chủ không
 
 ## Bộ nhớ giữa các phiên
 
-[`.claude/memory/`](.claude/memory/) giữ những thứ **không suy ra được từ code**: phản hồi về cách
-viết bài, tiến độ, kết quả soát từng kệ. **Đọc [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md)
-trước khi bắt tay vào việc** — nó là chỉ mục một dòng một ghi chú; chỉ mở file con khi việc đang
-làm chạm tới nó. Quy ước ghi nằm ngay trong file đó.
+[`.claude/memory/`](.claude/memory/) giữ những thứ **không suy ra được từ code**, chia hai thư mục:
+`chuan/` là luật viết bài (còn đúng mãi), `nhat-ky/` là việc đã làm tới đâu ở từng kệ.
+**Đọc [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) trước khi bắt tay vào việc** — nó là
+chỉ mục một dòng một ghi chú. Sắp sửa nội dung thì đọc hết `chuan/`, đặc biệt
+[`chuan/chuan-bai-mau.md`](.claude/memory/chuan/chuan-bai-mau.md) — bài
+`random-forest` là thước đo chất lượng của cả kho. Quy ước ghi nằm trong `MEMORY.md`.
 
 Ranh giới: `CLAUDE.md` mô tả kho **đang như thế nào** (cấu trúc, quy ước, cách build), thư mục
 memory ghi việc **đang làm tới đâu và vì sao chọn cách đó**. Cùng một điều đừng viết ở cả hai chỗ.

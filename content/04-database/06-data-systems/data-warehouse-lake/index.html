@@ -48,8 +48,13 @@
 
 <section id="data-warehouse-lake-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p>Bài trước (<a href="../oltp-vs-olap/index.html">OLTP vs OLAP</a>) kết luận: đừng chạy báo cáo trên database giao dịch, hãy sao chép dữ liệu sang một hệ riêng cho phân tích. Nhưng dữ liệu công ty không chỉ đến từ một database OLTP — còn có log sự kiện, file CSV từ đối tác, dữ liệu từ API bên thứ ba, ảnh, văn bản. Câu hỏi trở thành: <b>lưu tất cả những thứ đó ở đâu, dưới hình dạng nào, để sau này dùng lại được</b>?</p>
-  <p class="key">Hai câu trả lời khác nhau về triết lý: ép cấu trúc <em>trước</em> khi lưu, hay lưu nguyên trạng rồi tính cấu trúc <em>lúc</em> đọc.</p>
+  <p><a href="../oltp-vs-olap/index.html">Bài trước</a> kết luận: đừng chạy báo cáo trên database giao dịch, chép sang một hệ riêng. Nhưng dữ liệu công ty không chỉ đến từ một chỗ:</p>
+  <div class="stack">
+    <div class="s"><b>Database OLTP</b><span>có schema sẵn, sạch, dễ nạp</span></div>
+    <div class="s"><b>Log sự kiện · file CSV đối tác</b><span>bán cấu trúc, định dạng đổi theo nguồn</span></div>
+    <div class="s warn"><b>Ảnh · văn bản · API bên thứ ba</b><span>không có schema nào để ép vào</span></div>
+  </div>
+  <p class="key">Lưu tất cả những thứ đó ở đâu, dưới hình dạng nào? Hai câu trả lời khác nhau về triết lý: ép cấu trúc <em>trước</em> khi lưu, hay lưu nguyên trạng rồi tính cấu trúc <em>lúc</em> đọc.</p>
 </section>
 
 <section id="data-warehouse-lake-s2" class="lesson">
@@ -64,9 +69,9 @@
     <div class="n ok"><h5>Warehouse</h5><p>đọc là chạy SQL được ngay</p></div>
   </div>
   <ul class="why">
-    <li>Dữ liệu có cấu trúc (structured), thường tổ chức theo <b>star schema</b>: một bảng <em>fact</em> ở giữa (mỗi dòng là một sự kiện đo lường được — một đơn hàng, một lượt xem) nối tới các bảng <em>dimension</em> xung quanh (khách hàng, sản phẩm, thời gian, cửa hàng) qua khoá ngoại.</li>
+    <li>Dữ liệu có cấu trúc, thường theo <b>star schema</b>: bảng <em>fact</em> ở giữa, mỗi dòng một sự kiện, nối ra các bảng <em>dimension</em>.</li>
     <li>Vì đã ép schema và làm sạch từ trước, truy vấn SQL trên warehouse nhanh và đáng tin cậy cho BI/dashboard/báo cáo định kỳ.</li>
-    <li>Cái giá: phải biết trước câu hỏi sẽ hỏi gì để thiết kế schema đúng, và pipeline nạp dữ liệu (transform trước khi load) tốn công hơn.</li>
+    <li>Cái giá: phải biết trước sẽ hỏi gì mới thiết kế được schema, và pipeline nạp tốn công hơn.</li>
     <li>Ví dụ: Snowflake, BigQuery, Redshift — engine column-oriented, đúng như OLAP đã học ở bài trước.</li>
   </ul>
   <div class="stack">
@@ -88,9 +93,9 @@
   </div>
   <ul class="why">
     <li>Lưu dữ liệu thô (raw), mọi định dạng: log JSON, CSV, ảnh, Parquet — không cần làm sạch hay ép schema trước.</li>
-    <li>Điển hình: object storage giá rẻ (S3, GCS) chứa file định dạng cột như Parquet, đọc bằng engine truy vấn riêng (Spark, Athena, DuckDB) khi cần.</li>
-    <li>Linh hoạt, rẻ, phù hợp cho việc chưa biết trước sẽ hỏi gì — điển hình cho khai thác dữ liệu ML: cần dữ liệu thô để trích feature theo nhiều cách khác nhau, không cái nào cố định.</li>
-    <li>Cái giá: không có gì đảm bảo dữ liệu sạch hay nhất quán — dễ biến thành "data swamp" (đầm lầy dữ liệu) nếu không có kỷ luật đặt tên và mô tả (metadata), đây cũng chính là lý do nhóm bài này có bài riêng về <a href="../data-quality/index.html">data quality</a>.</li>
+    <li>Điển hình: object storage rẻ (S3, GCS) chứa file Parquet, đọc bằng engine riêng (Spark, Athena, DuckDB).</li>
+    <li>Linh hoạt, rẻ, hợp khi chưa biết sẽ hỏi gì — điển hình là ML: cần dữ liệu thô để trích feature theo nhiều cách.</li>
+    <li>Cái giá: không gì đảm bảo dữ liệu sạch, thiếu kỷ luật đặt tên là thành "data swamp" — xem <a href="../data-quality/index.html">data quality</a>.</li>
   </ul>
 </section>
 
@@ -115,7 +120,79 @@
 </section>
 
 <section id="data-warehouse-lake-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Cả hai đều phải làm sạch và ép schema — khác nhau ở chỗ trả công đó trước khi lưu hay sau, lúc có người đọc.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 498" role="img" aria-label="Tổng kết data warehouse và data lake: nguồn dữ liệu nhiều dạng, hai đường schema-on-write và schema-on-read, đối chiếu bốn trục, và lakehouse">
+    <text class="sv-h" x="0" y="12">&#9312; CÙNG MỘT ĐỐNG NGUỒN, BA MỨC CẤU TRÚC</text>
+    <rect x="8" y="24" width="272" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="20" y="42" fill="#8EE0BE">database OLTP — có schema sẵn, sạch</text>
+    <rect x="292" y="24" width="272" height="26" rx="4" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
+    <text class="sv-l" x="304" y="42" fill="#EDB44A">log, CSV đối tác — bán cấu trúc</text>
+    <rect x="576" y="24" width="276" height="26" rx="4" fill="#F2718A" fill-opacity="0.12" stroke="#F2718A"/>
+    <text class="sv-l" x="588" y="42" fill="#F79BAB">ảnh, văn bản, API — không có schema</text>
+
+    <text class="sv-h" x="0" y="82">&#9313; HAI ĐƯỜNG — KHÁC NHAU Ở CHỖ ĐẶT CÔNG ĐOẠN TỐN NHẤT</text>
+
+    <rect x="8" y="94" width="844" height="76" rx="5" fill="#8CA9F2" fill-opacity="0.06" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="114" fill="#A8BEF6">WAREHOUSE — schema-on-write</text>
+    <rect x="20" y="126" width="240" height="32" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="32" y="146">nguồn</text>
+    <path d="M268 142 L300 142" stroke="#3D352C" stroke-width="1.5" marker-end="url(#dwla)"/>
+    <defs><marker id="dwla" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="#3D352C"/></marker></defs>
+    <rect x="308" y="126" width="256" height="32" rx="4" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
+    <text class="sv-l" x="320" y="146" fill="#EDB44A">làm sạch &amp; ép schema — TỐN NHẤT</text>
+    <path d="M572 142 L604 142" stroke="#3D352C" stroke-width="1.5" marker-end="url(#dwla)"/>
+    <rect x="612" y="126" width="228" height="32" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="624" y="146" fill="#8EE0BE">đọc là chạy SQL được ngay</text>
+
+    <rect x="8" y="180" width="844" height="76" rx="5" fill="#8CA9F2" fill-opacity="0.06" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="200" fill="#A8BEF6">LAKE — schema-on-read</text>
+    <rect x="20" y="212" width="240" height="32" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="32" y="232">nguồn + ảnh, JSON, file lạ</text>
+    <path d="M268 228 L300 228" stroke="#3D352C" stroke-width="1.5" marker-end="url(#dwla)"/>
+    <rect x="308" y="212" width="256" height="32" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="320" y="232" fill="#8EE0BE">đổ nguyên trạng — rẻ, không hỏi gì</text>
+    <path d="M572 228 L604 228" stroke="#3D352C" stroke-width="1.5" marker-end="url(#dwla)"/>
+    <rect x="612" y="212" width="228" height="32" rx="4" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
+    <text class="sv-l" x="624" y="232" fill="#EDB44A">ép schema lúc đọc — TỐN NHẤT</text>
+
+    <text class="sv-d" x="0" y="276">khối vàng chỉ đổi chỗ, không biến mất — mọi khác biệt còn lại đều là hệ quả của việc nó nằm trước hay sau</text>
+
+    <text class="sv-h" x="0" y="310">&#9314; HỆ QUẢ — BỐN TRỤC</text>
+    <rect x="8" y="322" width="410" height="112" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="342" fill="#A8BEF6">Data warehouse</text>
+    <text class="sv-d" x="20" y="360">dữ liệu có cấu trúc, đã sạch &#183; star schema</text>
+    <text class="sv-d" x="20" y="378">BI, báo cáo, dashboard định kỳ</text>
+    <text class="sv-d" x="20" y="396">lưu trữ đắt hơn, tính toán trước tốn công</text>
+    <text class="sv-d" x="20" y="420">phải biết trước sẽ hỏi gì mới thiết kế được</text>
+
+    <rect x="442" y="322" width="410" height="112" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="454" y="342" fill="#8EE0BE">Data lake</text>
+    <text class="sv-d" x="454" y="360">dữ liệu thô, mọi định dạng &#183; Parquet trên S3/GCS</text>
+    <text class="sv-d" x="454" y="378">ML, khai phá dữ liệu, lưu trữ dài hạn</text>
+    <text class="sv-d" x="454" y="396">lưu trữ rẻ, nhưng không gì đảm bảo sạch</text>
+    <text class="sv-d" x="454" y="420">thiếu kỷ luật đặt tên &#8594; &quot;data swamp&quot;</text>
+
+    <line x1="0" y1="456" x2="860" y2="456" stroke="#2E2822"/>
+    <text class="sv-l" x="0" y="476">&#9315; LAKEHOUSE — Delta Lake, Iceberg: thêm lớp metadata giao dịch lên chính các file Parquet, để có ACID, schema evolution và time travel</text>
+    <text class="sv-d" x="0" y="490">mà vẫn giữ chi phí lưu trữ rẻ — sinh ra để khỏi phải chép cùng một dữ liệu vào hai nơi với hai định nghĩa &quot;doanh thu&quot;</text>
+  </svg>
+  <figcaption>&#9312; nguồn xếp theo mức cấu trúc, &#9313; hai đường chỉ khác nhau ở chỗ đặt khối vàng, &#9314; hệ quả của lựa chọn đó, &#9315; và lối ghép lại.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Schema-on-write vs schema-on-read</b> — ở &#9313;: đó là toàn bộ khác biệt gốc, phần còn lại chỉ là hệ quả.</li>
+    <li><b>Star schema</b> — ở &#9314;: bảng fact ở giữa nối ra các bảng dimension, hình dạng chuẩn của warehouse.</li>
+    <li><b>Data swamp</b> — ở &#9314;: cái giá thật của lake không phải chi phí lưu trữ mà là không ai còn dám tin file nào.</li>
+    <li><b>Lakehouse</b> — ở &#9315;: vá đúng điểm yếu của lake (không có gì đảm bảo nhất quán) trên chính chỗ lưu rẻ đó.</li>
+  </ul>
+</section>
+
+<section id="data-warehouse-lake-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Đổ vào lake rồi coi như xong</h4><p>Không ai đặt tên theo quy ước, không ai ghi metadata, không ai biết file nào còn dùng. Sáu tháng sau là "data swamp": dữ liệu vẫn đó nhưng không ai dám tin dùng cái nào.</p></div>
     <div class="card bad"><h4>Thiết kế star schema trước khi biết sẽ hỏi gì</h4><p>Warehouse bắt trả giá trước: chọn sai chiều (dimension) thì câu hỏi mới sẽ cần dựng lại pipeline. Dữ liệu chưa rõ mục đích nên nằm ở lake cho tới khi câu hỏi ổn định.</p></div>
@@ -126,8 +203,8 @@
   </div>
 </section>
 
-<section id="data-warehouse-lake-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="data-warehouse-lake-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
   <details class="qa"><summary>Vì sao không đổ hết vào data lake cho đơn giản?</summary>
   <p>Vì phần lớn nhu cầu thực tế (báo cáo doanh thu tháng, dashboard cho lãnh đạo) cần truy vấn nhanh, lặp lại, trên dữ liệu đã biết cấu trúc — warehouse làm việc đó rẻ hơn nhiều so với việc mỗi lần đọc lại phải parse dữ liệu thô. Lake hợp cho dữ liệu chưa biết trước sẽ dùng thế nào.</p></details>
   <details class="qa"><summary>Star schema khác gì schema chuẩn hoá (normalized) đã học ở nhóm SQL?</summary>

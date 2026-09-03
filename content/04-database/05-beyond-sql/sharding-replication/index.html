@@ -123,9 +123,9 @@
 
   <p>Dấu hiệu đã hết đường mở rộng theo chiều dọc (vertical scaling — mua máy mạnh hơn):</p>
   <ul class="why">
-    <li>Toàn bộ working set không còn vừa RAM/SSD của máy mạnh nhất đang có trên thị trường, hoặc chi phí máy đó đã vượt xa lợi ích.</li>
+    <li>Working set không còn vừa RAM/SSD của máy mạnh nhất, hoặc giá máy đó đã vượt xa lợi ích.</li>
     <li>Thông lượng ghi đã vượt quá khả năng của một node đơn, kể cả sau khi đã tối ưu index và query.</li>
-    <li>Replication đã dùng hết để tách đọc/ghi nhưng bản thân lượng <b>ghi</b> vẫn quá tải cho một leader duy nhất — sharding phân cả tải ghi ra nhiều node, không chỉ tải đọc.</li>
+    <li>Replication đã tách đọc/ghi nhưng lượng <b>ghi</b> vẫn quá tải cho một leader — sharding phân cả tải ghi ra nhiều node.</li>
   </ul>
 
   <div class="axis">
@@ -204,8 +204,8 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
   <h3>Ba tiêu chí chọn shard key</h3>
   <ul class="why">
     <li><b>Phân bố đều</b> — tránh giá trị lặp lại nhiều (ví dụ <code>country</code> khi phần lớn user ở một nước) gây một shard quá tải.</li>
-    <li><b>Khớp với truy vấn phổ biến nhất</b> — nếu 90% truy vấn lọc theo <code>user_id</code>, shard theo <code>user_id</code> để mỗi truy vấn chỉ chạm một shard; shard sai trục khiến mọi truy vấn phải quét tất cả các shard (scatter-gather).</li>
-    <li><b>Ổn định theo thời gian</b> — tránh khoá mà giá trị đổi liên tục (ví dụ trạng thái đơn hàng), vì đổi giá trị shard key nghĩa là phải di chuyển bản ghi sang shard khác.</li>
+    <li><b>Khớp với truy vấn phổ biến nhất</b> — 90% lọc theo <code>user_id</code> thì shard theo nó. Sai trục là phải quét hết shard (scatter-gather).</li>
+    <li><b>Ổn định theo thời gian</b> — tránh khoá đổi giá trị liên tục, vì đổi shard key là phải chuyển bản ghi sang shard khác.</li>
   </ul>
 
   <div class="note warn">
@@ -239,7 +239,108 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
 </section>
 
 <section id="shard-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Replication nhân bản <b>toàn bộ</b> để chịu lỗi và chia tải đọc; sharding chia <b>từng phần</b> khi dữ liệu đã lớn hơn một máy — và trả giá bằng join, transaction, unique.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 544" role="img" aria-label="Tổng kết sharding và replication: thang mở rộng, replication đồng bộ và bất đồng bộ, partitioning, ba chiến lược shard key, và cái mất khi sharding">
+    <text class="sv-h" x="0" y="12">&#9312; THANG MỞ RỘNG — ĐI TỪ TRÁI SANG PHẢI, ĐỪNG NHẢY CÓC</text>
+
+    <rect x="8" y="26" width="150" height="30" rx="5" fill="#5BCFA0" fill-opacity="0.14" stroke="#5BCFA0"/>
+    <text class="sv-l" x="83" y="45" text-anchor="middle" fill="#8EE0BE">query &amp; index</text>
+    <rect x="166" y="26" width="126" height="30" rx="5" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
+    <text class="sv-l" x="229" y="45" text-anchor="middle" fill="#8EE0BE">cache</text>
+    <rect x="300" y="26" width="160" height="30" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="380" y="45" text-anchor="middle" fill="#EDB44A">replication</text>
+    <rect x="468" y="26" width="170" height="30" rx="5" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
+    <text class="sv-l" x="553" y="45" text-anchor="middle" fill="#EDB44A">partitioning</text>
+    <rect x="646" y="26" width="206" height="30" rx="5" fill="#F2718A" fill-opacity="0.12" stroke="#F2718A"/>
+    <text class="sv-l" x="749" y="45" text-anchor="middle" fill="#F79BAB">sharding</text>
+    <line x1="8" y1="68" x2="852" y2="68" stroke="#3D352C"/>
+    <text class="sv-d" x="8" y="84">rẻ, đảo ngược được</text>
+    <text class="sv-d" x="430" y="84" text-anchor="middle">cái giá tăng dần, khó lùi lại dần</text>
+    <text class="sv-d" x="852" y="84" text-anchor="end">đắt, khó đảo ngược</text>
+
+    <text class="sv-h" x="0" y="118">&#9313; REPLICATION — NHÂN BẢN TOÀN BỘ</text>
+
+    <rect x="8" y="132" width="110" height="30" rx="5" fill="#8CA9F2" fill-opacity="0.16" stroke="#8CA9F2"/>
+    <text class="sv-l" x="63" y="151" text-anchor="middle" fill="#A8BEF6">leader</text>
+    <line x1="122" y1="147" x2="150" y2="134" stroke="#3D352C" stroke-width="1.5"/>
+    <line x1="122" y1="147" x2="150" y2="160" stroke="#3D352C" stroke-width="1.5"/>
+    <rect x="154" y="120" width="110" height="26" rx="4" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="209" y="137" text-anchor="middle">follower</text>
+    <rect x="154" y="150" width="110" height="26" rx="4" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
+    <text class="sv-l" x="209" y="167" text-anchor="middle">follower</text>
+    <text class="sv-d" x="8" y="192">đọc mở rộng &#183; high availability &#183; backup</text>
+
+    <line x1="300" y1="112" x2="300" y2="196" stroke="#2E2822"/>
+
+    <rect x="326" y="120" width="250" height="30" rx="4" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
+    <text class="sv-l" x="338" y="139" fill="#8EE0BE">Synchronous — chờ follower ack</text>
+    <text class="sv-t" x="590" y="140">mất leader không mất dữ liệu &#183; ghi chậm hơn</text>
+    <rect x="326" y="156" width="250" height="30" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="338" y="175" fill="#EDB44A">Asynchronous — báo xong ngay</text>
+    <text class="sv-t" x="590" y="176">ghi nhanh &#183; có <tspan fill="#F79BAB">replication lag</tspan>, đọc thấy dữ liệu cũ</text>
+
+    <text class="sv-h" x="0" y="220">&#9314; PARTITIONING — CHIA MẢNH, VẪN MỘT MÁY</text>
+    <rect x="8" y="232" width="276" height="26" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="20" y="249" fill="#EDB44A">partition pruning</text>
+    <rect x="292" y="232" width="276" height="26" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="304" y="249" fill="#EDB44A">DROP mảnh cũ — mili giây</text>
+    <rect x="576" y="232" width="276" height="26" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
+    <text class="sv-l" x="588" y="249" fill="#EDB44A">bảo trì trên từng mảnh</text>
+    <text class="sv-d" x="8" y="274">vẫn một transaction, ứng dụng không cần biết — rất nhiều hệ tưởng cần shard thật ra chỉ cần partition theo thời gian</text>
+
+    <text class="sv-h" x="0" y="308">&#9315; BA CHIẾN LƯỢC CHIA MẢNH — KHÁC NHAU Ở LÚC THÊM/BỚT NODE</text>
+
+    <rect x="8" y="320" width="276" height="94" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
+    <text class="sv-l" x="20" y="340" fill="#F79BAB">Range-based</text>
+    <text class="sv-d" x="20" y="358">chia theo dải giá trị liên tục</text>
+    <text class="sv-d" x="20" y="374">range query TỐT</text>
+    <text class="sv-d" x="20" y="390">nhưng dữ liệu mới dồn vào một đầu dải</text>
+    <text class="sv-d" x="20" y="406">→ <tspan fill="#F79BAB">hotspot</tspan></text>
+
+    <rect x="292" y="320" width="276" height="94" rx="5" fill="#EDB44A" fill-opacity="0.08" stroke="#EDB44A"/>
+    <text class="sv-l" x="304" y="340" fill="#EDB44A">Hash-based · hash % N</text>
+    <text class="sv-d" x="304" y="358">tải phân bố rất đều</text>
+    <text class="sv-d" x="304" y="374">range query KÉM — quét mọi shard</text>
+    <text class="sv-d" x="304" y="390">đổi N → <tspan fill="#F79BAB">gần như toàn bộ dữ liệu</tspan></text>
+    <text class="sv-d" x="304" y="406">phải dịch chuyển</text>
+
+    <rect x="576" y="320" width="276" height="94" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="588" y="340" fill="#8EE0BE">Consistent hashing</text>
+    <text class="sv-d" x="588" y="358">node và khoá cùng trên một vòng</text>
+    <text class="sv-d" x="588" y="374">tải đều hơn nữa nhờ virtual node</text>
+    <text class="sv-d" x="588" y="390">thêm/bớt node chỉ dịch <tspan fill="#8EE0BE">~1/N</tspan></text>
+    <text class="sv-d" x="588" y="406">range query vẫn kém</text>
+
+    <text class="sv-d" x="0" y="434">chọn shard key theo ba tiêu chí: phân bố đều &#183; khớp truy vấn phổ biến nhất &#183; ổn định theo thời gian</text>
+
+    <text class="sv-h" x="0" y="466">&#9316; CÁI MẤT KHI SHARDING — TRÊN MỘT MÁY THÌ MIỄN PHÍ</text>
+    <rect x="8" y="478" width="276" height="42" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="20" y="496" fill="#F79BAB">Cross-shard join</text>
+    <text class="sv-d" x="20" y="512">tự hỏi từng shard rồi gộp — scatter-gather</text>
+    <rect x="292" y="478" width="276" height="42" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="304" y="496" fill="#F79BAB">Cross-shard transaction</text>
+    <text class="sv-d" x="304" y="512">two-phase commit hoặc saga</text>
+    <rect x="576" y="478" width="276" height="42" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
+    <text class="sv-l" x="588" y="496" fill="#F79BAB">Khoá duy nhất toàn cục</text>
+    <text class="sv-d" x="588" y="512">UNIQUE chỉ đúng trong một shard</text>
+  </svg>
+  <figcaption>Đọc từ trên xuống: &#9312; thứ tự thử các cách mở rộng, &#9313; nhân bản cho ai và trả giá gì, &#9314; nấc trung gian hay bị bỏ qua, &#9315; nếu đã shard thì chia bằng cách nào, &#9316; và mất những gì.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Replication vs sharding</b> — ở &#9312;&#9313;: nhân bản chịu lỗi và chia tải đọc, nhưng mỗi bản vẫn chứa hết dữ liệu.</li>
+    <li><b>Replication lag</b> — ở &#9313;: cái giá của bất đồng bộ; đọc-sau-ghi ở chỗ quan trọng phải đọc thẳng từ leader.</li>
+    <li><b>Ba nấc index → partitioning → sharding</b> — ở &#9312;&#9314;: đừng nhảy cóc, rất nhiều hệ chỉ cần partition theo thời gian.</li>
+    <li><b>Consistent hashing &amp; shard key</b> — ở &#9315;&#9316;: chọn khoá sai thì hotspot hoặc scatter-gather, và sửa lại sau là việc tốn kém nhất.</li>
+  </ul>
+</section>
+
+<section id="shard-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Sharding trước khi thử hết cách khác</h4><p>Tối ưu query, thêm index, thêm cache, replication cho đọc — thử hết trước. Sharding khó đảo ngược và mọi truy vấn xuyên shard đều đắt hơn.</p></div>
     <div class="card bad"><h4>Chọn shard key theo trường hay đổi giá trị</h4><p>Đổi giá trị shard key nghĩa là phải di chuyển cả bản ghi sang shard khác. Chọn khoá ổn định theo thời gian.</p></div>
@@ -250,8 +351,8 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
   </div>
 </section>
 
-<section id="shard-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+<section id="shard-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
 
   <details class="qa"><summary>Replication và sharding khác nhau ở đâu?</summary>
   <p>Replication tạo nhiều bản sao <em>giống hệt nhau</em> của toàn bộ dữ liệu trên nhiều máy — dùng để đọc mở rộng, chịu lỗi, backup, nhưng mỗi bản sao vẫn phải chứa hết dữ liệu. Sharding <em>chia</em> dữ liệu thành nhiều phần khác nhau, mỗi phần nằm trên một máy — dùng khi bản thân dữ liệu đã lớn hơn một máy có thể chứa hoặc ghi kịp. Hai kỹ thuật thường đi cùng nhau: mỗi shard thường lại được replicate riêng để chịu lỗi.</p></details>

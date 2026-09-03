@@ -48,7 +48,17 @@
 
 <section id="etl-elt-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="key">Bài trước nói dữ liệu đi vào <a href="../data-warehouse-lake/index.html">warehouse hoặc lake</a> — nhưng đi vào <em>bằng cách nào</em>? Dữ liệu thô từ nguồn (database OLTP, log, API bên thứ ba) gần như không bao giờ dùng ngay được: sai định dạng ngày tháng, thiếu giá trị, trùng khoá, đơn vị tiền tệ khác nhau giữa các nguồn. Phải đi qua ba bước — <b>Extract</b> (lấy dữ liệu từ nguồn), <b>Transform</b> (làm sạch, chuẩn hoá, tính toán lại), <b>Load</b> (ghi vào kho đích) — câu hỏi chỉ là <em>thứ tự</em> giữa Transform và Load.</p>
+  <p class="key">Dữ liệu đi vào <a href="../data-warehouse-lake/index.html">warehouse hoặc lake</a> <em>bằng cách nào</em>? Dữ liệu thô gần như không bao giờ dùng ngay được — sai định dạng ngày, thiếu giá trị, trùng khoá, lệch đơn vị tiền. Nó phải đi qua ba bước:</p>
+  <div class="flow">
+    <div class="n"><h5>Extract</h5><p>lấy từ nguồn: OLTP, log, API</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Transform</h5><p>làm sạch, chuẩn hoá, tính lại</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>Load</h5><p>ghi vào kho đích</p></div>
+  </div>
+  <ul class="why">
+    <li>Ba bước là cố định. Câu hỏi duy nhất là <b>thứ tự Transform và Load</b> — đổi chỗ là ra hai kiến trúc khác hẳn.</li>
+  </ul>
 </section>
 
 <section id="etl-elt-s2" class="lesson">
@@ -79,9 +89,9 @@
     <div class="n ok"><h5>3 · Transform</h5><p>chạy SQL/dbt ngay trong warehouse để làm sạch, tạo bảng tổng hợp</p></div>
   </div>
   <ul class="why">
-    <li>Trở nên phổ biến từ khi data warehouse cloud (Snowflake, BigQuery) vừa rẻ vừa mạnh — dùng chính engine column-oriented đó để transform nhanh hơn viết một hạ tầng transform riêng.</li>
-    <li>Transform viết bằng SQL (thường qua công cụ như dbt), nằm ngay trong kho đích — dễ đọc, dễ version, dễ kiểm tra hơn logic ẩn trong script ETL rời rạc.</li>
-    <li>Hợp cả với warehouse lẫn lake: dữ liệu thô cứ vào trước, mỗi nhóm dùng dữ liệu tự transform theo nhu cầu riêng thay vì chờ một pipeline ETL chung.</li>
+    <li>Phổ biến từ khi warehouse cloud (Snowflake, BigQuery) vừa rẻ vừa mạnh — mượn luôn engine column-oriented đó để transform.</li>
+    <li>Transform viết bằng SQL (thường qua dbt), nằm ngay trong kho đích — dễ đọc, dễ version hơn script ETL rời rạc.</li>
+    <li>Hợp cả warehouse lẫn lake: dữ liệu thô vào trước, mỗi nhóm tự transform theo nhu cầu thay vì chờ pipeline chung.</li>
   </ul>
   <p>Đây cũng là lý do ELT hợp tự nhiên với data lake ở bài trước: lake vốn đã theo triết lý "lưu thô, tính cấu trúc lúc đọc" — ELT chỉ là áp triết lý đó vào pipeline nạp dữ liệu.</p>
 </section>
@@ -105,7 +115,80 @@
 </section>
 
 <section id="etl-elt-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Ba bước là cố định; đổi chỗ T và L là ra hai kiến trúc khác hẳn — và lựa chọn đó đi theo kho đích chứ không phải theo sở thích.</p>
+
+  <figure class="scrollx">
+  <svg viewBox="0 0 860 496" role="img" aria-label="Tổng kết ETL và ELT: ba bước cố định, hai thứ tự transform-load, hai cách lấy phần thay đổi, và yêu cầu idempotent">
+    <text class="sv-h" x="0" y="12">&#9312; BA BƯỚC CỐ ĐỊNH</text>
+    <rect x="8" y="24" width="272" height="28" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="20" y="43">Extract — OLTP, log, API</text>
+    <rect x="292" y="24" width="272" height="28" rx="4" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
+    <text class="sv-l" x="304" y="43" fill="#EDB44A">Transform — làm sạch, chuẩn hoá</text>
+    <rect x="576" y="24" width="276" height="28" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="588" y="43">Load — ghi vào kho đích</text>
+    <text class="sv-d" x="0" y="70">dữ liệu thô gần như không bao giờ dùng ngay được: sai định dạng ngày, thiếu giá trị, trùng khoá, lệch đơn vị tiền</text>
+
+    <text class="sv-h" x="0" y="104">&#9313; ĐỔI CHỖ T VÀ L</text>
+
+    <rect x="8" y="116" width="844" height="72" rx="5" fill="#8CA9F2" fill-opacity="0.06" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="136" fill="#A8BEF6">ETL — transform trước khi load</text>
+    <rect x="20" y="148" width="230" height="28" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="32" y="167">Extract</text>
+    <rect x="262" y="148" width="290" height="28" rx="4" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
+    <text class="sv-l" x="274" y="167" fill="#EDB44A">Transform — hạ tầng RIÊNG (Spark)</text>
+    <rect x="564" y="148" width="276" height="28" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="576" y="167" fill="#8EE0BE">Load — bản đã sạch vào warehouse</text>
+
+    <rect x="8" y="198" width="844" height="72" rx="5" fill="#8CA9F2" fill-opacity="0.06" stroke="#8CA9F2"/>
+    <text class="sv-l" x="20" y="218" fill="#A8BEF6">ELT — load trước, transform sau</text>
+    <rect x="20" y="230" width="230" height="28" rx="4" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="32" y="249">Extract</text>
+    <rect x="262" y="230" width="290" height="28" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
+    <text class="sv-l" x="274" y="249" fill="#8EE0BE">Load — đổ gần như thô vào kho đích</text>
+    <rect x="564" y="230" width="276" height="28" rx="4" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
+    <text class="sv-l" x="576" y="249" fill="#EDB44A">Transform — SQL/dbt NGAY TRONG kho</text>
+
+    <text class="sv-d" x="0" y="290">ETL hợp warehouse schema-on-write &#183; ELT hợp lake và warehouse cloud, vì mượn luôn engine sẵn có làm việc transform</text>
+
+    <text class="sv-h" x="0" y="324">&#9314; LẤY TOÀN BỘ HAY CHỈ PHẦN THAY ĐỔI</text>
+
+    <rect x="8" y="336" width="272" height="80" rx="5" fill="none" stroke="#3D352C"/>
+    <text class="sv-l" x="20" y="356">Full batch</text>
+    <text class="sv-d" x="20" y="374">chạy toàn bộ dữ liệu mỗi lần</text>
+    <text class="sv-d" x="20" y="392">chạy lại là an toàn</text>
+    <text class="sv-d" x="20" y="408">chậm khi bảng lớn</text>
+
+    <rect x="292" y="336" width="272" height="80" rx="5" fill="#EDB44A" fill-opacity="0.08" stroke="#EDB44A"/>
+    <text class="sv-l" x="304" y="356" fill="#EDB44A">Incremental — timestamp</text>
+    <text class="sv-d" x="304" y="374">WHERE updated_at &gt; lần trước</text>
+    <text class="sv-d" x="304" y="392">làm được với mọi nguồn</text>
+    <text class="sv-d" x="304" y="408">KHÔNG bắt được xoá cứng</text>
+
+    <rect x="576" y="336" width="276" height="80" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
+    <text class="sv-l" x="588" y="356" fill="#8EE0BE">Incremental — CDC</text>
+    <text class="sv-d" x="588" y="374">đọc write-ahead log (Debezium)</text>
+    <text class="sv-d" x="588" y="392">bắt đủ cả xoá, trễ tính bằng giây</text>
+    <text class="sv-d" x="588" y="408">cần quyền replication, sự kiện tới trùng</text>
+
+    <line x1="0" y1="440" x2="860" y2="440" stroke="#2E2822"/>
+    <text class="sv-l" x="0" y="460">&#9315; CẢ BA ĐƯỜNG ĐỀU ĐÒI BƯỚC LOAD PHẢI IDEMPOTENT — chạy lại ra cùng kết quả, UPSERT chứ không INSERT</text>
+    <text class="sv-d" x="0" y="476">CDC làm ranh giới batch/stream mờ đi: nó biến một database quan hệ thành một luồng sự kiện — dẫn thẳng sang bài kế tiếp</text>
+  </svg>
+  <figcaption>&#9312; ba bước không đổi, &#9313; hai thứ tự và kho đích tương ứng, &#9314; trục thứ hai — lấy bao nhiêu mỗi lần, &#9315; và điều kiện chung cho cả ba.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>ETL vs ELT</b> — ở &#9313;: khác nhau đúng một chỗ đặt khối Transform, mọi hệ quả còn lại suy ra từ đó.</li>
+    <li><b>CDC — change data capture</b> — ở &#9314;: cách duy nhất trong ba cách bắt được xoá cứng ở nguồn.</li>
+    <li><b>Idempotent</b> — ở &#9315;: điều kiện để chạy lại pipeline an toàn, cùng nguyên tắc đã gặp ở transaction.</li>
+    <li><b>dbt</b> — ở &#9313;: chỗ gom transform về một nơi, viết bằng SQL, có version control.</li>
+  </ul>
+</section>
+
+<section id="etl-elt-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Transform logic tản mát nhiều nơi</h4><p>Một phần transform trong script Python, một phần trong SQL view, một phần trong dashboard — không ai còn nắm được toàn cảnh dữ liệu đi qua những bước nào. ELT với công cụ như dbt giảm vấn đề này vì gom hết vào một nơi, viết bằng SQL, có version control.</p></div>
     <div class="card bad"><h4>Không idempotent — chạy lại pipeline ra kết quả khác</h4><p>Job Extract chạy lại vào ngày hôm sau vô tình <code>INSERT</code> trùng thay vì <code>UPSERT</code>. Luôn thiết kế bước Load để chạy lại an toàn (idempotent), giống nguyên tắc idempotency đã gặp ở transaction.</p></div>
@@ -114,8 +197,8 @@
   </div>
 </section>
 
-<section id="etl-elt-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="etl-elt-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
   <details class="qa"><summary>Vì sao ELT phổ biến hơn ETL trong các hệ thống mới?</summary>
   <p>Vì data warehouse cloud hiện nay (Snowflake, BigQuery) vừa rẻ vừa đủ mạnh để transform ngay bên trong, nên không cần đầu tư một hạ tầng transform riêng như thời ETL truyền thống. Viết transform bằng SQL/dbt cũng dễ đọc, dễ kiểm tra hơn logic ẩn trong pipeline ETL rời rạc.</p></details>
   <details class="qa"><summary>Khi nào vẫn nên dùng ETL thay vì ELT?</summary>

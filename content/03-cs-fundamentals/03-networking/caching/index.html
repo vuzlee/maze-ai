@@ -53,7 +53,7 @@
 
   <ul class="why">
     <li>Tối ưu TCP và HTTP chỉ <b>giảm số RTT</b> — từ bốn xuống một. Cache <b>bỏ hẳn</b> chuyến đi.</li>
-    <li>Đổi lại là bài toán khó nhất của cache: <b>biết khi nào dữ liệu đã cũ</b>. Phần lớn bug cache là bug vô hiệu hoá, không phải bug lưu trữ.</li>
+    <li>Đổi lại là bài khó nhất của cache: <b>biết khi nào dữ liệu đã cũ</b>. Phần lớn bug cache nằm ở đó.</li>
   </ul>
 
   <div class="note">
@@ -84,7 +84,7 @@
     <div class="m"><i>GET /data · If-None-Match: "abc123"</i><div class="ar r"></div><u>lần sau</u></div>
     <div class="m"><i>304 Not Modified · body rỗng</i><div class="ar l"></div><u>vẫn tốn 1 RTT, nhưng không tốn 500 KB</u></div>
   </div>
-  <p><code>stale-while-revalidate</code> đáng biết vì nó phá được đánh đổi giữa độ mới và độ trễ: khi cache vừa hết hạn, trả ngay bản cũ cho người dùng <em>rồi</em> làm mới ở nền. Người dùng không bao giờ phải chờ, và dữ liệu vẫn được cập nhật. Nó cũng là một phần lời giải cho thundering herd ở mục 12.</p>
+  <p><code>stale-while-revalidate</code> đáng biết vì nó phá được đánh đổi giữa độ mới và độ trễ: khi cache vừa hết hạn, trả ngay bản cũ cho người dùng <em>rồi</em> làm mới ở nền. Người dùng không bao giờ phải chờ, và dữ liệu vẫn được cập nhật. Nó cũng là một phần lời giải cho thundering herd nói ở mục sau.</p>
 </section>
 
 <section id="cache-s3">
@@ -153,7 +153,84 @@
 </section>
 
 <section id="cache-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Cache dễ ở chỗ lưu lại, khó ở chỗ <em>bỏ đi đúng lúc</em> — mọi chiến lược trong bài đều là một cách trả lời câu hỏi thứ hai.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Năm tầng cache xếp theo khoảng cách tới người dùng, ba chiến lược vô hiệu hoá, và thundering herd khi một khoá nóng hết hạn">
+
+      <text class="sv-h" x="8" y="16">&#9312; NĂM TẦNG — CÀNG GẦN NGƯỜI DÙNG CÀNG RẺ, CŨNG CÀNG KHÓ THU HỒI</text>
+      <rect x="8" y="26" width="164" height="28" rx="4" fill="rgba(91,207,160,.14)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="18" y="45" fill="#8EE0BE">Browser</text>
+      <rect x="180" y="26" width="164" height="28" rx="4" fill="rgba(91,207,160,.10)" stroke="#3D352C"/>
+      <text class="sv-t" x="190" y="45" fill="#8EE0BE">CDN</text>
+      <rect x="352" y="26" width="164" height="28" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-t" x="362" y="45" fill="#A8BEF6">Reverse proxy</text>
+      <rect x="524" y="26" width="164" height="28" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="534" y="45" fill="#A8BEF6">Ứng dụng &#183; Redis</text>
+      <rect x="696" y="26" width="152" height="28" rx="4" fill="rgba(237,180,74,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="706" y="45" fill="#EDB44A">Cơ sở dữ liệu</text>
+      <line x1="8" y1="68" x2="848" y2="68" stroke="#3D352C"/>
+      <text class="sv-d" x="8" y="86" fill="#7A6F63">rẻ nhất &#183; gửi đi rồi thu về không được</text>
+      <text class="sv-d" x="524" y="86" fill="#7A6F63">kiểm soát tốt nhất &#183; xoá khoá được</text>
+
+      <text class="sv-h" x="8" y="116">&#9313; HTTP — HAI CẶP TÊN GÂY NHẦM NHẤT</text>
+      <rect x="8" y="126" width="200" height="34" rx="4" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
+      <text class="sv-t" x="18" y="147" fill="#EDB44A">no-cache</text>
+      <text class="sv-d" x="92" y="147" fill="#7A6F63">được lưu, phải xác nhận lại</text>
+      <rect x="216" y="126" width="200" height="34" rx="4" fill="rgba(242,113,138,.10)" stroke="#F2718A"/>
+      <text class="sv-t" x="226" y="147" fill="#F79BAB">no-store</text>
+      <text class="sv-d" x="298" y="147" fill="#7A6F63">không lưu ở bất cứ đâu</text>
+      <text class="sv-l" x="8" y="180">ETag + If-None-Match &#8594; 304 &#183; vẫn tốn 1 RTT nhưng không tốn body</text>
+      <text class="sv-l" x="8" y="196" fill="#8EE0BE">stale-while-revalidate &#8594; 0 RTT chờ: trả bản cũ ngay, làm mới ở nền</text>
+
+      <text class="sv-h" x="440" y="116">&#9314; BA CÁCH BỎ DỮ LIỆU CŨ ĐI</text>
+      <rect x="440" y="126" width="408" height="26" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="450" y="144" fill="#A8BEF6">TTL</text>
+      <text class="sv-d" x="500" y="144" fill="#7A6F63">đơn giản nhất &#183; dữ liệu cũ trong tối đa một TTL</text>
+      <rect x="440" y="156" width="408" height="26" rx="4" fill="rgba(237,180,74,.08)" stroke="#3D352C"/>
+      <text class="sv-t" x="450" y="174" fill="#EDB44A">Xoá khi ghi</text>
+      <text class="sv-d" x="540" y="174" fill="#7A6F63">luôn mới &#183; phải nhớ mọi chỗ ghi, dễ bỏ sót</text>
+      <rect x="440" y="186" width="408" height="26" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="450" y="204" fill="#8EE0BE">Khoá có phiên bản</text>
+      <text class="sv-d" x="574" y="204" fill="#7A6F63">app.7f3a2c.js &#183; tránh hẳn việc phải vô hiệu hoá</text>
+      <text class="sv-l" x="440" y="230" fill="#F79BAB">cache-aside: khi ghi phải XOÁ khoá, không phải cập nhật giá trị mới vào</text>
+
+      <rect x="8" y="252" width="840" height="80" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
+      <text class="sv-h" x="20" y="272" fill="#F79BAB">&#9315; THUNDERING HERD — SỰ CỐ DO CHÍNH CACHE GÂY RA</text>
+      <rect x="20" y="280" width="150" height="34" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
+      <text class="sv-t" x="30" y="296" fill="#EDB44A">t = 0</text>
+      <text class="sv-d" x="30" y="309" fill="#7A6F63">khoá nóng hết hạn</text>
+      <path d="M170 297 h22" stroke="#7A6F63"/><path d="M192 297 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="194" y="280" width="170" height="34" rx="5" fill="rgba(242,113,138,.10)" stroke="#3D352C"/>
+      <text class="sv-t" x="204" y="296" fill="#F79BAB">1.000 cache miss</text>
+      <text class="sv-d" x="204" y="309" fill="#7A6F63">cùng lúc, cùng truy vấn</text>
+      <path d="M364 297 h22" stroke="#7A6F63"/><path d="M386 297 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="388" y="280" width="150" height="34" rx="5" fill="rgba(242,113,138,.14)" stroke="#F2718A"/>
+      <text class="sv-t" x="398" y="296" fill="#F79BAB">DB quá tải</text>
+      <text class="sv-d" x="398" y="309" fill="#7A6F63">càng chậm càng dồn</text>
+      <rect x="560" y="280" width="276" height="34" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="570" y="296" fill="#8EE0BE">single-flight + stale-while-revalidate</text>
+      <text class="sv-d" x="570" y="309" fill="#7A6F63">một request đi lấy, mọi người khác nhận bản cũ ngay</text>
+
+      <line x1="8" y1="348" x2="852" y2="348" stroke="#2E2822"/>
+      <text class="sv-l" x="8" y="366">&#9312;&#9313; tối ưu TCP/HTTP chỉ giảm số RTT — cache là thứ duy nhất bỏ hẳn chuyến đi</text>
+      <text class="sv-l" x="8" y="382">&#9314;&#9315; phần khó không nằm ở lúc lưu mà ở lúc bỏ, và ở hành vi hệ thống đúng lúc cache hết hạn</text>
+    </svg>
+    <figcaption>Đọc theo số: năm tầng xếp theo khoảng cách tới người dùng &#9312;, header HTTP quyết định tầng nào được giữ gì &#9313;, ba cách bỏ dữ liệu cũ &#9314;, và tình huống hỏng khi một khoá nóng hết hạn &#9315;.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><strong>Cache-aside</strong> là mẫu đọc-ghi mặc định ở tầng ứng dụng của &#9312;, và chính nó đặt ra luật "xoá chứ không cập nhật" ở &#9314;.</li>
+    <li><strong>Jitter</strong> chữa &#9315; ở gốc: TTL cộng thêm phần ngẫu nhiên thì các khoá không còn hết hạn cùng một khoảnh khắc.</li>
+    <li><strong>CDN</strong> là tầng duy nhất trong &#9312; cắt được RTT về địa lý — <code>s-maxage</code> và <code>private</code> ở &#9313; là hai công tắc của nó.</li>
+    <li><strong>Write-behind</strong> đổi chiều đánh đổi của &#9314;: ghi rất nhanh, đổi lại mất dữ liệu nếu cache chết trước khi kịp đẩy xuống.</li>
+  </ul>
+</section>
+
+<section id="cache-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Hai lỗi kinh điển: một cái để lại dữ liệu cũ vĩnh viễn, một cái tưởng đã tắt cache mà chưa.</p>
 
@@ -163,8 +240,8 @@
   </div>
 </section>
 
-<section id="cache-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+<section id="cache-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

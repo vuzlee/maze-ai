@@ -49,9 +49,17 @@
 <section id="cap-theorem-consistency-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
   <p class="key">Một node không chịu nổi khi hệ thống lớn lên — nhưng có nhiều node thì phải trả giá bằng một đánh đổi không thể né.</p>
+  <div class="flow">
+    <div class="n"><h5>1 · Một node</h5><p>hết chỗ chứa, hết sức xử lý</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>2 · Nhiều node</h5><p>mỗi node một bản sao</p></div>
+    <div class="a">→</div>
+    <div class="n no"><h5>3 · Mạng đứt</h5><p>hai nửa không nói chuyện được</p></div>
+  </div>
+
   <ul class="why">
-    <li>Một máy chủ có giới hạn: hết chỗ chứa dữ liệu, hoặc hết khả năng xử lý request. Cách chữa quen thuộc là chạy <b>nhiều node</b>, mỗi node giữ một bản sao (hoặc một phần) dữ liệu.</li>
-    <li>Ngay khi có nhiều bản sao nối với nhau qua mạng — mà mạng thì không tin cậy tuyệt đối — xuất hiện một câu hỏi không tránh được: <b>khi mạng giữa các node bị đứt</b> (network partition), hệ thống trả lời ngay bằng dữ liệu có thể cũ/sai, hay từ chối phục vụ để giữ đúng dữ liệu?</li>
+    <li>Nhiều node nối nhau qua mạng, mà mạng thì <b>thế nào cũng có lúc đứt</b>.</li>
+    <li>Lúc đó phải chọn: trả lời ngay bằng dữ liệu có thể cũ, hay từ chối để giữ đúng?</li>
   </ul>
 </section>
 
@@ -88,9 +96,9 @@
   </div>
   <p class="axiscap"><span>chậm, luôn đúng</span><span><em>đổi độ chính xác tức thời lấy tốc độ</em></span><span>nhanh, có lúc đọc cũ</span></p>
   <ul class="why">
-    <li><b>Strong consistency</b> — đọc luôn thấy giá trị ghi gần nhất, như thể chỉ có một bản sao duy nhất. Phải đồng bộ các node trước khi trả lời nên chậm hơn.</li>
-    <li><b>Eventual consistency</b> — các bản sao <em>sẽ</em> hội tụ về cùng giá trị nếu không có ghi mới, nhưng tại một thời điểm có thể đọc thấy giá trị cũ ở node khác. Đổi lại là tốc độ và sẵn sàng cao.</li>
-    <li><b>Causal consistency</b> — mức trung gian: thao tác có quan hệ nhân-quả (ví dụ trả lời một bình luận) luôn được thấy đúng thứ tự ở mọi nơi, nhưng hai thao tác không liên quan thì không đảm bảo thứ tự toàn cục — người khác có thể thấy hai bài đăng không liên quan theo thứ tự khác nhau.</li>
+    <li><b>Strong</b> — đọc luôn thấy ghi gần nhất, như chỉ có một bản sao. Phải đồng bộ trước khi trả lời nên chậm.</li>
+    <li><b>Eventual</b> — các bản sao <em>sẽ</em> hội tụ, nhưng lúc này có thể đọc thấy giá trị cũ. Đổi lại là tốc độ.</li>
+    <li><b>Causal</b> — thao tác có nhân-quả (trả lời một bình luận) luôn đúng thứ tự; hai thao tác rời nhau thì không hứa.</li>
   </ul>
 </section>
 
@@ -103,27 +111,119 @@
     <div class="s"><b>Follower A, B, C…</b><span>nhận bản sao chép sau đó — có độ trễ</span></div>
   </div>
   <ul class="why">
-    <li>Mô hình phổ biến nhất là <b>leader–follower</b>: một node nhận mọi lệnh ghi, các node còn lại sao chép lại. Đọc phân tải ra follower được, nhưng luôn có <em>độ trễ sao chép</em> (replication lag) nên follower có thể trả dữ liệu cũ hơn leader. Các mô hình topology khác và cách xử lý lag xem ở <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</li>
-    <li><b>Quorum</b> là chỗ CAP trở thành một nút vặn có thể chỉnh. Thay vì một leader cố định, yêu cầu một <em>số lượng tối thiểu</em> node xác nhận: với N node, ghi thành công khi W node xác nhận, đọc thành công khi R node phản hồi. Chọn <b>W + R &gt; N</b> đảm bảo tập đã ghi và tập đang đọc luôn giao nhau ít nhất một node, nên đọc luôn thấy giá trị mới nhất. Tăng W hoặc R thì chặt hơn nhưng dễ mất khả năng phản hồi khi node chết; giảm thì nhanh và sẵn sàng hơn nhưng đọc có thể thấy dữ liệu cũ. Đây là cách các hệ AP như Cassandra cho phép chỉnh consistency theo từng truy vấn.</li>
+    <li><b>Leader–follower</b>: một node nhận mọi lệnh ghi, các node khác sao chép lại.</li>
+    <li>Đọc phân tải ra follower được, nhưng có <b>replication lag</b> nên follower trả dữ liệu cũ hơn leader. Chi tiết ở <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</li>
+    <li><b>Quorum</b> là chỗ CAP thành một núm vặn được: N bản sao, ghi cần W xác nhận, đọc cần R phản hồi.</li>
+    <li>Chọn <b>W + R &gt; N</b> thì tập ghi và tập đọc luôn giao nhau — đọc chắc chắn thấy giá trị mới.</li>
+    <li>W, R lớn thì chặt nhưng dễ tắc khi node chết; nhỏ thì nhanh nhưng đọc cũ. Cassandra chỉnh nó theo từng truy vấn.</li>
   </ul>
 </section>
 
 <section id="cap-theorem-consistency-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Sharding & partitioning</h2></div>
-  <p>Một node vẫn có thể không chứa hết dữ liệu hoặc không chịu hết tải đọc/ghi khi dữ liệu vượt quy mô một máy — <b>sharding</b> (hay partitioning) là chia dữ liệu ra nhiều node theo một khoá (shard key), với ba chiến lược chính: <b>range-based</b> (chia theo khoảng giá trị khoá), <b>hash-based</b> (băm khoá để phân phối đều), và <b>consistent hashing</b> (băm nhưng giảm xáo trộn khi thêm/bớt node). Đánh đổi chính: thêm hoặc bớt node đòi <em>rebalance</em> — di chuyển dữ liệu giữa các node, tốn băng thông và thời gian — và chọn sai shard key có thể gây <em>hotspot</em>, một shard nhận quá nhiều tải trong khi các shard khác rảnh. Xem cách chọn shard key và mô hình replication topology cụ thể ở bài <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</p>
+  <p class="key">Replication là <em>cùng dữ liệu ở nhiều node</em>. Sharding là <em>chia dữ liệu ra nhiều node</em> theo một <b>shard key</b>.</p>
+
+  <div class="stack">
+    <div class="s"><b>Range-based</b><span>chia theo khoảng giá trị khoá</span></div>
+    <div class="s"><b>Hash-based</b><span>băm khoá cho phân phối đều</span></div>
+    <div class="s"><b>Consistent hashing</b><span>băm, nhưng thêm/bớt node ít xáo trộn hơn</span></div>
+  </div>
+
+  <ul class="why">
+    <li>Thêm hay bớt node đều phải <b>rebalance</b> — chuyển dữ liệu qua lại, tốn băng thông.</li>
+    <li>Chọn sai shard key gây <b>hotspot</b>: một shard gánh hết tải, các shard khác rảnh.</li>
+    <li>Cách chọn shard key ở <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</li>
+  </ul>
 </section>
 
 <section id="cap-theorem-consistency-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Đánh đổi thực tế</h2></div>
   <p class="key">Chọn CP hay AP phụ thuộc chi phí của việc <em>sai</em> so với chi phí của việc <em>không phản hồi</em> — không có lựa chọn đúng chung cho mọi hệ thống.</p>
-  <ul class="why">
-    <li><b>Ngân hàng, hệ giao dịch tài chính</b> — thường ưu tiên CP / strong consistency: thà từ chối giao dịch còn hơn trả sai số dư tài khoản.</li>
-    <li><b>Mạng xã hội, news feed, giỏ hàng thương mại điện tử</b> — thường ưu tiên AP / eventual consistency: thà hiển thị dữ liệu hơi cũ (like chưa cập nhật, feed chậm vài giây) còn hơn không hiển thị được gì.</li>
-  </ul>
+  <div class="cmp two">
+    <div><h5>Chọn CP — ngân hàng, thanh toán</h5>
+      <p><b>Sai thì</b> mất tiền thật</p>
+      <p><b>Nên</b> thà từ chối giao dịch còn hơn trả sai số dư</p></div>
+    <div><h5>Chọn AP — feed, giỏ hàng</h5>
+      <p><b>Sai thì</b> like hiện chậm vài giây</p>
+      <p><b>Nên</b> thà hiện dữ liệu hơi cũ còn hơn không hiện gì</p></div>
+  </div>
 </section>
 
 <section id="cap-theorem-consistency-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>07</b><h2>Tổng kết một hình</h2></div>
+
+  <p class="key">Chỉ cần mạng có lúc đứt là mọi thứ trong bài sinh ra: <em>lúc đó trả lời bằng dữ liệu cũ, hay không trả lời</em> &#8212; các mục còn lại chỉ là cách vặn núm giữa hai đầu đó.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 406" role="img" aria-label="Mạng đứt buộc chọn giữa C và A, trục consistency, replication với quorum, sharding và hotspot">
+
+      <text class="sv-h" x="8" y="16">&#9312; GỐC CỦA MỌI THỨ &#8212; NHIỀU NODE NGHĨA LÀ CÓ MẠNG, MÀ MẠNG CÓ LÚC ĐỨT</text>
+      <rect x="8" y="26" width="180" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-l" x="18" y="45" fill="#A8BEF6">một node &#183; hết sức chịu</text>
+      <path d="M192 41 h18" stroke="#7A6F63"/><path d="M210 41 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="214" y="26" width="180" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-l" x="224" y="45" fill="#A8BEF6">nhiều node &#183; mỗi node một bản</text>
+      <path d="M398 41 h18" stroke="#F2718A"/><path d="M416 41 l-7 -4 v8 z" fill="#F2718A"/>
+      <rect x="420" y="26" width="180" height="30" rx="4" fill="rgba(242,113,138,.12)" stroke="#F2718A"/>
+      <text class="sv-l" x="430" y="45" fill="#F79BAB">mạng đứt &#183; hai nửa mù nhau</text>
+      <text class="sv-l" x="616" y="45">P không phải lựa chọn &#8212; nó là điều kiện</text>
+
+      <rect x="8" y="70" width="404" height="52" rx="5" fill="rgba(242,113,138,.08)" stroke="#F2718A"/>
+      <text class="sv-t" x="20" y="88" fill="#F79BAB">CP &#8212; từ chối phục vụ</text>
+      <text class="sv-l" x="20" y="106">giữ đúng dữ liệu, thà không trả lời</text>
+      <text class="sv-d" x="256" y="106" fill="#7A6F63">ngân hàng, thanh toán</text>
+      <rect x="424" y="70" width="424" height="52" rx="5" fill="rgba(91,207,160,.08)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="436" y="88" fill="#8EE0BE">AP &#8212; vẫn trả lời</text>
+      <text class="sv-l" x="436" y="106">dữ liệu có thể chưa đồng bộ hết</text>
+      <text class="sv-d" x="680" y="106" fill="#7A6F63">feed, giỏ hàng</text>
+      <text class="sv-l" x="8" y="140">chọn theo cái giá: sai thì mất tiền thật, hay sai thì like hiện chậm vài giây</text>
+
+      <text class="sv-h" x="8" y="172">&#9313; CONSISTENCY LÀ MỘT TRỤC, KHÔNG PHẢI BẬT/TẮT</text>
+      <line x1="20" y1="196" x2="820" y2="196" stroke="#3D352C"/>
+      <circle cx="60" cy="196" r="5" fill="#F2718A"/>
+      <text class="sv-t" x="40" y="216" fill="#F79BAB">STRONG</text>
+      <text class="sv-d" x="20" y="232" fill="#7A6F63">đọc luôn thấy ghi gần nhất &#183; chậm</text>
+      <circle cx="420" cy="196" r="5" fill="#EDB44A"/>
+      <text class="sv-t" x="392" y="216" fill="#EDB44A">CAUSAL</text>
+      <text class="sv-d" x="340" y="232" fill="#7A6F63">đúng thứ tự nhân-quả, không hơn</text>
+      <circle cx="780" cy="196" r="5" fill="#5BCFA0"/>
+      <text class="sv-t" x="740" y="216" fill="#8EE0BE">EVENTUAL</text>
+      <text class="sv-d" x="676" y="232" fill="#7A6F63">rồi sẽ hội tụ, không hứa lúc nào</text>
+
+      <text class="sv-h" x="8" y="264">&#9314; REPLICATION &#8212; CÙNG DỮ LIỆU Ở NHIỀU NODE</text>
+      <rect x="8" y="274" width="150" height="28" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
+      <text class="sv-l" x="18" y="292" fill="#A8BEF6">client ghi</text>
+      <path d="M162 288 h18" stroke="#7A6F63"/><path d="M180 288 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="184" y="274" width="150" height="28" rx="4" fill="rgba(91,207,160,.12)" stroke="#5BCFA0"/>
+      <text class="sv-l" x="194" y="292" fill="#8EE0BE">leader nhận mọi ghi</text>
+      <path d="M338 288 h18" stroke="#7A6F63"/><path d="M356 288 l-7 -4 v8 z" fill="#7A6F63"/>
+      <rect x="360" y="274" width="180" height="28" rx="4" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
+      <text class="sv-l" x="370" y="292" fill="#EDB44A">follower &#183; có replication lag</text>
+      <text class="sv-l" x="560" y="284" fill="#8EE0BE">quorum: N bản, ghi cần W, đọc cần R</text>
+      <text class="sv-d" x="560" y="300" fill="#7A6F63">W + R &gt; N thì hai tập giao nhau &#8594; đọc chắc thấy giá trị mới</text>
+      <text class="sv-l" x="8" y="322">W, R lớn thì chặt nhưng dễ tắc khi node chết &#183; nhỏ thì nhanh nhưng đọc cũ &#8212; chính là núm vặn của &#9312;</text>
+
+      <text class="sv-h" x="8" y="354">&#9315; SHARDING &#8212; CHIA DỮ LIỆU RA NHIỀU NODE, KHÁC HẲN &#9314;</text>
+      <text class="sv-l" x="8" y="374" fill="#A8BEF6">range-based</text>
+      <text class="sv-l" x="180" y="374" fill="#A8BEF6">hash-based</text>
+      <text class="sv-l" x="360" y="374" fill="#8EE0BE">consistent hashing</text>
+      <text class="sv-d" x="560" y="374" fill="#7A6F63">thêm/bớt node ít xáo trộn hơn</text>
+      <line x1="8" y1="384" x2="852" y2="384" stroke="#2E2822"/>
+      <text class="sv-l" x="8" y="398" fill="#F79BAB">chọn sai shard key &#8594; hotspot: một shard gánh hết tải, các shard khác rảnh</text>
+    </svg>
+    <figcaption>Đọc theo số: mạng đứt là thứ ép ra lựa chọn CP hay AP &#9312;, consistency có nhiều mức chứ không chỉ hai &#9313;, replication giữ nhiều bản và quorum là núm vặn độ chặt &#9314;, còn sharding chia dữ liệu chứ không nhân bản &#9315;.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><strong>Partition tolerance</strong> gần như bắt buộc, nên "chọn 2 trong 3" thực chất là chọn giữa C và A <em>trong lúc</em> partition xảy ra.</li>
+    <li><strong>Replication lag</strong> là lý do đọc từ follower ở &#9314; thấy dữ liệu cũ — chính eventual consistency của &#9313; trong vận hành.</li>
+    <li><strong>Rebalance</strong> là cái giá của &#9315;: thêm hay bớt node đều phải chuyển dữ liệu qua lại, tốn băng thông.</li>
+    <li><strong>Shard key</strong> quyết định có hotspot hay không; cách chọn nằm ở <a href="../../../04-database/05-beyond-sql/sharding-replication/index.html">Sharding &amp; replication</a>.</li>
+  </ul>
+</section>
+
+<section id="cap-theorem-consistency-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
   <details class="qa"><summary>CAP theorem thật ra nói gì, "chọn 2 trong 3" có đúng không?</summary>

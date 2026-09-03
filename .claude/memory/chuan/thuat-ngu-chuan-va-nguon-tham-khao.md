@@ -44,6 +44,16 @@ những chữ thật sự nằm trong bài.
    mục nào ứng với bước nào). Chữ dùng phải là **thuật ngữ quốc tế** của chủ đề (majority vote,
    averaging, bagging, decorrelate), không tự chế cách gọi.
 
-5. Quy ước cũ vẫn giữ nguyên: ít chữ, nhiều hình ([[it-chu-nhieu-hinh]]), câu tiếng Việt thường,
+5. **Thuật ngữ chuẩn phải sống sót qua mọi lần rút gọn — kể cả trong lab và phần tương tác.**
+   Ngày 2026-09-03, khi rút gọn `random-forest` cho bớt chữ tôi đã đổi nhãn `out-of-bag` trong lab
+   thành "bỏ ngoài", và gọi ρ (correlation giữa các cây) là "mức sàn". Người dùng bắt lỗi ngay:
+   *"bỏ ngoài vẫn để đúng thuật ngữ out-of-bag để liên kết xuyên suốt bài"*. Rút gọn được phép cắt
+   **câu**, không được phép cắt **tên**: khái niệm nào đã có tên tiếng Anh chuẩn thì mọi chỗ nhắc
+   tới nó — nhãn ô trong lab, thanh trạng thái, câu chốt, figcaption, tiêu đề mục — đều phải dùng
+   đúng tên đó, không thay bằng cách nói thường cho ngắn. Cách nói thường chỉ được đứng **cạnh**
+   tên chuẩn để giải nghĩa lần đầu (`OOB = out-of-bag, nghĩa đen là nằm ngoài túi`), không thay thế
+   nó. Cũng không được tự chế tên cho khái niệm đã có tên ("mức sàn" → `correlation` ρ).
+
+6. Quy ước cũ vẫn giữ nguyên: ít chữ, nhiều hình ([[it-chu-nhieu-hinh]]), câu tiếng Việt thường,
    **chỉ giữ tiếng Anh ở cụm danh từ chuyên ngành**, và mở bài bằng "nó là gì" trước khi bàn vì
    sao cần nó.
