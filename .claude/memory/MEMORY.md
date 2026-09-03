@@ -11,6 +11,9 @@ Quy ước ghi/đọc nằm ở cuối file này.
 - [Soát kệ 04-database](soat-ke-04-database.md) — review 2026-09-02: 2 khung cuối đã viết, 2 chỗ trùng đã gỡ, 4 lỗ hổng đã bù
 - [Tách bài overfitting → Core concepts](tach-bai-overfitting-core-concepts.md) — đọc bài đã viết trước khi viết khung cạnh nó; trùng thì tách, đừng viết mới
 - [Cách trả lời: thật ngắn](cach-tra-loi-ngan-gon.md) — phần giao diện/CSS nói kết quả nhìn thấy, đừng kể thuật ngữ
+- [Soát kệ 05-machine-learning](soat-ke-05-machine-learning.md) — review 2026-09-03: đã viết lại random-forest + gradient-boosting, dồn so sánh về overview, đồng bộ cả kệ (phép đo văn xuôi trong đó đã bị bác bỏ)
+- [Ít chữ, nhiều hình](it-chu-nhieu-hinh.md) — chuẩn chất lượng bài học, đo bằng chữ/hình; chỉ số "tỉ lệ văn xuôi" cũ là sai hướng
+- [Thuật ngữ chuẩn & nguồn tham khảo](thuat-ngu-chuan-va-nguon-tham-khao.md) — tra nhiều nguồn lấy phần kiến thức phổ biến nhất; dán tên tiếng Anh chuẩn (root/internal/leaf node) lên hình, mỗi tầng một màu
 - [Khuôn .eq cho công thức](khuon-eq-cong-thuc.md) — chọn HTML thay KaTeX; ranh giới .eq vs <pre>; quy ước vẽ đường cong bằng SVG; đã áp dụng xong 14 khối
 
 ## Cách dùng thư mục này

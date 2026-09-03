@@ -52,15 +52,36 @@
   <p>Trước khi nghĩ tới chia nhỏ dữ liệu, bước rẻ hơn và nên làm trước luôn là <b>replication</b>: giữ nhiều bản sao giống hệt nhau của cùng một tập dữ liệu trên nhiều máy.</p>
 
   <h3>Master-slave (leader-follower)</h3>
-<pre><code>          ghi
-Client ────────► LEADER (master)
-                    │  sao chép thay đổi
-          ┌─────────┼─────────┐
-          ▼         ▼         ▼
-      FOLLOWER   FOLLOWER   FOLLOWER (slave, chỉ đọc)
+<figure>
+    <svg viewBox="0 0 820 250" role="img" aria-label="Một leader nhận ghi, ba follower nhận bản sao và phục vụ đọc">
+      <defs><marker id="rp1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#EDB44A"/></marker>
+      <marker id="rp2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8CA9F2"/></marker></defs>
 
-Client đọc ─────► bất kỳ follower nào (đọc mở rộng)
-Leader chết  ─────► promote một follower lên làm leader mới</code></pre>
+      <rect x="30" y="34" width="120" height="46" rx="6" class="sv-b"/>
+      <text x="90" y="63" class="sv-t" text-anchor="middle">Client</text>
+      <line x1="154" y1="57" x2="286" y2="57" stroke="#EDB44A" marker-end="url(#rp1)"/>
+      <text x="220" y="46" class="sv-l" fill="#EDB44A" text-anchor="middle">ghi</text>
+
+      <rect x="290" y="30" width="200" height="54" rx="6" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
+      <text x="390" y="62" class="sv-t" fill="#EDB44A" text-anchor="middle">LEADER</text>
+
+      <line x1="390" y1="88" x2="150" y2="146" stroke="#8CA9F2" marker-end="url(#rp2)"/>
+      <line x1="390" y1="88" x2="390" y2="146" stroke="#8CA9F2" marker-end="url(#rp2)"/>
+      <line x1="390" y1="88" x2="630" y2="146" stroke="#8CA9F2" marker-end="url(#rp2)"/>
+      <text x="404" y="120" class="sv-l" fill="#8CA9F2">sao chép thay đổi</text>
+
+      <g fill="rgba(140,169,242,.14)" stroke="#8CA9F2">
+        <rect x="60" y="150" width="180" height="50" rx="6"/>
+        <rect x="300" y="150" width="180" height="50" rx="6"/>
+        <rect x="540" y="150" width="180" height="50" rx="6"/>
+      </g>
+      <text x="150" y="180" class="sv-t" fill="#8CA9F2" text-anchor="middle">FOLLOWER</text>
+      <text x="390" y="180" class="sv-t" fill="#8CA9F2" text-anchor="middle">FOLLOWER</text>
+      <text x="630" y="180" class="sv-t" fill="#8CA9F2" text-anchor="middle">FOLLOWER</text>
+      <text x="390" y="228" class="sv-l" fill="#7A6F63" text-anchor="middle">client đọc từ bất kỳ follower nào · leader chết thì promote một follower lên thay</text>
+    </svg>
+    <figcaption>Mọi lệnh ghi đi qua đúng một leader nên không có xung đột ghi cần giải quyết.</figcaption>
+  </figure>
   <p>Mọi lệnh ghi đi qua đúng một leader; các follower chỉ nhận và áp lại luồng thay đổi đó. Đây là cách phổ biến nhất vì đơn giản: không có hai bên cùng ghi nên không có xung đột ghi cần giải quyết.</p>
 
   <h3>Master-master (multi-leader)</h3>
@@ -107,7 +128,14 @@ Leader chết  ─────► promote một follower lên làm leader mới<
     <li>Replication đã dùng hết để tách đọc/ghi nhưng bản thân lượng <b>ghi</b> vẫn quá tải cho một leader duy nhất — sharding phân cả tải ghi ra nhiều node, không chỉ tải đọc.</li>
   </ul>
 
-  <p>Sharding thường là bước <b>cuối cùng</b>, không phải đầu tiên, vì cái giá của nó — mất đi ở mục 05 — là rất thật và khó đảo ngược. Trình tự nên thử: tối ưu query và index → thêm cache → replication cho đọc → partitioning trong một node (mục 03) → rồi mới tới sharding.</p>
+  <div class="axis">
+    <div class="stop"><b>Tối ưu query &amp; index</b><span>rẻ nhất, thử trước</span></div>
+    <div class="stop"><b>Thêm cache</b><span>chặn tải đọc</span></div>
+    <div class="stop"><b>Replication</b><span>tách đọc khỏi ghi</span></div>
+    <div class="stop"><b>Partitioning</b><span>chia mảnh, vẫn một máy</span></div>
+    <div class="stop on"><b>Sharding</b><span>chia ra nhiều máy</span></div>
+  </div>
+  <p class="axiscap"><span>rẻ, đảo ngược được</span><span><em>cái giá tăng dần, khó lùi lại dần</em></span><span>đắt, khó đảo ngược</span></p>
 </section>
 
 <section id="shard-s3" class="lesson">
@@ -125,11 +153,11 @@ CREATE TABLE orders_2026_08 PARTITION OF orders
 SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>;</code></pre>
 
   <p>Ba thứ nó cho mà index không cho được:</p>
-  <ul class="why">
-    <li><b>Partition pruning</b> — planner loại thẳng các mảnh không thể chứa kết quả, trước cả khi đụng tới index. Bảng 5 năm dữ liệu nhưng truy vấn tháng này chỉ chạm 1/60 số dòng.</li>
-    <li><b>Xoá dữ liệu cũ tức thì</b> — <code>DROP TABLE orders_2021_01</code> mất mili giây, trong khi <code>DELETE</code> vài chục triệu dòng khoá bảng hàng giờ và để lại rác cho vacuum dọn.</li>
-    <li><b>Bảo trì theo mảnh</b> — <code>VACUUM</code>, rebuild index, nén dữ liệu cũ làm được trên từng mảnh thay vì cả bảng.</li>
-  </ul>
+  <div class="stack">
+    <div class="s ok"><b>Partition pruning</b><span>planner loại thẳng mảnh không thể chứa kết quả, trước cả khi đụng index — bảng 5 năm mà truy vấn tháng này chỉ chạm 1/60 số dòng</span></div>
+    <div class="s ok"><b>Xoá dữ liệu cũ tức thì</b><span><code>DROP TABLE orders_2021_01</code> mất mili giây, trong khi <code>DELETE</code> vài chục triệu dòng khoá bảng hàng giờ</span></div>
+    <div class="s"><b>Bảo trì theo mảnh</b><span><code>VACUUM</code>, rebuild index, nén dữ liệu cũ làm trên từng mảnh thay vì cả bảng</span></div>
+  </div>
 
   <div class="note key">
     <h4>Ba nấc thang, đi theo thứ tự</h4>
@@ -143,9 +171,11 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
   <p class="key">Ba chiến lược chia dữ liệu ra nhiều mảnh (shard) — khác nhau ở việc <em>thêm/bớt node thì phải dịch chuyển bao nhiêu dữ liệu</em>.</p>
 
   <h3>Range-based sharding</h3>
-<pre><code>Shard A: user_id  1 .. 1,000,000
-Shard B: user_id  1,000,001 .. 2,000,000
-Shard C: user_id  2,000,001 .. 3,000,000</code></pre>
+<div class="strip">
+    <div class="c dim"><i>Shard A</i><b>1 – 1 triệu</b><u>user cũ, gần như rảnh</u></div>
+    <div class="c dim"><i>Shard B</i><b>1 – 2 triệu</b><u>user cũ, gần như rảnh</u></div>
+    <div class="c f"><i>Shard C</i><b>2 – 3 triệu</b><u>hotspot — user mới đổ hết vào đây</u></div>
+  </div>
   <p>Chia theo khoảng giá trị liên tục của khoá. Dễ hiểu, hỗ trợ tốt truy vấn theo dải (range query — "lấy user id từ X tới Y"). Nhược điểm: dữ liệu mới thường rơi vào một đầu dải (id tăng dần theo thời gian) nên dễ tạo <b>hotspot</b> — một shard nhận toàn bộ ghi mới trong khi các shard cũ gần như rảnh.</p>
 
   <h3>Hash-based sharding</h3>
@@ -154,16 +184,21 @@ Shard C: user_id  2,000,001 .. 3,000,000</code></pre>
 
   <h3>Consistent hashing</h3>
   <p>Giải đúng nhược điểm trên của hash-based thuần. Ý tưởng: đặt cả node và khoá lên cùng một <b>vòng tròn hash</b> (ví dụ 0 → 2³²−1); mỗi khoá thuộc về node gần nhất theo chiều kim đồng hồ trên vòng đó.</p>
-<pre><code>          node C
-            ●
-        ╱       ╲
-   key ●           ● node A
-        ╲       ╱
-            ●
-          node B
-
-thêm node D vào giữa A và C:
-chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, C không đổi gì</code></pre>
+<figure>
+    <svg viewBox="0 0 700 280" role="img" aria-label="Vòng tròn hash với các node đặt trên vòng, thêm node mới chỉ dịch một cung">
+      <circle cx="350" cy="140" r="105" fill="none" stroke="#2E2822" stroke-width="2"/>
+      <circle cx="350" cy="35"  r="9" fill="#8CA9F2"/><text x="350" y="20" class="sv-t" fill="#8CA9F2" text-anchor="middle">node C</text>
+      <circle cx="441" cy="193" r="9" fill="#8CA9F2"/><text x="486" y="212" class="sv-t" fill="#8CA9F2" text-anchor="middle">node A</text>
+      <circle cx="259" cy="193" r="9" fill="#8CA9F2"/><text x="214" y="212" class="sv-t" fill="#8CA9F2" text-anchor="middle">node B</text>
+      <circle cx="441" cy="87"  r="9" fill="#5BCFA0"/><text x="492" y="80" class="sv-t" fill="#5BCFA0" text-anchor="middle">node D mới</text>
+      <circle cx="404" cy="45"  r="6" fill="#EDB44A"/><text x="378" y="62" class="sv-l" fill="#EDB44A">key</text>
+      <path d="M441 87 A105 105 0 0 0 350 35" fill="none" stroke="#5BCFA0" stroke-width="4"/>
+      <text x="350" y="266" class="sv-l" fill="#7A6F63" text-anchor="middle">chỉ cung xanh lá phải dịch — B và C không đổi gì</text>
+      <text x="350" y="145" class="sv-t" fill="#7A6F63" text-anchor="middle">mỗi khoá thuộc về node</text>
+      <text x="350" y="165" class="sv-t" fill="#7A6F63" text-anchor="middle">gần nhất theo chiều kim đồng hồ</text>
+    </svg>
+    <figcaption>Thêm hay bớt một node chỉ dịch khoảng <code>1/N</code> dữ liệu, thay vì gần như toàn bộ như <code>hash % N</code>.</figcaption>
+  </figure>
   <p>Khi thêm hoặc bớt một node, chỉ những khoá nằm trong đoạn cung liền kề node đó cần dịch chuyển — trung bình chỉ khoảng <code>1/N</code> tổng dữ liệu, thay vì gần như toàn bộ như hash-based thuần. Đây là lý do consistent hashing là kỹ thuật nền của DynamoDB, Cassandra và phần lớn hệ phân tán hiện đại. Triển khai thật còn thêm <b>virtual node</b> (mỗi node vật lý ánh xạ vào nhiều điểm ảo trên vòng) để tải chia đều hơn khi số node ít.</p>
 
   <h3>Ba tiêu chí chọn shard key</h3>
@@ -178,12 +213,11 @@ chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, 
     Shard theo <code>country</code> cho một app có 80% người dùng ở một quốc gia: một shard gánh gần hết tải trong khi các shard còn lại gần như rảnh — mất hết lợi ích của việc chia mảnh. Cách sửa thường dùng: ghép thêm một trường có độ phân tán cao vào khoá (composite key, ví dụ <code>hash(user_id)</code> thay vì <code>country</code>), hoặc chọn hẳn một khoá khác đã đo là phân bố đều.
   </div>
 
-  <table>
-    <tr><th>Chiến lược</th><th>Phân bố tải</th><th>Rebalance khi thêm/bớt node</th><th>Hỗ trợ range query</th></tr>
-    <tr><td>Range-based</td><td>Dễ lệch (hotspot ở đầu dải mới)</td><td>Chỉ cần chia lại dải liền kề — tương đối cục bộ</td><td>Tốt — quét một dải liên tục trên ít shard</td></tr>
-    <tr><td>Hash-based (modulo N)</td><td>Đều</td><td><b>Gần như toàn bộ dữ liệu</b> phải dịch chuyển</td><td>Kém — phải quét tất cả shard</td></tr>
-    <tr><td>Consistent hashing</td><td>Đều (tốt hơn nữa với virtual node)</td><td>Chỉ khoảng <code>1/N</code> dữ liệu dịch chuyển</td><td>Kém — phải quét tất cả shard</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>Range-based — chia theo dải giá trị</b><span>tải dễ lệch (hotspot ở đầu dải mới) · rebalance chỉ cần chia lại dải liền kề · <b>range query tốt</b>: quét một dải liên tục trên ít shard</span></div>
+    <div class="s warn"><b>Hash-based (modulo N)</b><span>tải đều · nhưng thêm/bớt node là <b>gần như toàn bộ dữ liệu phải dịch chuyển</b> · range query kém: phải quét mọi shard</span></div>
+    <div class="s ok"><b>Consistent hashing</b><span>tải đều (đều hơn nữa nhờ virtual node) · thêm/bớt node chỉ dịch khoảng <code>1/N</code> dữ liệu · range query vẫn kém</span></div>
+  </div>
 </section>
 
 <section id="shard-s5" class="lesson">
@@ -191,14 +225,12 @@ chỉ những khoá đang thuộc về đoạn (A, D) mới cần dịch — B, 
 
   <p class="key">Chia dữ liệu ra nhiều máy nghĩa là những phép toán vốn dễ trên một máy — join, transaction, unique — giờ phải <em>băng qua mạng</em> hoặc phải bỏ hẳn.</p>
 
-  <h3>Cross-shard query & join</h3>
-  <p>Một truy vấn chạm đúng một shard thì rẻ như trước. Nhưng một câu hỏi cần dữ liệu từ nhiều shard — ví dụ "tổng đơn hàng của toàn hệ thống theo ngày" khi đơn hàng shard theo <code>user_id</code> — không có JOIN xuyên shard sẵn có; ứng dụng (hoặc lớp middleware) phải tự truy vấn từng shard rồi gộp kết quả ở tầng ứng dụng (scatter-gather), chậm hơn hẳn và phức tạp hơn hẳn một JOIN trong SQL.</p>
-
-  <h3>Cross-shard transaction</h3>
-  <p>Một transaction cập nhật dữ liệu nằm trên hai shard khác nhau (ví dụ chuyển tiền giữa hai user rơi vào hai shard) không còn atomic miễn phí như trên một node. Cần một giao thức riêng — phổ biến nhất là <b>two-phase commit (2PC)</b> hoặc saga pattern — vừa chậm hơn, vừa thêm điểm có thể lỗi giữa chừng.</p>
-
-  <h3>Khoá duy nhất toàn cục</h3>
-  <p>Ràng buộc <code>UNIQUE</code> trên một cột (ví dụ email) chỉ đảm bảo được trong phạm vi <b>một shard</b> nếu để cơ sở dữ liệu tự lo — hai user cùng email nhưng rơi vào hai shard khác nhau thì không ai phát hiện. Cách xử lý: shard chính theo khoá cần unique, hoặc duy trì thêm một bảng/service tra cứu tập trung chỉ để kiểm tra tính duy nhất trước khi ghi.</p>
+  <div class="stack">
+    <div class="s warn"><b>Cross-shard query &amp; join</b><span>một câu cần dữ liệu ở nhiều shard không còn JOIN sẵn — ứng dụng phải hỏi từng shard rồi tự gộp (scatter-gather)</span></div>
+    <div class="s warn"><b>Cross-shard transaction</b><span>chuyển tiền giữa hai user rơi vào hai shard không còn atomic miễn phí — phải dùng two-phase commit hoặc saga, chậm hơn và thêm chỗ hỏng</span></div>
+    <div class="s warn"><b>Khoá duy nhất toàn cục</b><span><code>UNIQUE</code> chỉ đúng trong một shard — hai user cùng email ở hai shard khác nhau không ai phát hiện</span></div>
+  </div>
+  <p class="stripnote"><span>trên một máy: miễn phí</span><span><em>ba phép toán vốn dễ, giờ phải băng qua mạng hoặc bỏ hẳn</em></span><span>trên nhiều shard: phải tự lo</span></p>
 
   <div class="note key">
     <h4>Nguyên tắc thiết kế bù lại</h4>

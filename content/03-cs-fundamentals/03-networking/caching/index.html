@@ -65,39 +65,38 @@
 
 <section id="cache-s2">
   <div class="sh"><b>02</b><h2>Cache HTTP</h2></div>
-<pre><code>Cache-Control: max-age=3600            client cache 1 giờ, không hỏi lại
-Cache-Control: s-maxage=86400          dành riêng cho cache dùng chung (CDN)
-Cache-Control: no-cache                được cache nhưng PHẢI xác nhận lại mỗi lần
-Cache-Control: no-store                KHÔNG được lưu ở đâu cả
-Cache-Control: private                 chỉ browser được cache, CDN thì không
-Cache-Control: stale-while-revalidate=60   trả bản cũ ngay, làm mới ở nền</code></pre>
+<div class="strip">
+    <div class="c t"><i>max-age=3600</i><b>được cache</b><u>client giữ 1 giờ, không hỏi lại</u></div>
+    <div class="c t"><i>s-maxage=86400</i><b>được cache</b><u>dành riêng cho CDN dùng chung</u></div>
+    <div class="c on"><i>no-cache</i><b>được cache</b><u>nhưng phải xác nhận lại mỗi lần</u></div>
+    <div class="c f"><i>no-store</i><b>không lưu</b><u>không được giữ ở bất cứ đâu</u></div>
+    <div class="c on"><i>private</i><b>chỉ browser</b><u>CDN không được cache</u></div>
+    <div class="c t"><i>stale-while-revalidate=60</i><b>trả bản cũ ngay</b><u>làm mới ở nền</u></div>
+  </div>
   <div class="note warn">
     <h4><code>no-cache</code> không có nghĩa là không cache</h4>
     Nó có nghĩa là "được lưu, nhưng phải <strong>xác nhận lại</strong> với server trước khi dùng". Thứ có nghĩa là không lưu gì cả là <code>no-store</code>. Đây là cặp tên gây nhầm lẫn nhiều nhất trong HTTP, và dùng sai <code>no-cache</code> cho dữ liệu nhạy cảm là một lỗi bảo mật thật.
   </div>
-<pre><code>XÁC NHẬN LẠI BẰNG ETAG — tiết kiệm băng thông
-
-    lần đầu:   GET /data
-               200 OK, ETag: "abc123", body 500 KB
-
-    lần sau:   GET /data
-               If-None-Match: "abc123"
-               → 304 Not Modified, body RỖNG
-
-    → vẫn tốn 1 RTT, nhưng không tốn 500 KB.</code></pre>
+<div class="seq">
+    <div class="who"><span>Client</span><span>Server</span></div>
+    <div class="m"><i>GET /data</i><div class="ar r"></div><u>lần đầu</u></div>
+    <div class="m"><i>200 OK · ETag "abc123" · body 500 KB</i><div class="ar l"></div><u>tải về đầy đủ</u></div>
+    <div class="m"><i>GET /data · If-None-Match: "abc123"</i><div class="ar r"></div><u>lần sau</u></div>
+    <div class="m"><i>304 Not Modified · body rỗng</i><div class="ar l"></div><u>vẫn tốn 1 RTT, nhưng không tốn 500 KB</u></div>
+  </div>
   <p><code>stale-while-revalidate</code> đáng biết vì nó phá được đánh đổi giữa độ mới và độ trễ: khi cache vừa hết hạn, trả ngay bản cũ cho người dùng <em>rồi</em> làm mới ở nền. Người dùng không bao giờ phải chờ, và dữ liệu vẫn được cập nhật. Nó cũng là một phần lời giải cho thundering herd ở mục 12.</p>
 </section>
 
 <section id="cache-s3">
   <div class="sh"><b>03</b><h2>Năm tầng cache</h2></div>
-<pre><code>1. BROWSER          nhanh nhất, nhưng không kiểm soát được sau khi đã gửi header
-2. CDN              gần người dùng về địa lý → cắt RTT rất nhiều
-3. REVERSE PROXY    nginx, Varnish — trước ứng dụng, chặn tải trước khi vào app
-4. ỨNG DỤNG         Redis hoặc cache trong tiến trình — kết quả đã tính
-5. CƠ SỞ DỮ LIỆU    buffer pool, query cache — tự động, ít kiểm soát
-
-Nguyên tắc: cache CÀNG GẦN người dùng CÀNG RẺ,
-nhưng CÀNG KHÓ vô hiệu hoá khi dữ liệu đổi.</code></pre>
+<div class="stack">
+    <div class="s ok"><b>Browser</b><span>nhanh nhất — nhưng gửi header đi rồi thì không thu về được nữa</span></div>
+    <div class="s"><b>CDN</b><span>gần người dùng về địa lý, cắt RTT rất nhiều</span></div>
+    <div class="s"><b>Reverse proxy</b><span>nginx, Varnish — chặn tải ngay trước ứng dụng</span></div>
+    <div class="s"><b>Ứng dụng</b><span>Redis hoặc cache trong tiến trình — giữ kết quả đã tính</span></div>
+    <div class="s warn"><b>Cơ sở dữ liệu</b><span>buffer pool, query cache — tự động, gần như không kiểm soát được</span></div>
+  </div>
+  <p class="stripnote"><span>Càng lên trên càng gần người dùng: <em>càng rẻ</em>.</span><span>Nhưng cũng <em>càng khó thu hồi</em> khi dữ liệu đổi.</span></p>
   <table>
     <tr><th>Tầng</th><th>Cache gì</th><th>Vô hiệu hoá</th></tr>
     <tr><td>CDN</td><td>Tài nguyên tĩnh, ảnh, API công khai</td><td>Purge chủ động, hoặc đặt phiên bản vào URL</td></tr>
@@ -119,19 +118,11 @@ nhưng CÀNG KHÓ vô hiệu hoá khi dữ liệu đổi.</code></pre>
     <tr><td><strong>Xoá khi ghi</strong></td><td>Khi cập nhật dữ liệu thì xoá khoá cache tương ứng</td><td>Dữ liệu luôn mới; nhưng phải nhớ mọi chỗ ghi, và dễ bỏ sót</td></tr>
     <tr><td><strong>Khoá có phiên bản</strong></td><td>Đưa số phiên bản hoặc mã băm vào khoá cache</td><td>Không cần xoá gì; bản cũ tự bị bỏ rơi và hết hạn dần</td></tr>
   </table>
-<pre><code>Ba mẫu ghi, cần phân biệt:
-
-CACHE-ASIDE (phổ biến nhất)
-    đọc:  thử cache → miss thì đọc DB → ghi vào cache
-    ghi:  ghi DB → XOÁ khoá cache
-
-WRITE-THROUGH
-    ghi:  ghi cache VÀ ghi DB cùng lúc
-    → cache luôn mới, nhưng mọi lần ghi đều chậm hơn
-
-WRITE-BEHIND
-    ghi:  ghi cache ngay, đẩy xuống DB sau
-    → ghi rất nhanh, nhưng CÓ THỂ MẤT dữ liệu nếu cache chết</code></pre>
+<div class="stack">
+    <div class="s ok"><b>Cache-aside — phổ biến nhất</b><span>đọc: thử cache, miss thì đọc DB rồi ghi vào cache · ghi: ghi DB rồi <b>xoá</b> khoá cache</span></div>
+    <div class="s"><b>Write-through</b><span>ghi cache và ghi DB cùng lúc — cache luôn mới, nhưng mọi lần ghi đều chậm hơn</span></div>
+    <div class="s warn"><b>Write-behind</b><span>ghi cache ngay, đẩy xuống DB sau — ghi rất nhanh, nhưng mất dữ liệu nếu cache chết</span></div>
+  </div>
   <div class="note warn">
     <h4>Trong cache-aside, phải XOÁ chứ không phải CẬP NHẬT</h4>
     Nếu khi ghi bạn cập nhật cache bằng giá trị mới, hai request ghi đồng thời có thể ghi vào cache theo thứ tự ngược với thứ tự ghi vào cơ sở dữ liệu — và cache giữ giá trị cũ mãi mãi. Xoá khoá thì lần đọc sau buộc phải lấy lại từ nguồn, nên luôn đúng. Đây là chi tiết tinh vi và là câu hỏi vặn hay gặp.
@@ -140,13 +131,13 @@ WRITE-BEHIND
 
 <section id="cache-s5">
   <div class="sh"><b>05</b><h2>Thundering herd</h2></div>
-<pre><code>Một khoá cache rất nóng hết hạn tại t = 0.
-
-    1.000 request đang chờ đều thấy cache miss
-    → cả 1.000 cùng đi xuống cơ sở dữ liệu
-    → cùng một truy vấn, chạy 1.000 lần đồng thời
-    → cơ sở dữ liệu quá tải, càng chậm, càng nhiều request dồn vào
-    → sập</code></pre>
+<div class="flow">
+    <div class="n"><h5>t = 0</h5><p>một khoá rất nóng hết hạn</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>1.000 cache miss</h5><p>cùng lúc, cùng một truy vấn</p></div>
+    <div class="a">→</div>
+    <div class="n no"><h5>DB quá tải</h5><p>càng chậm càng dồn → sập</p></div>
+  </div>
   <table>
     <tr><th>Cách chữa</th><th>Cơ chế</th></tr>
     <tr><td><strong>Single-flight</strong></td><td>Chỉ cho <em>một</em> request đi lấy dữ liệu; những request khác chờ và dùng chung kết quả đó</td></tr>

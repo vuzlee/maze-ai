@@ -49,12 +49,11 @@
 <section id="sqlcte-s1">
   <div class="sh"><b>01</b><h2>Truy vấn con ở ba chỗ</h2></div>
   <p class="key">Một subquery là <em>một câu SELECT hoàn chỉnh nằm bên trong câu SELECT khác</em>. Nó đặt được ở ba vị trí, mỗi vị trí một vai trò khác nhau.</p>
-  <table>
-    <tr><th>Vị trí</th><th>Vai trò</th><th>Ví dụ</th></tr>
-    <tr><td><code>WHERE</code></td><td>Lọc dựa trên kết quả một truy vấn khác</td><td><code>WHERE customer_id IN (SELECT id FROM customers WHERE country='VN')</code></td></tr>
-    <tr><td><code>FROM</code></td><td>Dùng kết quả trung gian như một bảng tạm</td><td><code>FROM (SELECT customer_id, SUM(amount) t FROM orders GROUP BY customer_id) s</code></td></tr>
-    <tr><td><code>SELECT</code></td><td>Tính một giá trị đơn lẻ cho mỗi dòng</td><td><code>SELECT name, (SELECT COUNT(*) FROM orders WHERE customer_id=c.id) AS so_don FROM customers c</code></td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>Trong WHERE — lọc</b><span>lọc dòng dựa trên kết quả một truy vấn khác</span></div>
+    <div class="s ok"><b>Trong FROM — bảng tạm</b><span>dùng kết quả trung gian như một bảng, rồi join/lọc tiếp</span></div>
+    <div class="s"><b>Trong SELECT — một giá trị cho mỗi dòng</b><span>trả về đúng một ô, tính lại cho từng dòng ngoài</span></div>
+  </div>
 <pre><code><span class="cm">-- FROM: giải bài toán "SUM rồi JOIN làm nhân dòng" đã nói ở bài JOIN —
 --       tổng hợp TRƯỚC trong subquery, join SAU trên kết quả đã gọn</span>
 SELECT c.name, s.tong
@@ -141,7 +140,29 @@ WITH RECURSIVE subordinates <span class="kw">AS</span> (
   JOIN subordinates s ON e.manager_id = s.id
 )
 SELECT * FROM subordinates ORDER BY depth;</code></pre>
-  <p>Cơ chế: PostgreSQL chạy phần <b>anchor</b> một lần để ra tập kết quả ban đầu, rồi lặp lại phần <b>recursive</b> — mỗi lượt chỉ nhìn các dòng <em>mới thêm ở lượt trước</em> — cho tới khi một lượt không sinh thêm dòng nào thì dừng.</p>
+<figure>
+    <svg viewBox="0 0 820 210" role="img" aria-label="Cách CTE đệ quy lan từng tầng">
+      <defs><marker id="rc1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#8CA9F2"/></marker></defs>
+      <rect class="sv-b" x="20" y="30" width="150" height="56" rx="6" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
+      <text class="sv-t" x="95" y="54" text-anchor="middle" fill="#EDE7DE">anchor</text>
+      <text class="sv-l" x="95" y="72" text-anchor="middle" fill="#7A6F63">Chi · depth 1</text>
+      <line x1="176" y1="58" x2="216" y2="58" stroke="#8CA9F2" stroke-width="2" marker-end="url(#rc1)"/>
+      <rect class="sv-b" x="222" y="30" width="150" height="56" rx="6" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text class="sv-t" x="297" y="54" text-anchor="middle" fill="#EDE7DE">lượt 1</text>
+      <text class="sv-l" x="297" y="72" text-anchor="middle" fill="#7A6F63">cấp dưới của Chi · depth 2</text>
+      <line x1="378" y1="58" x2="418" y2="58" stroke="#8CA9F2" stroke-width="2" marker-end="url(#rc1)"/>
+      <rect class="sv-b" x="424" y="30" width="150" height="56" rx="6" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text class="sv-t" x="499" y="54" text-anchor="middle" fill="#EDE7DE">lượt 2</text>
+      <text class="sv-l" x="499" y="72" text-anchor="middle" fill="#7A6F63">cấp dưới của họ · depth 3</text>
+      <line x1="580" y1="58" x2="620" y2="58" stroke="#8CA9F2" stroke-width="2" marker-end="url(#rc1)"/>
+      <rect class="sv-b" x="626" y="30" width="170" height="56" rx="6" fill="rgba(91,207,160,.16)" stroke="#5BCFA0"/>
+      <text class="sv-t" x="711" y="54" text-anchor="middle" fill="#EDE7DE">lượt 3 — rỗng</text>
+      <text class="sv-l" x="711" y="72" text-anchor="middle" fill="#7A6F63">không thêm dòng nào → dừng</text>
+      <text class="sv-l" x="20" y="128" fill="#7A6F63">Mỗi lượt chỉ nhìn các dòng MỚI thêm ở lượt ngay trước, không quét lại từ đầu.</text>
+      <text class="sv-l" x="20" y="150" fill="#F2718A">Dữ liệu có chu trình (A quản lý B, B quản lý A) thì không lượt nào rỗng — chạy mãi.</text>
+    </svg>
+    <figcaption>Đệ quy ở đây là <b>lan theo tầng</b>: dừng khi một lượt không sinh thêm dòng nào.</figcaption>
+  </figure>
   <div class="note warn">
     <h4>Tránh vòng lặp vô hạn</h4>
     Nếu dữ liệu có chu trình (A quản lý B, B quản lý A) thì CTE đệ quy sẽ chạy mãi. Với dữ liệu có khả năng lỗi như vậy, thêm giới hạn tầng: <code>WHERE depth &lt; 20</code> ở nhánh recursive.
@@ -161,13 +182,16 @@ SELECT * FROM paid_totals WHERE tong &gt; <span class="st">1000000</span>;   <sp
 <span class="cm">-- materialized view: lưu KẾT QUẢ ra đĩa như một bảng thật</span>
 CREATE MATERIALIZED VIEW paid_totals_mv <span class="kw">AS</span> SELECT ...;
 REFRESH MATERIALIZED VIEW paid_totals_mv;        <span class="cm">-- phải tự làm mới, không tự đồng bộ</span></code></pre>
-  <table>
-    <tr><th></th><th>View</th><th>Materialized view</th></tr>
-    <tr><td>Lưu gì</td><td>Câu truy vấn</td><td>Kết quả đã tính</td></tr>
-    <tr><td>Độ mới</td><td>Luôn mới — đọc dữ liệu hiện tại</td><td>Cũ tới lần <code>REFRESH</code> gần nhất</td></tr>
-    <tr><td>Chi phí đọc</td><td>Bằng chi phí truy vấn gốc</td><td>Rẻ như đọc một bảng thường</td></tr>
-    <tr><td>Dùng khi</td><td>Đặt tên cho logic hay lặp lại, hoặc giấu bớt cột nhạy cảm</td><td>Truy vấn tổng hợp nặng, đọc nhiều lần, chấp nhận số cũ vài phút</td></tr>
-  </table>
+<div class="cmp two">
+    <div><h5>View — lưu câu truy vấn</h5>
+      <p>Luôn đọc dữ liệu <b>hiện tại</b>, nên luôn mới.</p>
+      <p>Chi phí đọc <b>bằng</b> chi phí truy vấn gốc — không nhanh hơn gì.</p>
+      <p>Dùng để đặt tên cho logic hay lặp, hoặc giấu bớt cột nhạy cảm.</p></div>
+    <div><h5>Materialized view — lưu kết quả</h5>
+      <p>Số liệu <b>cũ</b> tới lần <code>REFRESH</code> gần nhất.</p>
+      <p>Đọc rẻ như một bảng thường.</p>
+      <p>Dùng cho truy vấn tổng hợp nặng, đọc nhiều lần, chấp nhận số cũ vài phút.</p></div>
+  </div>
   <ul class="why">
     <li>View <b>không</b> làm truy vấn nhanh hơn — nó chỉ thay chỗ dán đoạn SQL. Ai nghĩ "đưa vào view cho nhanh" là hiểu sai; thứ làm nhanh là materialized view, và cái giá là dữ liệu cũ.</li>
     <li>View lồng view nhiều tầng là bẫy quen thuộc: nhìn thì gọn, nhưng planner phải bung hết ra và bạn mất khả năng đoán chi phí — xem <a href="../../04-sql-advanced/sql-index-query-plan/index.html">Index &amp; query plan</a>.</li>

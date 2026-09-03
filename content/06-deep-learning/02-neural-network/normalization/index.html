@@ -65,12 +65,15 @@
 
 <section id="norm-s2">
   <div class="sh"><b>02</b><h2>BatchNorm</h2></div>
-<pre><code>Với mỗi ĐẶC TRƯNG, tính thống kê trên toàn BATCH:
-
-    μ  = mean(x)  theo chiều batch
-    σ² = var(x)   theo chiều batch
-    x̂  = (x - μ) / √(σ² + ε)
-    y  = γ · x̂ + β                ← γ và β là tham số HỌC ĐƯỢC</code></pre>
+<p class="key">Với mỗi đặc trưng, tính thống kê trên <em>toàn batch</em> rồi ép về trung bình 0, phương sai 1.</p>
+  <div class="eq">
+    <div class="line"><span class="t"><span>x̂</span></span><span class="op">=</span><span class="t b"><span>(x − μ)</span><em>trừ trung bình của batch</em></span><span class="op">/</span><span class="t p"><span>√(σ² + ε)</span><em>chia độ lệch chuẩn của batch</em></span></div>
+    <div class="line"><span class="t"><span>y</span></span><span class="op">=</span><span class="t g"><span>γ · x̂ + β</span><em>hai tham số học được, trả lại độ tự do</em></span></div>
+    <dl>
+      <dt>μ, σ²</dt><dd>tính theo chiều batch — riêng cho từng đặc trưng</dd>
+      <dt>ε</dt><dd>số rất nhỏ, tránh chia cho 0</dd>
+    </dl>
+  </div>
   <p><strong>Vì sao cần <code>γ</code> và <code>β</code>:</strong> chuẩn hoá cứng về trung bình 0 phương sai 1 có thể làm mất khả năng biểu diễn — ví dụ với sigmoid thì vùng quanh 0 gần như tuyến tính. Hai tham số này cho mạng <em>tự học lại</em> thang đo và độ dịch phù hợp, kể cả học ra phép biến đổi ngược nếu chuẩn hoá là có hại.</p>
   <h3>Hai chế độ — nguồn của nhiều bug</h3>
   <table>
@@ -87,11 +90,12 @@
 
 <section id="norm-s3">
   <div class="sh"><b>03</b><h2>Phụ thuộc batch size — hệ quả thực tế</h2></div>
-<pre><code>BatchNorm tính trung bình và phương sai từ các mẫu trong batch.
-
-batch = 256  →  thống kê ổn định, chính xác
-batch = 8    →  thống kê nhiễu, chất lượng tụt rõ
-batch = 1    →  phương sai bằng 0, BatchNorm VÔ NGHĨA</code></pre>
+<div class="axis">
+    <div class="stop"><b>batch = 256</b><span>thống kê ổn định, chính xác</span></div>
+    <div class="stop on"><b>batch = 8</b><span>thống kê nhiễu, chất lượng tụt rõ</span></div>
+    <div class="stop"><b>batch = 1</b><span>phương sai bằng 0 — BatchNorm vô nghĩa</span></div>
+  </div>
+  <p class="axiscap"><span>batch càng lớn thống kê càng đáng tin</span><span><em>BatchNorm mượn thông tin từ các mẫu khác trong batch</em></span><span>batch nhỏ thì không còn gì để mượn</span></p>
   <p>Đây không phải vấn đề lý thuyết — nó chặn hẳn một số ứng dụng:</p>
   <table>
     <tr><th>Tình huống</th><th>Vấn đề</th><th>Giải pháp</th></tr>
@@ -106,14 +110,33 @@ batch = 1    →  phương sai bằng 0, BatchNorm VÔ NGHĨA</code></pre>
 
 <section id="norm-s4">
   <div class="sh"><b>04</b><h2>LayerNorm và các biến thể</h2></div>
-<pre><code>Tưởng tượng tensor có shape (N mẫu, C đặc trưng). Mỗi loại norm tính
-thống kê trên một chiều khác nhau:
+<p class="key">Bốn loại norm khác nhau đúng một chuyện: <em>gộp thống kê theo chiều nào</em>.</p>
+  <figure>
+    <svg viewBox="0 0 900 240" role="img" aria-label="BatchNorm gộp theo chiều mẫu, LayerNorm gộp theo chiều đặc trưng, GroupNorm gộp theo nhóm kênh của từng mẫu">
+      <text x="30" y="24" class="sv-l" fill="#7A6F63">MỘT TENSOR (N MẪU × C ĐẶC TRƯNG)</text>
+      <g class="sv-b" stroke="#3D352C">
+        <rect x="30" y="44" width="230" height="150" rx="6"/>
+        <rect x="335" y="44" width="230" height="150" rx="6"/>
+        <rect x="640" y="44" width="230" height="150" rx="6"/>
+      </g>
+      <g stroke="#3D352C" stroke-width="1">
+        <path d="M30 94 H260 M30 144 H260"/><path d="M88 44 V194 M146 44 V194 M204 44 V194"/>
+        <path d="M335 94 H565 M335 144 H565"/><path d="M393 44 V194 M451 44 V194 M509 44 V194"/>
+        <path d="M640 94 H870 M640 144 H870"/><path d="M698 44 V194 M756 44 V194 M814 44 V194"/>
+      </g>
+      <rect x="88" y="44" width="58" height="150" fill="rgba(140,169,242,.3)" stroke="#8CA9F2"/>
+      <rect x="335" y="94" width="230" height="50" fill="rgba(237,180,74,.3)" stroke="#EDB44A"/>
+      <rect x="640" y="94" width="116" height="50" fill="rgba(91,207,160,.3)" stroke="#5BCFA0"/>
 
-BatchNorm    ────────────►   theo chiều N, riêng cho từng đặc trưng
-LayerNorm    │              theo chiều C, riêng cho từng mẫu
-             ▼
-InstanceNorm                 từng mẫu, từng kênh (cho ảnh)
-GroupNorm                    từng mẫu, theo NHÓM kênh — trung gian giữa Layer và Instance</code></pre>
+      <text x="145" y="216" text-anchor="middle" class="sv-t" fill="#8CA9F2">BatchNorm</text>
+      <text x="145" y="234" text-anchor="middle" class="sv-l" fill="#7A6F63">một cột · gộp mọi mẫu</text>
+      <text x="450" y="216" text-anchor="middle" class="sv-t" fill="#EDB44A">LayerNorm</text>
+      <text x="450" y="234" text-anchor="middle" class="sv-l" fill="#7A6F63">một hàng · gộp mọi đặc trưng của một mẫu</text>
+      <text x="755" y="216" text-anchor="middle" class="sv-t" fill="#5BCFA0">GroupNorm</text>
+      <text x="755" y="234" text-anchor="middle" class="sv-l" fill="#7A6F63">nửa hàng · một nhóm kênh của một mẫu</text>
+    </svg>
+    <figcaption>Chỉ ô tô đậm được gộp lại thành một cặp (μ, σ²). InstanceNorm là GroupNorm với mỗi nhóm đúng một kênh.</figcaption>
+  </figure>
   <table>
     <tr><th>Loại</th><th>Tính thống kê trên</th><th>Phụ thuộc batch</th><th>Dùng ở</th></tr>
     <tr><td>BatchNorm</td><td>Chiều batch, từng đặc trưng</td><td><strong>Có</strong></td><td>CNN với batch lớn</td></tr>
@@ -133,15 +156,11 @@ RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ t
 <section id="norm-s5">
   <div class="sh"><b>05</b><h2>BatchNorm thật sự làm gì</h2></div>
   <p>Bài báo gốc giải thích bằng khái niệm <em>internal covariate shift</em>: phân phối đầu vào của mỗi lớp thay đổi khi các lớp trước cập nhật, và BatchNorm giữ nó ổn định. Cách giải thích này được nhắc lại khắp nơi — nhưng nghiên cứu sau đó cho thấy nó <strong>có lẽ không phải nguyên nhân chính</strong>.</p>
-<pre><code>Thí nghiệm phản chứng (Santurkar và cộng sự, 2018):
-
-Cố ý TIÊM nhiễu vào sau lớp BatchNorm để phá vỡ sự ổn định của phân phối
-— tức tái tạo lại internal covariate shift một cách chủ động.
-
-Kết quả: mạng vẫn huấn luyện nhanh và tốt như thường.
-
-→ nếu ổn định phân phối là cơ chế chính, việc phá nó phải làm mất lợi ích.
-   Nó không mất. Vậy cơ chế phải là thứ khác.</code></pre>
+<div class="stack">
+    <div class="s"><b>Giả thuyết gốc</b><span>BatchNorm giúp vì nó giữ phân phối đầu vào mỗi lớp ổn định (internal covariate shift)</span></div>
+    <div class="s warn"><b>Thí nghiệm phản chứng · Santurkar 2018</b><span>cố ý tiêm nhiễu ngay sau lớp BatchNorm để phá vỡ sự ổn định đó</span></div>
+    <div class="s ok"><b>Kết quả</b><span>mạng vẫn huấn luyện nhanh và tốt như thường → nếu ổn định phân phối là cơ chế chính thì phá nó phải làm mất lợi ích; nó không mất</span></div>
+  </div>
   <p>Giải thích được cho là đúng hơn: BatchNorm <strong>làm mặt mất mát trơn hơn</strong>. Nó giới hạn độ lớn của gradient và của độ cong, nên bước cập nhật trở nên dự đoán được — cho phép dùng learning rate lớn hơn mà không phân kỳ.</p>
   <div class="note">
     <h4>Vì sao đáng biết chi tiết này</h4>
@@ -152,12 +171,16 @@ Kết quả: mạng vẫn huấn luyện nhanh và tốt như thường.
 <section id="norm-s6">
   <div class="sh"><b>06</b><h2>Đặt norm ở đâu</h2></div>
   <h3>Trước hay sau activation</h3>
-<pre><code>Bài báo gốc:      conv → BN → ReLU        ← vẫn là mặc định phổ biến nhất
-Biến thể:         conv → ReLU → BN        ← đôi khi tốt hơn chút, ít dùng
-Pre-activation:   BN → ReLU → conv        ← ResNet v2, ổn định hơn cho mạng rất sâu</code></pre>
+<div class="stack">
+    <div class="s ok"><b>conv → BN → ReLU</b><span>bài báo gốc · vẫn là mặc định phổ biến nhất</span></div>
+    <div class="s"><b>conv → ReLU → BN</b><span>đôi khi tốt hơn chút, ít dùng</span></div>
+    <div class="s"><b>BN → ReLU → conv</b><span>pre-activation · ResNet v2 · ổn định hơn cho mạng rất sâu</span></div>
+  </div>
   <h3>Pre-LN và Post-LN trong Transformer</h3>
-<pre><code>Post-LN (bài báo gốc):   x = LN(x + attn(x))
-Pre-LN (model hiện nay): x = x + attn(LN(x))</code></pre>
+<div class="cmp two">
+    <div><h5>Post-LN — bài báo gốc</h5><p><code>x = LN(x + attn(x))</code><br>LayerNorm nằm <strong>trên</strong> đường residual, cắt ngang nó.</p></div>
+    <div><h5>Pre-LN — model hiện nay</h5><p><code>x = x + attn(LN(x))</code><br>LayerNorm nằm <strong>trong</strong> nhánh phụ, đường residual sạch từ đầu tới cuối.</p></div>
+  </div>
   <table>
     <tr><th></th><th>Post-LN</th><th>Pre-LN</th></tr>
     <tr><td>Đường residual</td><td>Bị LayerNorm cắt ngang</td><td><strong>Sạch hoàn toàn</strong> từ đầu tới cuối</td></tr>
@@ -174,12 +197,13 @@ Pre-LN (model hiện nay): x = x + attn(LN(x))</code></pre>
 
 <section id="norm-s7">
   <div class="sh"><b>07</b><h2>Weight decay và norm</h2></div>
-<pre><code>Weight decay = L2 regularization: phạt tổng bình phương trọng số.
-
-Nhưng KHÔNG nên áp dụng cho:
-    - γ và β của các lớp norm
-    - bias
-    - embedding (thường không, tuỳ trường hợp)</code></pre>
+<p class="key">Weight decay = L2 regularization: phạt tổng bình phương trọng số — nhưng <em>không</em> áp cho mọi tham số.</p>
+  <div class="strip">
+    <div class="c t"><i>áp weight decay</i><b>ma trận trọng số</b><u>conv, linear · tensor nhiều chiều</u></div>
+    <div class="c f"><i>không áp</i><b>γ và β của norm</b><u>tham số thang đo, không phải biểu diễn</u></div>
+    <div class="c f"><i>không áp</i><b>bias</b><u>chỉ dịch chuyển giá trị</u></div>
+    <div class="c dim"><i>tuỳ trường hợp</i><b>embedding</b><u>thường không</u></div>
+  </div>
   <p><strong>Vì sao không phạt <code>γ</code>:</strong> nó là tham số thang đo, không phải tham số biểu diễn. Đẩy <code>γ</code> về 0 nghĩa là <em>tắt</em> tín hiệu đi qua lớp đó — không phải làm model đơn giản hơn mà là làm nó mất khả năng. Tương tự, <code>β</code> và bias chỉ dịch chuyển giá trị, không liên quan tới độ phức tạp của hàm mà model biểu diễn.</p>
 <pre><code><span class="cm"># cách làm đúng trong PyTorch — tách tham số thành hai nhóm</span>
 decay, no_decay = [], []

@@ -51,10 +51,11 @@
 
   <p class="key">Fine-tune đầy đủ một model 7B cần khoảng <em>60–80 GB VRAM</em> chỉ riêng cho trọng số, gradient và trạng thái optimizer.</p>
 
-  <ul class="why">
-    <li>Mỗi tham số phải giữ <b>bốn bản</b>: trọng số, gradient, và hai moment của Adam. Đó là chỗ bộ nhớ bốc hơi, không phải ở forward pass.</li>
-    <li>Thêm nữa mỗi tác vụ lại ra <b>một bản model đầy đủ</b> — mười tác vụ là mười lần 14 GB phải lưu và phải nạp.</li>
-  </ul>
+  <div class="bars">
+    <div class="b bad"><i>full fine-tune 7B</i><u style="width:100%"></u><b>~80 GB</b></div>
+    <div class="b"><i>chỉ riêng trọng số</i><u style="width:18%"></u><b>14 GB</b></div>
+  </div>
+  <p class="stripnote"><span>Mỗi tham số phải giữ <em>bốn bản</em>: trọng số, gradient và hai moment của Adam — đó là chỗ bộ nhớ bốc hơi, không phải ở forward pass.</span><span>Thêm nữa mỗi tác vụ lại ra một bản model đầy đủ: mười tác vụ là mười lần 14 GB phải lưu và phải nạp.</span></p>
 
   <div class="note">
     <h4>Bài này nối tiếp</h4>
@@ -65,22 +66,47 @@
 
 <section id="lora-s2">
   <div class="sh"><b>02</b><h2>LoRA — Low-Rank Adaptation</h2></div>
-<pre><code>Ý tưởng: phần CẬP NHẬT của một ma trận trọng số thường có hạng thấp,
-nên biểu diễn được bằng tích của hai ma trận nhỏ.
+<p class="key">Phần <em>cập nhật</em> của một ma trận trọng số thường có hạng thấp, nên viết được thành tích của hai ma trận gầy.</p>
+  <figure>
+    <svg viewBox="0 0 900 250" role="img" aria-label="Ma trận trọng số lớn đóng băng, cộng thêm tích của hai ma trận gầy B và A">
+      <rect x="40" y="50" width="150" height="150" rx="6" fill="#241F1A" stroke="#3D352C"/>
+      <text x="115" y="130" class="sv-t" fill="#7A6F63" text-anchor="middle">W_gốc</text>
+      <text x="115" y="150" class="sv-l" fill="#7A6F63" text-anchor="middle">đóng băng</text>
+      <text x="115" y="228" class="sv-l" fill="#7A6F63" text-anchor="middle">4096 × 4096 = 16,7 triệu</text>
 
-    W_mới = W_gốc + ΔW
-    ΔW    = B · A        với A: (r, d_in),  B: (d_out, r),  r rất nhỏ
+      <text x="215" y="135" class="sv-t" fill="#EDE7DE">+</text>
 
-    W_gốc  ĐÓNG BĂNG, không cập nhật
-    A, B   là phần duy nhất được huấn luyện
+      <rect x="250" y="50" width="36" height="150" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2"/>
+      <text x="268" y="132" class="sv-t" fill="#8CA9F2" text-anchor="middle">B</text>
+      <text x="268" y="228" class="sv-l" fill="#8CA9F2" text-anchor="middle">4096 × 16</text>
 
-Số tham số: từ d_in × d_out  →  r × (d_in + d_out)
-Với d = 4096, r = 16:  16.7 triệu  →  131 nghìn  (0.8%)</code></pre>
-<pre><code>Lúc suy luận:
-    h = W_gốc·x + (α/r) · B·A·x
+      <text x="305" y="135" class="sv-t" fill="#EDE7DE">·</text>
 
-α/r là hệ số tỉ lệ, cho phép đổi r mà không phải dò lại learning rate.
-Có thể GỘP B·A vào W_gốc sau khi huấn luyện → suy luận không tốn thêm gì.</code></pre>
+      <rect x="325" y="50" width="150" height="36" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2"/>
+      <text x="400" y="74" class="sv-t" fill="#8CA9F2" text-anchor="middle">A</text>
+      <text x="400" y="110" class="sv-l" fill="#8CA9F2" text-anchor="middle">16 × 4096</text>
+
+      <text x="345" y="170" class="sv-t" fill="#EDB44A">chỉ hai khối xanh được huấn luyện</text>
+      <text x="345" y="192" class="sv-l" fill="#7A6F63">131 nghìn tham số — 0,8% của khối xám</text>
+
+      <line x1="560" y1="40" x2="560" y2="210" stroke="#2E2822"/>
+      <text x="600" y="80" class="sv-t">r = 16 là "chiều rộng" của lối đi</text>
+      <text x="600" y="106" class="sv-l" fill="#7A6F63">cả cập nhật phải chui qua 16 chiều đó</text>
+      <text x="600" y="140" class="sv-t">r nhỏ → ít tham số, học được ít</text>
+      <text x="600" y="166" class="sv-t">r lớn → gần full fine-tune hơn</text>
+    </svg>
+    <figcaption>Số tham số phải huấn luyện đi từ <code>d_in × d_out</code> xuống <code>r × (d_in + d_out)</code>.</figcaption>
+  </figure>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>h</span></span>
+      <span class="op">=</span>
+      <span class="t"><span>W_gốc·x</span><em>đường cũ, không đổi</em></span>
+      <span class="op">+</span>
+      <span class="t b"><span>(α/r) · B·A·x</span><em>nhánh LoRA cộng thêm</em></span>
+    </div>
+  </div>
+  <p><code>α/r</code> là hệ số tỉ lệ, cho phép đổi <code>r</code> mà không phải dò lại learning rate. Huấn luyện xong có thể <b>gộp</b> <code>B·A</code> thẳng vào <code>W_gốc</code> — lúc đó suy luận không tốn thêm gì so với model gốc.</p>
   <div class="note key">
     <h4>Vì sao B khởi tạo bằng 0 và A khởi tạo ngẫu nhiên</h4>
     Vì <code>ΔW = B·A = 0</code> lúc bắt đầu, nên model khởi đầu <strong>giống hệt model gốc</strong> — không có cú sốc nào ở bước đầu tiên. Nếu cả hai đều ngẫu nhiên thì <code>ΔW</code> là nhiễu ngẫu nhiên cộng vào trọng số đã huấn luyện tốt, phá chất lượng ngay. Nếu cả hai đều bằng 0 thì gradient của cả hai bằng 0 mãi mãi — không học được gì. Một cái 0, một cái ngẫu nhiên là lựa chọn duy nhất đúng.
@@ -126,22 +152,18 @@ Có thể GỘP B·A vào W_gốc sau khi huấn luyện → suy luận không t
 
 <section id="lora-s4">
   <div class="sh"><b>04</b><h2>QLoRA</h2></div>
-<pre><code>Model nền được lượng tử hoá xuống 4-bit và ĐÓNG BĂNG.
-Adapter LoRA giữ ở bf16 và được huấn luyện.
-
-Ba đóng góp kỹ thuật:
-
-1. NF4 — NormalFloat 4-bit
-   Các mức lượng tử hoá được chọn theo phân phối CHUẨN, không cách đều.
-   Vì trọng số mạng nơ-ron xấp xỉ phân phối chuẩn, cách này mất ít thông tin hơn.
-
-2. Double quantization
-   Lượng tử hoá luôn cả các hằng số scale của bước lượng tử hoá.
-   Tiết kiệm thêm khoảng 0.4 bit mỗi tham số.
-
-3. Paged optimizer
-   Đẩy trạng thái optimizer sang RAM khi VRAM đầy, tránh lỗi hết bộ nhớ
-   ở những đợt đột biến.</code></pre>
+<p class="key">Model nền bị nén xuống <em>4-bit</em> và đóng băng; chỉ adapter LoRA giữ ở bf16 và được huấn luyện.</p>
+  <div class="stack">
+    <div class="s"><b>NF4 — NormalFloat 4-bit</b><span>các mức lượng tử hoá chọn theo phân phối chuẩn thay vì cách đều — vì trọng số mạng nơ-ron xấp xỉ phân phối chuẩn, cách này mất ít thông tin hơn</span></div>
+    <div class="s"><b>Double quantization</b><span>lượng tử hoá luôn cả các hằng số scale của bước lượng tử hoá, tiết kiệm thêm khoảng 0,4 bit mỗi tham số</span></div>
+    <div class="s ok"><b>Paged optimizer</b><span>đẩy trạng thái optimizer sang RAM khi VRAM đầy, tránh lỗi hết bộ nhớ ở những đợt đột biến</span></div>
+  </div>
+  <div class="bars">
+    <div class="b bad"><i>full fine-tune</i><u style="width:100%"></u><b>~100 GB</b></div>
+    <div class="b"><i>LoRA</i><u style="width:20%"></u><b>~20 GB</b></div>
+    <div class="b hi"><i>QLoRA</i><u style="width:6%"></u><b>~6 GB</b></div>
+  </div>
+  <p class="stripnote"><span>Bộ nhớ để fine-tune một model 7B.</span><span>Chất lượng cả ba <em>gần bằng nhau</em> — thứ QLoRA trả giá là tốc độ.</span></p>
   <table>
     <tr><th></th><th>Full fine-tune</th><th>LoRA</th><th>QLoRA</th></tr>
     <tr><td>Bộ nhớ cho model 7B</td><td>~100 GB</td><td>~20 GB</td><td><strong>~6 GB</strong></td></tr>
@@ -157,12 +179,14 @@ Ba đóng góp kỹ thuật:
 
 <section id="lora-s5">
   <div class="sh"><b>05</b><h2>Quên kiến thức cũ</h2></div>
-<pre><code>Fine-tune trên dữ liệu miền hẹp → model giỏi việc đó, nhưng:
-    - mất khả năng làm theo chỉ dẫn chung
-    - quên kiến thức không liên quan
-    - mất tính an toàn đã được huấn luyện
-
-Gọi là catastrophic forgetting.</code></pre>
+<p class="key">Fine-tune trên dữ liệu miền hẹp làm model giỏi đúng việc đó, nhưng đánh mất những thứ nó vốn đã biết — gọi là <em>catastrophic forgetting</em>.</p>
+  <div class="strip">
+    <div class="c t"><i>được cái</i><b>giỏi miền hẹp</b><u>thứ mình vừa dạy</u></div>
+    <div class="cut"></div>
+    <div class="c f"><i>mất cái</i><b>làm theo chỉ dẫn</b><u>khả năng chung</u></div>
+    <div class="c f"><i>mất cái</i><b>kiến thức khác</b><u>không liên quan miền hẹp</u></div>
+    <div class="c f"><i>mất cái</i><b>tính an toàn</b><u>đã huấn luyện trước đó</u></div>
+  </div>
   <table>
     <tr><th>Cách giảm</th><th>Cơ chế</th></tr>
     <tr><td><strong>Dùng LoRA</strong></td><td>Trọng số gốc không đổi nên phần lớn năng lực cũ được bảo toàn — và có thể tắt adapter để về model gốc</td></tr>
@@ -195,11 +219,14 @@ Gọi là catastrophic forgetting.</code></pre>
   <details class="qa"><summary>LoRA hoạt động thế nào, vì sao tiết kiệm được nhiều?</summary>
   <p>Nó đóng băng trọng số gốc và học thêm <code>ΔW = B·A</code> với <code>A</code> và <code>B</code> là hai ma trận hạng thấp. Số tham số huấn luyện từ <code>d_in × d_out</code> xuống <code>r × (d_in + d_out)</code> — với <code>d = 4096</code> và <code>r = 16</code> thì từ 16.7 triệu xuống 131 nghìn. Tiết kiệm bộ nhớ chủ yếu không nằm ở trọng số mà ở <b>trạng thái optimizer và gradient</b>, vì chúng chỉ tồn tại cho phần tham số huấn luyện. <code>B</code> khởi tạo bằng 0 để <code>ΔW = 0</code> lúc bắt đầu, nên model khởi đầu giống hệt model gốc. Sau khi huấn luyện có thể gộp <code>B·A</code> vào trọng số gốc nên suy luận không tốn thêm gì.</p></details>
 
-  <details class="qa"><summary>Chọn <code>r</code> và <code>alpha</code> thế nào?</summary>\n  <p>Thứ quyết định độ mạnh là <b>tỉ số <code>alpha / r</code></b>, không phải từng con số riêng lẻ — quy ước phổ biến là đặt <code>alpha = 2r</code> rồi chỉ chỉnh <code>r</code>. Bắt đầu ở <code>r = 8</code> hoặc 16 cho tác vụ đổi giọng văn và định dạng đầu ra; lên 32 tới 64 khi cần học một miền kiến thức mới. Dấu hiệu <code>r</code> quá nhỏ là loss chững lại rất sớm — lúc đó tăng <code>r</code> chứ đừng tăng số epoch, vì thêm epoch chỉ làm nó học thuộc.</p></details>
+  <details class="qa"><summary>Chọn <code>r</code> và <code>alpha</code> thế nào?</summary>
+  <p>Thứ quyết định độ mạnh là <b>tỉ số <code>alpha / r</code></b>, không phải từng con số riêng lẻ — quy ước phổ biến là đặt <code>alpha = 2r</code> rồi chỉ chỉnh <code>r</code>. Bắt đầu ở <code>r = 8</code> hoặc 16 cho tác vụ đổi giọng văn và định dạng đầu ra; lên 32 tới 64 khi cần học một miền kiến thức mới. Dấu hiệu <code>r</code> quá nhỏ là loss chững lại rất sớm — lúc đó tăng <code>r</code> chứ đừng tăng số epoch, vì thêm epoch chỉ làm nó học thuộc.</p></details>
 
-  <details class="qa"><summary>QLoRA nén 4-bit mà sao vẫn huấn luyện được?</summary>\n  <p>Vì phần bị nén là <b>trọng số gốc đã đóng băng</b>, không phải thứ đang học. Trọng số nền giữ ở NF4 chỉ để chạy forward; khi cần tính thì giải nén từng khối về bf16. Còn <b>adapter LoRA vẫn ở độ chính xác đầy đủ</b> — gradient chỉ chảy vào đó. Hai mẹo kèm theo là lượng tử hoá kép để nén luôn các hằng số lượng tử hoá, và paged optimizer để tràn sang RAM thay vì hết VRAM.</p></details>
+  <details class="qa"><summary>QLoRA nén 4-bit mà sao vẫn huấn luyện được?</summary>
+  <p>Vì phần bị nén là <b>trọng số gốc đã đóng băng</b>, không phải thứ đang học. Trọng số nền giữ ở NF4 chỉ để chạy forward; khi cần tính thì giải nén từng khối về bf16. Còn <b>adapter LoRA vẫn ở độ chính xác đầy đủ</b> — gradient chỉ chảy vào đó. Hai mẹo kèm theo là lượng tử hoá kép để nén luôn các hằng số lượng tử hoá, và paged optimizer để tràn sang RAM thay vì hết VRAM.</p></details>
 
-  <details class="qa"><summary>Vì sao LoRA ít quên kiến thức cũ hơn fine-tune đầy đủ?</summary>\n  <p>Vì trọng số gốc <b>không hề bị sửa</b> — toàn bộ thứ học được nằm trong một ma trận hạng thấp cộng thêm bên cạnh. Fine-tune đầy đủ ghi đè trực tiếp lên tham số đang mang kiến thức cũ, nên mất mát là vĩnh viễn. Với LoRA, muốn trả model về nguyên trạng thì chỉ cần tháo adapter ra, và một model nền có thể phục vụ nhiều tác vụ bằng cách đổi adapter lúc chạy.</p></details>
+  <details class="qa"><summary>Vì sao LoRA ít quên kiến thức cũ hơn fine-tune đầy đủ?</summary>
+  <p>Vì trọng số gốc <b>không hề bị sửa</b> — toàn bộ thứ học được nằm trong một ma trận hạng thấp cộng thêm bên cạnh. Fine-tune đầy đủ ghi đè trực tiếp lên tham số đang mang kiến thức cũ, nên mất mát là vĩnh viễn. Với LoRA, muốn trả model về nguyên trạng thì chỉ cần tháo adapter ra, và một model nền có thể phục vụ nhiều tác vụ bằng cách đổi adapter lúc chạy.</p></details>
 </section>
 
 <footer>Deep dive · PEFT — LoRA &amp; QLoRA · phần SFT, RLHF và DPO nằm ở bài <a href="../sft-alignment/index.html">SFT &amp; alignment</a>.</footer>

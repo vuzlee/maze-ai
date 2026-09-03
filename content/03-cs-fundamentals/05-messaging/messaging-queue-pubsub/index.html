@@ -49,7 +49,21 @@
 <section id="messaging-queue-pubsub-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
   <p>Cách đơn giản nhất để service A nhờ service B làm một việc là <strong>gọi trực tiếp, đồng bộ</strong> — ví dụ một HTTP call — rồi chờ B trả kết quả. Cách này có hai vấn đề gắn liền với bối cảnh hệ thống phân tán: nếu B chậm hoặc đang bảo trì, A cũng kẹt theo, vì cả hai buộc phải <strong>cùng sẵn sàng cùng một thời điểm</strong>; và nếu nhiều A cùng gọi dồn dập, B dễ quá tải vì phải xử lý ngay lập tức, không có chỗ nào để "xếp hàng chờ".</p>
-  <p>Một message queue hay broker đứng giữa A và B để <strong>tách rời về thời gian</strong>: A chỉ cần đẩy message vào queue rồi đi tiếp ngay, không quan tâm B có đang sống hay không; B đọc và xử lý theo tốc độ của riêng mình, khi nào rảnh thì đọc. A và B không còn phải cùng online tại cùng một khoảnh khắc — điều không tưởng khi gọi trực tiếp lại trở nên bình thường khi có một hàng đợi đứng giữa.</p>
+  <div class="cmp two">
+    <div>
+      <h5>Gọi trực tiếp — A gọi B rồi chờ</h5>
+      <p><b>Ràng buộc:</b> hai bên phải cùng sống cùng một lúc.</p>
+      <p><b>B chậm:</b> A kẹt theo.</p>
+      <p><b>Dồn dập:</b> B phải xử lý ngay, dễ quá tải.</p>
+    </div>
+    <div>
+      <h5>Qua queue — A đẩy message rồi đi tiếp</h5>
+      <p><b>Ràng buộc:</b> A không cần biết B có đang sống không.</p>
+      <p><b>B chậm:</b> message nằm chờ trong queue.</p>
+      <p><b>Dồn dập:</b> queue giữ hàng, B đọc theo tốc độ của mình.</p>
+    </div>
+  </div>
+  <p>Một message queue hay broker đứng giữa A và B để <strong>tách rời về thời gian</strong>: A và B không còn phải cùng online tại cùng một khoảnh khắc. A và B không còn phải cùng online tại cùng một khoảnh khắc — điều không tưởng khi gọi trực tiếp lại trở nên bình thường khi có một hàng đợi đứng giữa.</p>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Gọi trực tiếp gắn A và B lại theo <strong>thời gian</strong>: chậm một bên, chậm cả hai. Message queue cắt sợi dây đó — cái giá phải trả là A không còn biết ngay kết quả, và hệ thống phải sống chung với độ trễ cùng khả năng message tới trùng hoặc mất, những chủ đề của cả bài này.
@@ -79,12 +93,11 @@
 
 <section id="messaging-queue-pubsub-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Delivery semantics</h2></div>
-  <table>
-    <tr><th>Mức đảm bảo</th><th>Nghĩa</th><th>Đánh đổi</th></tr>
-    <tr><td>At-most-once</td><td>Gửi tối đa một lần, không gửi lại</td><td>Nhanh nhất, nhưng có thể <strong>mất</strong> message nếu lỗi xảy ra trước khi consumer xử lý xong</td></tr>
-    <tr><td><strong>At-least-once</strong></td><td>Gửi lại nếu chưa nhận được ack từ consumer</td><td>Không mất message, nhưng có thể <strong>gửi trùng</strong> nếu ack bị mất trên đường về dù consumer đã xử lý xong — lựa chọn phổ biến nhất trong thực tế</td></tr>
-    <tr><td>Exactly-once</td><td>"Chỉ đúng một lần thật sự"</td><td>Gần như không thể đảm bảo tuyệt đối qua mạng không tin cậy</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s warn"><b>At-most-once — gửi tối đa một lần, không gửi lại</b><span>nhanh nhất, nhưng <b>mất message</b> nếu lỗi xảy ra trước khi consumer xử lý xong</span></div>
+    <div class="s ok"><b>At-least-once — gửi lại nếu chưa nhận được ack</b><span>không mất message, nhưng có thể <b>gửi trùng</b> khi ack rớt trên đường về — lựa chọn phổ biến nhất trong thực tế</span></div>
+    <div class="s warn"><b>Exactly-once — "chỉ đúng một lần thật sự"</b><span>gần như không thể đảm bảo tuyệt đối qua mạng không tin cậy</span></div>
+  </div>
   <div class="note warn">
     <h4>"Exactly-once" các hệ thống thực tế quảng cáo là gì</h4>
     Về lý thuyết, không thể vừa đảm bảo message không mất vừa đảm bảo không trùng khi mạng có thể trễ hoặc rớt gói tuỳ ý — đây là hệ quả cùng bản chất với đánh đổi consistency/availability đã thấy ở <a href="../../04-distributed/cap-theorem-consistency/index.html">CAP &amp; consistency</a>. Cái các broker gọi là "exactly-once" thường là <strong>at-least-once delivery + idempotent processing</strong> ở phía consumer — xử lý trùng vẫn cho kết quả như xử lý một lần — chứ không phải một cơ chế mạng nào đó thần kỳ loại bỏ hẳn việc gửi trùng.
@@ -94,7 +107,15 @@
 <section id="messaging-queue-pubsub-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Idempotency</h2></div>
   <p>Broker (Kafka, RabbitMQ, SQS...) không thể tự tránh xử lý trùng, vì nó không biết ý nghĩa nghiệp vụ của message — nó chỉ đảm bảo được việc <em>gửi</em> (có thể trùng), còn "xử lý trùng có gây hậu quả gì" là bài toán chỉ consumer hiểu. Vì vậy trách nhiệm chống trùng nằm ở consumer, không phải broker.</p>
-  <p>Kỹ thuật phổ biến nhất: consumer lưu lại ID của các message đã xử lý (trong một database hoặc một set), khi gặp message trùng ID thì bỏ qua thay vì xử lý lại. Tinh thần giống hệt idempotency key ở tầng HTTP đã nói tại bài <a href="../../03-networking/tcp-http/index.html">TCP &amp; HTTP</a>, chỉ khác chỗ đứng: ở đó server lưu vết theo khoá client gửi lên để trả lại kết quả cũ khi client tự thử lại; ở đây chính consumer tự lưu vết message đã xử lý, vì broker gửi lại nó mà không hỏi ý kiến consumer.</p>
+  <div class="flow">
+    <div class="n"><h5>Broker gửi message</h5><p>có thể gửi lại cùng một ID</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Consumer tra ID</h5><p>đã có trong sổ đã xử lý chưa?</p></div>
+    <div class="a">→</div>
+    <div class="n no"><h5>Có rồi</h5><p>bỏ qua, không xử lý lại</p></div>
+    <div class="n ok"><h5>Chưa có</h5><p>xử lý, rồi ghi ID vào sổ</p></div>
+  </div>
+  <p>Tinh thần giống idempotency key ở tầng HTTP trong bài <a href="../../03-networking/tcp-http/index.html">TCP &amp; HTTP</a>, chỉ khác chỗ đứng: ở đó server lưu vết theo khoá client gửi lên; ở đây chính consumer tự lưu vết, vì broker gửi lại mà không hỏi ý kiến.</p>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     At-least-once + dedup ở consumer &gt; hy vọng broker tự lo hết. Nếu xử lý một message hai lần gây hậu quả thật (trừ tiền, gửi email), idempotency ở consumer không phải "nice to have" — nó là phần bắt buộc của hệ thống, không phải phần broker cấp sẵn.

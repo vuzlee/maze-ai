@@ -58,8 +58,15 @@ val, err = parse(s)
 <span class="cm"># kiểu exception: không xử lý thì nó tự ồn ào</span>
 val = parse(s)          <span class="cm"># hỏng ở đây là dừng ngay, kèm traceback</span></code></pre>
 
+  <div class="stack">
+    <div class="s ok"><b>main() — có <code>except ValueError</code></b><span>lỗi dừng ở đây, chương trình chạy tiếp</span></div>
+    <div class="s"><b>load_config() — không bắt</b><span>lỗi đi xuyên qua, bay tiếp lên trên</span></div>
+    <div class="s warn"><b>parse() — <code>raise ValueError</code></b><span>chỗ sinh lỗi</span></div>
+  </div>
+  <p class="stripnote"><span>nơi xử lý lỗi</span><span><em>lỗi bay ngược lên tới khối <code>except</code> khớp đầu tiên</em></span><span>nơi sinh lỗi</span></p>
+
   <ul class="why">
-    <li>Exception <b>bay ngược lên</b> qua từng khung hàm cho tới khi gặp <code>except</code> khớp — nên chỗ xử lý lỗi không cần nằm cạnh chỗ sinh lỗi.</li>
+    <li>Chỗ xử lý lỗi <b>không cần nằm cạnh chỗ sinh lỗi</b> — đó là điểm mạnh chính.</li>
     <li>Đổi lại: đường đi của lỗi không hiện trong chữ ký hàm. Muốn biết hàm ném gì thì phải đọc tài liệu hoặc đọc code.</li>
     <li>Trong Python, exception còn dùng cho <b>luồng chạy bình thường</b> — <code>StopIteration</code> kết thúc vòng <code>for</code>, <code>KeyError</code> là cách <code>dict</code> báo thiếu khoá.</li>
   </ul>
@@ -79,13 +86,12 @@ val = parse(s)          <span class="cm"># hỏng ở đây là dừng ngay, kè
 <span class="kw">finally</span>:
     cleanup()                 <span class="cm"># chạy trong MỌI trường hợp</span></code></pre>
 
-  <table>
-    <tr><th>Khối</th><th>Chạy khi</th><th>Vì sao đáng dùng</th></tr>
-    <tr><td><code>try</code></td><td>luôn</td><td>giữ <b>càng ít dòng càng tốt</b> — bọc cả hàm là bắt nhầm lỗi của dòng khác</td></tr>
-    <tr><td><code>except</code></td><td>có lỗi khớp loại</td><td>ghi rõ loại lỗi bạn đã lường trước</td></tr>
-    <tr><td><code>else</code></td><td>không có lỗi nào</td><td>tách phần "chạy tiếp" ra khỏi phần được canh chừng</td></tr>
-    <tr><td><code>finally</code></td><td>mọi trường hợp, kể cả <code>return</code></td><td>đóng tài nguyên — chạy cả khi lỗi đang bay lên tiếp</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b><code>try</code> — chạy luôn</b><span>giữ <b>càng ít dòng càng tốt</b>; bọc cả hàm là bắt nhầm lỗi của dòng khác</span></div>
+    <div class="s"><b><code>except</code> — khi có lỗi khớp loại</b><span>ghi rõ loại lỗi đã lường trước, không bắt bừa</span></div>
+    <div class="s ok"><b><code>else</code> — khi không có lỗi nào</b><span>tách phần "chạy tiếp" ra khỏi phần được canh chừng</span></div>
+    <div class="s ok"><b><code>finally</code> — mọi trường hợp, kể cả <code>return</code></b><span>đóng tài nguyên, chạy cả khi lỗi đang bay lên tiếp</span></div>
+  </div>
 
   <p class="stripnote"><span><code>finally</code> cho tài nguyên là cách viết tay</span><span>có <code>__enter__</code>/<code>__exit__</code> rồi thì <a href="../decorator-context-manager/index.html"><em>context manager</em></a> gọn hơn</span></p>
 </section>
@@ -166,9 +172,13 @@ val = parse(s)          <span class="cm"># hỏng ở đây là dừng ngay, kè
     <div class="card bad"><h4>Dùng exception cho luồng chạy thông thường</h4><p>Bắt <code>KeyError</code> để kiểm tra khoá thì <code>d.get(k)</code> hoặc <code>k in d</code> vừa rõ hơn vừa nhanh hơn.</p></div>
   </div>
 
-  <div class="note warn">
-    <h4>EAFP — nhưng đúng chỗ</h4>
-    Python chuộng <em>easier to ask forgiveness than permission</em>: cứ thử rồi bắt lỗi, thay vì kiểm tra trước. Nó đúng khi trường hợp lỗi <b>hiếm</b> (mở file, gọi mạng) — kiểm tra trước vừa thừa vừa có khe hở giữa lúc kiểm và lúc dùng. Nó sai khi lỗi là chuyện <b>thường xuyên</b>: bắt exception tốn hơn một phép kiểm tra rất nhiều.
+  <div class="cmp two">
+    <div><h5>EAFP — cứ thử rồi bắt lỗi</h5>
+      <p><b>Đúng khi</b> lỗi hiếm: mở file, gọi mạng</p>
+      <p><b>Vì</b> kiểm tra trước vừa thừa, vừa có khe hở giữa lúc kiểm và lúc dùng</p></div>
+    <div><h5>Kiểm tra trước</h5>
+      <p><b>Đúng khi</b> lỗi là chuyện thường xuyên: khoá thiếu trong <code>dict</code></p>
+      <p><b>Vì</b> bắt exception tốn hơn một phép kiểm tra rất nhiều</p></div>
   </div>
 </section>
 

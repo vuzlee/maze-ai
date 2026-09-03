@@ -91,7 +91,11 @@ tok.encode(<span class="st">"Con mèo ngồi"</span>)      <span class="cm"># 8 
 <pre><code>W_emb: (V, d) = (50257, 768)          <span class="cm"># GPT-2 small</span>
 ids:   [1044, 8712, 3390]             <span class="cm"># (T,)</span>
 X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span></code></pre>
-  <p>Không có phép nhân ma trận nào ở đây — chỉ là lấy dòng theo chỉ số. Bảng này thường chiếm phần lớn tham số của model nhỏ: <code>50257 × 768 ≈ 38.6M</code>, trong khi cả 12 block cộng lại khoảng <code>85M</code>.</p>
+<p>Không có phép nhân ma trận nào ở đây — chỉ là lấy dòng theo chỉ số. Bảng này chiếm một phần rất lớn tham số của model nhỏ:</p>
+  <div class="bars">
+    <div class="b hi"><i>W_emb — chỉ một bảng tra</i><u style="width:45%"></u><b>38,6 M</b></div>
+    <div class="b"><i>cả 12 block cộng lại</i><u style="width:100%"></u><b>85 M</b></div>
+  </div>
   <div class="note key">
     <h4>Weight tying</h4>
     Nhiều model dùng lại chính <code>W_emb</code> (chuyển vị) làm ma trận chiếu ra logits. Tiết kiệm được <code>V × d</code> tham số, và có lý do trực giác: cùng một không gian nghĩa dùng cho cả đọc vào lẫn viết ra.
@@ -104,12 +108,11 @@ X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span
 <pre><code><span class="cm"># chứng minh trong đầu: attention(X) với X đảo dòng</span>
 <span class="cm"># = attention(X) rồi đảo dòng kết quả  → permutation equivariant</span></code></pre>
   <h3>Ba cách thêm vị trí</h3>
-  <table>
-    <tr><th>Cách</th><th>Cơ chế</th><th>Điểm mạnh / yếu</th></tr>
-    <tr><td>Sinusoidal<br><span class="cm">Transformer gốc</span></td><td>Cộng vào embedding một vector sin/cos với nhiều tần số khác nhau</td><td>Không tốn tham số, ngoại suy được ra độ dài chưa gặp — nhưng yếu trong thực tế</td></tr>
-    <tr><td>Learned absolute<br><span class="cm">GPT-2, BERT</span></td><td>Một bảng <code>(T_max, d)</code> học được, cộng vào embedding</td><td>Đơn giản, hiệu quả — nhưng cứng độ dài tối đa, vượt là hỏng</td></tr>
-    <tr><td>RoPE<br><span class="cm">LLaMA, Qwen, hầu hết model mới</span></td><td>Xoay từng cặp chiều của Q và K một góc tỉ lệ với vị trí</td><td>Mã hoá <em>khoảng cách tương đối</em> ngay trong tích Q·K, nới context dễ hơn</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>Sinusoidal — Transformer gốc</b><span>cộng vào embedding một vector sin/cos nhiều tần số · không tốn tham số, nhưng yếu trong thực tế</span></div>
+    <div class="s warn"><b>Learned absolute — GPT-2, BERT</b><span>một bảng <code>(T_max, d)</code> học được · đơn giản, nhưng cứng độ dài tối đa, vượt là hỏng</span></div>
+    <div class="s ok"><b>RoPE — LLaMA, Qwen, hầu hết model mới</b><span>xoay từng cặp chiều của Q và K một góc tỉ lệ với vị trí · mã hoá <b>khoảng cách tương đối</b>, nới context dễ hơn</span></div>
+  </div>
   <p><strong>Vì sao RoPE thắng:</strong> khi xoay cả Q ở vị trí <code>m</code> và K ở vị trí <code>n</code>, tích vô hướng chỉ còn phụ thuộc hiệu <code>m − n</code>. Model học được quan hệ "cách nhau 3 từ" thay vì "từ này ở ô số 412", nên chuyển sang câu dài hơn ít gãy hơn.</p>
 </section>
 
@@ -121,14 +124,16 @@ X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span
   <h3>LayerNorm — giữ độ lớn ổn định</h3>
 <pre><code>y = (x - mean(x)) / sqrt(var(x) + eps) * gamma + beta
 <span class="cm"># mean và var tính trên chiều đặc trưng, TỪNG token một</span></code></pre>
-  <table>
-    <tr><th></th><th>BatchNorm</th><th>LayerNorm</th></tr>
-    <tr><td>Chuẩn hoá theo</td><td>Toàn batch, từng đặc trưng</td><td>Từng mẫu, toàn bộ đặc trưng</td></tr>
-    <tr><td>Phụ thuộc batch size</td><td>Có — batch nhỏ thì thống kê nhiễu</td><td>Không</td></tr>
-    <tr><td>Chuỗi dài ngắn khác nhau</td><td>Rắc rối vì có ô đệm</td><td>Không ảnh hưởng</td></tr>
-    <tr><td>Train và inference</td><td>Hai chế độ khác nhau</td><td>Giống hệt nhau</td></tr>
-  </table>
-  <p>Bốn dòng trên là toàn bộ lý do NLP dùng LayerNorm. Trong đó dòng cuối quan trọng nhất khi triển khai: BatchNorm phải giữ thống kê trung bình động, sinh ra khác biệt giữa lúc train và lúc phục vụ.</p>
+<div class="cmp two">
+    <div><h5>BatchNorm</h5>
+      <p>Chuẩn hoá theo <b>toàn batch</b>, từng đặc trưng một.</p>
+      <p>Batch nhỏ thì thống kê nhiễu; chuỗi dài ngắn khác nhau thì rắc rối vì có ô đệm.</p>
+      <p>Train và inference là <b>hai chế độ khác nhau</b> — phải giữ thống kê trung bình động.</p></div>
+    <div><h5>LayerNorm</h5>
+      <p>Chuẩn hoá theo <b>từng token</b>, trên toàn bộ đặc trưng.</p>
+      <p>Không phụ thuộc batch size, không bận tâm độ dài chuỗi.</p>
+      <p>Train và inference <b>giống hệt nhau</b> — lý do quan trọng nhất khi triển khai.</p></div>
+  </div>
   <div class="note key">
     <h4>Pre-LN và Post-LN</h4>
     Bài báo gốc đặt LayerNorm <em>sau</em> khối con: <code>x = LN(x + f(x))</code>. Model hiện nay gần như đều đặt <em>trước</em>: <code>x = x + f(LN(x))</code>. Pre-LN giữ đường residual hoàn toàn sạch nên huấn luyện ổn định hơn, không cần giai đoạn khởi động learning rate quá thận trọng.
@@ -142,12 +147,11 @@ X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span
 W_1: (d, 4d) = (768, 3072)     <span class="cm"># nở ra 4 lần</span>
 W_2: (4d, d) = (3072, 768)     <span class="cm"># nén lại</span></code></pre>
   <p>Áp dụng độc lập cho từng vị trí — token này không nhìn token kia ở đây. Toàn bộ việc trao đổi thông tin giữa các token đã xong ở tầng attention.</p>
-  <p>Đếm nhanh cho một block GPT-2 small:</p>
-  <table>
-    <tr><th>Thành phần</th><th>Tham số</th><th>Tỉ lệ</th></tr>
-    <tr><td>Attention (W_q, W_k, W_v, W_o)</td><td><code>4 × 768² ≈ 2.36M</code></td><td>33%</td></tr>
-    <tr><td>FFN (W_1, W_2)</td><td><code>2 × 768 × 3072 ≈ 4.72M</code></td><td>67%</td></tr>
-  </table>
+<p>Đếm nhanh cho một block GPT-2 small:</p>
+  <div class="bars">
+    <div class="b"><i>Attention — W_q, W_k, W_v, W_o</i><u style="width:33%"></u><b>2,36 M · 33%</b></div>
+    <div class="b hi"><i>FFN — W_1, W_2</i><u style="width:67%"></u><b>4,72 M · 67%</b></div>
+  </div>
   <p>Hai phần ba tham số nằm ở FFN. Nghiên cứu diễn giải model cho rằng đây là nơi lưu <strong>kiến thức dạng sự kiện</strong> — hoạt động gần như một bộ nhớ khoá–giá trị, trong khi attention lo phần định tuyến thông tin.</p>
   <div class="note">
     <h4>Vì sao nở gấp 4</h4>
@@ -204,12 +208,11 @@ logits   = H @ W_out                 <span class="cm"># (3, 50257)</span>
 logits   = logits[-1]                <span class="cm"># chỉ quan tâm vị trí cuối khi sinh chữ</span>
 probs    = softmax(logits / T)       <span class="cm"># T = temperature</span></code></pre>
   <h3>Ba núm điều chỉnh lúc sinh</h3>
-  <table>
-    <tr><th>Núm</th><th>Làm gì</th><th>Đặt sai thì</th></tr>
-    <tr><td><code>temperature</code></td><td>Chia logits trước softmax. Nhỏ hơn 1 làm phân phối nhọn, lớn hơn 1 làm phẳng</td><td>0.1: lặp câu, cụt ý tưởng. 1.8: lạc đề, bịa tên riêng</td></tr>
-    <tr><td><code>top-k</code></td><td>Chỉ giữ k token xác suất cao nhất rồi mới lấy mẫu</td><td>k cố định không hợp mọi ngữ cảnh: chỗ chắc chắn thì thừa, chỗ mơ hồ thì thiếu</td></tr>
-    <tr><td><code>top-p</code></td><td>Giữ nhóm nhỏ nhất có tổng xác suất vượt p</td><td>Kích thước nhóm tự co giãn theo độ chắc chắn, nên thường tốt hơn top-k</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>temperature — chia logits trước softmax</b><span>&lt;1 làm phân phối nhọn, &gt;1 làm phẳng · 0,1 thì lặp câu, 1,8 thì lạc đề và bịa tên riêng</span></div>
+    <div class="s warn"><b>top-k — giữ k token xác suất cao nhất</b><span>k cố định không hợp mọi ngữ cảnh: chỗ chắc chắn thì thừa, chỗ mơ hồ thì thiếu</span></div>
+    <div class="s ok"><b>top-p — giữ nhóm nhỏ nhất có tổng xác suất vượt p</b><span>kích thước nhóm tự co giãn theo độ chắc chắn, nên thường tốt hơn top-k</span></div>
+  </div>
   <div class="note key">
     <h4>Thứ tự áp dụng</h4>
     temperature trước, rồi lọc top-k / top-p, rồi mới lấy mẫu. Đảo thứ tự cho kết quả khác hẳn — temperature cao sau khi đã lọc thì không mở rộng được tập lựa chọn nữa.
@@ -247,13 +250,11 @@ probs    = softmax(logits / T)       <span class="cm"># T = temperature</span></
 
 <section id="tfm-s10">
   <div class="sh"><b>10</b><h2>Encoder, Decoder, hay cả hai</h2></div>
-  <table>
-    <tr><th></th><th>Encoder-only</th><th>Decoder-only</th><th>Encoder–Decoder</th></tr>
-    <tr><td>Đại diện</td><td>BERT</td><td>GPT, LLaMA</td><td>T5, model dịch máy</td></tr>
-    <tr><td>Attention</td><td>Hai chiều, không mask</td><td>Một chiều, causal mask</td><td>Encoder hai chiều, decoder causal, cộng cross-attention</td></tr>
-    <tr><td>Mục tiêu huấn luyện</td><td>Đoán token bị che</td><td>Đoán token kế tiếp</td><td>Sinh chuỗi đích từ chuỗi nguồn</td></tr>
-    <tr><td>Hợp với</td><td>Phân loại, trích xuất, nhúng văn bản</td><td>Sinh văn bản, hội thoại, mọi tác vụ ép về dạng sinh</td><td>Dịch, tóm tắt — khi nguồn và đích tách bạch</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>Encoder-only — BERT</b><span>attention hai chiều, không mask · học bằng cách đoán token bị che · hợp phân loại, trích xuất, nhúng văn bản</span></div>
+    <div class="s ok"><b>Decoder-only — GPT, LLaMA</b><span>attention một chiều với causal mask · học bằng cách đoán token kế tiếp · hợp sinh văn bản, hội thoại, mọi tác vụ ép được về dạng sinh</span></div>
+    <div class="s"><b>Encoder–Decoder — T5, model dịch máy</b><span>encoder hai chiều, decoder causal, cộng thêm cross-attention · hợp dịch và tóm tắt, khi nguồn và đích tách bạch</span></div>
+  </div>
   <p><strong>Cross-attention khác self-attention ở đâu:</strong> Q lấy từ decoder, còn K và V lấy từ đầu ra của encoder. Nghĩa là "câu đang viết" đặt câu hỏi cho "câu nguồn". Công thức không đổi một chữ nào — chỉ đổi nguồn của ba đầu vào.</p>
   <div class="note">
     <h4>Vì sao decoder-only thắng thế</h4>
@@ -287,7 +288,8 @@ probs    = softmax(logits / T)       <span class="cm"># T = temperature</span></
   <details class="qa"><summary>Khi nào chọn encoder-only thay vì decoder-only?</summary>
   <p>Khi cần một biểu diễn của toàn bộ văn bản chứ không cần sinh chữ: phân loại, trích xuất thực thể, tạo vector nhúng cho tìm kiếm. Encoder nhìn được hai chiều nên biểu diễn giàu hơn, model nhỏ hơn nhiều và suy luận rẻ hơn hẳn. Dùng LLM sinh chữ để phân loại nhãn nhị phân là lãng phí cả chi phí lẫn độ trễ.</p></details>
 
-  <details class="qa"><summary>Phần lớn tham số của một Transformer nằm ở đâu?</summary>\n  <p>Ở <b>FFN</b>, không phải attention. Mỗi block có bốn ma trận <code>d×d</code> cho Q/K/V/O, tức <code>4d²</code>; còn FFN mở rộng lên <code>4d</code> rồi thu về, tức <code>8d²</code> — gấp đôi. Cộng thêm embedding <code>V×d</code> vốn rất lớn ở model nhỏ. Điểm đáng nói là chi phí <b>tham số</b> nằm ở FFN, còn chi phí <b>context dài</b> lại nằm ở attention vì nó bậc hai theo độ dài chuỗi.</p></details>
+  <details class="qa"><summary>Phần lớn tham số của một Transformer nằm ở đâu?</summary>
+  <p>Ở <b>FFN</b>, không phải attention. Mỗi block có bốn ma trận <code>d×d</code> cho Q/K/V/O, tức <code>4d²</code>; còn FFN mở rộng lên <code>4d</code> rồi thu về, tức <code>8d²</code> — gấp đôi. Cộng thêm embedding <code>V×d</code> vốn rất lớn ở model nhỏ. Điểm đáng nói là chi phí <b>tham số</b> nằm ở FFN, còn chi phí <b>context dài</b> lại nằm ở attention vì nó bậc hai theo độ dài chuỗi.</p></details>
 </section>
 
 <footer>Deep dive · kiến trúc Transformer · phần cơ chế attention nằm ở bài <a href="../self-attention/index.html">Self-attention</a>.</footer>

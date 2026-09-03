@@ -47,18 +47,12 @@
 </header>
 
 <section id="init-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
-<pre><code>Vấn đề:  độ lớn tín hiệu TRÔI DẠT khi đi qua nhiều lớp
-         → teo dần về 0, hoặc nổ dần ra vô cùng
-         → gradient cũng vậy → mạng không học được
-
-Hai lớp phòng thủ:
-
-    KHỞI TẠO   đặt độ lớn ĐÚNG ngay từ đầu
-               → Xavier, He
-
-    CHUẨN HOÁ  ép độ lớn về đúng SAU MỖI LỚP, suốt quá trình huấn luyện
-               → BatchNorm, LayerNorm, RMSNorm</code></pre>
+  <div class="sh"><b>01</b><h2>Khởi tạo trọng số là gì</h2></div>
+<p class="key">Độ lớn tín hiệu <em>trôi dạt</em> khi đi qua nhiều lớp — teo dần về 0 hoặc nổ ra vô cùng. Gradient trôi theo, và mạng đứng học.</p>
+  <div class="cmp two">
+    <div><h5>Khởi tạo</h5><p>Đặt độ lớn đúng ngay <b>ở bước đầu tiên</b> — Xavier, He.</p></div>
+    <div><h5>Chuẩn hoá</h5><p>Ép độ lớn về đúng <b>sau mỗi lớp, suốt quá trình huấn luyện</b> — BatchNorm, LayerNorm, RMSNorm.</p></div>
+  </div>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Khởi tạo chỉ đúng ở <strong>bước đầu tiên</strong> — sau vài nghìn bước cập nhật, trọng số đã đi rất xa giá trị khởi tạo. Chuẩn hoá là thứ giữ độ lớn tín hiệu ổn định <strong>trong suốt</strong> quá trình. Đó là lý do cần cả hai, không phải chọn một.
@@ -67,41 +61,51 @@ Hai lớp phòng thủ:
 
 <section id="init-s2">
   <div class="sh"><b>02</b><h2>Vấn đề gốc — độ lớn trôi dạt</h2></div>
-<pre><code>Mỗi lớp nhân tín hiệu với một hệ số nào đó. Qua L lớp, hệ số được LUỸ THỪA:
-
-    hệ số 0.8 mỗi lớp  →  qua 30 lớp: 0.8³⁰ ≈ 0.001      tín hiệu TEO
-    hệ số 1.2 mỗi lớp  →  qua 30 lớp: 1.2³⁰ ≈ 237        tín hiệu NỔ
-
-Chỉ cần lệch khỏi 1.0 một chút, qua nhiều lớp thì lệch theo hàm mũ.</code></pre>
-  <table>
-    <tr><th>Khi tín hiệu teo</th><th>Khi tín hiệu nổ</th></tr>
-    <tr><td>Activation ở lớp sâu gần như bằng 0</td><td>Activation rất lớn, sigmoid và tanh bão hoà</td></tr>
-    <tr><td>Gradient về lớp đầu gần như bằng 0 → lớp đầu không học</td><td>Gradient rất lớn → bước cập nhật quá lớn → mất mát thành <code>NaN</code></td></tr>
-    <tr><td>Mất mát giảm rất chậm hoặc đứng im</td><td>Mất mát dao động dữ dội rồi phân kỳ</td></tr>
-  </table>
+<p>Mỗi lớp nhân tín hiệu với một hệ số nào đó. Qua <code>L</code> lớp, hệ số bị <b>luỹ thừa</b>:</p>
+  <div class="bars">
+    <div class="b bad"><i>hệ số 0,8 · qua 30 lớp</i><u style="width:0.5%"></u><b>0,001 — teo</b></div>
+    <div class="b hi"><i>hệ số 1,0 · qua 30 lớp</i><u style="width:4%"></u><b>1,0 — giữ nguyên</b></div>
+    <div class="b bad"><i>hệ số 1,2 · qua 30 lớp</i><u style="width:100%"></u><b>237 — nổ</b></div>
+  </div>
+  <p class="stripnote"><span>Chỉ cần lệch khỏi 1,0 một chút.</span><span>Qua nhiều lớp thì lệch <em>theo hàm mũ</em>.</span></p>
+  <div class="cmp two">
+    <div><h5>Tín hiệu teo</h5>
+      <p>Activation ở lớp sâu gần như bằng 0</p>
+      <p>Gradient về lớp đầu gần như bằng 0 → lớp đầu không học</p>
+      <p>Mất mát giảm rất chậm hoặc đứng im</p></div>
+    <div><h5>Tín hiệu nổ</h5>
+      <p>Activation rất lớn, sigmoid và tanh bão hoà</p>
+      <p>Gradient rất lớn → bước cập nhật quá lớn → mất mát thành <code>NaN</code></p>
+      <p>Mất mát dao động dữ dội rồi phân kỳ</p></div>
+  </div>
   <p>Điểm quan trọng: đây là <strong>cùng một vấn đề</strong> nhìn từ hai phía, và cả hai đều xuất phát từ việc độ lớn không được kiểm soát. Nên hai lời giải — khởi tạo đúng và chuẩn hoá — đều nhằm vào một mục tiêu: giữ hệ số mỗi lớp ở gần 1.</p>
 </section>
 
 <section id="init-s3">
   <div class="sh"><b>03</b><h2>Khởi tạo — dẫn lại công thức</h2></div>
-<pre><code>Một nơ-ron nhận n đầu vào:   z = Σᵢ wᵢxᵢ
-
-Giả sử wᵢ và xᵢ độc lập, trung bình 0:
-
-    Var(z) = Σᵢ Var(wᵢxᵢ) = n · Var(w) · Var(x)
-
-Muốn độ lớn tín hiệu KHÔNG đổi khi qua lớp, tức Var(z) = Var(x):
-
-    n · Var(w) = 1
-    Var(w) = 1/n
-    std(w) = √(1/n)          ← đây là nguồn gốc của căn bậc hai</code></pre>
-  <table>
-    <tr><th>Cách</th><th>Phương sai</th><th>Dùng với</th><th>Lý do</th></tr>
-    <tr><td><strong>Xavier / Glorot</strong></td><td><code>2 / (n_in + n_out)</code></td><td>tanh, sigmoid</td><td>Cân cả lượt forward (cần <code>1/n_in</code>) và lượt backward (cần <code>1/n_out</code>) bằng cách lấy trung bình</td></tr>
-    <tr><td><strong>He / Kaiming</strong></td><td><code>2 / n_in</code></td><td>ReLU và họ ReLU</td><td>ReLU đặt một nửa đầu vào về 0 nên phương sai đầu ra còn một nửa; hệ số 2 bù đúng phần đó</td></tr>
-    <tr><td>Orthogonal</td><td>ma trận trực giao</td><td>RNN</td><td>Giữ chuẩn của vector qua nhiều bước thời gian</td></tr>
-    <tr><td>Truncated normal</td><td>cắt ở 2 độ lệch chuẩn</td><td>Transformer</td><td>Tránh vài trọng số quá lớn do đuôi phân phối</td></tr>
-  </table>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>z</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Σ w<sub>i</sub> x<sub>i</sub></span><em>một nơ-ron nhận n đầu vào</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Var(z)</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>n · Var(w) · Var(x)</span><em>giả sử w và x độc lập, trung bình 0</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Var(z) = Var(x)</span><em>muốn độ lớn không đổi qua lớp</em></span>
+      <span class="op">⇒</span>
+      <span class="t g"><span>std(w) = √(1/n)</span><em>nguồn gốc của căn bậc hai</em></span>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="s ok"><b>Xavier / Glorot — <code>2 / (n_in + n_out)</code></b><span>cho tanh, sigmoid: cân cả lượt forward (cần <code>1/n_in</code>) và backward (cần <code>1/n_out</code>) bằng cách lấy trung bình</span></div>
+    <div class="s ok"><b>He / Kaiming — <code>2 / n_in</code></b><span>cho ReLU: ReLU đặt một nửa đầu vào về 0 nên phương sai đầu ra còn một nửa, hệ số 2 bù đúng phần đó</span></div>
+    <div class="s"><b>Orthogonal — ma trận trực giao</b><span>cho RNN: giữ chuẩn của vector qua nhiều bước thời gian</span></div>
+    <div class="s"><b>Truncated normal — cắt ở 2 độ lệch chuẩn</b><span>cho Transformer: tránh vài trọng số quá lớn do đuôi phân phối</span></div>
+  </div>
   <div class="note key">
     <h4>Cách trả lời gọn</h4>
     "Phương sai của tổng n số hạng độc lập là n lần phương sai mỗi số hạng, nên muốn giữ độ lớn tín hiệu không đổi qua lớp thì cần <code>Var(w) = 1/n</code>. He thêm hệ số 2 để bù phần ReLU cắt bỏ; Xavier lấy trung bình của <code>n_in</code> và <code>n_out</code> để cân cả hai chiều lan truyền." Dẫn được như vậy tốt hơn nhiều so với chỉ nhớ tên công thức.

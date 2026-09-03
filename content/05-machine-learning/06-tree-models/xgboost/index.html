@@ -78,14 +78,33 @@
 
   <p>Ở vòng thứ <code>t</code>, model hiện tại đã dự đoán <code>ŷ</code>, và ta cần biết thêm một lượng <code>f(x)</code> vào thì loss đổi thế nào. Khai triển Taylor tới bậc hai quanh <code>ŷ</code>:</p>
 
-<pre><code>L(ŷ + f) ≈ L(ŷ) + g·f + ½·h·f²
-                   ↑      ↑
-              g = đạo hàm bậc 1   h = đạo hàm bậc 2 (Hessian)
-              "dốc hướng nào"     "dốc cong bao nhiêu"
+  <figure>
+    <svg viewBox="0 0 900 250" role="img" aria-label="Chỉ biết độ dốc thì phải mò từng bước; biết thêm độ cong thì nhảy thẳng tới đáy">
+      <g>
+        <text class="sv-t" x="70" y="26" fill="#8CA9F2">Chỉ có độ dốc — mò từng bước nhỏ</text>
+        <path d="M70 60 C160 200 260 200 400 76" fill="none" stroke="#3D352C" stroke-width="2"></path>
+        <circle cx="110" cy="106" r="5" fill="#8CA9F2"></circle>
+        <line x1="80" y1="86" x2="150" y2="130" stroke="#8CA9F2" stroke-width="2"></line>
+        <circle cx="150" cy="148" r="4" fill="#8CA9F2" opacity=".6"></circle>
+        <circle cx="185" cy="170" r="4" fill="#8CA9F2" opacity=".45"></circle>
+        <circle cx="215" cy="181" r="4" fill="#8CA9F2" opacity=".3"></circle>
+        <text class="sv-l" x="70" y="222">biết dốc hướng nào, không biết đi bao xa</text>
+      </g>
+      <g>
+        <text class="sv-t" x="520" y="26" fill="#5BCFA0">Thêm độ cong — nhảy thẳng tới đáy</text>
+        <path d="M520 60 C610 200 710 200 850 76" fill="none" stroke="#3D352C" stroke-width="2"></path>
+        <path d="M530 74 C620 214 720 214 860 90" fill="none" stroke="#5BCFA0" stroke-width="2" stroke-dasharray="5 4" opacity=".85"></path>
+        <circle cx="560" cy="106" r="5" fill="#5BCFA0"></circle>
+        <path d="M566 110 Q640 150 682 186" fill="none" stroke="#EDB44A" stroke-width="2"></path>
+        <circle cx="688" cy="190" r="6" fill="#EDB44A"></circle>
+        <text class="sv-l" x="700" y="196" fill="#EDB44A">đỉnh parabol — tính bằng công thức</text>
+        <text class="sv-l" x="520" y="222" fill="#5BCFA0">parabol xấp xỉ loss quanh chỗ đang đứng</text>
+      </g>
+    </svg>
+    <figcaption>Khai triển Taylor bậc hai: <code>L(ŷ + f) ≈ L(ŷ) + g·f + ½·h·f²</code> — <code>g</code> là độ dốc, <code>h</code> là độ cong. Bỏ hằng số <code>L(ŷ)</code> thì còn lại đúng một hàm bậc hai theo <code>f</code>.</figcaption>
+  </figure>
 
-L(ŷ) là hằng số ở vòng này → bỏ. Còn lại một hàm bậc hai theo f.</code></pre>
-
-  <p>Đây là chỗ mọi thứ mở ra: một hàm bậc hai có đỉnh, và đỉnh đó tìm bằng công thức chứ không phải mò từng bước. Nên nếu biết mỗi mẫu rơi vào lá nào, ta <b>tính thẳng được giá trị tối ưu của lá đó</b> — không cần lặp, không cần learning rate ở bước này.</p>
+  <p>Đây là chỗ mọi thứ mở ra: hàm bậc hai có đỉnh, và đỉnh tìm bằng công thức chứ không phải mò từng bước. Biết mỗi mẫu rơi vào lá nào là <b>tính thẳng được giá trị tối ưu của lá đó</b>.</p>
 
   <ul class="why">
     <li>Cái giá phải trả: loss buộc phải <b>khả vi hai lần</b>. Hầu hết loss thông dụng — MSE, log loss — đều thoả, nên trong thực tế đây không phải hạn chế đáng kể.</li>
@@ -149,7 +168,19 @@ L(ŷ) là hằng số ở vòng này → bỏ. Còn lại một hàm bậc hai t
     <tr><td><b>Block nén theo cột</b></td><td>Sắp xếp trước mỗi cột và lưu thành khối, dùng lại qua mọi vòng</td><td>Chạy song song theo cột; tận dụng cache</td></tr>
   </table>
 
-  <p>Mẹo thứ hai đáng nhớ nhất trong lúc dùng thật: XGBoost <b>không cần bạn điền giá trị thiếu</b>. Nó coi "thiếu" là một tín hiệu và học xem hướng nào cho gain tốt hơn. Điền bừa bằng trung bình là xoá mất tín hiệu đó — xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</p>
+  <p class="key">Mẹo thứ hai đáng nhớ nhất khi dùng thật: <em>XGBoost không cần bạn điền giá trị thiếu</em>.</p>
+
+  <div class="flow">
+    <div class="n"><h5>Nút đang xét</h5><p>một số mẫu không có giá trị ở cột này</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>Thử cho hết sang trái</h5><p>đo gain</p></div>
+    <div class="n"><h5>Thử cho hết sang phải</h5><p>đo gain</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>Ghi lại hướng thắng</h5><p>đó là hướng mặc định của nút này</p></div>
+  </div>
+  <p class="stripnote"><span>"thiếu" được coi là một tín hiệu</span><span><em>điền bằng trung bình là xoá mất tín hiệu đó</em></span></p>
+
+  <p>Chi tiết đầy đủ về giá trị thiếu ở <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</p>
 </section>
 
 <section id="xgb-s5" class="lesson">

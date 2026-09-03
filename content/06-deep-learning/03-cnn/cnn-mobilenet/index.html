@@ -48,16 +48,15 @@
 
 
 <section id="cnn-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
-<pre><code>Fully connected      mỗi nơ-ron nhìn TOÀN BỘ ảnh      → quá nhiều tham số
-   ↓ chia sẻ trọng số + kết nối cục bộ
-Convolution          bộ lọc nhỏ trượt khắp ảnh         → ít tham số, bắt được cạnh
-   ↓ xếp chồng nhiều lớp
-CNN sâu              receptive field lớn dần           → cạnh → hình → khái niệm
-   ↓ tách phép tính ra hai bước
-Depthwise separable  lọc theo kênh + trộn kênh         → rẻ hơn 8–9 lần
-   ↓ đảo chiều khối residual
-MobileNetV2          nở → lọc → nén, nối ở chỗ HẸP     → tiết kiệm bộ nhớ</code></pre>
+  <div class="sh"><b>01</b><h2>CNN là gì</h2></div>
+  <p class="key">Cả dòng kiến trúc này là một chuỗi <em>giảm số phép nhân mà giữ khả năng biểu diễn</em>.</p>
+  <div class="stack">
+    <div class="s warn"><b>Fully connected</b><span>mỗi nơ-ron nhìn toàn bộ ảnh → quá nhiều tham số</span></div>
+    <div class="s"><b>Convolution</b><span>chia sẻ trọng số + kết nối cục bộ · bộ lọc nhỏ trượt khắp ảnh → ít tham số, bắt được cạnh</span></div>
+    <div class="s"><b>CNN sâu</b><span>xếp chồng nhiều lớp · receptive field lớn dần → cạnh → hình → khái niệm</span></div>
+    <div class="s"><b>Depthwise separable</b><span>tách phép tính hai bước · lọc theo kênh + trộn kênh → rẻ hơn 8–9 lần</span></div>
+    <div class="s ok"><b>MobileNetV2</b><span>đảo chiều khối residual · nở → lọc → nén, nối ở chỗ hẹp → tiết kiệm bộ nhớ</span></div>
+  </div>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Mọi tiến bộ trong nhóm này đều là một dạng <strong>giảm số phép nhân mà giữ được khả năng biểu diễn</strong>. Hiểu được từng bước đánh đổi gì là hiểu cả dòng kiến trúc — và đó chính là thứ được hỏi khi bạn nói mình làm về model chạy trên thiết bị biên.
@@ -66,13 +65,11 @@ MobileNetV2          nở → lọc → nén, nối ở chỗ HẸP     → ti�
 
 <section id="cnn-s2">
   <div class="sh"><b>02</b><h2>Vì sao không dùng fully connected cho ảnh</h2></div>
-<pre><code>Ảnh 224×224×3, lớp fully connected đầu tiên với 1000 nơ-ron:
-
-    224 × 224 × 3 × 1000 = 150.528.000 tham số     ← chỉ MỘT lớp
-
-Một lớp convolution 3×3, 3 kênh vào, 64 kênh ra:
-
-    3 × 3 × 3 × 64 = 1.728 tham số                 ← ít hơn 87.000 lần</code></pre>
+  <div class="bars">
+    <div class="b bad"><i>fully connected · 1000 nơ-ron</i><u style="width:100%"></u><b>224 × 224 × 3 × 1000 = 150.528.000 tham số</b></div>
+    <div class="b hi"><i>convolution 3×3 · 3 → 64 kênh</i><u style="width:0.4%"></u><b>3 × 3 × 3 × 64 = 1.728 tham số</b></div>
+  </div>
+  <p class="stripnote"><span>cùng một ảnh 224×224×3</span><span><em>ít hơn 87.000 lần</em></span></p>
   <p>Convolution đạt được điều đó bằng hai giả định về cấu trúc của ảnh:</p>
   <ul>
     <li><strong>Kết nối cục bộ.</strong> Một pixel liên quan tới các pixel lân cận, không liên quan trực tiếp tới pixel ở góc đối diện. Nên mỗi nơ-ron chỉ cần nhìn một vùng nhỏ.</li>
@@ -86,16 +83,27 @@ Một lớp convolution 3×3, 3 kênh vào, 64 kênh ra:
 
 <section id="cnn-s3">
   <div class="sh"><b>03</b><h2>Convolution và công thức shape</h2></div>
-<pre><code>Đầu vào:   H × W × C_in
-Bộ lọc:    k × k × C_in,  có C_out bộ
-Bước:      s (stride)
-Đệm:       p (padding)
-
-           ⌊ (H + 2p - k) / s ⌋ + 1
-H_out  =  ─────────────────────────
-
-Tham số  =  k · k · C_in · C_out  +  C_out        ← số hạng cuối là bias
-MAC      =  H_out · W_out · k · k · C_in · C_out  ← số phép nhân-cộng</code></pre>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>H<sub>out</sub></span><em>cạnh đầu ra</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>⌊ (H + 2p − k) / s ⌋ + 1</span><em>k kernel · s stride · p padding</em></span>
+    </div>
+    <div class="line">
+      <span class="t p"><span>tham số</span><em>trọng số phải học</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>k · k · C<sub>in</sub> · C<sub>out</sub> + C<sub>out</sub></span><em>số hạng cuối là bias</em></span>
+    </div>
+    <div class="line">
+      <span class="t g"><span>MAC</span><em>phép nhân-cộng</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>H<sub>out</sub> · W<sub>out</sub> · k · k · C<sub>in</sub> · C<sub>out</sub></span><em>nhân thêm số vị trí đầu ra</em></span>
+    </div>
+    <dl>
+      <dt>đầu vào</dt><dd>H × W × C<sub>in</sub></dd>
+      <dt>bộ lọc</dt><dd>k × k × C<sub>in</sub>, có C<sub>out</sub> bộ</dd>
+    </dl>
+  </div>
   <table>
     <tr><th>Tham số</th><th>Tác dụng</th><th>Giá trị thường dùng</th></tr>
     <tr><td><code>k</code></td><td>Vùng mỗi bộ lọc nhìn thấy</td><td>3 — gần như luôn là 3, xem lý do dưới</td></tr>
@@ -130,19 +138,21 @@ MAC      =  H_out · W_out · k · k · C_in · C_out  ← số phép nhân-cộ
 
 <section id="cnn-s5">
   <div class="sh"><b>05</b><h2>Receptive field</h2></div>
-<pre><code>Vùng ảnh gốc ảnh hưởng tới một nơ-ron ở lớp sâu.
-
-Với các lớp 3×3, stride 1, xếp chồng:
-    lớp 1:  3×3
-    lớp 2:  5×5
-    lớp 3:  7×7
-    → RF = 1 + 2L, tăng TUYẾN TÍNH theo số lớp
-
-Thêm một lớp stride 2 vào giữa:
-    mọi lớp phía sau nó có receptive field tăng GẤP ĐÔI mỗi bước
-    → RF tăng theo hàm mũ
-
-Công thức chung:   RF_l = RF_{l-1} + (k_l - 1) · (tích mọi stride TRƯỚC lớp l)</code></pre>
+  <p class="key">Receptive field là <em>vùng ảnh gốc ảnh hưởng tới một nơ-ron ở lớp sâu</em>.</p>
+  <div class="axis">
+    <div class="stop"><b>lớp 1</b><span>3×3</span></div>
+    <div class="stop"><b>lớp 2</b><span>5×5</span></div>
+    <div class="stop"><b>lớp 3</b><span>7×7</span></div>
+    <div class="stop on"><b>+ một lớp stride 2</b><span>mọi lớp sau nó tăng gấp đôi mỗi bước</span></div>
+  </div>
+  <p class="axiscap"><span>các lớp 3×3 stride 1</span><span>RF = 1 + 2L — tăng tuyến tính</span><span>có stride — tăng theo hàm mũ</span></p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>RF<sub>l</sub></span><em>receptive field ở lớp l</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>RF<sub>l−1</sub> + (k<sub>l</sub> − 1) · ∏ s</span><em>tích mọi stride trước lớp l</em></span>
+    </div>
+  </div>
   <div class="note">
     <h4>Vì sao receptive field quan trọng trong thực tế</h4>
     Nếu vật thể cần nhận diện lớn hơn receptive field của lớp cuối, model <strong>không thể</strong> nhìn thấy nó trọn vẹn — nó chỉ thấy từng phần. Đó là lý do các kiến trúc phát hiện vật thể phải kết hợp nhiều tầng độ phân giải (feature pyramid), và là câu trả lời cho "vì sao model của em nhận diện tốt vật nhỏ mà kém với vật lớn".
@@ -159,24 +169,44 @@ Công thức chung:   RF_l = RF_{l-1} + (k_l - 1) · (tích mọi stride TRƯỚ
     <tr><td>Xu hướng hiện nay</td><td>Vẫn dùng nhưng ít hơn</td><td>Chủ yếu ở lớp cuối</td><td><strong>Được ưa dùng</strong></td></tr>
   </table>
   <p><strong>Vì sao stride dần thay thế pooling:</strong> nó gộp hai việc — lọc đặc trưng và giảm kích thước — vào một phép tính, nên rẻ hơn; và cách giảm kích thước trở thành thứ <em>học được</em> thay vì một quy tắc cố định. MobileNet và ResNet đều dùng stride cho phần lớn các bước giảm kích thước.</p>
-<pre><code>Global average pooling — thay cho lớp fully connected ở cuối:
-
-    7 × 7 × 512  →  average trên chiều không gian  →  1 × 1 × 512  →  lớp phân loại
-
-Thay vì  7·7·512·1000 = 25 triệu tham số của một lớp FC,
-chỉ còn  512·1000 = 512 nghìn.
-Và model chấp nhận được ảnh đầu vào ở nhiều kích thước khác nhau.</code></pre>
+  <p class="key">Global average pooling thay hẳn lớp fully connected ở cuối: <em>7 × 7 × 512 → trung bình trên chiều không gian → 1 × 1 × 512 → lớp phân loại</em>.</p>
+  <div class="bars">
+    <div class="b bad"><i>lớp FC cuối</i><u style="width:100%"></u><b>7·7·512·1000 = 25 triệu tham số</b></div>
+    <div class="b hi"><i>global average pooling</i><u style="width:2%"></u><b>512·1000 = 512 nghìn</b></div>
+  </div>
+  <p class="stripnote"><span>và model chấp nhận ảnh đầu vào ở nhiều kích thước khác nhau</span><span><em>ít hơn 49 lần</em></span></p>
 </section>
 
 <section id="cnn-s7">
   <div class="sh"><b>07</b><h2>Convolution 1×1 — nhỏ mà quan trọng</h2></div>
-<pre><code>Bộ lọc 1×1 chỉ nhìn MỘT pixel. Nghe vô nghĩa — nhưng nó nhìn
-tất cả các KÊNH của pixel đó.
+  <p class="key">Bộ lọc 1×1 chỉ nhìn <em>một pixel</em> — nghe vô nghĩa, nhưng nó nhìn <em>tất cả các kênh</em> của pixel đó.</p>
+  <figure>
+    <svg viewBox="0 0 900 190" role="img" aria-label="Convolution 1x1 gộp toàn bộ các kênh của một pixel thành các kênh mới">
+      <g stroke="#8CA9F2" fill="rgba(140,169,242,.14)">
+        <rect x="60" y="40" width="34" height="34" rx="4"/><rect x="72" y="52" width="34" height="34" rx="4"/>
+        <rect x="84" y="64" width="34" height="34" rx="4"/><rect x="96" y="76" width="34" height="34" rx="4"/>
+      </g>
+      <text x="95" y="132" text-anchor="middle" class="sv-t" fill="#8CA9F2">C_in kênh</text>
+      <text x="95" y="152" text-anchor="middle" class="sv-l" fill="#7A6F63">cùng một vị trí</text>
 
-    1 × 1 × C_in × C_out
+      <rect x="360" y="52" width="120" height="46" rx="8" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
+      <text x="420" y="80" text-anchor="middle" class="sv-t" fill="#EDB44A">1 × 1 conv</text>
+      <text x="420" y="120" text-anchor="middle" class="sv-l" fill="#7A6F63">1 · 1 · C_in · C_out trọng số</text>
 
-→ nó là một phép biến đổi tuyến tính trên chiều KÊNH,
-  áp dụng độc lập cho từng vị trí không gian.</code></pre>
+      <g stroke="#5BCFA0" fill="rgba(91,207,160,.16)">
+        <rect x="700" y="46" width="34" height="34" rx="4"/><rect x="712" y="58" width="34" height="34" rx="4"/>
+        <rect x="724" y="70" width="34" height="34" rx="4"/>
+      </g>
+      <text x="735" y="132" text-anchor="middle" class="sv-t" fill="#5BCFA0">C_out kênh</text>
+
+      <g stroke="#3D352C" stroke-width="2" fill="none" marker-end="url(#c11a)">
+        <path d="M150 76 L354 76"/><path d="M486 76 L694 76"/>
+      </g>
+      <defs><marker id="c11a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#3D352C"/></marker></defs>
+      <text x="450" y="180" text-anchor="middle" class="sv-l" fill="#7A6F63">một phép biến đổi tuyến tính trên chiều kênh, áp dụng độc lập cho từng vị trí không gian</text>
+    </svg>
+    <figcaption>Không trộn gì theo không gian, chỉ trộn theo kênh — nên rẻ bằng 1/9 một lớp 3×3 trên cùng số kênh.</figcaption>
+  </figure>
   <table>
     <tr><th>Công dụng</th><th>Cách dùng</th></tr>
     <tr><td><strong>Đổi số kênh</strong></td><td>Nén 256 kênh xuống 64 trước một phép conv 3×3 đắt — đây là ý tưởng bottleneck của ResNet</td></tr>
@@ -188,10 +218,22 @@ tất cả các KÊNH của pixel đó.
 
 <section id="cnn-s8">
   <div class="sh"><b>08</b><h2>Residual connection</h2></div>
-<pre><code>y = x + f(x)
-
-Gradient:  ∂y/∂x = 1 + ∂f/∂x
-                   ↑ số hạng này cho gradient một đường đi thẳng về</code></pre>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>y</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>x</span><em>đường tắt</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span>f(x)</span><em>phần dư phải học</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>∂y/∂x</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>1</span><em>gradient về thẳng, không nhân với gì</em></span>
+      <span class="op">+</span>
+      <span class="t"><span>∂f/∂x</span></span>
+    </div>
+  </div>
   <p>Đã giải thích ở bài <em>Backpropagation từng bước</em>: số hạng <code>1</code> tạo một đường mà gradient chảy qua không bị nhân với gì, nên dù <code>∂f/∂x</code> teo về 0 thì gradient vẫn về được lớp đầu. Đó là điều kiện để huấn luyện mạng sâu hàng trăm lớp.</p>
   <p>Cách nhìn thứ hai, hữu ích khi trả lời phỏng vấn: khối residual chỉ cần học <strong>phần dư</strong> — thay vì học hàm mục tiêu <code>H(x)</code>, nó học <code>H(x) − x</code>. Nếu ánh xạ tối ưu gần với ánh xạ đồng nhất thì việc học phần dư dễ hơn nhiều, vì chỉ cần đẩy trọng số về gần 0. Nói cách khác, <em>thêm lớp không bao giờ làm model tệ hơn</em> — trong trường hợp xấu nhất nó học ra hàm 0 và khối trở thành đường thẳng.</p>
   <div class="note warn">
@@ -203,27 +245,18 @@ Gradient:  ∂y/∂x = 1 + ∂f/∂x
 <section id="cnn-s9">
   <div class="sh"><b>09</b><h2>Depthwise separable convolution</h2></div>
   <p>Ý tưởng: convolution thường làm hai việc cùng lúc — <em>lọc theo không gian</em> và <em>trộn các kênh</em>. Tách hai việc đó ra thì rẻ hơn rất nhiều.</p>
-<pre><code>CONVOLUTION THƯỜNG
-    một phép: k×k×C_in×C_out
-    tham số:  k² · C_in · C_out
-
-DEPTHWISE SEPARABLE — hai bước
-    1. depthwise:  mỗi kênh có MỘT bộ lọc k×k riêng, không trộn kênh
-                   tham số: k² · C_in
-    2. pointwise:  conv 1×1 để trộn kênh
-                   tham số: C_in · C_out
-
-    tổng: k² · C_in  +  C_in · C_out</code></pre>
-<pre><code>TỈ LỆ TIẾT KIỆM
-
-        k² · C_in · C_out                    1
-    ───────────────────────────  =  ─────────────────
-     k² · C_in + C_in · C_out        1/C_out + 1/k²
-
-Với k = 3, C_out = 128:
-    1 / (1/128 + 1/9) = 1 / (0.0078 + 0.1111) = 8.4 lần
-
-Khi C_out lớn, số hạng 1/C_out biến mất → tỉ lệ tiến tới k² = 9.</code></pre>
+  <div class="cmp two">
+    <div><h5>Convolution thường — một phép</h5><p>k×k×C<sub>in</sub>×C<sub>out</sub> làm cả hai việc cùng lúc. Tham số: <b>k² · C<sub>in</sub> · C<sub>out</sub></b></p></div>
+    <div><h5>Depthwise separable — hai bước</h5><p><b>1 · depthwise</b> mỗi kênh một bộ lọc k×k riêng, không trộn kênh — k² · C<sub>in</sub><br><b>2 · pointwise</b> conv 1×1 trộn kênh — C<sub>in</sub> · C<sub>out</sub><br>Tổng: <b>k² · C<sub>in</sub> + C<sub>in</sub> · C<sub>out</sub></b></p></div>
+  </div>
+  <div class="eq">
+    <div class="line">
+      <span class="t g"><span>tỉ lệ tiết kiệm</span><em>thường / separable</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>1 / ( 1/C<sub>out</sub> + 1/k² )</span><em>rút gọn từ hai công thức trên</em></span>
+    </div>
+    <p class="read">Với k = 3, C<sub>out</sub> = 128: 1 / (0,0078 + 0,1111) = <b>8,4 lần</b>. Khi C<sub>out</sub> lớn, số hạng 1/C<sub>out</sub> biến mất nên tỉ lệ tiến tới k² = 9.</p>
+  </div>
   <div class="note key">
     <h4>Con số cần nhớ</h4>
     Với kernel 3×3, depthwise separable rẻ hơn khoảng <strong>8–9 lần</strong> về cả tham số và phép tính, đổi lại độ chính xác giảm khoảng 1 điểm phần trăm. Đây là đánh đổi tốt đến mức MobileNet, EfficientNet và gần như mọi kiến trúc cho thiết bị di động đều dùng nó. Nói được con số <em>và</em> cách dẫn ra nó là câu trả lời hoàn chỉnh.
@@ -236,15 +269,51 @@ Khi C_out lớn, số hạng 1/C_out biến mất → tỉ lệ tiến tới k²
 
 <section id="cnn-s10">
   <div class="sh"><b>10</b><h2>MobileNetV2 — inverted residual và linear bottleneck</h2></div>
-<pre><code>KHỐI RESIDUAL THƯỜNG (ResNet)          KHỐI INVERTED RESIDUAL (MobileNetV2)
-    rộng                                    hẹp
-      ↓ 1×1 NÉN xuống                         ↓ 1×1 NỞ ra (t = 6 lần)
-    hẹp                                     rộng
-      ↓ 3×3                                   ↓ 3×3 depthwise
-    hẹp                                     rộng
-      ↓ 1×1 NỞ lại                            ↓ 1×1 NÉN lại, KHÔNG có ReLU
-    rộng                                    hẹp
-      ↑ nối tắt ở chỗ RỘNG                    ↑ nối tắt ở chỗ HẸP</code></pre>
+  <figure>
+    <svg viewBox="0 0 900 280" role="img" aria-label="So sánh khối residual của ResNet và khối inverted residual của MobileNetV2">
+      <text x="215" y="26" text-anchor="middle" class="sv-t" fill="#EDE7DE">Khối residual thường · ResNet</text>
+      <text x="675" y="26" text-anchor="middle" class="sv-t" fill="#EDE7DE">Inverted residual · MobileNetV2</text>
+
+      <g fill="rgba(140,169,242,.16)" stroke="#8CA9F2">
+        <rect x="115" y="46" width="200" height="30" rx="5"/>
+        <rect x="175" y="106" width="80" height="30" rx="5"/>
+        <rect x="175" y="160" width="80" height="30" rx="5"/>
+        <rect x="115" y="220" width="200" height="30" rx="5"/>
+      </g>
+      <g class="sv-l" fill="#EDE7DE" text-anchor="middle">
+        <text x="215" y="66">rộng</text><text x="215" y="126">hẹp</text><text x="215" y="180">hẹp</text><text x="215" y="240">rộng</text>
+      </g>
+      <g class="sv-l" fill="#7A6F63" text-anchor="middle">
+        <text x="215" y="97">1×1 nén xuống</text>
+        <text x="215" y="152">3×3</text>
+        <text x="215" y="211">1×1 nở lại</text>
+      </g>
+      <path d="M105 61 L60 61 L60 235 L105 235" stroke="#EDB44A" stroke-width="2" fill="none"/>
+      <text x="52" y="152" text-anchor="end" class="sv-l" fill="#EDB44A">nối tắt</text>
+      <text x="52" y="168" text-anchor="end" class="sv-l" fill="#EDB44A">ở chỗ rộng</text>
+
+      <line x1="450" y1="20" x2="450" y2="260" stroke="#2E2822"/>
+
+      <g fill="rgba(91,207,160,.16)" stroke="#5BCFA0">
+        <rect x="635" y="46" width="80" height="30" rx="5"/>
+        <rect x="575" y="106" width="200" height="30" rx="5"/>
+        <rect x="575" y="160" width="200" height="30" rx="5"/>
+        <rect x="635" y="220" width="80" height="30" rx="5"/>
+      </g>
+      <g class="sv-l" fill="#EDE7DE" text-anchor="middle">
+        <text x="675" y="66">hẹp</text><text x="675" y="126">rộng</text><text x="675" y="180">rộng</text><text x="675" y="240">hẹp</text>
+      </g>
+      <g class="sv-l" fill="#7A6F63" text-anchor="middle">
+        <text x="675" y="97">1×1 nở ra · t = 6 lần</text>
+        <text x="675" y="152">3×3 depthwise</text>
+        <text x="675" y="211">1×1 nén lại · không ReLU</text>
+      </g>
+      <path d="M625 61 L540 61 L540 235 L625 235" stroke="#EDB44A" stroke-width="2" fill="none"/>
+      <text x="532" y="152" text-anchor="end" class="sv-l" fill="#EDB44A">nối tắt</text>
+      <text x="532" y="168" text-anchor="end" class="sv-l" fill="#EDB44A">ở chỗ hẹp</text>
+    </svg>
+    <figcaption>ResNet nén ở giữa và nối tắt ở hai đầu rộng; MobileNetV2 làm ngược lại — nên tensor phải giữ cho phép cộng residual là tensor <b>hẹp</b>, nhỏ hơn nhiều.</figcaption>
+  </figure>
   <p><strong>Vì sao gọi là "inverted":</strong> khối của ResNet nén ở giữa và nối tắt ở hai đầu rộng. MobileNetV2 làm ngược lại — nở ở giữa và nối tắt ở hai đầu hẹp.</p>
   <h3>Vì sao đảo lại có lợi</h3>
   <ul>
@@ -252,14 +321,12 @@ Khi C_out lớn, số hạng 1/C_out biến mất → tỉ lệ tiến tới k²
     <li><strong>Depthwise cần nhiều kênh mới hiệu quả.</strong> Nó không trộn kênh nên nếu số kênh ít thì khả năng biểu diễn rất hạn chế. Nở ra trước khi lọc là cách cho nó không gian làm việc.</li>
   </ul>
   <h3>Linear bottleneck — vì sao bỏ ReLU ở lớp cuối</h3>
-<pre><code>ReLU đặt mọi giá trị âm về 0, tức nó LÀM MẤT thông tin.
-
-Ở không gian nhiều chiều, mất một phần không quá tệ — thông tin còn lưu ở các
-chiều khác. Nhưng ở không gian ÍT chiều (chỗ hẹp của bottleneck), mất một nửa
-số chiều là mất luôn phần lớn thông tin, không có chỗ nào bù lại.
-
-→ lớp 1×1 nén cuối khối dùng hàm KHÔNG phi tuyến (linear).
-→ đây chính là "linear bottleneck" trong tên bài báo.</code></pre>
+  <p class="key">ReLU đặt mọi giá trị âm về 0 — tức nó <em>làm mất thông tin</em>, và thiệt hại đó phụ thuộc vào số chiều.</p>
+  <div class="cmp two">
+    <div><h5>Không gian nhiều chiều</h5><p>Mất một phần không quá tệ — thông tin còn lưu ở các chiều khác.</p></div>
+    <div><h5>Không gian ít chiều · chỗ hẹp của bottleneck</h5><p>Mất một nửa số chiều là mất luôn phần lớn thông tin, không có chỗ nào bù lại.</p></div>
+  </div>
+  <p class="stripnote"><span>nên lớp 1×1 nén cuối khối dùng hàm tuyến tính, không ReLU</span><span><em>đây chính là "linear bottleneck" trong tên bài báo</em></span></p>
   <div class="note key">
     <h4>Bốn câu về MobileNet nên trả lời được</h4>
     <p><strong>Vì sao phù hợp thiết bị biên?</strong> Depthwise separable giảm 8–9 lần phép tính; inverted residual giữ tensor trung gian nhỏ nên tiết kiệm bộ nhớ đỉnh.</p>
@@ -271,10 +338,16 @@ số chiều là mất luôn phần lớn thông tin, không có chỗ nào bù 
 
 <section id="cnn-s11">
   <div class="sh"><b>11</b><h2>Lượng tử hoá cho thiết bị biên</h2></div>
-<pre><code>float32 → int8:   dung lượng giảm 4 lần, và số nguyên tính nhanh hơn nhiều
-                   trên CPU di động cùng các bộ tăng tốc
-
-Ánh xạ:  giá_trị_thực ≈ scale × (số_nguyên - zero_point)</code></pre>
+  <p class="key">Lượng tử hoá float32 → int8: <em>dung lượng giảm 4 lần</em>, và số nguyên tính nhanh hơn nhiều trên CPU di động cùng các bộ tăng tốc.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>giá trị thực</span><em>float32 gốc</em></span>
+      <span class="op">≈</span>
+      <span class="t p"><span>scale</span><em>bước lượng tử</em></span>
+      <span class="op">×</span>
+      <span class="t"><span>( số nguyên − zero_point )</span><em>int8 lưu trong model</em></span>
+    </div>
+  </div>
   <table>
     <tr><th>Cách</th><th>Cơ chế</th><th>Mất mát chất lượng</th></tr>
     <tr><td>Post-training, động</td><td>Lượng tử hoá trọng số; activation tính scale lúc chạy</td><td>Nhỏ; không cần dữ liệu</td></tr>
@@ -291,16 +364,25 @@ số chiều là mất luôn phần lớn thông tin, không có chỗ nào bù 
 <section id="cnn-s12">
   <div class="sh"><b>12</b><h2>Tối ưu suy luận trên thiết bị</h2></div>
   <h3>Gộp BatchNorm vào convolution</h3>
-<pre><code>Lúc suy luận, BatchNorm là một phép tuyến tính với tham số CỐ ĐỊNH:
-
-    y = γ · (x - μ) / √(σ² + ε) + β
-
-Gộp được vào trọng số của conv ngay trước nó:
-
-    W' = γ · W / √(σ² + ε)
-    b' = β - γ · μ / √(σ² + ε)
-
-→ bỏ hẳn một lớp, giảm số lần đọc bộ nhớ. Kết quả giống hệt, không mất gì.</code></pre>
+  <p class="key">Lúc suy luận, BatchNorm là một phép tuyến tính với tham số <em>cố định</em> — nên gộp thẳng được vào conv ngay trước nó.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>y</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>γ · (x − μ) / √(σ² + ε) + β</span><em>BatchNorm lúc suy luận</em></span>
+    </div>
+    <div class="line">
+      <span class="t g"><span>W′</span><em>trọng số conv mới</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>γ · W / √(σ² + ε)</span></span>
+    </div>
+    <div class="line">
+      <span class="t g"><span>b′</span><em>bias conv mới</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>β − γ · μ / √(σ² + ε)</span></span>
+    </div>
+    <p class="read">Bỏ hẳn một lớp, giảm số lần đọc bộ nhớ. Kết quả <b>giống hệt</b>, không mất gì.</p>
+  </div>
   <p>Đây là bước tối ưu đầu tiên mọi công cụ triển khai đều làm, và nó miễn phí. Nêu ra được khi được hỏi về tối ưu suy luận là điểm cộng rõ ràng.</p>
   <table>
     <tr><th>Kỹ thuật</th><th>Tác dụng</th><th>Cái giá</th></tr>

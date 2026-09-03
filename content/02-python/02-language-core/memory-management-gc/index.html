@@ -47,7 +47,7 @@
 </header>
 
 <section id="memgc-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
+  <div class="sh"><b>01</b><h2>Python quản lý bộ nhớ thế nào</h2></div>
 
   <p class="key">Python dọn bộ nhớ bằng <em>hai cơ chế chồng lên nhau</em>, không phải một.</p>
 
@@ -77,11 +77,24 @@ sys.getrefcount(a)     <span class="cm"># 3</span>
 sys.getrefcount(a)     <span class="cm"># 2</span></code></pre>
   <p>Cơ chế chính là <strong>đếm tham chiếu</strong>: mỗi object giữ một biến đếm, về 0 thì được giải phóng ngay lập tức. Đây là lý do Python giải phóng bộ nhớ rất kịp thời — và cũng là lý do có GIL, như đã nói ở bài trước.</p>
   <h3>Vấn đề chu trình</h3>
-<pre><code>a = {}; b = {}
-a[<span class="st">"b"</span>] = b
-b[<span class="st">"a"</span>] = a          <span class="cm"># trỏ vòng vào nhau</span>
-<span class="kw">del</span> a, b            <span class="cm"># hai tên biến mất, nhưng mỗi dict vẫn còn 1 tham chiếu</span>
-                    <span class="cm"># → đếm tham chiếu không bao giờ về 0</span></code></pre>
+<figure>
+    <svg viewBox="0 0 700 190" role="img" aria-label="Hai dict trỏ vòng vào nhau">
+      <defs><marker id="gc1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#8CA9F2"/></marker></defs>
+      <rect class="sv-b" x="60" y="60" width="150" height="56" rx="6" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text class="sv-t" x="135" y="84" text-anchor="middle" fill="#EDE7DE">dict A</text>
+      <text class="sv-l" x="135" y="103" text-anchor="middle" fill="#EDB44A">refcount = 1</text>
+      <rect class="sv-b" x="430" y="60" width="150" height="56" rx="6" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text class="sv-t" x="505" y="84" text-anchor="middle" fill="#EDE7DE">dict B</text>
+      <text class="sv-l" x="505" y="103" text-anchor="middle" fill="#EDB44A">refcount = 1</text>
+      <path d="M215 78 L425 78" stroke="#8CA9F2" stroke-width="2" marker-end="url(#gc1)"/>
+      <path d="M425 100 L215 100" stroke="#8CA9F2" stroke-width="2" marker-end="url(#gc1)"/>
+      <text class="sv-l" x="320" y="70" text-anchor="middle" fill="#7A6F63">a["b"] = b</text>
+      <text class="sv-l" x="320" y="122" text-anchor="middle" fill="#7A6F63">b["a"] = a</text>
+      <text class="sv-l" x="60" y="158" fill="#F2718A">del a, b — hai cái tên biến mất, nhưng mỗi dict vẫn còn đúng 1 tham chiếu từ dict kia.</text>
+      <text class="sv-l" x="60" y="176" fill="#F2718A">Bộ đếm không bao giờ về 0 → đếm tham chiếu một mình không dọn được.</text>
+    </svg>
+    <figcaption>Đây là <b>lỗ hổng duy nhất</b> của đếm tham chiếu, và là lý do Python cần thêm bộ thu gom theo thế hệ.</figcaption>
+  </figure>
   <p>Vì vậy Python có thêm một <strong>bộ thu gom theo thế hệ</strong> chạy định kỳ để phát hiện những nhóm object chỉ còn trỏ lẫn nhau. Nó chỉ quét các object kiểu container, chạy theo ba thế hệ với tần suất giảm dần — object sống lâu thì bị quét ít hơn.</p>
   <div class="note">
     <h4>Khi nào chuyện này thành vấn đề thật</h4>
@@ -114,13 +127,12 @@ sys.getsizeof({})           <span class="cm"># khoảng 64 byte</span></code></p
 <section id="memgc-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Rò rỉ bộ nhớ trong Python</h2></div>
   <p>Có bộ thu gom rác không có nghĩa là không rò rỉ. Bốn nguồn thường gặp nhất:</p>
-  <table>
-    <tr><th>Nguồn</th><th>Vì sao</th><th>Cách chữa</th></tr>
-    <tr><td>Cache không giới hạn</td><td><code>lru_cache(maxsize=None)</code> giữ mọi đối số và kết quả mãi mãi</td><td>Đặt <code>maxsize</code>, hoặc dùng TTL cache</td></tr>
-    <tr><td><code>lru_cache</code> trên phương thức</td><td>Cache giữ <code>self</code> nên instance không bao giờ được giải phóng</td><td><code>cached_property</code>, hoặc cache theo instance</td></tr>
-    <tr><td>Biến toàn cục dồn dữ liệu</td><td>List hoặc dict ở cấp module chỉ thêm mà không xoá</td><td>Giới hạn kích thước, hoặc dùng <code>deque(maxlen=n)</code></td></tr>
-    <tr><td>Đăng ký callback / observer</td><td>Object bị giữ bởi danh sách listener sau khi đã hết dùng</td><td>Huỷ đăng ký, hoặc dùng <code>weakref</code></td></tr>
-  </table>
+<div class="stack">
+    <div class="s warn"><b>Cache không giới hạn</b><span><code>lru_cache(maxsize=None)</code> giữ mọi đối số và kết quả mãi mãi → đặt <code>maxsize</code>, hoặc dùng TTL cache</span></div>
+    <div class="s warn"><b><code>lru_cache</code> đặt trên phương thức</b><span>cache giữ luôn <code>self</code> nên instance không bao giờ được giải phóng → dùng <code>cached_property</code></span></div>
+    <div class="s warn"><b>Biến toàn cục dồn dữ liệu</b><span>list/dict ở cấp module chỉ thêm mà không xoá → giới hạn kích thước, hoặc <code>deque(maxlen=n)</code></span></div>
+    <div class="s warn"><b>Đăng ký callback / observer</b><span>object bị giữ trong danh sách listener sau khi đã hết dùng → huỷ đăng ký, hoặc <code>weakref</code></span></div>
+  </div>
 <pre><code><span class="kw">import</span> weakref
 <span class="cm"># weakref: trỏ tới object mà KHÔNG tăng bộ đếm tham chiếu</span>
 r = weakref.ref(obj)

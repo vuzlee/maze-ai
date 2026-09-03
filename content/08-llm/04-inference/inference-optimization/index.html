@@ -48,18 +48,13 @@
 
 
 <section id="inference-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
-<pre><code>Một request đi qua HAI pha có tính chất trái ngược:
-
-PREFILL   xử lý toàn bộ prompt một lượt
-          nhiều token cùng lúc → GIỚI HẠN BỞI PHÉP TÍNH
-          quyết định TTFT (thời gian tới token đầu tiên)
-
-DECODE    sinh từng token một, mỗi lần một token
-          phải đọc TOÀN BỘ trọng số cho mỗi token → GIỚI HẠN BỞI BỘ NHỚ
-          quyết định TPOT (thời gian mỗi token sau đó)
-
-→ Mọi kỹ thuật tối ưu đều nhằm vào MỘT trong hai pha, không phải cả hai.</code></pre>
+  <div class="sh"><b>01</b><h2>Inference optimization là gì</h2></div>
+  <p class="key">Một request đi qua <em>hai pha có tính chất trái ngược</em> — và mọi kỹ thuật tối ưu chỉ nhằm vào một trong hai.</p>
+  <div class="cmp two">
+    <div><h5>Prefill — xử lý cả prompt một lượt</h5><p>Nhiều token cùng lúc → <b>giới hạn bởi phép tính</b>. Quyết định <b>TTFT</b>, thời gian tới token đầu tiên.</p></div>
+    <div><h5>Decode — sinh từng token một</h5><p>Phải đọc toàn bộ trọng số cho mỗi token → <b>giới hạn bởi bộ nhớ</b>. Quyết định <b>TPOT</b>, thời gian mỗi token sau đó.</p></div>
+  </div>
+  <p class="stripnote"><span>prefill thiếu sức tính · decode thiếu băng thông</span><span><em>một tối ưu chỉ giúp được một pha</em></span></p>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Prefill thiếu <strong>sức tính</strong>; decode thiếu <strong>băng thông bộ nhớ</strong>. Biết một tối ưu tác động vào pha nào là biết nó có giúp được bài toán của bạn hay không — và đó là điều phân biệt câu trả lời có hệ thống với việc kể tên công cụ.
@@ -68,23 +63,21 @@ DECODE    sinh từng token một, mỗi lần một token
 
 <section id="inference-s2">
   <div class="sh"><b>02</b><h2>Prefill và decode — vì sao khác nhau về bản chất</h2></div>
-<pre><code>PREFILL: prompt 2000 token, xử lý cùng lúc
-    mỗi trọng số được đọc MỘT lần và dùng cho 2000 token
-    → tỉ lệ phép tính / byte đọc RẤT CAO
-    → GPU chạy hết công suất tính toán
-
-DECODE: sinh token thứ 2001
-    mỗi trọng số được đọc MỘT lần và dùng cho ĐÚNG MỘT token
-    → tỉ lệ phép tính / byte đọc RẤT THẤP
-    → GPU đứng chờ bộ nhớ, phần lớn năng lực tính toán bỏ không</code></pre>
-<pre><code>Ước lượng thô cho model 7B ở fp16 (14 GB trọng số):
-
-Băng thông một GPU tầm trung ≈ 900 GB/s
-Thời gian đọc hết trọng số một lần ≈ 14 / 900 ≈ 15 ms
-→ với batch = 1, tốc độ sinh tối đa ≈ 65 token/giây
-
-Con số này KHÔNG phụ thuộc vào việc GPU mạnh bao nhiêu về FLOPs
-— nó bị chặn bởi băng thông.</code></pre>
+  <div class="bars">
+    <div class="b hi"><i>prefill · prompt 2000 token</i><u style="width:100%"></u><b>mỗi trọng số đọc 1 lần, dùng cho 2000 token — GPU chạy hết công suất</b></div>
+    <div class="b bad"><i>decode · sinh token thứ 2001</i><u style="width:0.05%"></u><b>mỗi trọng số đọc 1 lần, dùng cho đúng 1 token — GPU đứng chờ bộ nhớ</b></div>
+  </div>
+  <p class="stripnote"><span>tỉ lệ phép tính trên mỗi byte đọc</span><span><em>chênh nhau đúng bằng số token trong prompt</em></span></p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>15 ms</span><em>đọc hết trọng số một lần</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>14 GB</span><em>trọng số model 7B ở fp16</em></span>
+      <span class="op">/</span>
+      <span class="t p"><span>900 GB/s</span><em>băng thông GPU tầm trung</em></span>
+    </div>
+    <p class="read">Với batch = 1, tốc độ sinh tối đa ≈ <b>65 token/giây</b> — và con số này <b>không</b> phụ thuộc GPU mạnh bao nhiêu về FLOPs.</p>
+  </div>
   <div class="note key">
     <h4>Hệ quả quan trọng nhất của việc decode bị chặn bởi bộ nhớ</h4>
     Với batch = 1, GPU đọc hết trọng số chỉ để sinh <em>một</em> token. Với batch = 32, nó đọc <strong>cùng một lượng trọng số</strong> nhưng sinh ra 32 token. Nghĩa là <strong>thông lượng tăng gần 32 lần mà độ trễ mỗi request gần như không đổi</strong> — cho tới khi chạm giới hạn tính toán. Đây là lý do batching là tối ưu có lãi nhất, và là nền của mọi hệ thống phục vụ LLM.
@@ -93,24 +86,25 @@ Con số này KHÔNG phụ thuộc vào việc GPU mạnh bao nhiêu về FLOPs
 
 <section id="inference-s3">
   <div class="sh"><b>03</b><h2>KV cache</h2></div>
-<pre><code>Không có cache: sinh token thứ n phải tính lại K và V cho cả n-1 token trước
-→ chi phí O(n²) cho cả câu, lặp lại công việc đã làm
-
-Có cache: lưu K và V của mọi token đã xử lý
-→ token mới chỉ tính K, V của CHÍNH NÓ rồi attend vào cache
-→ chi phí O(n) cho cả câu
-
-Cái giá: BỘ NHỚ. Và nó là ràng buộc chính của hệ thống phục vụ LLM.</code></pre>
-<pre><code>Công thức:
-
-    bytes = 2 × L × n_kv_heads × head_dim × seq_len × batch × bytes_mỗi_số
-            ↑ hệ số 2 cho K và V
-
-Ví dụ model 8B kiểu Llama-3 (L = 32, n_kv_heads = 8, head_dim = 128, fp16):
-
-    mỗi token: 2 × 32 × 8 × 128 × 2 byte = 131.072 byte = 128 KB
-    context 8.000 token, batch 1:  ~1 GB
-    context 8.000 token, batch 32: ~32 GB     ← lớn hơn cả trọng số model</code></pre>
+  <div class="cmp two">
+    <div><h5>Không có cache</h5><p>Sinh token thứ n phải tính lại K và V cho cả n−1 token trước → chi phí <b>O(n²)</b> cho cả câu, lặp lại việc đã làm.</p></div>
+    <div><h5>Có cache</h5><p>Lưu K, V của mọi token đã xử lý; token mới chỉ tính K, V của chính nó rồi attend vào cache → chi phí <b>O(n)</b>.</p></div>
+  </div>
+  <p class="stripnote"><span>cái giá là bộ nhớ</span><span><em>và nó là ràng buộc chính của hệ thống phục vụ LLM</em></span></p>
+  <div class="eq">
+    <div class="line">
+      <span class="t g"><span>bytes</span><em>KV cache</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span>2 · L · n<sub>kv</sub> · d<sub>head</sub></span><em>hệ số 2 cho K và V</em></span>
+      <span class="op">×</span>
+      <span class="t p"><span>seq_len · batch · bytes/số</span><em>phần tăng không giới hạn</em></span>
+    </div>
+    <p class="read">Model 8B kiểu Llama-3 (L = 32, n<sub>kv</sub> = 8, d<sub>head</sub> = 128, fp16): mỗi token tốn 2 × 32 × 8 × 128 × 2 = <b>128 KB</b>.</p>
+  </div>
+  <div class="bars">
+    <div class="b"><i>context 8.000 · batch 1</i><u style="width:3%"></u><b>~1 GB</b></div>
+    <div class="b bad"><i>context 8.000 · batch 32</i><u style="width:100%"></u><b>~32 GB — lớn hơn cả trọng số model</b></div>
+  </div>
   <div class="note warn">
     <h4>KV cache thường là thứ hết trước, không phải trọng số</h4>
     Trọng số là <strong>hằng số</strong> — nạp một lần, dùng cho mọi request. KV cache <strong>tỉ lệ với batch × độ dài context</strong>, nên nó là phần tăng không giới hạn. Trên một GPU 80GB phục vụ model 8B, trọng số chỉ chiếm 16GB còn 64GB còn lại là hạn mức cho KV cache — và chính con số đó quyết định bạn phục vụ được bao nhiêu request đồng thời.
@@ -147,17 +141,43 @@ Ví dụ model 8B kiểu Llama-3 (L = 32, n_kv_heads = 8, head_dim = 128, fp16):
 
 <section id="inference-s5">
   <div class="sh"><b>05</b><h2>GQA và MQA — giảm KV cache từ kiến trúc</h2></div>
-<pre><code>MHA — Multi-Head Attention (Transformer gốc)
-    mỗi head Q có K, V riêng → n_kv = n_q = 32
-    KV cache lớn nhất, chất lượng chuẩn tham chiếu
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="MHA, GQA và MQA khác nhau ở số cặp K V mà các head Q chia sẻ">
+      <g class="sv-t" fill="#EDE7DE" text-anchor="middle">
+        <text x="150" y="26">MHA</text><text x="450" y="26">GQA</text><text x="750" y="26">MQA</text>
+      </g>
+      <g class="sv-l" fill="#7A6F63" text-anchor="middle">
+        <text x="150" y="44">mỗi head Q một cặp K,V</text>
+        <text x="450" y="44">4 head Q dùng chung một cặp</text>
+        <text x="750" y="44">mọi head Q dùng chung một cặp</text>
+      </g>
+      <g fill="rgba(140,169,242,.2)" stroke="#8CA9F2">
+        <rect x="60" y="62" width="26" height="22" rx="3"/><rect x="98" y="62" width="26" height="22" rx="3"/><rect x="136" y="62" width="26" height="22" rx="3"/><rect x="174" y="62" width="26" height="22" rx="3"/><rect x="212" y="62" width="26" height="22" rx="3"/>
+        <rect x="360" y="62" width="26" height="22" rx="3"/><rect x="398" y="62" width="26" height="22" rx="3"/><rect x="436" y="62" width="26" height="22" rx="3"/><rect x="474" y="62" width="26" height="22" rx="3"/><rect x="512" y="62" width="26" height="22" rx="3"/>
+        <rect x="660" y="62" width="26" height="22" rx="3"/><rect x="698" y="62" width="26" height="22" rx="3"/><rect x="736" y="62" width="26" height="22" rx="3"/><rect x="774" y="62" width="26" height="22" rx="3"/><rect x="812" y="62" width="26" height="22" rx="3"/>
+      </g>
+      <g class="sv-l" fill="#8CA9F2"><text x="20" y="79">Q</text><text x="320" y="79">Q</text><text x="620" y="79">Q</text></g>
 
-GQA — Grouped-Query Attention
-    nhiều head Q CHIA SẺ một cặp K, V → n_kv = 8 (4 head Q dùng chung)
-    KV cache giảm 4 lần, chất lượng gần như không đổi
+      <g fill="rgba(237,180,74,.2)" stroke="#EDB44A">
+        <rect x="60" y="130" width="26" height="22" rx="3"/><rect x="98" y="130" width="26" height="22" rx="3"/><rect x="136" y="130" width="26" height="22" rx="3"/><rect x="174" y="130" width="26" height="22" rx="3"/><rect x="212" y="130" width="26" height="22" rx="3"/>
+        <rect x="398" y="130" width="26" height="22" rx="3"/><rect x="474" y="130" width="26" height="22" rx="3"/>
+        <rect x="736" y="130" width="26" height="22" rx="3"/>
+      </g>
+      <g class="sv-l" fill="#EDB44A"><text x="12" y="147">K,V</text><text x="312" y="147">K,V</text><text x="612" y="147">K,V</text></g>
 
-MQA — Multi-Query Attention
-    MỌI head Q chia sẻ MỘT cặp K, V → n_kv = 1
-    KV cache giảm 32 lần, nhưng chất lượng tụt rõ hơn</code></pre>
+      <g stroke="#3D352C" stroke-width="1.4">
+        <path d="M73 88 L73 126"/><path d="M111 88 L111 126"/><path d="M149 88 L149 126"/><path d="M187 88 L187 126"/><path d="M225 88 L225 126"/>
+        <path d="M373 88 L405 126"/><path d="M411 88 L411 126"/><path d="M449 88 L417 126"/><path d="M487 88 L487 126"/><path d="M525 88 L493 126"/>
+        <path d="M673 88 L744 126"/><path d="M711 88 L748 126"/><path d="M749 88 L749 126"/><path d="M787 88 L754 126"/><path d="M825 88 L758 126"/>
+      </g>
+      <g class="sv-t" text-anchor="middle">
+        <text x="150" y="184" fill="#F2718A">KV cache 1×</text>
+        <text x="450" y="184" fill="#5BCFA0">1/4 · chất lượng gần như không đổi</text>
+        <text x="750" y="184" fill="#EDB44A">1/32 · chất lượng tụt rõ hơn</text>
+      </g>
+    </svg>
+    <figcaption>Số cặp K,V quyết định KV cache; số head Q không đổi nên chất lượng attention giảm rất ít khi chỉ gộp K,V.</figcaption>
+  </figure>
   <table>
     <tr><th></th><th>MHA</th><th>GQA</th><th>MQA</th></tr>
     <tr><td>KV cache tương đối</td><td>1×</td><td><strong>1/4</strong></td><td>1/32</td></tr>
@@ -172,22 +192,34 @@ MQA — Multi-Query Attention
 
 <section id="inference-s6">
   <div class="sh"><b>06</b><h2>Batching — static và continuous</h2></div>
-<pre><code>STATIC BATCHING (cách ngây thơ)
-    gom 8 request thành một batch, chạy tới khi TẤT CẢ xong
+  <figure>
+    <svg viewBox="0 0 900 250" role="img" aria-label="Static batching để lộ nhiều khe trống, continuous batching lấp đầy ngay">
+      <text x="20" y="24" class="sv-t" fill="#F2718A">Static batching — chạy tới khi tất cả xong</text>
+      <g class="sv-l" fill="#7A6F63"><text x="20" y="52">A</text><text x="20" y="76">B</text><text x="20" y="100">C</text><text x="20" y="124">D</text></g>
+      <g fill="#8CA9F2">
+        <rect x="50" y="40" width="140" height="14" rx="3"/>
+        <rect x="50" y="64" width="700" height="14" rx="3"/>
+        <rect x="50" y="88" width="230" height="14" rx="3"/>
+        <rect x="50" y="112" width="100" height="14" rx="3"/>
+      </g>
+      <g fill="rgba(242,113,138,.18)" stroke="#F2718A" stroke-dasharray="3 3">
+        <rect x="190" y="40" width="560" height="14" rx="3"/>
+        <rect x="280" y="88" width="470" height="14" rx="3"/>
+        <rect x="150" y="112" width="600" height="14" rx="3"/>
+      </g>
+      <text x="470" y="146" text-anchor="middle" class="sv-l" fill="#F2718A">khe đã xong nhưng vẫn bị giữ — GPU chạy mà phần lớn khe không tải</text>
 
-    req A: ████                      xong sớm nhưng phải CHỜ
-    req B: ████████████████████      dài nhất, quyết định thời gian cả batch
-    req C: ██████                    chờ
-    req D: ███                        chờ
-           └── GPU chạy nhưng phần lớn khe đang xử lý request đã xong ──┘
-
-CONTINUOUS BATCHING (cách đúng)
-    lập lịch ở cấp TỪNG BƯỚC decode, không phải cấp request
-
-    req A: ████ → xong, RỜI batch ngay
-    req E:     ████████ → gia nhập vào chỗ A vừa trống
-    req B: ████████████████████
-    → GPU luôn kín chỗ</code></pre>
+      <line x1="20" y1="160" x2="880" y2="160" stroke="#2E2822"/>
+      <text x="20" y="184" class="sv-t" fill="#5BCFA0">Continuous batching — lập lịch ở cấp từng bước decode</text>
+      <g class="sv-l" fill="#7A6F63"><text x="20" y="212">A→E</text><text x="20" y="236">B</text></g>
+      <rect x="50" y="200" width="140" height="14" rx="3" fill="#8CA9F2"/>
+      <rect x="194" y="200" width="300" height="14" rx="3" fill="#5BCFA0"/>
+      <rect x="498" y="200" width="252" height="14" rx="3" fill="#5BCFA0"/>
+      <rect x="50" y="224" width="700" height="14" rx="3" fill="#8CA9F2"/>
+      <text x="470" y="184" class="sv-l" fill="#5BCFA0" text-anchor="middle">A xong là rời batch ngay, E gia nhập vào chỗ vừa trống</text>
+    </svg>
+    <figcaption>Độ dài phản hồi lệch rất mạnh trong thực tế — có request 10 token, có request 2.000 — nên khoảng trống ở hình trên là phần lớn công suất GPU.</figcaption>
+  </figure>
   <p><strong>Vì sao chênh lệch lớn:</strong> độ dài phản hồi trong thực tế lệch rất mạnh — có request sinh 10 token, có request sinh 2000. Với static batching, cả batch bị giữ bởi request dài nhất, nên phần lớn khe trong batch chạy không tải. Continuous batching cho thông lượng cao hơn nhiều lần trên cùng phần cứng, và đây là đóng góp chính của các máy phục vụ như vLLM và TGI.</p>
   <div class="note warn">
     <h4>Đánh đổi giữa thông lượng và độ trễ</h4>
@@ -197,19 +229,17 @@ CONTINUOUS BATCHING (cách đúng)
 
 <section id="inference-s7">
   <div class="sh"><b>07</b><h2>PagedAttention</h2></div>
-<pre><code>VẤN ĐỀ: không biết trước request sẽ sinh bao nhiêu token,
-nên phải cấp phát cache theo độ dài TỐI ĐA có thể.
-
-    request thực tế dùng 200 token, đã cấp phát cho 4096
-    → phân mảnh, phần lớn bộ nhớ đã cấp phát bị bỏ không
-
-GIẢI PHÁP: quản lý KV cache theo KHỐI cố định, như phân trang của hệ điều hành
-
-    cache logic:  [khối 0][khối 1][khối 2]...
-    cache vật lý: rải rác khắp VRAM, có bảng ánh xạ
-
-    → cấp phát theo nhu cầu thực, gần như không phân mảnh
-    → và các request có PREFIX GIỐNG NHAU dùng chung khối</code></pre>
+  <p class="key">Không biết trước request sẽ sinh bao nhiêu token, nên cách ngây thơ phải <em>cấp phát cache theo độ dài tối đa</em> — và phần lớn chỗ đó bỏ không.</p>
+  <div class="strip">
+    <div class="c on"><i>dùng thật</i><b>200 token</b><u>phần có dữ liệu</u></div>
+    <div class="c dim"><i>đã cấp phát</i><b>4.096 token</b><u>bỏ không</u></div>
+  </div>
+  <p class="stripnote"><span>cấp phát liền khối theo độ dài tối đa</span><span><em>phân mảnh, phần lớn VRAM đã cấp bị lãng phí</em></span></p>
+  <div class="stack">
+    <div class="s"><b>Cache logic</b><span>[khối 0][khối 1][khối 2]… — liên tục theo cách nhìn của request</span></div>
+    <div class="s"><b>Cache vật lý</b><span>các khối rải rác khắp VRAM, nối lại bằng một bảng ánh xạ — như phân trang của hệ điều hành</span></div>
+    <div class="s ok"><b>Kết quả</b><span>cấp phát theo nhu cầu thực, gần như không phân mảnh · và các request có <b>prefix giống nhau</b> dùng chung khối</span></div>
+  </div>
   <p>Lợi ích thứ hai — <strong>chia sẻ prefix</strong> — quan trọng hơn vẻ ngoài. Trong thực tế, hàng nghìn request thường dùng chung một system prompt dài. Với PagedAttention, phần KV cache của prefix đó được lưu <em>một lần</em> và mọi request trỏ vào cùng các khối, thay vì mỗi request giữ một bản riêng.</p>
   <div class="note">
     <h4>Cách nói gọn</h4>
@@ -234,15 +264,13 @@ GIẢI PHÁP: quản lý KV cache theo KHỐI cố định, như phân trang c�
 
 <section id="inference-s9">
   <div class="sh"><b>09</b><h2>Speculative decoding</h2></div>
-<pre><code>Ý tưởng: dùng một model NHỎ đề xuất trước nhiều token,
-rồi model LỚN kiểm tra tất cả trong MỘT lượt forward.
-
-    1. model nháp (nhỏ, nhanh) sinh k = 4 token đề xuất
-    2. model chính chạy MỘT lượt forward trên cả 4 token đó
-    3. so sánh: chấp nhận các token khớp, loại từ chỗ lệch đầu tiên
-    4. lặp lại
-
-Nếu chấp nhận được 3 trong 4 token → sinh 3 token với chi phí gần bằng 1.</code></pre>
+  <p class="key">Dùng một model <em>nhỏ</em> đề xuất trước nhiều token, rồi model lớn kiểm tra tất cả trong <em>một</em> lượt forward.</p>
+  <div class="stack">
+    <div class="s"><b>1 · Model nháp đề xuất</b><span>model nhỏ, nhanh, sinh k = 4 token</span></div>
+    <div class="s"><b>2 · Model chính kiểm tra</b><span>một lượt forward duy nhất trên cả 4 token đó</span></div>
+    <div class="s"><b>3 · Chấp nhận tới chỗ lệch đầu tiên</b><span>token khớp thì giữ, từ chỗ lệch trở đi thì bỏ</span></div>
+    <div class="s ok"><b>4 · Lặp lại</b><span>chấp nhận 3 trong 4 → sinh 3 token với chi phí gần bằng 1</span></div>
+  </div>
   <div class="note key">
     <h4>Vì sao việc này khả thi và không làm đổi kết quả</h4>
     <p><strong>Khả thi</strong> vì decode bị chặn bởi bộ nhớ: kiểm tra 4 token trong một lượt forward tốn gần bằng sinh 1 token, do trọng số vẫn chỉ được đọc một lần. Phần năng lực tính toán vốn bỏ không giờ được dùng.</p>
@@ -253,14 +281,12 @@ Nếu chấp nhận được 3 trong 4 token → sinh 3 token với chi phí g�
 
 <section id="inference-s10">
   <div class="sh"><b>10</b><h2>Cache prompt</h2></div>
-<pre><code>Nhiều request dùng chung phần đầu prompt:
-
-    [system prompt 2000 token]  ← GIỐNG NHAU ở mọi request
-    [tài liệu RAG 3000 token]   ← giống nhau trong một phiên
-    [câu hỏi 50 token]          ← khác nhau
-
-Không cache: prefill lại 5050 token mỗi lần
-Có cache:    tái dùng KV của 5000 token đầu, chỉ prefill 50 token mới</code></pre>
+  <div class="strip">
+    <div class="c t"><i>system prompt</i><b>2.000 token</b><u>giống nhau ở mọi request</u></div>
+    <div class="c t"><i>tài liệu RAG</i><b>3.000 token</b><u>giống nhau trong một phiên</u></div>
+    <div class="c on"><i>câu hỏi</i><b>50 token</b><u>khác nhau</u></div>
+  </div>
+  <p class="stripnote"><span>không cache: prefill lại 5.050 token mỗi lần</span><span><em>có cache: chỉ prefill 50 token mới</em></span></p>
   <table>
     <tr><th>Lợi ích</th><th>Mức độ</th></tr>
     <tr><td>Giảm TTFT</td><td>Rất đáng kể khi phần prefix chiếm phần lớn prompt</td></tr>

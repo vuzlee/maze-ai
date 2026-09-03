@@ -48,7 +48,7 @@
 
 
 <section id="sqlwindow-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
+  <div class="sh"><b>01</b><h2>Window function là gì</h2></div>
 <pre><code>SELECT
   name, dept, salary,
   AVG(salary) OVER (PARTITION BY dept)  AS avg_dept,
@@ -64,23 +64,48 @@ FROM employees;
 
 <section id="sqlwindow-s2">
   <div class="sh"><b>02</b><h2>Khác GROUP BY ở đâu</h2></div>
-<pre><code><span class="cm">-- GROUP BY: 3 phòng ban → 3 dòng, mất chi tiết từng người</span>
-SELECT dept, AVG(salary) FROM employees GROUP BY dept;
+<p class="key">Cùng một dữ liệu, cùng một phép trung bình — khác nhau ở chỗ <em>còn lại bao nhiêu dòng</em>.</p>
+  <figure>
+    <svg viewBox="0 0 900 260" role="img" aria-label="GROUP BY gộp nhiều dòng thành một, window function giữ nguyên số dòng và thêm cột">
+      <text x="30" y="26" class="sv-l" fill="#7A6F63">3 DÒNG GỐC</text>
+      <g class="sv-b" stroke="#3D352C">
+        <rect x="30" y="40" width="200" height="34" rx="5"/>
+        <rect x="30" y="80" width="200" height="34" rx="5"/>
+        <rect x="30" y="120" width="200" height="34" rx="5"/>
+      </g>
+      <text x="44" y="62" class="sv-t">An · eng · 6000</text>
+      <text x="44" y="102" class="sv-t">Bình · eng · 4000</text>
+      <text x="44" y="142" class="sv-t">Chi · sales · 4500</text>
 
-  dept   avg
-  ────   ────
-  eng    5000
-  sales  4000
+      <g stroke="#3D352C" stroke-width="2" fill="none" marker-end="url(#wf1)">
+        <path d="M240 60 L330 60"/><path d="M240 100 L330 60"/>
+        <path d="M240 140 L330 190"/>
+        <path d="M240 60 L620 60"/><path d="M240 100 L620 100"/><path d="M240 140 L620 140"/>
+      </g>
+      <defs><marker id="wf1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#3D352C"/></marker></defs>
 
-<span class="cm">-- WINDOW: 10 người → 10 dòng, mỗi dòng biết cả mức trung bình phòng mình</span>
-SELECT name, dept, salary, AVG(salary) OVER (PARTITION BY dept) AS avg_dept
-FROM employees;
+      <text x="340" y="30" class="sv-l" fill="#F2718A">GROUP BY dept</text>
+      <g stroke="#F2718A" fill="rgba(242,113,138,.12)">
+        <rect x="340" y="42" width="180" height="34" rx="5"/>
+        <rect x="340" y="172" width="180" height="34" rx="5"/>
+      </g>
+      <text x="354" y="64" class="sv-t">eng · 5000</text>
+      <text x="354" y="194" class="sv-t">sales · 4500</text>
+      <text x="430" y="232" text-anchor="middle" class="sv-l" fill="#7A6F63">còn 2 dòng · mất tên từng người</text>
 
-  name   dept   salary   avg_dept
-  ────   ────   ──────   ────────
-  An     eng     6000      5000
-  Bình   eng     4000      5000
-  Chi    sales   4500      4000</code></pre>
+      <text x="630" y="30" class="sv-l" fill="#5BCFA0">AVG(...) OVER (PARTITION BY dept)</text>
+      <g stroke="#5BCFA0" fill="rgba(91,207,160,.12)">
+        <rect x="630" y="42" width="240" height="34" rx="5"/>
+        <rect x="630" y="82" width="240" height="34" rx="5"/>
+        <rect x="630" y="122" width="240" height="34" rx="5"/>
+      </g>
+      <text x="644" y="64" class="sv-t">An · 6000 · <tspan fill="#5BCFA0">5000</tspan></text>
+      <text x="644" y="104" class="sv-t">Bình · 4000 · <tspan fill="#5BCFA0">5000</tspan></text>
+      <text x="644" y="144" class="sv-t">Chi · 4500 · <tspan fill="#5BCFA0">4500</tspan></text>
+      <text x="750" y="232" text-anchor="middle" class="sv-l" fill="#7A6F63">vẫn 3 dòng · thêm một cột biết mức của nhóm</text>
+    </svg>
+    <figcaption>Cột <code>avg_dept</code> lặp lại cho mọi người cùng phòng — đó chính là dấu hiệu "không gộp".</figcaption>
+  </figure>
   <p>Chính vì giữ nguyên dòng, window function giải được lớp bài mà <code>GROUP BY</code> không giải nổi trong một truy vấn:</p>
   <ul>
     <li><strong>So dòng với nhóm</strong> — ai lương cao hơn trung bình phòng mình.</li>
@@ -94,17 +119,11 @@ FROM employees;
 
 <section id="sqlwindow-s3">
   <div class="sh"><b>03</b><h2>Cấu trúc OVER</h2></div>
-<pre><code>hàm(...) OVER (
-    PARTITION BY cột      <span class="cm">-- chia thành các nhóm độc lập; bỏ đi = cả bảng là một nhóm</span>
-    ORDER BY   cột        <span class="cm">-- sắp thứ tự TRONG nhóm; quyết định "trước" và "sau"</span>
-    ROWS/RANGE ...        <span class="cm">-- khung: lấy bao nhiêu dòng quanh dòng hiện tại</span>
-)</code></pre>
-  <table>
-    <tr><th>Thành phần</th><th>Vai trò</th><th>Bỏ đi thì sao</th></tr>
-    <tr><td><code>PARTITION BY</code></td><td>Reset phép tính ở mỗi nhóm</td><td>Toàn bảng là một nhóm duy nhất</td></tr>
-    <tr><td><code>ORDER BY</code></td><td>Định nghĩa thứ tự — bắt buộc với hàm xếp hạng, <code>LAG</code>, <code>LEAD</code></td><td>Với hàm gộp: khung mặc định là <strong>cả nhóm</strong>, không luỹ tiến</td></tr>
-    <tr><td>Frame</td><td>Giới hạn cửa sổ quanh dòng hiện tại</td><td>Mặc định phụ thuộc có <code>ORDER BY</code> hay không — xem mục 09</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>PARTITION BY cột</b><span>chia thành các nhóm độc lập · bỏ đi = cả bảng là một nhóm</span></div>
+    <div class="s"><b>ORDER BY cột</b><span>sắp thứ tự trong nhóm · quyết định thế nào là "trước" và "sau"</span></div>
+    <div class="s"><b>ROWS / RANGE …</b><span>khung: lấy bao nhiêu dòng quanh dòng hiện tại</span></div>
+  </div>
 <pre><code><span class="cm">-- dùng nhiều lần cùng một định nghĩa? đặt tên bằng WINDOW</span>
 SELECT name,
        RANK()      OVER w,
@@ -115,23 +134,13 @@ WINDOW w AS (PARTITION BY dept ORDER BY salary DESC);</code></pre>
 
 <section id="sqlwindow-s4">
   <div class="sh"><b>04</b><h2>Thứ tự thực thi logic — vì sao WHERE không dùng được</h2></div>
-<pre><code>FROM / JOIN
-   ↓
-WHERE                    ← window function CHƯA tồn tại ở đây
-   ↓
-GROUP BY
-   ↓
-HAVING
-   ↓
-WINDOW FUNCTIONS         ← tính ở đây
-   ↓
-SELECT
-   ↓
-DISTINCT
-   ↓
-ORDER BY
-   ↓
-LIMIT</code></pre>
+<div class="stack">
+    <div class="s"><b>FROM / JOIN</b><span>lấy dữ liệu về</span></div>
+    <div class="s warn"><b>WHERE</b><span>window function chưa tồn tại ở đây — nên không lọc theo nó được</span></div>
+    <div class="s"><b>GROUP BY → HAVING</b><span>gộp và lọc theo nhóm</span></div>
+    <div class="s ok"><b>WINDOW FUNCTIONS</b><span>tính ở đây, sau khi đã lọc xong</span></div>
+    <div class="s"><b>SELECT → DISTINCT → ORDER BY → LIMIT</b><span>chọn cột, sắp, cắt</span></div>
+  </div>
 <pre><code><span class="cm">-- SAI: không tồn tại rn ở thời điểm WHERE được đánh giá</span>
 SELECT name, ROW_NUMBER() OVER (ORDER BY salary DESC) AS rn
 FROM employees
@@ -191,13 +200,12 @@ WHERE rn &lt;= <span class="st">3</span>;</code></pre>
     <tr><td>5000</td><td>3</td><td>2</td><td>2</td></tr>
     <tr><td>4000</td><td>4</td><td><strong>4</strong> — nhảy 3</td><td><strong>3</strong> — không nhảy</td></tr>
   </table>
-  <table>
-    <tr><th>Cần gì</th><th>Dùng</th></tr>
-    <tr><td>Đánh số duy nhất, không quan tâm hoà</td><td><code>ROW_NUMBER</code> — dùng để khử trùng lặp, phân trang</td></tr>
-    <tr><td>Xếp hạng kiểu thi đấu — hoà thì cùng hạng, hạng sau bị nhảy</td><td><code>RANK</code></td></tr>
-    <tr><td>Xếp hạng liên tục — "mức lương cao thứ ba" bất kể bao nhiêu người hoà</td><td><code>DENSE_RANK</code></td></tr>
-    <tr><td>Chia thành k nhóm đều nhau</td><td><code>NTILE(k)</code> — phân vị, chia khách theo mức chi tiêu</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b><code>ROW_NUMBER</code></b><span>đánh số duy nhất, không quan tâm hoà — khử trùng lặp, phân trang</span></div>
+    <div class="s"><b><code>RANK</code></b><span>kiểu thi đấu: hoà thì cùng hạng, hạng sau bị nhảy</span></div>
+    <div class="s ok"><b><code>DENSE_RANK</code></b><span>xếp hạng liên tục — "mức lương cao thứ ba" bất kể bao nhiêu người hoà</span></div>
+    <div class="s"><b><code>NTILE(k)</code></b><span>chia thành k nhóm đều nhau — phân vị, chia khách theo mức chi tiêu</span></div>
+  </div>
   <div class="note warn">
     <h4><code>ROW_NUMBER</code> khi có hoà là <em>không xác định</em></h4>
     Với hai dòng bằng nhau ở mọi cột trong <code>ORDER BY</code>, thứ tự đánh số phụ thuộc plan thực thi và có thể đổi giữa hai lần chạy. Nếu cần kết quả ổn định — ví dụ để phân trang — hãy thêm một cột phá hoà vào <code>ORDER BY</code>, thường là khoá chính.
@@ -216,12 +224,11 @@ SELECT * FROM (
 WHERE rn &lt;= <span class="st">3</span>
 ORDER BY dept, rn;</code></pre>
   <p>Chọn hàm nào tuỳ vào cách xử lý hoà — và nói rõ lựa chọn này ra là điểm cộng:</p>
-  <table>
-    <tr><th>Yêu cầu</th><th>Hàm</th><th>Kết quả khi có hoà ở vị trí 3</th></tr>
-    <tr><td>Đúng 3 dòng mỗi phòng</td><td><code>ROW_NUMBER</code></td><td>Chỉ lấy 3, người hoà bị bỏ tuỳ ý</td></tr>
-    <tr><td>Mọi người thuộc top 3 mức lương</td><td><code>DENSE_RANK</code></td><td>Có thể ra 4–5 dòng</td></tr>
-    <tr><td>Kiểu thi đấu</td><td><code>RANK</code></td><td>Giống dense nhưng hạng bị nhảy</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>Đúng 3 dòng mỗi phòng → <code>ROW_NUMBER</code></b><span>chỉ lấy 3, người hoà bị bỏ tuỳ ý</span></div>
+    <div class="s ok"><b>Mọi người thuộc top 3 mức lương → <code>DENSE_RANK</code></b><span>có thể ra 4–5 dòng</span></div>
+    <div class="s"><b>Kiểu thi đấu → <code>RANK</code></b><span>giống dense nhưng hạng bị nhảy</span></div>
+  </div>
   <h3>So với hai cách cũ</h3>
 <pre><code><span class="cm">-- truy vấn con tương quan: chạy một lần cho MỖI dòng → chậm</span>
 SELECT * FROM employees e
@@ -265,11 +272,16 @@ LAG(revenue, <span class="st">1</span>, <span class="st">0</span>)              
 
 <section id="sqlwindow-s9">
   <div class="sh"><b>09</b><h2>Frame — ROWS và RANGE</h2></div>
-<pre><code>ROWS  BETWEEN ... AND ...     <span class="cm">-- đếm theo SỐ DÒNG vật lý</span>
-RANGE BETWEEN ... AND ...     <span class="cm">-- gộp các dòng có GIÁ TRỊ ORDER BY bằng nhau</span>
-
-các mốc: UNBOUNDED PRECEDING · n PRECEDING · CURRENT ROW
-         n FOLLOWING · UNBOUNDED FOLLOWING</code></pre>
+<p class="key"><code>ROWS</code> đếm theo <em>số dòng vật lý</em>. <code>RANGE</code> gộp cả các dòng có <em>giá trị ORDER BY bằng nhau</em>.</p>
+  <div class="strip">
+    <div class="c dim"><i>t1</i><b>10</b></div>
+    <div class="c t"><i>t2</i><b>20</b><u>2 PRECEDING</u></div>
+    <div class="c t"><i>t3</i><b>30</b><u>1 PRECEDING</u></div>
+    <div class="c on"><i>t4</i><b>40</b><u>CURRENT ROW</u></div>
+    <div class="c dim"><i>t5</i><b>50</b><u>1 FOLLOWING</u></div>
+    <div class="c dim"><i>t6</i><b>60</b></div>
+  </div>
+  <p class="stripnote"><span>UNBOUNDED PRECEDING = từ đầu nhóm</span><span><em>ROWS BETWEEN 2 PRECEDING AND CURRENT ROW</em></span><span>UNBOUNDED FOLLOWING = tới cuối nhóm</span></p>
   <table>
     <tr><th>Mục đích</th><th>Frame</th></tr>
     <tr><td>Tổng luỹ tiến</td><td><code>ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code></td></tr>
@@ -278,11 +290,12 @@ các mốc: UNBOUNDED PRECEDING · n PRECEDING · CURRENT ROW
     <tr><td>Toàn nhóm</td><td><code>ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING</code></td></tr>
   </table>
   <h3>Khung mặc định — nguồn của nhiều nhầm lẫn</h3>
-  <table>
-    <tr><th>Viết thế nào</th><th>Khung thực tế</th></tr>
-    <tr><td><code>SUM(x) OVER (PARTITION BY d)</code></td><td>Cả nhóm — cho ra tổng nhóm</td></tr>
-    <tr><td><code>SUM(x) OVER (PARTITION BY d ORDER BY t)</code></td><td><code>RANGE UNBOUNDED PRECEDING AND CURRENT ROW</code> — <strong>tổng luỹ tiến</strong></td></tr>
-  </table>
+  <div class="cmp two">
+    <div><h5>Không có <code>ORDER BY</code></h5>
+      <p><code>SUM(x) OVER (PARTITION BY d)</code> → khung là <b>cả nhóm</b>, cho ra tổng nhóm, mọi dòng cùng một số.</p></div>
+    <div><h5>Thêm <code>ORDER BY</code></h5>
+      <p><code>SUM(x) OVER (PARTITION BY d ORDER BY t)</code> → khung tự đổi thành <code>UNBOUNDED PRECEDING … CURRENT ROW</code>, cho ra <b>tổng luỹ tiến</b>.</p></div>
+  </div>
   <p>Chỉ cần thêm <code>ORDER BY</code> là <code>SUM</code> đổi từ "tổng nhóm" sang "tổng luỹ tiến" — mà không có từ khoá nào báo hiệu điều đó. Đây là chi tiết hay bị hỏi vặn.</p>
   <div class="note warn">
     <h4><code>ROWS</code> hay <code>RANGE</code> khi có giá trị trùng</h4>
@@ -337,16 +350,16 @@ FROM employees GROUP BY dept;</code></pre>
 <section id="sqlwindow-s12">
   <div class="sh"><b>12</b><h2>Hiệu năng</h2></div>
   <p>Window function cần dữ liệu <strong>đã được sắp xếp</strong> theo <code>PARTITION BY</code> rồi <code>ORDER BY</code>. Nên trong <code>EXPLAIN</code> thường thấy một nút <code>Sort</code> ngay dưới nút <code>WindowAgg</code>.</p>
-<pre><code>WindowAgg  (cost=... rows=10000)
-  -&gt;  Sort  (cost=... )                    ← đây là phần đắt
-        Sort Key: dept, salary DESC</code></pre>
-  <table>
-    <tr><th>Kỹ thuật</th><th>Hiệu quả</th></tr>
-    <tr><td>Index trên <code>(partition_col, order_col)</code></td><td>Planner có thể đọc theo index và <strong>bỏ hẳn bước Sort</strong></td></tr>
-    <tr><td>Dùng lại cùng một định nghĩa <code>OVER</code></td><td>Nhiều hàm chia sẻ một nút <code>WindowAgg</code>, chỉ sắp xếp một lần</td></tr>
-    <tr><td>Lọc bằng <code>WHERE</code> trước</td><td>Giảm số dòng phải sắp — nhưng nhớ nó đổi phạm vi tính toán</td></tr>
-    <tr><td>Nhiều định nghĩa <code>OVER</code> khác nhau</td><td>Mỗi định nghĩa cần một lần sắp xếp riêng — tránh nếu được</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>WindowAgg</b><span>tính các hàm window trên dữ liệu đã sắp</span></div>
+    <div class="s warn"><b>Sort · Sort Key: dept, salary DESC</b><span>đây là phần đắt — và là thứ index đúng thứ tự có thể bỏ hẳn</span></div>
+  </div>
+  <div class="stack">
+    <div class="s ok"><b>Index trên <code>(partition_col, order_col)</code></b><span>planner đọc theo index và <b>bỏ hẳn bước Sort</b></span></div>
+    <div class="s ok"><b>Dùng lại cùng một định nghĩa <code>OVER</code></b><span>nhiều hàm chia sẻ một nút <code>WindowAgg</code>, chỉ sắp xếp một lần</span></div>
+    <div class="s"><b>Lọc bằng <code>WHERE</code> trước</b><span>giảm số dòng phải sắp — nhưng nhớ nó đổi phạm vi tính toán</span></div>
+    <div class="s warn"><b>Nhiều định nghĩa <code>OVER</code> khác nhau</b><span>mỗi định nghĩa cần một lần sắp xếp riêng — tránh nếu được</span></div>
+  </div>
   <div class="note key">
     <h4>Một câu đáng nói khi được hỏi về tối ưu</h4>
     "Window function bắt buộc sắp xếp theo partition rồi order, nên nếu có index đúng thứ tự đó thì planner đọc theo index và bỏ được nút Sort. Và tôi cố dùng lại cùng một định nghĩa <code>OVER</code> cho nhiều hàm để chỉ sắp xếp một lần."

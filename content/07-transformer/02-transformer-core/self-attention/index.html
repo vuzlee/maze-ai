@@ -47,32 +47,15 @@
 </header>
 
 <section id="attn-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
+  <div class="sh"><b>01</b><h2>Self-attention là gì</h2></div>
   <p>Một model GPT chỉ làm đúng một việc: nhận một chuỗi token, trả về phân phối xác suất cho token kế tiếp. Mọi thứ bên dưới là chi tiết của việc đó.</p>
-<pre><code>"Con mèo ngồi"
-   │  tokenization                      list[int]        (T,)
-   ▼
-[1044, 8712, 3390]
-   │  embedding lookup                  (T, d)
-   ▼
-X                                       (3, 768)
-   │  + positional information
-   ▼
-X                                       (3, 768)
-   │
-   ├──────── block 1 ─────────┐
-   │   x = x + attn(ln1(x))   │         (3, 768)
-   │   x = x + ffn(ln2(x))    │         (3, 768)
-   └──────────────────────────┘
-   │  × N block (GPT-2 small: N = 12)
-   ▼
-H                                       (3, 768)
-   │  final LayerNorm + W_out           (768, 50257)
-   ▼
-logits                                  (3, 50257)
-   │  lấy dòng cuối, softmax
-   ▼
-p(token kế tiếp)                        (50257,)</code></pre>
+<div class="stack">
+    <div class="s"><b>"Con mèo ngồi" → [1044, 8712, 3390]</b><span>tokenization — chuỗi chữ thành danh sách số, (T,)</span></div>
+    <div class="s"><b>X — (3, 768)</b><span>embedding lookup, cộng thêm thông tin vị trí</span></div>
+    <div class="s ok"><b>× 12 block: x = x + attn(ln1(x)) rồi x = x + ffn(ln2(x))</b><span>hình dạng không đổi qua mọi block — vẫn (3, 768)</span></div>
+    <div class="s"><b>logits — (3, 50257)</b><span>LayerNorm cuối rồi nhân W_out</span></div>
+    <div class="s"><b>p(token kế tiếp) — (50257,)</b><span>lấy dòng cuối, softmax</span></div>
+  </div>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Attention <strong>trộn thông tin giữa các token</strong>. FFN <strong>xử lý từng token riêng lẻ</strong>. Cả model chỉ là hai việc đó lặp lại N lần, cộng với đường tắt residual để gradient chảy được.
@@ -120,10 +103,25 @@ V = x @ W_v      <span class="cm"># (3, 64)</span></code></pre>
 <section id="attn-s4">
   <div class="sh"><b>04</b><h2>Scaled dot-product attention</h2></div>
   <p>Toàn bộ công thức nằm trong bốn dòng:</p>
-<pre><code>scores  = Q @ K.T / sqrt(d_k)     <span class="cm"># (T, T)  — độ hợp nhau giữa mọi cặp</span>
-scores  = scores + mask           <span class="cm"># (T, T)  — che tương lai, xem mục 10</span>
-weights = softmax(scores, dim=-1) <span class="cm"># (T, T)  — mỗi DÒNG cộng lại bằng 1</span>
-out     = weights @ V             <span class="cm"># (T, d_v) — tổng có trọng số của V</span></code></pre>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>scores</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Q · K<sup>T</sup> / √d<sub>k</sub></span><em>(T, T) — độ hợp nhau giữa mọi cặp</em></span>
+      <span class="op">+</span>
+      <span class="t r"><span>mask</span><em>che tương lai, xem mục 07</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>weights</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>softmax(scores)</span><em>theo dòng — mỗi dòng cộng lại bằng 1</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>out</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>weights · V</span><em>(T, d_v) — tổng có trọng số của V</em></span>
+    </div>
+  </div>
   <h3>Đọc từng bước bằng lời</h3>
   <ol>
     <li><code>Q @ K.T</code> — với mỗi token i, tính tích vô hướng giữa query của nó và key của mọi token j. Tích lớn nghĩa là "cái tôi cần" khớp với "cái anh có".</li>
@@ -216,13 +214,78 @@ out     = weights @ V             <span class="cm"># (T, d_v) — tổng có tr�
   <div class="sh"><b>07</b><h2>Masking — hai loại, đừng nhầm</h2></div>
   <h3>Causal mask (che tương lai)</h3>
   <p>Khi huấn luyện, ta đưa cả câu vào cùng lúc và bắt model đoán token kế tiếp ở <em>mọi</em> vị trí song song. Nếu token 3 nhìn thấy token 4, nó chỉ việc chép đáp án. Mask tam giác trên bằng <code>-inf</code> chặn điều đó.</p>
-<pre><code>mask = torch.tril(torch.ones(T, T))     <span class="cm"># tam giác dưới toàn 1</span>
-
-scores trước softmax:            sau khi mask:
-[ 2.1  0.4  1.3  0.8 ]           [ 2.1  -inf -inf -inf ]
-[ 0.9  1.7  0.2  1.1 ]           [ 0.9   1.7 -inf -inf ]
-[ 1.4  0.3  2.2  0.6 ]           [ 1.4   0.3  2.2 -inf ]
-[ 0.7  1.2  0.5  1.9 ]           [ 0.7   1.2  0.5  1.9 ]</code></pre>
+<figure>
+    <svg viewBox="0 0 1000 260" role="img" aria-label="Ma trận điểm số trước và sau khi che tam giác trên bằng âm vô cùng">
+      <text x="40" y="32" class="sv-l" fill="#7A6F63">SCORES TRƯỚC SOFTMAX</text>
+      <text x="520" y="32" class="sv-l" fill="#7A6F63">SAU KHI CỘNG CAUSAL MASK</text>
+      <rect x="40" y="50" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="79" y="75" class="sv-t" fill="#EDE7DE" text-anchor="middle">2.1</text>
+      <rect x="124" y="50" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="163" y="75" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.4</text>
+      <rect x="208" y="50" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="247" y="75" class="sv-t" fill="#EDE7DE" text-anchor="middle">1.3</text>
+      <rect x="292" y="50" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="331" y="75" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.8</text>
+      <rect x="40" y="96" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="79" y="121" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.9</text>
+      <rect x="124" y="96" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="163" y="121" class="sv-t" fill="#EDE7DE" text-anchor="middle">1.7</text>
+      <rect x="208" y="96" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="247" y="121" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.2</text>
+      <rect x="292" y="96" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="331" y="121" class="sv-t" fill="#EDE7DE" text-anchor="middle">1.1</text>
+      <rect x="40" y="142" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="79" y="167" class="sv-t" fill="#EDE7DE" text-anchor="middle">1.4</text>
+      <rect x="124" y="142" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="163" y="167" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.3</text>
+      <rect x="208" y="142" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="247" y="167" class="sv-t" fill="#EDE7DE" text-anchor="middle">2.2</text>
+      <rect x="292" y="142" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="331" y="167" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.6</text>
+      <rect x="40" y="188" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="79" y="213" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.7</text>
+      <rect x="124" y="188" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="163" y="213" class="sv-t" fill="#EDE7DE" text-anchor="middle">1.2</text>
+      <rect x="208" y="188" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="247" y="213" class="sv-t" fill="#EDE7DE" text-anchor="middle">0.5</text>
+      <rect x="292" y="188" width="78" height="40" rx="4" fill="#241F1A" stroke="#3D352C"/>
+      <text x="331" y="213" class="sv-t" fill="#EDE7DE" text-anchor="middle">1.9</text>
+      <rect x="520" y="50" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="559" y="75" class="sv-t" fill="#8CA9F2" text-anchor="middle">2.1</text>
+      <rect x="604" y="50" width="78" height="40" rx="4" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
+      <text x="643" y="75" class="sv-t" fill="#F2718A" text-anchor="middle">-inf</text>
+      <rect x="688" y="50" width="78" height="40" rx="4" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
+      <text x="727" y="75" class="sv-t" fill="#F2718A" text-anchor="middle">-inf</text>
+      <rect x="772" y="50" width="78" height="40" rx="4" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
+      <text x="811" y="75" class="sv-t" fill="#F2718A" text-anchor="middle">-inf</text>
+      <rect x="520" y="96" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="559" y="121" class="sv-t" fill="#8CA9F2" text-anchor="middle">0.9</text>
+      <rect x="604" y="96" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="643" y="121" class="sv-t" fill="#8CA9F2" text-anchor="middle">1.7</text>
+      <rect x="688" y="96" width="78" height="40" rx="4" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
+      <text x="727" y="121" class="sv-t" fill="#F2718A" text-anchor="middle">-inf</text>
+      <rect x="772" y="96" width="78" height="40" rx="4" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
+      <text x="811" y="121" class="sv-t" fill="#F2718A" text-anchor="middle">-inf</text>
+      <rect x="520" y="142" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="559" y="167" class="sv-t" fill="#8CA9F2" text-anchor="middle">1.4</text>
+      <rect x="604" y="142" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="643" y="167" class="sv-t" fill="#8CA9F2" text-anchor="middle">0.3</text>
+      <rect x="688" y="142" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="727" y="167" class="sv-t" fill="#8CA9F2" text-anchor="middle">2.2</text>
+      <rect x="772" y="142" width="78" height="40" rx="4" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
+      <text x="811" y="167" class="sv-t" fill="#F2718A" text-anchor="middle">-inf</text>
+      <rect x="520" y="188" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="559" y="213" class="sv-t" fill="#8CA9F2" text-anchor="middle">0.7</text>
+      <rect x="604" y="188" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="643" y="213" class="sv-t" fill="#8CA9F2" text-anchor="middle">1.2</text>
+      <rect x="688" y="188" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="727" y="213" class="sv-t" fill="#8CA9F2" text-anchor="middle">0.5</text>
+      <rect x="772" y="188" width="78" height="40" rx="4" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
+      <text x="811" y="213" class="sv-t" fill="#8CA9F2" text-anchor="middle">1.9</text>
+      <text x="40" y="248" class="sv-l" fill="#7A6F63">token 1 chỉ nhìn chính nó · token 4 nhìn cả bốn</text>
+    </svg>
+    <figcaption>Ô đỏ là tương lai — bị đặt <code>-inf</code> nên softmax cho đúng 0. Đặt 0 thì <code>exp(0) = 1</code>, ô bị che vẫn nhận trọng số đáng kể.</figcaption>
+  </figure>
   <p>Dùng <code>-inf</code> chứ không dùng 0, vì <code>softmax(-inf) = 0</code> chính xác. Đặt 0 thì <code>exp(0) = 1</code>, ô bị che vẫn nhận trọng số đáng kể.</p>
   <div class="note key">
     <h4>Vì sao mask lại là điều kiện để huấn luyện song song</h4>
@@ -239,17 +302,12 @@ scores trước softmax:            sau khi mask:
 <section id="attn-s8">
   <div class="sh"><b>08</b><h2>Multi-head attention</h2></div>
   <p>Một head chỉ học được một kiểu quan hệ. Với <code>h</code> head, ta chạy <code>h</code> phép attention độc lập trên các không gian con nhỏ hơn, rồi ghép lại.</p>
-<pre><code>d = 768, h = 12  →  d_k = d / h = 64
-
-x            (T, 768)
- ↓ W_q, W_k, W_v: (768, 768) rồi tách thành 12 nhóm 64 chiều
-Q, K, V      (h, T, 64)          <span class="cm"># 12 head chạy song song</span>
- ↓ attention từng head
-heads        (h, T, 64)
- ↓ concat theo chiều cuối
-concat       (T, 768)
- ↓ W_o: (768, 768)               <span class="cm"># trộn lại thông tin giữa các head</span>
-out          (T, 768)</code></pre>
+<div class="stack">
+    <div class="s"><b>x — (T, 768)</b><span>d = 768, h = 12 → mỗi head được d_k = 768 / 12 = 64 chiều</span></div>
+    <div class="s"><b>Q, K, V — (12, T, 64)</b><span>chiếu qua W_q, W_k, W_v (768, 768) rồi tách thành 12 nhóm 64 chiều — 12 head chạy song song</span></div>
+    <div class="s"><b>concat — (T, 768)</b><span>attention từng head rồi ghép lại theo chiều cuối</span></div>
+    <div class="s ok"><b>out — (T, 768)</b><span>nhân W_o (768, 768) để trộn lại thông tin giữa các head</span></div>
+  </div>
   <p><strong>Tổng chi phí không đổi.</strong> Chia 768 chiều cho 12 head, mỗi head 64 chiều — cộng lại vẫn là 768. Multi-head gần như miễn phí so với một head to.</p>
   <h3>Mỗi head học gì</h3>
   <p>Phân tích trên model đã huấn luyện cho thấy các head chuyên hoá: head bám token liền trước, head nối đại từ với danh từ tương ứng, head khớp dấu ngoặc mở với ngoặc đóng, head theo dõi động từ chính. Không ai lập trình việc này — nó nổi lên từ dữ liệu.</p>
@@ -285,13 +343,10 @@ out          (T, 768)</code></pre>
   <div class="sh"><b>10</b><h2>KV cache — thứ quyết định chi phí phục vụ</h2></div>
   <p>Sinh chữ là tuần tự: mỗi lần chỉ ra một token, rồi nối vào đầu vào và chạy lại. Nếu tính lại từ đầu mỗi bước thì sinh 1000 token tốn công gấp cả nghìn lần cần thiết.</p>
   <p>Nhận xét mấu chốt: với causal mask, <strong>K và V của các token cũ không bao giờ thay đổi</strong>. Vậy thì lưu lại.</p>
-<pre><code>Không cache — sinh token thứ t:
-  tính Q, K, V cho cả t token       →  O(t · d²) mỗi bước
-  tổng cho N token                  →  O(N² · d²)
-
-Có cache — sinh token thứ t:
-  chỉ tính Q, K, V cho token mới    →  O(d²) mỗi bước
-  attention của nó với t key đã lưu →  O(t · d)</code></pre>
+<div class="cmp two">
+    <div><h5>Không cache</h5><p>Mỗi bước tính lại Q, K, V cho cả <code>t</code> token: <code>O(t · d²)</code> mỗi bước, <code>O(N² · d²)</code> cho cả câu.</p></div>
+    <div><h5>Có cache</h5><p>Chỉ tính cho token mới: <code>O(d²)</code> mỗi bước, cộng <code>O(t · d)</code> để nó nhìn <code>t</code> key đã lưu sẵn.</p></div>
+  </div>
   <h3>Hai pha có đặc tính hoàn toàn khác nhau</h3>
   <table>
     <tr><th></th><th>Prefill</th><th>Decode</th></tr>
@@ -305,13 +360,27 @@ Có cache — sinh token thứ t:
     Sinh một token cần đọc <em>toàn bộ</em> trọng số model từ VRAM, nhưng chỉ thực hiện một lượng phép tính rất nhỏ trên chúng. GPU rảnh rỗi chờ dữ liệu. Đây chính là lý do gộp batch lại hiệu quả đến vậy: đã tốn công đọc trọng số rồi thì phục vụ 32 request cùng lúc gần như không tốn thêm.
   </div>
   <h3>Cache tốn bao nhiêu</h3>
-<pre><code>bytes/token = 2 (K và V) × n_layers × n_kv_heads × d_head × bytes_per_value
-
-LLaMA-2 7B, fp16, MHA đầy đủ:
-  2 × 32 × 32 × 128 × 2 = 524,288 bytes ≈ 0.5 MB / token
-
-Một context 8000 token  →  ~4 GB chỉ riêng cache
-32 request đồng thời    →  ~128 GB — vượt xa một GPU 80GB</code></pre>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>bytes / token</span></span>
+      <span class="op">=</span>
+      <span class="t"><span>2</span><em>K và V</em></span>
+      <span class="op">×</span>
+      <span class="t b"><span>n_layers</span><em>32</em></span>
+      <span class="op">×</span>
+      <span class="t p"><span>n_kv_heads</span><em>32</em></span>
+      <span class="op">×</span>
+      <span class="t"><span>d_head</span><em>128</em></span>
+      <span class="op">×</span>
+      <span class="t"><span>bytes</span><em>2 — fp16</em></span>
+    </div>
+    <p class="read">LLaMA-2 7B với MHA đầy đủ: <b>≈ 0,5 MB cho mỗi token</b>.</p>
+  </div>
+  <div class="bars">
+    <div class="b"><i>một context 8.000 token</i><u style="width:3%"></u><b>~4 GB</b></div>
+    <div class="b bad"><i>32 request đồng thời</i><u style="width:100%"></u><b>~128 GB</b></div>
+  </div>
+  <p class="stripnote"><span>Một GPU 80 GB không chứa nổi.</span><span>Đó là lý do tồn tại của <em>GQA</em>, lượng tử hoá cache và <em>PagedAttention</em>.</span></p>
   <p>Con số này là lý do tồn tại của GQA, lượng tử hoá cache, và PagedAttention. Nó cũng là lý do độ dài context được tính tiền.</p>
 </section>
 

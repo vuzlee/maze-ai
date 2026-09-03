@@ -48,17 +48,18 @@
 
 
 <section id="sqltx-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
-<pre><code>Một transaction = một nhóm lệnh chạy TRỌN VẸN hoặc KHÔNG GÌ CẢ.
-
-BEGIN;
-  UPDATE accounts SET balance = balance - 100 WHERE id = 1;
-  UPDATE accounts SET balance = balance + 100 WHERE id = 2;
-COMMIT;        ← chỉ tới đây thay đổi mới thành vĩnh viễn
-
-Vấn đề khó không nằm ở một transaction, mà ở NHIỀU transaction chạy cùng lúc.
-Isolation level là cái núm điều chỉnh: cô lập càng chặt càng ít lỗi dữ liệu,
-nhưng càng nhiều xung đột và càng chậm.</code></pre>
+  <div class="sh"><b>01</b><h2>Transaction là gì</h2></div>
+<p class="key">Một transaction = một nhóm lệnh chạy <em>trọn vẹn hoặc không gì cả</em>.</p>
+  <div class="flow">
+    <div class="n"><h5>BEGIN</h5><p>mở transaction</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>trừ 100 ở tài khoản A</h5><p>bên ngoài chưa thấy gì</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>cộng 100 ở tài khoản B</h5><p>bên ngoài chưa thấy gì</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>COMMIT</h5><p>tới đây mới thành vĩnh viễn</p></div>
+  </div>
+  <p>Phần khó không nằm ở một transaction, mà ở <strong>nhiều transaction chạy cùng lúc</strong>. Isolation level là cái núm điều chỉnh: cô lập càng chặt càng ít lỗi dữ liệu, nhưng càng nhiều xung đột và càng chậm.</p>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Isolation level không phải cài đặt "hiệu năng" — nó là <strong>hợp đồng về những gì transaction của bạn được phép nhìn thấy</strong>. Chọn mức thấp nghĩa là bạn <em>chấp nhận</em> một số hiện tượng dị thường và tự lo phần còn lại trong code.
@@ -67,37 +68,47 @@ nhưng càng nhiều xung đột và càng chậm.</code></pre>
 
 <section id="sqltx-s2">
   <div class="sh"><b>02</b><h2>ACID</h2></div>
-  <table>
-    <tr><th>Tính chất</th><th>Nghĩa</th><th>Cơ chế thực hiện</th></tr>
-    <tr><td><strong>A</strong>tomicity<br>Nguyên tử</td><td>Trọn vẹn hoặc không gì cả</td><td>Write-ahead log, rollback</td></tr>
-    <tr><td><strong>C</strong>onsistency<br>Nhất quán</td><td>Mọi ràng buộc vẫn đúng sau khi xong</td><td>Constraint, foreign key, trigger</td></tr>
-    <tr><td><strong>I</strong>solation<br>Cô lập</td><td>Chạy song song mà như chạy lần lượt</td><td>MVCC, khoá — <em>đây là phần của bài này</em></td></tr>
-    <tr><td><strong>D</strong>urability<br>Bền vững</td><td>Đã commit là không mất, kể cả mất điện</td><td>WAL được ghi xuống đĩa trước khi báo commit</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>A — Atomicity · trọn vẹn hoặc không gì cả</b><span>làm được nhờ write-ahead log và rollback</span></div>
+    <div class="s"><b>C — Consistency · mọi ràng buộc vẫn đúng sau khi xong</b><span>constraint, foreign key, trigger</span></div>
+    <div class="s ok"><b>I — Isolation · chạy song song mà như chạy lần lượt</b><span>MVCC và khoá — <i>đây là phần của bài này</i></span></div>
+    <div class="s"><b>D — Durability · đã commit là không mất, kể cả mất điện</b><span>WAL ghi xuống đĩa trước khi báo commit</span></div>
+  </div>
   <p>Ba tính chất đầu gần như luôn được đảm bảo. <strong>Isolation là tính chất duy nhất bạn phải chọn mức</strong> — và cũng là nơi phần lớn bug dữ liệu trong hệ thống thật phát sinh.</p>
 </section>
 
 <section id="sqltx-s3">
   <div class="sh"><b>03</b><h2>Bốn hiện tượng dị thường</h2></div>
   <h3>Dirty read — đọc dữ liệu chưa commit</h3>
-<pre><code>T1: BEGIN; UPDATE accounts SET balance = 0 WHERE id = 1;
-T2:                    SELECT balance FROM accounts WHERE id = 1;  → 0
-T1: ROLLBACK;          ← T2 đã đọc một giá trị chưa từng tồn tại thật</code></pre>
+<div class="seq">
+    <div class="who"><span>T1</span><span>T2</span></div>
+    <div class="m"><i>UPDATE balance = 0</i><div class="ar r"></div><u>mới sửa, chưa commit</u></div>
+    <div class="m wait"><i>SELECT balance → 0</i><div class="ar l"></div><u>T2 đọc được số chưa commit</u></div>
+    <div class="m"><i>ROLLBACK</i><div class="ar r"></div><u>số 0 chưa từng tồn tại thật — nhưng T2 đã dùng nó</u></div>
+  </div>
   <h3>Non-repeatable read — đọc hai lần, hai giá trị</h3>
-<pre><code>T1: BEGIN; SELECT balance WHERE id = 1;   → 100
-T2:        UPDATE ... SET balance = 50 WHERE id = 1; COMMIT;
-T1:        SELECT balance WHERE id = 1;   → 50   ← cùng một dòng, đổi giá trị giữa đường</code></pre>
+<div class="seq">
+    <div class="who"><span>T1</span><span>T2</span></div>
+    <div class="m"><i>SELECT balance → 100</i><div class="ar r"></div><u>lần đọc thứ nhất</u></div>
+    <div class="m"><i>UPDATE balance = 50 · COMMIT</i><div class="ar l"></div><u>T2 xen vào giữa</u></div>
+    <div class="m wait"><i>SELECT balance → 50</i><div class="ar r"></div><u>cùng một dòng mà hai lần đọc ra hai số</u></div>
+  </div>
   <h3>Phantom read — dòng mới xuất hiện</h3>
-<pre><code>T1: BEGIN; SELECT COUNT(*) WHERE status = 'active';   → 10
-T2:        INSERT INTO users (status) VALUES ('active'); COMMIT;
-T1:        SELECT COUNT(*) WHERE status = 'active';   → 11   ← dòng "bóng ma"</code></pre>
+<div class="seq">
+    <div class="who"><span>T1</span><span>T2</span></div>
+    <div class="m"><i>COUNT(*) WHERE status = 'active' → 10</i><div class="ar r"></div><u>lần đếm thứ nhất</u></div>
+    <div class="m"><i>INSERT một dòng active · COMMIT</i><div class="ar l"></div><u>T2 thêm dòng mới</u></div>
+    <div class="m wait"><i>COUNT(*) WHERE status = 'active' → 11</i><div class="ar r"></div><u>dòng "bóng ma" xuất hiện giữa hai lần đếm</u></div>
+  </div>
   <h3>Lost update — mất một lần cập nhật</h3>
-<pre><code>T1: BEGIN; SELECT stock WHERE id = 1;   → 10
-T2: BEGIN; SELECT stock WHERE id = 1;   → 10
-T1:        UPDATE SET stock = 9;  COMMIT;      (10 − 1)
-T2:        UPDATE SET stock = 9;  COMMIT;      (10 − 1)  ← đáng lẽ phải là 8
-
-Bán hai món nhưng kho chỉ trừ một. Đây là hiện tượng gây thiệt hại thật nhiều nhất.</code></pre>
+<div class="seq">
+    <div class="who"><span>T1</span><span>T2</span></div>
+    <div class="m"><i>SELECT stock → 10</i><div class="ar r"></div><u>đọc tồn kho</u></div>
+    <div class="m"><i>SELECT stock → 10</i><div class="ar l"></div><u>đọc đúng con số đó</u></div>
+    <div class="m"><i>UPDATE stock = 9 · COMMIT</i><div class="ar r"></div><u>10 − 1</u></div>
+    <div class="m wait"><i>UPDATE stock = 9 · COMMIT</i><div class="ar l"></div><u>ghi đè lên công của T1: bán hai món mà kho chỉ trừ một, đáng lẽ còn 8</u></div>
+  </div>
+  <p>Đây là hiện tượng gây thiệt hại thật nhiều nhất.</p>
   <div class="note warn">
     <h4>Lost update khác ba cái trên</h4>
     Ba hiện tượng đầu là chuyện <em>đọc</em> thấy dữ liệu không nhất quán. Lost update là chuyện <em>ghi</em> đè mất công của nhau, và nó <strong>xảy ra được ngay ở mức cô lập mặc định</strong> của mọi cơ sở dữ liệu phổ biến. Mục 09 dành riêng cho ba cách chữa.
@@ -159,22 +170,19 @@ SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;</code></pre>
 <section id="sqltx-s6">
   <div class="sh"><b>06</b><h2>MVCC — đọc không chặn ghi</h2></div>
   <p>Multi-Version Concurrency Control: thay vì khoá dòng khi đọc, cơ sở dữ liệu <strong>giữ nhiều phiên bản của cùng một dòng</strong>.</p>
-<pre><code>Mỗi phiên bản dòng có hai cột hệ thống:
-  xmin  = id của transaction đã TẠO phiên bản này
-  xmax  = id của transaction đã XOÁ / thay thế nó
-
-UPDATE không sửa tại chỗ — nó tạo phiên bản MỚI và đánh dấu bản cũ hết hiệu lực:
-
-  trước:  (id=1, balance=100, xmin=50, xmax=null)
-  sau:    (id=1, balance=100, xmin=50, xmax=77)     ← bản cũ, còn đó cho ai đang đọc
-          (id=1, balance=50,  xmin=77, xmax=null)   ← bản mới</code></pre>
+<p class="key">UPDATE không sửa tại chỗ — nó <em>tạo một phiên bản mới</em> và đánh dấu bản cũ hết hiệu lực.</p>
+  <div class="strip">
+    <div class="c dim"><i>bản cũ</i><b>balance = 100</b><u>xmin 50 · xmax 77</u></div>
+    <div class="c on"><i>bản mới</i><b>balance = 50</b><u>xmin 77 · xmax null</u></div>
+  </div>
+  <p class="stripnote"><span>vẫn còn đó cho ai đang đọc dở</span><span><em>xmin = ai tạo · xmax = ai xoá</em></span><span>bản mọi người thấy từ giờ</span></p>
   <p>Mỗi transaction có một <strong>snapshot</strong> quy định nó thấy phiên bản nào: chỉ những bản được tạo bởi transaction đã commit trước thời điểm chụp ảnh, và chưa bị xoá tại thời điểm đó.</p>
-  <table>
-    <tr><th>Hệ quả tốt</th><th>Cái giá</th></tr>
-    <tr><td>Người đọc không chặn người ghi và ngược lại</td><td>Bảng phình ra vì chứa nhiều phiên bản chết</td></tr>
-    <tr><td>Dirty read là bất khả thi về mặt cơ chế</td><td>Cần <code>VACUUM</code> chạy nền để thu hồi chỗ</td></tr>
-    <tr><td>Ảnh chụp nhất quán mà không cần khoá</td><td>Index cũng phình theo, làm chậm dần</td></tr>
-  </table>
+  <div class="cmp two">
+    <div><h5>Được gì</h5>
+      <p>Người đọc không chặn người ghi và ngược lại. Dirty read là <b>bất khả thi về cơ chế</b>. Có ảnh chụp nhất quán mà không cần khoá.</p></div>
+    <div><h5>Cái giá</h5>
+      <p>Bảng phình ra vì chứa nhiều phiên bản chết, index phình theo và chậm dần — nên cần <code>VACUUM</code> chạy nền để thu hồi chỗ.</p></div>
+  </div>
   <div class="note">
     <h4>Vì sao <code>COUNT(*)</code> trong PostgreSQL chậm</h4>
     Vì mỗi transaction thấy một tập dòng khác nhau tuỳ snapshot, nên không có con số "tổng số dòng" nào đúng cho tất cả. Đếm phải quét thật. Đây là hệ quả trực tiếp của MVCC, và là một câu hỏi hay gặp.
@@ -183,12 +191,11 @@ UPDATE không sửa tại chỗ — nó tạo phiên bản MỚI và đánh dấ
 
 <section id="sqltx-s7">
   <div class="sh"><b>07</b><h2>PostgreSQL thực tế</h2></div>
-  <table>
-    <tr><th>Mức</th><th>Cách cài đặt</th><th>Điều cần biết</th></tr>
-    <tr><td>READ COMMITTED</td><td>Snapshot mới cho <strong>mỗi câu lệnh</strong></td><td>Hai <code>SELECT</code> trong cùng transaction có thể thấy khác nhau. Mặc định.</td></tr>
-    <tr><td>REPEATABLE READ</td><td>Một snapshot cho <strong>cả transaction</strong></td><td>Chặn cả phantom. Nếu phát hiện ghi xung đột thì ném lỗi <code>40001</code></td></tr>
-    <tr><td>SERIALIZABLE</td><td>Snapshot + theo dõi phụ thuộc đọc–ghi (SSI)</td><td>Chặn cả những xung đột phức tạp hơn; nhiều lỗi <code>40001</code> hơn</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>READ COMMITTED — snapshot mới cho <i>mỗi câu lệnh</i></b><span>hai <code>SELECT</code> trong cùng transaction có thể thấy khác nhau. Mặc định.</span></div>
+    <div class="s"><b>REPEATABLE READ — một snapshot cho <i>cả transaction</i></b><span>chặn cả phantom; phát hiện ghi xung đột thì ném lỗi <code>40001</code></span></div>
+    <div class="s warn"><b>SERIALIZABLE — snapshot + theo dõi phụ thuộc đọc–ghi (SSI)</b><span>chặn cả xung đột phức tạp hơn, đổi lại nhiều lỗi <code>40001</code> hơn</span></div>
+  </div>
 <pre><code><span class="cm">-- ở READ COMMITTED, một UPDATE luôn đọc bản MỚI NHẤT đã commit,</span>
 <span class="cm">-- kể cả khi nó khác snapshot của câu SELECT trước đó trong cùng transaction</span>
 BEGIN;
@@ -210,12 +217,14 @@ COMMIT;</code></pre>
 SELECT ... FOR UPDATE NOWAIT;         <span class="cm">-- không chờ, ném lỗi ngay</span>
 SELECT ... FOR UPDATE SKIP LOCKED;    <span class="cm">-- bỏ qua dòng đang bị khoá</span>
 SELECT ... FOR SHARE;                 <span class="cm">-- người khác đọc được, không ghi được</span></code></pre>
-  <table>
-    <tr><th></th><th>Bi quan — pessimistic</th><th>Lạc quan — optimistic</th></tr>
-    <tr><td>Cách làm</td><td>Khoá trước khi sửa (<code>FOR UPDATE</code>)</td><td>Không khoá; kiểm tra lúc ghi bằng cột <code>version</code></td></tr>
-    <tr><td>Tốt khi</td><td>Xung đột <strong>thường xuyên</strong></td><td>Xung đột <strong>hiếm</strong></td></tr>
-    <tr><td>Cái giá</td><td>Transaction khác phải chờ; nguy cơ deadlock</td><td>Phải viết logic thử lại ở tầng ứng dụng</td></tr>
-  </table>
+  <div class="cmp two">
+    <div><h5>Bi quan — pessimistic</h5>
+      <p>Khoá trước khi sửa (<code>FOR UPDATE</code>). Tốt khi xung đột <b>thường xuyên</b>.</p>
+      <p>Cái giá: transaction khác phải chờ, và có nguy cơ deadlock.</p></div>
+    <div><h5>Lạc quan — optimistic</h5>
+      <p>Không khoá; kiểm tra lúc ghi bằng cột <code>version</code>. Tốt khi xung đột <b>hiếm</b>.</p>
+      <p>Cái giá: phải viết logic thử lại ở tầng ứng dụng.</p></div>
+  </div>
   <p><code>SKIP LOCKED</code> là một mẫu rất hữu ích trong thực tế: nó cho phép nhiều worker cùng lấy việc từ một bảng hàng đợi mà không bao giờ tranh nhau cùng một dòng — mỗi worker lấy dòng nào đang rảnh.</p>
 </section>
 
@@ -248,19 +257,20 @@ WHERE id = <span class="st">1</span> AND version = <span class="st">42</span>;  
 
 <section id="sqltx-s10">
   <div class="sh"><b>10</b><h2>Deadlock</h2></div>
-<pre><code>T1: BEGIN; UPDATE accounts SET ... WHERE id = 1;   <span class="cm">-- khoá dòng 1</span>
-T2: BEGIN; UPDATE accounts SET ... WHERE id = 2;   <span class="cm">-- khoá dòng 2</span>
-T1:        UPDATE accounts SET ... WHERE id = 2;   <span class="cm">-- chờ T2</span>
-T2:        UPDATE accounts SET ... WHERE id = 1;   <span class="cm">-- chờ T1  → vòng tròn</span>
-
-PostgreSQL phát hiện sau khoảng 1 giây, huỷ MỘT transaction với lỗi 40P01.</code></pre>
-  <table>
-    <tr><th>Cách phòng</th><th>Chi tiết</th></tr>
-    <tr><td><strong>Khoá theo thứ tự nhất quán</strong></td><td>Luôn khoá theo id tăng dần. Nếu mọi transaction cùng quy ước thì vòng tròn không thể hình thành — đây là cách chữa gốc rễ</td></tr>
-    <tr><td>Transaction ngắn</td><td>Giữ khoá càng ít thời gian càng ít cơ hội đụng nhau</td></tr>
-    <tr><td>Gộp thành một câu lệnh</td><td>Một <code>UPDATE ... WHERE id IN (1,2)</code> thì cơ sở dữ liệu tự khoá theo thứ tự của nó</td></tr>
-    <tr><td>Thử lại</td><td>Deadlock là lỗi <em>tạm thời</em>. Bắt <code>40P01</code> rồi chạy lại toàn bộ transaction</td></tr>
-  </table>
+<div class="seq">
+    <div class="who"><span>T1</span><span>T2</span></div>
+    <div class="m"><i>UPDATE dòng 1</i><div class="ar r"></div><u>giữ khoá dòng 1</u></div>
+    <div class="m"><i>UPDATE dòng 2</i><div class="ar l"></div><u>giữ khoá dòng 2</u></div>
+    <div class="m wait"><i>UPDATE dòng 2 — chờ</i><div class="ar r"></div><u>dòng 2 đang bị T2 giữ</u></div>
+    <div class="m wait"><i>UPDATE dòng 1 — chờ</i><div class="ar l"></div><u>dòng 1 đang bị T1 giữ → vòng tròn, không ai đi tiếp được</u></div>
+  </div>
+  <p>PostgreSQL phát hiện sau khoảng một giây rồi huỷ <strong>một</strong> transaction với lỗi <code>40P01</code>.</p>
+  <div class="stack">
+    <div class="s ok"><b>Khoá theo thứ tự nhất quán</b><span>luôn khoá theo id tăng dần — mọi transaction cùng quy ước thì vòng tròn không thể hình thành. Cách chữa gốc rễ.</span></div>
+    <div class="s"><b>Transaction ngắn</b><span>giữ khoá càng ít thời gian càng ít cơ hội đụng nhau</span></div>
+    <div class="s"><b>Gộp thành một câu lệnh</b><span>một <code>UPDATE … WHERE id IN (1,2)</code> thì database tự khoá theo thứ tự của nó</span></div>
+    <div class="s"><b>Thử lại</b><span>deadlock là lỗi <i>tạm thời</i> — bắt <code>40P01</code> rồi chạy lại toàn bộ transaction</span></div>
+  </div>
   <div class="note warn">
     <h4>Đừng bao giờ đợi người dùng trong lúc đang giữ khoá</h4>
     Mẫu sai kinh điển: <code>BEGIN</code>, khoá dòng, gọi một API bên ngoài mất hai giây, rồi <code>COMMIT</code>. Khoá bị giữ suốt thời gian chờ mạng. Nếu API chậm hoặc treo thì cả hệ thống dồn vào chờ. Nguyên tắc: <strong>gọi ra ngoài trước, mở transaction sau</strong>.
@@ -304,26 +314,24 @@ SET statement_timeout = <span class="st">'10s'</span>;</code></pre>
         <span class="kw">except</span> psycopg2.errors.SerializationFailure:   <span class="cm"># 40001</span>
             <span class="kw">if</span> i == attempts - <span class="st">1</span>: <span class="kw">raise</span>
             time.sleep(<span class="st">0.05</span> * <span class="st">2</span>**i)          <span class="cm"># chờ tăng dần, tránh đụng lại ngay</span></code></pre>
-  <table>
-    <tr><th>Mã lỗi</th><th>Nghĩa</th><th>Nên làm</th></tr>
-    <tr><td><code>40001</code></td><td>serialization_failure</td><td>Thử lại toàn bộ transaction</td></tr>
-    <tr><td><code>40P01</code></td><td>deadlock_detected</td><td>Thử lại toàn bộ transaction</td></tr>
-    <tr><td><code>23505</code></td><td>unique_violation</td><td><strong>Không</strong> thử lại — lỗi logic, thử lại cũng thế</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s ok"><b><code>40001</code> · serialization_failure</b><span>thử lại toàn bộ transaction</span></div>
+    <div class="s ok"><b><code>40P01</code> · deadlock_detected</b><span>thử lại toàn bộ transaction</span></div>
+    <div class="s warn"><b><code>23505</code> · unique_violation</b><span><b>không</b> thử lại — lỗi logic, thử lại cũng thế</span></div>
+  </div>
   <p><strong>Điều kiện để thử lại an toàn:</strong> transaction phải <em>idempotent</em> — chạy lại không gây tác dụng phụ nhân đôi. Nếu bên trong có gửi email hay gọi API thanh toán thì thử lại là nguy hiểm. Cách chuẩn là tách phần ghi cơ sở dữ liệu ra khỏi phần tác dụng phụ, và dùng một khoá idempotency cho phần bên ngoài.</p>
 </section>
 
 <section id="sqltx-s13">
   <div class="sh"><b>13</b><h2>Chọn mức nào</h2></div>
-  <table>
-    <tr><th>Tình huống</th><th>Mức</th><th>Vì sao</th></tr>
-    <tr><td>Đa số truy vấn CRUD thông thường</td><td>READ COMMITTED</td><td>Mặc định, rẻ, đủ dùng khi mỗi câu lệnh tự nhất quán</td></tr>
-    <tr><td>Báo cáo đọc nhiều bảng, cần ảnh nhất quán</td><td>REPEATABLE READ</td><td>Một snapshot cho cả transaction nên các bảng khớp nhau</td></tr>
-    <tr><td>Chuyển tiền, trừ kho, đặt chỗ</td><td>READ COMMITTED + <code>UPDATE</code> nguyên tử</td><td>Đơn giản nhất, không cần thử lại</td></tr>
-    <tr><td>Logic nhiều bước không nhét được vào một câu SQL</td><td>READ COMMITTED + <code>FOR UPDATE</code></td><td>Khoá tường minh, dễ suy luận</td></tr>
-    <tr><td>Ràng buộc phức tạp qua nhiều bảng, không được sai</td><td>SERIALIZABLE + thử lại</td><td>Cơ sở dữ liệu tự bắt mọi xung đột, đổi lại nhiều lỗi 40001</td></tr>
-    <tr><td>Hàng đợi công việc nhiều worker</td><td>READ COMMITTED + <code>FOR UPDATE SKIP LOCKED</code></td><td>Worker không tranh nhau cùng một dòng</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s ok"><b>CRUD thông thường → READ COMMITTED</b><span>mặc định, rẻ, đủ dùng khi mỗi câu lệnh tự nhất quán</span></div>
+    <div class="s"><b>Báo cáo đọc nhiều bảng → REPEATABLE READ</b><span>một snapshot cho cả transaction nên các bảng khớp nhau</span></div>
+    <div class="s ok"><b>Chuyển tiền, trừ kho, đặt chỗ → READ COMMITTED + <code>UPDATE</code> nguyên tử</b><span>đơn giản nhất, không cần thử lại</span></div>
+    <div class="s"><b>Logic nhiều bước → READ COMMITTED + <code>FOR UPDATE</code></b><span>khoá tường minh, dễ suy luận</span></div>
+    <div class="s warn"><b>Ràng buộc phức tạp qua nhiều bảng → SERIALIZABLE + thử lại</b><span>database tự bắt mọi xung đột, đổi lại nhiều lỗi <code>40001</code></span></div>
+    <div class="s"><b>Hàng đợi nhiều worker → READ COMMITTED + <code>FOR UPDATE SKIP LOCKED</code></b><span>worker không tranh nhau cùng một dòng</span></div>
+  </div>
   <p>Lưu ý về thứ tự ưu tiên: <strong>tăng mức cô lập là lựa chọn sau cùng</strong>. Trước đó hãy thử viết câu lệnh nguyên tử, dùng ràng buộc <code>UNIQUE</code>, hoặc khoá tường minh — cả ba đều rẻ hơn và dễ suy luận hơn.</p>
 </section>
 

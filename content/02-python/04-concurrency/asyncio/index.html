@@ -51,10 +51,11 @@
 
   <p class="key">Cùng là để chờ I/O, nhưng async đổi <em>đơn vị chờ</em> từ luồng hệ điều hành sang một object vài trăm byte.</p>
 
-  <ul class="why">
-    <li>Một luồng tốn khoảng <b>8 MB stack</b> và mỗi lần chuyển luồng phải đi qua nhân. 1000 kết nối đồng thời là 1000 luồng — không kham nổi.</li>
-    <li>Một coroutine đang chờ chỉ là một object trong event loop. Đổi lại: <b>chỉ cần một lệnh chặn là treo cả vòng lặp</b>, ảnh hưởng mọi request khác.</li>
-  </ul>
+  <div class="bars">
+    <div class="b bad"><i>1.000 luồng hệ điều hành</i><u style="width:100%"></u><b>~8 GB stack</b></div>
+    <div class="b hi"><i>1.000 coroutine</i><u style="width:1%"></u><b>vài MB</b></div>
+  </div>
+  <p class="stripnote"><span>Mỗi lần chuyển luồng còn phải đi qua nhân; chuyển coroutine chỉ là một lần gọi hàm.</span><span>Đổi lại: chỉ cần <em>một</em> lệnh chặn là treo cả vòng lặp, ảnh hưởng mọi request khác.</span></p>
 
   <div class="note">
     <h4>Bài này nối tiếp</h4>
@@ -77,14 +78,13 @@
         <span class="kw">return</span> <span class="kw">await</span> asyncio.gather(*[fetch(s, u) <span class="kw">for</span> u <span class="kw">in</span> urls])
 
 asyncio.run(main(urls))                <span class="cm"># 1000 request đồng thời trên MỘT luồng</span></code></pre>
-  <table>
-    <tr><th>Khái niệm</th><th>Là gì</th></tr>
-    <tr><td><code>coroutine</code></td><td>Hàm khai báo <code>async def</code>. Gọi nó <strong>không chạy gì cả</strong> — chỉ tạo một object chờ được await</td></tr>
-    <tr><td><code>await</code></td><td>Điểm nhường quyền: "tôi chờ ở đây, event loop cứ chạy việc khác"</td></tr>
-    <tr><td><code>event loop</code></td><td>Bộ điều phối: giữ danh sách tác vụ, chạy cái nào đã sẵn sàng</td></tr>
-    <tr><td><code>Task</code></td><td>Coroutine đã được giao cho event loop, chạy nền độc lập</td></tr>
-    <tr><td><code>gather</code></td><td>Chạy nhiều thứ đồng thời và chờ tất cả xong</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>coroutine</b><span>hàm khai báo <code>async def</code> — gọi nó <b>không chạy gì cả</b>, chỉ tạo một object chờ được await</span></div>
+    <div class="s ok"><b>await</b><span>điểm nhường quyền: "tôi chờ ở đây, event loop cứ chạy việc khác"</span></div>
+    <div class="s"><b>event loop</b><span>bộ điều phối: giữ danh sách tác vụ, chạy cái nào đã sẵn sàng</span></div>
+    <div class="s"><b>Task</b><span>coroutine đã giao cho event loop, chạy nền độc lập</span></div>
+    <div class="s"><b>gather</b><span>chạy nhiều thứ đồng thời rồi chờ tất cả xong</span></div>
+  </div>
   <div class="note key">
     <h4>Vì sao async nhẹ hơn thread nhiều lần</h4>
     Một luồng hệ điều hành tốn khoảng vài MB ngăn xếp và mỗi lần chuyển luồng phải đi qua kernel. Một task async chỉ là một object Python vài KB, và chuyển đổi chỉ là một lần gọi hàm trong không gian người dùng. Đó là lý do 10.000 kết nối đồng thời khả thi với async nhưng vô vọng với thread.
@@ -116,20 +116,38 @@ result = <span class="kw">await</span> fetch(url)    <span class="cm"># đúng</
 
 <span class="cm"># ĐÚNG: phát hết ra rồi chờ chung</span>
 results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="kw">for</span> u <span class="kw">in</span> urls])</code></pre>
-  <div class="note warn">
-    <h4>Chi tiết ít người biết</h4>
-    Nếu một tác vụ trong <code>gather</code> ném lỗi, các tác vụ khác <strong>vẫn tiếp tục chạy</strong> và lỗi được ném lên ngay. Dùng <code>return_exceptions=True</code> để nhận lỗi như một giá trị kết quả thay vì làm sập cả nhóm. Đây là điều bắt buộc phải xử lý trong code thật.
-  </div>
+  <figure>
+    <svg viewBox="0 0 840 200" role="img" aria-label="Ba request chạy nối đuôi nhau so với ba request chồng lấn nhau">
+      <text x="40" y="28" class="sv-l" fill="#F2718A">AWAIT TRONG VÒNG LẶP — NỐI ĐUÔI</text>
+      <rect x="40" y="38" width="220" height="26" rx="4" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
+      <rect x="266" y="38" width="220" height="26" rx="4" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
+      <rect x="492" y="38" width="220" height="26" rx="4" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
+      <text x="150" y="56" class="sv-l" fill="#F2718A" text-anchor="middle">fetch 1</text>
+      <text x="376" y="56" class="sv-l" fill="#F2718A" text-anchor="middle">fetch 2</text>
+      <text x="602" y="56" class="sv-l" fill="#F2718A" text-anchor="middle">fetch 3</text>
+      <text x="730" y="56" class="sv-t" fill="#F2718A">300 ms</text>
+
+      <text x="40" y="110" class="sv-l" fill="#5BCFA0">GATHER — CHỒNG LẤN</text>
+      <rect x="40" y="120" width="220" height="20" rx="4" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
+      <rect x="40" y="144" width="220" height="20" rx="4" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
+      <rect x="40" y="168" width="220" height="20" rx="4" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
+      <text x="150" y="135" class="sv-l" fill="#5BCFA0" text-anchor="middle">fetch 1</text>
+      <text x="150" y="159" class="sv-l" fill="#5BCFA0" text-anchor="middle">fetch 2</text>
+      <text x="150" y="183" class="sv-l" fill="#5BCFA0" text-anchor="middle">fetch 3</text>
+      <text x="278" y="159" class="sv-t" fill="#5BCFA0">100 ms</text>
+      <line x1="270" y1="110" x2="270" y2="196" stroke="#2E2822" stroke-dasharray="4 4"/>
+    </svg>
+    <figcaption>Nếu một tác vụ trong <code>gather</code> ném lỗi, những tác vụ khác <b>vẫn chạy tiếp</b> và lỗi được ném lên ngay. Dùng <code>return_exceptions=True</code> để nhận lỗi như một giá trị kết quả thay vì làm sập cả nhóm.</figcaption>
+  </figure>
 </section>
 
 <section id="async-s4">
   <div class="sh"><b>04</b><h2>Chi phí thật của từng mô hình</h2></div>
-  <table>
-    <tr><th></th><th>Bộ nhớ mỗi đơn vị</th><th>Chi phí tạo</th><th>Chi phí chuyển đổi</th><th>Số lượng khả thi</th></tr>
-    <tr><td>Process</td><td>~30 MB trở lên</td><td>Hàng chục–trăm ms</td><td>Qua kernel, đắt</td><td>Bằng số lõi</td></tr>
-    <tr><td>Thread</td><td>~8 MB ngăn xếp</td><td>Dưới ms</td><td>Qua kernel</td><td>Hàng trăm</td></tr>
-    <tr><td>Async task</td><td>Vài KB</td><td>Micro giây</td><td>Gọi hàm, rất rẻ</td><td><strong>Hàng chục nghìn</strong></td></tr>
-  </table>
+  <div class="strip">
+    <div class="c f"><i>Process</i><b>~30 MB trở lên</b><u>tạo mất hàng chục–trăm ms · chỉ chạy được bằng số lõi</u></div>
+    <div class="c on"><i>Thread</i><b>~8 MB ngăn xếp</b><u>tạo dưới 1 ms · chuyển qua kernel · hàng trăm là hết</u></div>
+    <div class="c t"><i>Async task</i><b>vài KB</b><u>tạo mất micro giây · chuyển là gọi hàm · hàng chục nghìn</u></div>
+  </div>
   <p>Bảng này giải thích tại sao câu hỏi "tại sao async chứ không thread" có câu trả lời định lượng: cùng phục vụ 10.000 kết nối đồng thời, thread cần khoảng 80 GB RAM, async cần vài chục MB.</p>
 </section>
 
@@ -149,12 +167,12 @@ results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="k
 
 <section id="async-s6">
   <div class="sh"><b>06</b><h2>Trong hệ thống thật</h2></div>
-<pre><code>Một API phục vụ model LLM:
-
-  uvicorn --workers 4          ← 4 TIẾN TRÌNH, thoát GIL, dùng 4 lõi
-    └── mỗi tiến trình: 1 event loop
-          ├── async: nhận request, gọi vector DB, gọi LLM API, stream về client
-          └── to_thread: gọi driver DB đồng bộ, đọc file, xử lý ảnh</code></pre>
+<div class="stack">
+    <div class="s ok"><b>uvicorn --workers 4</b><span>4 tiến trình — thoát GIL, dùng đủ 4 lõi</span></div>
+    <div class="s"><b>mỗi tiến trình: 1 event loop</b><span>bộ điều phối riêng cho các coroutine của nó</span></div>
+    <div class="s"><b>async</b><span>nhận request, gọi vector DB, gọi LLM API, stream về client</span></div>
+    <div class="s warn"><b>to_thread</b><span>driver DB đồng bộ, đọc file, xử lý ảnh — những thư viện chưa có bản async</span></div>
+  </div>
   <p>Đây là kiến trúc gặp ở gần như mọi service Python hiện đại, và nó dùng <em>cả ba</em> mô hình đúng chỗ: process để dùng nhiều lõi, async để chồng lấn hàng nghìn lần chờ, thread để chứa những thư viện chưa có bản async.</p>
   <div class="note">
     <h4>Câu hỏi hay gặp ở vòng system design</h4>

@@ -50,10 +50,22 @@
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
   <p class="key">Đến đây kho đã đi qua SQL, index, transaction — mọi thứ nói về <em>một</em> database phục vụ <em>một</em> ứng dụng. Nhưng một công ty không chỉ có một database: dữ liệu bán hàng, dữ liệu marketing, log sản phẩm phải <b>chảy tới nhau</b> để trả lời câu hỏi ở quy mô toàn công ty — "tháng này lãi bao nhiêu", "khách nào sắp rời bỏ". Nhóm bài này rời khỏi một database đơn lẻ, nhìn dữ liệu ở quy mô cả hệ thống.</p>
   <p>Điểm xuất phát là nhận ra hai kiểu tải hoàn toàn khác nhau đang cạnh tranh trên cùng một tập dữ liệu:</p>
-  <ul class="why">
-    <li><b>Giao dịch (transaction):</b> "trừ kho 1 đơn vị", "ghi 1 dòng log đăng nhập" — rất nhiều lệnh, mỗi lệnh chạm rất ít dòng, cần trả lời trong mili-giây.</li>
-    <li><b>Phân tích (analytics):</b> "tổng doanh thu theo tháng theo vùng" — rất ít lệnh, nhưng mỗi lệnh quét hàng triệu dòng, gộp lại thành vài con số.</li>
-  </ul>
+  <div class="cmp two">
+    <div>
+      <h5>Giao dịch — OLTP</h5>
+      <p><b>Ví dụ:</b> trừ kho 1 đơn vị, ghi 1 dòng log đăng nhập.</p>
+      <p><b>Số lệnh:</b> rất nhiều.</p>
+      <p><b>Mỗi lệnh chạm:</b> rất ít dòng.</p>
+      <p><b>Cần trả lời trong:</b> mili-giây.</p>
+    </div>
+    <div>
+      <h5>Phân tích — OLAP</h5>
+      <p><b>Ví dụ:</b> tổng doanh thu theo tháng theo vùng.</p>
+      <p><b>Số lệnh:</b> rất ít.</p>
+      <p><b>Mỗi lệnh chạm:</b> hàng triệu dòng, gộp lại vài con số.</p>
+      <p><b>Cần trả lời trong:</b> giây tới phút cũng chấp nhận được.</p>
+    </div>
+  </div>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     OLTP tối ưu cho <strong>ghi và tra cứu điểm</strong>; OLAP tối ưu cho <strong>đọc khối lớn rồi tổng hợp</strong>. Hai mục tiêu tối ưu vật lý gần như ngược nhau, nên hiếm khi một hệ làm tốt cả hai.
@@ -80,6 +92,37 @@
     <li><b>Schema thường denormalized</b> — <em>star schema</em> hoặc <em>snowflake schema</em> (một bảng fact trung tâm nối tới các bảng dimension), tối ưu cho việc gộp (aggregate) nhanh hơn là tránh trùng lặp. Xem chi tiết ở bài kế tiếp, <a href="../data-warehouse-lake/index.html">Data warehouse &amp; data lake</a>.</li>
     <li>Chấp nhận đọc dữ liệu <em>hơi cũ</em> (cập nhật theo lô, không real-time từng dòng) để đổi lấy tốc độ quét khối lớn.</li>
   </ul>
+<figure>
+    <svg viewBox="0 0 880 260" role="img" aria-label="Row-oriented so với column-oriented">
+      <text class="sv-l" x="20" y="26" fill="#7A6F63">ROW-ORIENTED — OLTP</text>
+      <text class="sv-l" x="470" y="26" fill="#7A6F63">COLUMN-ORIENTED — OLAP</text>
+      <text class="sv-l" x="20" y="212" fill="#7A6F63">Đọc trọn một đơn hàng = một lần chạm đĩa.</text>
+      <text class="sv-l" x="20" y="232" fill="#F2718A">SUM(revenue) phải đọc cả những cột không cần.</text>
+      <text class="sv-l" x="470" y="212" fill="#7A6F63">SUM(revenue) chỉ đọc đúng một dải liền nhau.</text>
+      <text class="sv-l" x="470" y="232" fill="#F2718A">Đọc trọn một đơn hàng phải gom từ nhiều nơi.</text>
+      <g>
+        <rect class="sv-b" x="20" y="40" width="130" height="34" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="85" y="62" text-anchor="middle" fill="#EDE7DE">id 1</text>
+        <rect class="sv-b" x="154" y="40" width="130" height="34" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="219" y="62" text-anchor="middle" fill="#EDE7DE">ngày</text>
+        <rect class="sv-b" x="288" y="40" width="130" height="34" rx="4" fill="rgba(237,180,74,.22)" stroke="#EDB44A"/><text class="sv-t" x="353" y="62" text-anchor="middle" fill="#EDE7DE">revenue</text>
+        <rect class="sv-b" x="20" y="80" width="130" height="34" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="85" y="102" text-anchor="middle" fill="#EDE7DE">id 2</text>
+        <rect class="sv-b" x="154" y="80" width="130" height="34" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="219" y="102" text-anchor="middle" fill="#EDE7DE">ngày</text>
+        <rect class="sv-b" x="288" y="80" width="130" height="34" rx="4" fill="rgba(237,180,74,.22)" stroke="#EDB44A"/><text class="sv-t" x="353" y="102" text-anchor="middle" fill="#EDE7DE">revenue</text>
+        <rect class="sv-b" x="20" y="120" width="130" height="34" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="85" y="142" text-anchor="middle" fill="#EDE7DE">id 3</text>
+        <rect class="sv-b" x="154" y="120" width="130" height="34" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="219" y="142" text-anchor="middle" fill="#EDE7DE">ngày</text>
+        <rect class="sv-b" x="288" y="120" width="130" height="34" rx="4" fill="rgba(237,180,74,.22)" stroke="#EDB44A"/><text class="sv-t" x="353" y="142" text-anchor="middle" fill="#EDE7DE">revenue</text>
+        <rect x="14" y="34" width="410" height="46" rx="6" fill="none" stroke="#5BCFA0" stroke-width="2"/>
+        <text class="sv-l" x="20" y="176" fill="#5BCFA0">một dòng nằm liền nhau trên đĩa</text>
+      </g>
+      <g>
+        <rect class="sv-b" x="470" y="40" width="126" height="114" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="533" y="102" text-anchor="middle" fill="#EDE7DE">id 1·2·3</text>
+        <rect class="sv-b" x="600" y="40" width="126" height="114" rx="4" fill="rgba(140,169,242,.2)" stroke="#8CA9F2"/><text class="sv-t" x="663" y="102" text-anchor="middle" fill="#EDE7DE">ngày ×3</text>
+        <rect class="sv-b" x="730" y="40" width="126" height="114" rx="4" fill="rgba(237,180,74,.22)" stroke="#EDB44A"/><text class="sv-t" x="793" y="102" text-anchor="middle" fill="#EDE7DE">revenue ×3</text>
+        <rect x="724" y="34" width="138" height="126" rx="6" fill="none" stroke="#5BCFA0" stroke-width="2"/>
+        <text class="sv-l" x="470" y="176" fill="#5BCFA0">một cột nằm liền nhau trên đĩa</text>
+      </g>
+    </svg>
+    <figcaption>Cùng một bảng, hai cách xếp lên đĩa. Khung xanh lá là <b>thứ đọc được trong một lần chạm</b> — và đó là toàn bộ lý do hai hệ không thay nhau được.</figcaption>
+  </figure>
   <p>Ví dụ: Snowflake, BigQuery, Redshift chạy báo cáo doanh thu theo tháng, theo vùng, theo kênh bán.</p>
 </section>
 

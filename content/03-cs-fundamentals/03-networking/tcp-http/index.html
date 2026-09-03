@@ -47,15 +47,15 @@
 </header>
 
 <section id="http-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
-<pre><code>client                                                      server
-  │  1. DNS: tên miền → địa chỉ IP                    (1 RTT nếu chưa cache)
-  │  2. TCP: bắt tay ba bước                          (1 RTT)
-  │  3. TLS: bắt tay, thoả thuận khoá                 (1–2 RTT)
-  │  4. HTTP: gửi request, nhận response              (1 RTT + thời gian xử lý)
-  ▼
-Với RTT = 100ms, một kết nối MỚI tốn 400–500ms
-TRƯỚC KHI server bắt đầu làm bất cứ việc gì.</code></pre>
+  <div class="sh"><b>01</b><h2>TCP và HTTP nằm ở đâu</h2></div>
+<p class="key">Trước khi server làm <em>bất cứ việc gì</em>, đã có bốn lượt đi-về tiêu tốn thời gian.</p>
+  <div class="bars">
+    <div class="b"><i>1 · DNS — tên miền thành địa chỉ IP</i><u style="width:25%"></u><b>1 RTT nếu chưa cache</b></div>
+    <div class="b"><i>2 · TCP — bắt tay ba bước</i><u style="width:25%"></u><b>1 RTT</b></div>
+    <div class="b"><i>3 · TLS — thoả thuận khoá</i><u style="width:40%"></u><b>1–2 RTT</b></div>
+    <div class="b hi"><i>4 · HTTP — request và response</i><u style="width:25%"></u><b>1 RTT + thời gian xử lý</b></div>
+  </div>
+  <p class="stripnote"><span>với RTT = 100 ms</span><span><em>một kết nối mới tốn 400–500 ms trước khi server bắt đầu làm việc</em></span></p>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Trong hệ thống phân tán, <strong>số vòng khứ hồi quan trọng hơn băng thông</strong>. Băng thông mua được; RTT bị chặn bởi tốc độ ánh sáng và khoảng cách địa lý. Nên mọi tối ưu mạng đều là một dạng <em>giảm số vòng khứ hồi</em> — tái dùng kết nối, cache, đặt server gần người dùng.
@@ -107,16 +107,13 @@ TRƯỚC KHI server bắt đầu làm bất cứ việc gì.</code></pre>
 
 <section id="http-s4">
   <div class="sh"><b>04</b><h2>TCP — những gì cần biết</h2></div>
-<pre><code>BẮT TAY BA BƯỚC
-    client → SYN
-    server → SYN-ACK
-    client → ACK  (và có thể gửi dữ liệu kèm)
-    → 1 RTT trước khi truyền được dữ liệu
-
-KHỞI ĐỘNG CHẬM
-    TCP không gửi hết tốc độ ngay; nó tăng dần cửa sổ để dò băng thông.
-    → kết nối mới CHẬM ở những KB đầu tiên, kể cả khi đường truyền rộng
-    → lý do nữa để tái dùng kết nối: kết nối đã "nóng" thì cửa sổ đã lớn</code></pre>
+<div class="seq">
+    <div class="who"><span>client</span><span>server</span></div>
+    <div class="m"><i>SYN</i><div class="ar r"></div><u>xin mở kết nối</u></div>
+    <div class="m"><i>SYN-ACK</i><div class="ar l"></div><u>đồng ý</u></div>
+    <div class="m"><i>ACK + dữ liệu</i><div class="ar r"></div><u>một RTT đã trôi qua trước khi byte đầu tiên đi</u></div>
+  </div>
+  <p><strong>Khởi động chậm.</strong> TCP không gửi hết tốc độ ngay — nó tăng dần cửa sổ để dò băng thông. Nên kết nối mới chậm ở những KB đầu tiên kể cả khi đường truyền rộng, và đó là thêm một lý do để tái dùng kết nối: kết nối đã "nóng" thì cửa sổ đã lớn.</p>
   <table>
     <tr><th>Khái niệm</th><th>Ý nghĩa vận hành</th></tr>
     <tr><td>Keep-alive</td><td>Giữ kết nối mở để tái dùng. Bật theo mặc định ở HTTP/1.1, nhưng client phải dùng đúng</td></tr>
@@ -149,41 +146,35 @@ KHỞI ĐỘNG CHẬM
 
 <section id="http-s6">
   <div class="sh"><b>06</b><h2>Idempotency và khi nào được thử lại</h2></div>
-<pre><code>Idempotent = gọi nhiều lần cho kết quả GIỐNG gọi một lần.
-
-GET     idempotent, an toàn      → thử lại tự do
-PUT     idempotent               → thử lại được (đặt lại cùng giá trị)
-DELETE  idempotent               → thử lại được (lần hai trả 404, vẫn đúng ý)
-POST    KHÔNG idempotent         → thử lại có thể tạo BẢN GHI TRÙNG
-PATCH   tuỳ nội dung             → "tăng số dư lên 10" thì không idempotent</code></pre>
+<p class="key">Idempotent = gọi nhiều lần cho kết quả <em>giống hệt</em> gọi một lần.</p>
+  <div class="strip">
+    <div class="c t"><i>GET</i><b>an toàn</b><u>thử lại tự do</u></div>
+    <div class="c t"><i>PUT</i><b>idempotent</b><u>đặt lại cùng giá trị</u></div>
+    <div class="c t"><i>DELETE</i><b>idempotent</b><u>lần hai trả 404, vẫn đúng ý</u></div>
+    <div class="c on"><i>PATCH</i><b>tuỳ nội dung</b><u>"tăng số dư lên 10" thì không</u></div>
+    <div class="c f"><i>POST</i><b>không idempotent</b><u>thử lại có thể tạo bản ghi trùng</u></div>
+  </div>
   <div class="note warn">
     <h4>Vì sao đây là chỗ nguy hiểm nhất</h4>
     Timeout <strong>không</strong> có nghĩa là request thất bại — nó chỉ có nghĩa là bạn <em>không biết</em>. Server có thể đã xử lý xong và trả về, nhưng phản hồi bị mất trên đường. Thử lại một <code>POST</code> trong tình huống đó tạo ra đơn hàng thứ hai, lần trừ tiền thứ hai. Đây là lỗi gây thiệt hại thật nhiều nhất trong nhóm này.
   </div>
-<pre><code>GIẢI PHÁP: khoá idempotency
-
-    POST /orders
-    Idempotency-Key: 7f3a-c21e-...        ← client sinh ra, GIỮ NGUYÊN khi thử lại
-
-Server: nếu đã thấy khoá này rồi → trả về kết quả CŨ, không xử lý lại.
-
-→ POST trở thành idempotent trên thực tế, và thử lại an toàn.</code></pre>
+<div class="seq">
+    <div class="who"><span>client</span><span>server</span></div>
+    <div class="m"><i>POST /orders · Idempotency-Key: 7f3a-c21e</i><div class="ar r"></div><u>client sinh khoá, giữ nguyên khi thử lại</u></div>
+    <div class="m wait"><i>phản hồi mất trên đường</i><div class="ar l"></div><u>client không biết đơn đã tạo hay chưa</u></div>
+    <div class="m"><i>POST /orders · cùng khoá 7f3a-c21e</i><div class="ar r"></div><u>thử lại</u></div>
+    <div class="m"><i>trả kết quả cũ</i><div class="ar l"></div><u>server thấy khoá đã xử lý → không tạo đơn thứ hai</u></div>
+  </div>
   <p>Đây là cách mọi API thanh toán làm, và nêu ra được nó khi bàn về retry là một điểm cộng rõ — vì nó cho thấy bạn đã nghĩ tới trường hợp phản hồi mất chứ chỉ nghĩ tới trường hợp server lỗi.</p>
 </section>
 
 <section id="http-s7">
   <div class="sh"><b>07</b><h2>Backoff và jitter</h2></div>
-<pre><code>SAI — thử lại ngay lập tức
-    server đang quá tải, bạn đổ thêm tải vào → làm nó sập hẳn
-
-TỐT HƠN — backoff theo hàm mũ
-    chờ 1s, 2s, 4s, 8s...
-    nhưng: mọi client cùng thất bại lúc t=0 sẽ cùng thử lại lúc t=1, t=3, t=7
-    → tải đến theo TỪNG ĐỢT ĐỒNG BỘ
-
-ĐÚNG — backoff theo hàm mũ CỘNG JITTER
-    chờ = random(0, base × 2^lần_thử)
-    → các client rải đều ra, không dồn cục</code></pre>
+<div class="stack">
+    <div class="s warn"><b>Sai · thử lại ngay lập tức</b><span>server đang quá tải mà bạn đổ thêm tải vào → làm nó sập hẳn</span></div>
+    <div class="s"><b>Tốt hơn · backoff theo hàm mũ</b><span>chờ 1s, 2s, 4s, 8s… — nhưng mọi client cùng hỏng lúc t=0 sẽ cùng thử lại lúc t=1, t=3, t=7 → tải đến theo từng đợt đồng bộ</span></div>
+    <div class="s ok"><b>Đúng · backoff hàm mũ cộng jitter</b><span>chờ = <code>random(0, base × 2^lần_thử)</code> → các client rải đều ra, không dồn cục</span></div>
+  </div>
   <table>
     <tr><th>Nguyên tắc</th><th>Chi tiết</th></tr>
     <tr><td>Giới hạn số lần thử</td><td>3 lần là thường đủ. Thử mãi chỉ kéo dài sự cố</td></tr>
@@ -220,24 +211,21 @@ TỐT HƠN — backoff theo hàm mũ
 
 <section id="http-s9">
   <div class="sh"><b>09</b><h2>Timeout và circuit breaker</h2></div>
-<pre><code>TIMEOUT — mọi lời gọi ra ngoài PHẢI có
-    không có timeout = một upstream chậm sẽ giữ hết luồng/kết nối của bạn
-    → service của bạn chết theo dù bản thân nó hoàn toàn ổn
-
-Ngân sách timeout phải GIẢM DẦN theo chiều gọi:
-    gateway 3s  →  service A 2s  →  service B 1s  →  DB 500ms
-
-Nếu ngược lại — service B chờ 5s trong khi gateway chỉ chờ 1s —
-thì công việc của B là vô nghĩa: client đã bỏ đi từ lâu.</code></pre>
-<pre><code>CIRCUIT BREAKER — ba trạng thái
-
-    CLOSED     mọi thứ bình thường, request đi qua
-       ↓  tỉ lệ lỗi vượt ngưỡng
-    OPEN       TỪ CHỐI NGAY, không gọi upstream nữa
-       ↓  sau một khoảng chờ
-    HALF-OPEN  cho vài request thử
-       ├─ thành công → CLOSED
-       └─ vẫn lỗi   → OPEN</code></pre>
+<p class="key">Mọi lời gọi ra ngoài <em>phải</em> có timeout — không có thì một upstream chậm sẽ giữ hết luồng và kết nối của bạn, service của bạn chết theo dù bản thân nó hoàn toàn ổn.</p>
+  <div class="axis">
+    <div class="stop"><b>gateway · 3s</b><span>ngoài cùng, chờ lâu nhất</span></div>
+    <div class="stop"><b>service A · 2s</b><span></span></div>
+    <div class="stop"><b>service B · 1s</b><span></span></div>
+    <div class="stop on"><b>DB · 500ms</b><span>trong cùng, chờ ngắn nhất</span></div>
+  </div>
+  <p class="axiscap"><span>ngân sách timeout phải giảm dần theo chiều gọi</span><span><em>nếu ngược lại, B chờ 5s trong khi gateway chỉ chờ 1s thì công của B là vô nghĩa — client đã bỏ đi từ lâu</em></span></p>
+<div class="flow">
+    <div class="n ok"><h5>CLOSED</h5><p>bình thường, request đi qua</p></div>
+    <div class="a">tỉ lệ lỗi vượt ngưỡng →</div>
+    <div class="n no"><h5>OPEN</h5><p>từ chối ngay, không gọi upstream nữa</p></div>
+    <div class="a">sau một khoảng chờ →</div>
+    <div class="n"><h5>HALF-OPEN</h5><p>cho vài request thử · thành công thì về CLOSED, vẫn lỗi thì về OPEN</p></div>
+  </div>
   <div class="note key">
     <h4>Vì sao thất bại nhanh lại tốt hơn</h4>
     Khi upstream đã chết, mọi lời gọi tới nó chỉ để chờ timeout — <strong>chiếm luồng, chiếm kết nối, và làm chậm cả những request không liên quan</strong>. Circuit breaker cắt vòng đó: từ chối ngay, giải phóng tài nguyên, và cho upstream thời gian hồi phục thay vì tiếp tục dội tải vào nó. Cộng với ngân sách retry ở mục 07, đây là hai cơ chế chính chống sự cố lan truyền.

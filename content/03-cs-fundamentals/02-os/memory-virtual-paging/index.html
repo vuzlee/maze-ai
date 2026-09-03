@@ -56,6 +56,40 @@
     <li><b>Ảo giác không gian liên tục</b> — process "tưởng" mình sở hữu toàn bộ dải địa chỉ của kiến trúc máy (ví dụ gần hết không gian 64-bit), liên tục từ đầu tới cuối, dù RAM vật lý nhỏ hơn thế rất nhiều lần và đang bị chia sẻ với hàng chục process khác. Ảo giác này vẫn giữ được ngay cả khi RAM không đủ chỗ, nhờ swap — đẩy tạm phần ít dùng xuống đĩa.</li>
   </ul>
 
+  <figure>
+    <svg viewBox="0 0 860 250" role="img" aria-label="Hai process có không gian địa chỉ ảo riêng, page table dịch sang các frame rải rác trong RAM">
+      <defs><marker id="vm1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#EDB44A"/></marker></defs>
+
+      <text class="sv-l" x="20" y="20" fill="#8CA9F2">process A — địa chỉ ảo</text>
+      <rect class="sv-b" x="20" y="30" width="150" height="34" rx="4"/><text class="sv-t" x="95" y="52" text-anchor="middle" fill="#EDE7DE">page 0</text>
+      <rect class="sv-b" x="20" y="70" width="150" height="34" rx="4"/><text class="sv-t" x="95" y="92" text-anchor="middle" fill="#EDE7DE">page 1</text>
+
+      <text class="sv-l" x="20" y="140" fill="#5BCFA0">process B — địa chỉ ảo</text>
+      <rect class="sv-b" x="20" y="150" width="150" height="34" rx="4"/><text class="sv-t" x="95" y="172" text-anchor="middle" fill="#EDE7DE">page 0</text>
+      <rect class="sv-b" x="20" y="190" width="150" height="34" rx="4"/><text class="sv-t" x="95" y="212" text-anchor="middle" fill="#EDE7DE">page 1</text>
+
+      <rect x="300" y="60" width="150" height="130" rx="6" fill="#241F1A" stroke="#3D352C"/>
+      <text class="sv-t" x="375" y="112" text-anchor="middle" fill="#EDB44A">page table</text>
+      <text class="sv-l" x="375" y="134" text-anchor="middle">page → frame</text>
+
+      <path d="M175 47 H295" stroke="#EDB44A" stroke-width="1.4" fill="none" marker-end="url(#vm1)"/>
+      <path d="M175 87 H295" stroke="#EDB44A" stroke-width="1.4" fill="none" marker-end="url(#vm1)"/>
+      <path d="M175 167 H295" stroke="#EDB44A" stroke-width="1.4" fill="none" marker-end="url(#vm1)"/>
+      <path d="M175 207 H295" stroke="#EDB44A" stroke-width="1.4" fill="none" marker-end="url(#vm1)"/>
+
+      <text class="sv-l" x="620" y="20">RAM thật — các frame</text>
+      <rect x="560" y="30" width="180" height="30" rx="4" fill="#5BCFA0" opacity=".22" stroke="#5BCFA0"/><text class="sv-t" x="650" y="50" text-anchor="middle" fill="#EDE7DE">frame — B page 1</text>
+      <rect x="560" y="66" width="180" height="30" rx="4" fill="#8CA9F2" opacity=".22" stroke="#8CA9F2"/><text class="sv-t" x="650" y="86" text-anchor="middle" fill="#EDE7DE">frame — A page 1</text>
+      <rect class="sv-b" x="560" y="102" width="180" height="30" rx="4"/><text class="sv-l" x="650" y="122" text-anchor="middle">trống</text>
+      <rect x="560" y="138" width="180" height="30" rx="4" fill="#8CA9F2" opacity=".22" stroke="#8CA9F2"/><text class="sv-t" x="650" y="158" text-anchor="middle" fill="#EDE7DE">frame — A page 0</text>
+      <rect x="560" y="174" width="180" height="30" rx="4" fill="#5BCFA0" opacity=".22" stroke="#5BCFA0"/><text class="sv-t" x="650" y="194" text-anchor="middle" fill="#EDE7DE">frame — B page 0</text>
+
+      <path d="M455 100 H555" stroke="#EDB44A" stroke-width="1.4" fill="none" marker-end="url(#vm1)"/>
+      <path d="M455 130 H555" stroke="#EDB44A" stroke-width="1.4" fill="none" marker-end="url(#vm1)"/>
+    </svg>
+    <figcaption>Hai process đều có "page 0" và "page 1" của riêng mình — <b>trùng số nhưng khác chỗ trong RAM</b>. Page table là thứ quyết định ai chạm vào frame nào, nên A không thể với sang vùng của B, và các page liền nhau trong địa chỉ ảo không cần liền nhau trong RAM thật.</figcaption>
+  </figure>
+
   <div class="note">
     <h4>Bài này nối tiếp</h4>
     Ranh giới cô lập giữa process và thread, và chi phí context switch, nằm ở bài
@@ -89,11 +123,14 @@
 
   <p><b>Page fault</b> xảy ra khi CPU truy cập một page chưa được ánh xạ vào RAM cho process hiện tại. Có hai loại, chênh lệch tốc độ rất lớn:</p>
 
-  <table>
-    <tr><th>Loại</th><th>Khi nào xảy ra</th><th>Tốc độ xử lý</th></tr>
-    <tr><td><b>Minor fault</b> (nhẹ)</td><td>Page đã có sẵn trong RAM (của process khác, hoặc shared library), chỉ chưa được map vào process này — ví dụ copy-on-write khi <code>fork()</code></td><td>Rất nhanh — chỉ cập nhật page table, không chạm đĩa</td></tr>
-    <tr><td><b>Major fault</b> (nặng)</td><td>Page phải đọc từ đĩa hoặc từ swap lên RAM</td><td>Chậm hơn truy cập RAM tới hàng nghìn, có khi hàng chục nghìn lần</td></tr>
-  </table>
+  <div class="cmp two">
+    <div><h5>Minor fault — nhẹ</h5>
+      <p>Page <b>đã nằm sẵn trong RAM</b> (của process khác, hoặc shared library), chỉ chưa map vào process này — ví dụ copy-on-write sau <code>fork()</code>.</p>
+      <p>Rất nhanh: chỉ cập nhật page table, <b>không chạm đĩa</b>.</p></div>
+    <div><h5>Major fault — nặng</h5>
+      <p>Page <b>phải đọc từ đĩa</b> hoặc từ swap lên RAM.</p>
+      <p>Chậm hơn truy cập RAM hàng nghìn, có khi hàng chục nghìn lần.</p></div>
+  </div>
 
   <div class="bars">
     <div class="b"><i>RAM (~100ns)</i><u style="width:1%"></u><b>tham chiếu</b></div>

@@ -39,40 +39,85 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-logreg" data-title="Logistic regression" data-tag="Foundations" data-blurb="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
+      <article class="doc" id="art-logreg" data-title="Logistic regression" data-tag="ML" data-blurb="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
         <header class="hero">
-  <p class="eyebrow">Deep dive · Machine learning · nền tảng</p>
+  <p class="eyebrow">Machine learning · Classical models</p>
   <h1>Logistic <em>regression</em></h1>
   <p class="lede">Không phải "linear regression cho phân loại" — nó đổi cả <b>hàm bọc</b> lẫn <b>loss function</b>, và mỗi thay đổi đều có lý do bị hỏi tới cùng. Bài này giải thích vì sao <b>không dùng MSE cho phân loại</b>, cách đọc hệ số thành câu tiếng Việt, và vì sao ngưỡng 0.5 gần như luôn sai.</p>
 </header>
 <section id="logreg-s01">
   <div class="sh"><b>01</b><h2>Vì sao không dùng linear regression để phân loại</h2></div>
-<pre><code>Gán nhãn 0 và 1 rồi fit đường thẳng:
+<p class="key">Gán nhãn 0 và 1 rồi kẻ một đường thẳng qua chúng — <em>đường thẳng không biết dừng ở đâu</em>.</p>
 
-  ŷ = 1.7   ← xác suất 170%?
-  ŷ = -0.4  ← xác suất âm?
+  <figure>
+    <svg viewBox="0 0 900 240" role="img" aria-label="Đường thẳng vượt khỏi khoảng 0 tới 1, và bị một điểm xa kéo lệch">
+      <g>
+        <line x1="60" y1="40" x2="60" y2="180" stroke="#3D352C"></line>
+        <line x1="60" y1="180" x2="400" y2="180" stroke="#3D352C"></line>
+        <line x1="56" y1="60" x2="400" y2="60" stroke="#2E2822" stroke-dasharray="4 4"></line>
+        <text class="sv-l" x="46" y="64" text-anchor="end">1</text>
+        <text class="sv-l" x="46" y="184" text-anchor="end">0</text>
+        <line x1="80" y1="212" x2="392" y2="30" stroke="#8CA9F2" stroke-width="2"></line>
+        <circle cx="110" cy="180" r="4" fill="#8CA9F2"></circle><circle cx="150" cy="180" r="4" fill="#8CA9F2"></circle>
+        <circle cx="190" cy="180" r="4" fill="#8CA9F2"></circle>
+        <circle cx="270" cy="60" r="4" fill="#8CA9F2"></circle><circle cx="320" cy="60" r="4" fill="#8CA9F2"></circle>
+        <circle cx="360" cy="60" r="4" fill="#8CA9F2"></circle>
+        <text class="sv-l" x="392" y="26" fill="#F79BAB">ŷ = 1,7 — xác suất 170%?</text>
+        <text class="sv-l" x="84" y="226" fill="#F79BAB">ŷ = −0,4 — xác suất âm?</text>
+      </g>
+      <g>
+        <line x1="530" y1="40" x2="530" y2="180" stroke="#3D352C"></line>
+        <line x1="530" y1="180" x2="870" y2="180" stroke="#3D352C"></line>
+        <line x1="526" y1="60" x2="870" y2="60" stroke="#2E2822" stroke-dasharray="4 4"></line>
+        <text class="sv-l" x="516" y="64" text-anchor="end">1</text>
+        <text class="sv-l" x="516" y="184" text-anchor="end">0</text>
+        <line x1="546" y1="176" x2="800" y2="52" stroke="#2E2822" stroke-width="1.5" stroke-dasharray="4 4"></line>
+        <line x1="546" y1="188" x2="860" y2="86" stroke="#EDB44A" stroke-width="2"></line>
+        <circle cx="570" cy="180" r="4" fill="#8CA9F2"></circle><circle cx="610" cy="180" r="4" fill="#8CA9F2"></circle>
+        <circle cx="700" cy="60" r="4" fill="#8CA9F2"></circle><circle cx="740" cy="60" r="4" fill="#8CA9F2"></circle>
+        <circle cx="856" cy="60" r="6" fill="#EDB44A"></circle>
+        <text class="sv-l" x="850" y="42" text-anchor="end" fill="#EDB44A">thêm một điểm ở rất xa</text>
+        <text class="sv-l" x="700" y="212" text-anchor="middle" fill="#EDB44A">cả đường bị kéo nghiêng → ranh giới ở giữa đổi theo</text>
+      </g>
+    </svg>
+    <figcaption>Điểm bên phải ngoài cùng là điểm <strong>dễ phân loại nhất</strong>, vậy mà nó lại lay chuyển ranh giới nhiều nhất.</figcaption>
+  </figure>
 
-Và tệ hơn: thêm MỘT điểm ở rất xa về phía phải sẽ kéo cả đường thẳng
-xuống, làm đổi luôn ranh giới quyết định cho những điểm ở giữa.</code></pre>
-  <p>Ba vấn đề, xếp theo mức nghiêm trọng:</p>
-  <ul>
-    <li><strong>Đầu ra không bị chặn trong [0, 1]</strong> nên không diễn giải được thành xác suất.</li>
-    <li><strong>MSE giả định phần dư phân phối chuẩn</strong>, nhưng nhãn nhị phân thì theo phân phối Bernoulli — sai giả định ngay từ gốc.</li>
-    <li><strong>Điểm ở xa ảnh hưởng quá mạnh</strong> tới ranh giới, dù chúng vốn dễ phân loại nhất.</li>
+  <ul class="why">
+    <li><b>Đầu ra không bị chặn trong [0, 1]</b> nên không đọc thành xác suất được.</li>
+    <li><b>MSE giả định phần dư phân phối chuẩn</b>, nhãn nhị phân lại theo Bernoulli — sai giả định ngay từ gốc.</li>
+    <li>Logistic regression sửa cả ba: bọc <code>sigmoid</code> để ép đầu ra vào (0, 1), và đổi sang log loss cho khớp Bernoulli.</li>
   </ul>
-  <p>Logistic regression sửa cả ba: bọc <code>sigmoid</code> để chặn đầu ra trong (0, 1), và đổi loss function thành log loss để khớp với phân phối Bernoulli.</p>
 </section>
 
 <section id="logreg-s02">
   <div class="sh"><b>02</b><h2>Sigmoid và log loss</h2></div>
-<pre><code>z = w·x + b                    <span class="cm"># phần tuyến tính, gọi là log-odds</span>
-p = sigmoid(z) = 1 / (1 + e⁻ᶻ)  <span class="cm"># nén về khoảng (0, 1)</span>
+<p class="key">Sigmoid là cái phễu: <em>nhận một số bất kỳ, trả về một số trong khoảng 0–1</em>.</p>
 
-z = 0   → p = 0.5      ← ranh giới quyết định
-z &gt; 0   → p &gt; 0.5
-z = 2   → p ≈ 0.88
-z = -2  → p ≈ 0.12</code></pre>
-  <p>Điều đáng nhớ nhất về cấu trúc này: <strong>ranh giới quyết định vẫn là một mặt phẳng tuyến tính</strong> trong không gian đặc trưng. Sigmoid chỉ biến điểm số thành xác suất; nó không làm model phi tuyến. Muốn ranh giới cong thì phải tự thêm đặc trưng bậc cao hoặc đặc trưng tương tác.</p>
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="Đường cong sigmoid, bằng 0,5 tại z bằng 0 và bão hoà ở hai đầu">
+      <line x1="90" y1="30" x2="90" y2="170" stroke="#3D352C"></line>
+      <line x1="90" y1="170" x2="780" y2="170" stroke="#3D352C"></line>
+      <line x1="86" y1="40" x2="780" y2="40" stroke="#2E2822" stroke-dasharray="4 4"></line>
+      <line x1="86" y1="105" x2="780" y2="105" stroke="#2E2822" stroke-dasharray="4 4"></line>
+      <text class="sv-l" x="76" y="44" text-anchor="end">p = 1</text>
+      <text class="sv-l" x="76" y="109" text-anchor="end">p = 0,5</text>
+      <text class="sv-l" x="76" y="174" text-anchor="end">p = 0</text>
+      <path d="M100 166 C260 164 340 150 435 105 C530 60 610 46 770 44" fill="none" stroke="#8CA9F2" stroke-width="2.5"></path>
+      <line x1="435" y1="30" x2="435" y2="182" stroke="#EDB44A" stroke-dasharray="4 4"></line>
+      <circle cx="435" cy="105" r="5.5" fill="#EDB44A"></circle>
+      <text class="sv-l" x="435" y="198" text-anchor="middle" fill="#EDB44A">z = 0 · ranh giới quyết định</text>
+      <text class="sv-l" x="160" y="146" fill="#8CA9F2">z = −2 → p ≈ 0,12</text>
+      <text class="sv-l" x="620" y="70" fill="#8CA9F2">z = 2 → p ≈ 0,88</text>
+      <text class="sv-l" x="760" y="188" text-anchor="end">z = w·x + b  →</text>
+    </svg>
+    <figcaption>Hai đầu <strong>bẹt ra</strong> — chi tiết đó quay lại ở mục 03 và là lý do không dùng được MSE.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Ranh giới quyết định vẫn là một mặt phẳng</b>. Sigmoid chỉ đổi thang đo của điểm số, nó không làm model phi tuyến.</li>
+    <li>Muốn ranh giới cong thì phải tự thêm đặc trưng bậc cao hoặc đặc trưng tương tác.</li>
+  </ul>
 <div class="eq">
     <p class="read">Loss function — <b>log loss</b> (còn gọi binary cross-entropy):</p>
     <div class="line">
@@ -96,19 +141,26 @@ z = -2  → p ≈ 0.12</code></pre>
 <section id="logreg-s03">
   <div class="sh"><b>03</b><h2>Vì sao log loss chứ không phải MSE</h2></div>
   <p>Câu hỏi phỏng vấn kinh điển, và có <strong>hai</strong> lý do — nói được cả hai mới là câu trả lời đầy đủ.</p>
-  <h3>Lý do 1: MSE + sigmoid không lồi</h3>
-<pre><code>Với sigmoid bọc ngoài, mặt mất mát MSE theo w có nhiều cực tiểu địa phương.
-Log loss thì LỒI theo w → gradient descent chắc chắn tới cực tiểu toàn cục.</code></pre>
-  <h3>Lý do 2: gradient triệt tiêu đúng lúc cần nhất</h3>
-<pre><code>Trường hợp tệ nhất: nhãn thật y = 1, model dự đoán p = 0.001 (sai hoàn toàn)
+  <div class="cmp two">
+    <div>
+      <h5>Lý do 1 — mặt mất mát</h5>
+      <p>MSE bọc sigmoid cho mặt mất mát <b>không lồi</b>: nhiều hố cạn, gradient descent mắc kẹt ở hố nào cũng được.</p>
+      <p>Log loss thì <b>lồi</b> — chỉ có một đáy, chắc chắn tới được.</p>
+    </div>
+    <div>
+      <h5>Lý do 2 — tín hiệu học</h5>
+      <p>Đạo hàm của sigmoid <b>bẹt ở hai đầu</b>. MSE nhân nó vào gradient nên bóp chết tín hiệu ở đúng mẫu sai nặng nhất.</p>
+      <p>Log loss được dựng để <b>khử đúng cái nhân tử đó</b>.</p>
+    </div>
+  </div>
 
-Với MSE:      gradient ∝ (p - y) · σ'(z)
-              σ'(z) = p(1-p) ≈ 0.001 → gradient GẦN BẰNG 0
-              → model sai nặng nhưng gần như không học được gì
+  <p>Lý do 2 nhìn bằng số cho rõ. Mẫu tệ nhất có thể: nhãn thật là <b>1</b> mà model đoán <b>p = 0,001</b> — sai hoàn toàn.</p>
 
-Với log loss:  gradient ∝ (p - y) = -0.999
-              → tín hiệu học rất mạnh, đúng như mong đợi</code></pre>
-  <p>Đó là điểm cốt lõi: đạo hàm của sigmoid bão hoà ở hai đầu, nên nhân nó vào gradient sẽ <em>giết</em> tín hiệu học ở đúng những mẫu bị dự đoán sai nặng nhất. Log loss được thiết kế để triệt tiêu chính xác cái hệ số <code>σ'(z)</code> đó.</p>
+  <div class="bars">
+    <div class="b bad"><i>MSE</i><u style="width:1%"></u><b>gradient ≈ 0,001 — gần như không học được gì</b></div>
+    <div class="b hi"><i>log loss</i><u style="width:100%"></u><b>gradient ≈ 1,0 — tín hiệu mạnh, đúng như cần</b></div>
+  </div>
+  <p class="stripnote"><span>cùng một mẫu sai nặng như nhau</span><span><em>MSE có thêm nhân tử σ'(z) = p(1−p) ≈ 0,001 · log loss thì không</em></span></p>
   <div class="note">
     <h4>Nhìn từ góc thống kê</h4>
     Log loss không phải phát minh tuỳ ý — nó chính là <strong>âm log-likelihood</strong> của phân phối Bernoulli. Tối thiểu hoá nó tương đương với ước lượng hợp lý cực đại (MLE). Cũng như MSE là âm log-likelihood của phân phối chuẩn. Chọn loss function thực chất là <em>khai báo bạn giả định dữ liệu sinh ra từ phân phối nào</em>.
@@ -117,26 +169,30 @@ Với log loss:  gradient ∝ (p - y) = -0.999
 
 <section id="logreg-s04">
   <div class="sh"><b>04</b><h2>Odds ratio — cách diễn giải đúng</h2></div>
-<pre><code>odds = p / (1 - p)                 <span class="cm"># tỉ lệ cược</span>
-log(odds) = z = w·x + b            <span class="cm"># phần tuyến tính chính là LOG-ODDS</span>
+<p class="key">Phần tuyến tính <code>w·x + b</code> <em>chính là log-odds</em>. Nên tăng một đơn vị của x thì odds được <b>nhân</b> chứ không phải cộng.</p>
 
-→ tăng x₁ thêm 1 đơn vị làm log-odds tăng thêm w₁
-→ tức odds được NHÂN với e^w₁</code></pre>
-<pre><code>Ví dụ: w = 0.7 cho biến "có tiền sử mua hàng"
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>log</span></span>
+      <span class="t b"><span>( p / (1 − p) )</span><em>odds — tỉ lệ cược</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>w·x + b</span></span>
+    </div>
+    <p class="read">Với <code>w = 0,7</code> cho biến "có tiền sử mua hàng": <code>e<sup>0,7</sup> ≈ 2</code> → <b>odds mua lại gấp đôi</b>, khi giữ nguyên các biến khác.</p>
+  </div>
 
-e^0.7 ≈ 2.0
+  <p class="key">Nhưng <em>odds gấp đôi không phải xác suất gấp đôi</em> — và mức chênh phụ thuộc xác suất nền:</p>
 
-"Khách có tiền sử mua hàng có odds mua lại GẤP ĐÔI so với khách không có,
- khi giữ nguyên các biến khác."
+  <div class="bars">
+    <div class="b"><i>p nền 0,10 → sau khi ×2</i><u style="width:18%"></u><b>0,18 — gần gấp đôi thật</b></div>
+    <div class="b"><i>p nền 0,50 → sau khi ×2</i><u style="width:67%"></u><b>0,67 — không gấp đôi</b></div>
+    <div class="b bad"><i>p nền 0,90 → sau khi ×2</i><u style="width:95%"></u><b>0,95 — nhích rất ít</b></div>
+  </div>
+  <p class="stripnote"><span>cùng một odds ratio bằng 2</span><span><em>xác suất nền càng cao thì đụng trần, tăng càng ít</em></span></p>
 
-SAI nếu nói: "xác suất mua gấp đôi" — odds khác xác suất.</code></pre>
-  <table>
-    <tr><th>p</th><th>odds</th><th>odds sau khi × 2</th><th>p mới</th></tr>
-    <tr><td>0.10</td><td>0.11</td><td>0.22</td><td>0.18 — gần gấp đôi</td></tr>
-    <tr><td>0.50</td><td>1.00</td><td>2.00</td><td>0.67 — không gấp đôi</td></tr>
-    <tr><td>0.90</td><td>9.00</td><td>18.00</td><td>0.95 — tăng rất ít</td></tr>
-  </table>
-  <p>Bảng này cho thấy vì sao phải cẩn thận: cùng một odds ratio nhưng ảnh hưởng lên xác suất khác nhau hoàn toàn tuỳ vào xác suất nền. Đây là lỗi diễn giải phổ biến nhất khi trình bày kết quả logistic regression cho người không chuyên.</p>
+  <ul class="why">
+    <li>Nói với người không chuyên thì <b>quy về xác suất tại một mức nền cụ thể</b>, đừng nói odds ratio trần trụi — đây là lỗi diễn giải hay gặp nhất.</li>
+  </ul>
 </section>
 
 <section id="logreg-s05">
@@ -222,7 +278,7 @@ SAI nếu nói: "xác suất mua gấp đôi" — odds khác xác suất.</code>
   <p>Vì bốn thứ nó vẫn thắng: diễn giải được từng hệ số — bắt buộc ở tài chính và y tế nơi có yêu cầu pháp lý phải giải thích quyết định; xác suất được hiệu chỉnh tốt sẵn, không cần bước calibration; suy luận chỉ là một phép nhân vector nên phù hợp ràng buộc độ trễ rất thấp; và nó là mốc so sánh — nếu model phức tạp không thắng nổi nó thì vấn đề nằm ở dữ liệu hoặc đặc trưng chứ không ở model. Tôi luôn dựng nó làm baseline trước khi thử gì phức tạp hơn.</p></details>
 </section>
 
-<footer>Deep dive · logistic regression · công thức viết theo quy ước một mẫu, bỏ chỉ số batch cho gọn. Phần dự đoán số nằm ở bài <a href="../linear-regression/index.html">Linear regression</a>.</footer>
+<footer>Machine learning · Classical models · công thức viết theo quy ước một mẫu, bỏ chỉ số batch cho gọn. Phần dự đoán số nằm ở bài <a href="../linear-regression/index.html">Linear regression</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

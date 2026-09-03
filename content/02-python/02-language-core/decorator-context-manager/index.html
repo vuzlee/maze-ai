@@ -101,7 +101,14 @@ c(); c(); c()                  <span class="cm"># 1, 2, 3</span></code></pre>
 
 <span class="cm"># @timed chỉ là cách viết ngắn của:</span>
 <span class="cm"># slow = timed(slow)</span></code></pre>
-  <p>Dòng cuối là chìa khoá để hiểu toàn bộ: decorator <strong>không có gì huyền bí</strong>, nó chỉ là phép gán lại tên hàm bằng kết quả của một hàm nhận hàm.</p>
+  <div class="flow">
+    <div class="n"><h5>def slow</h5><p>hàm gốc</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>timed(slow)</h5><p>hàm nhận hàm, trả về hàm</p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>slow = wrapper</h5><p>tên cũ, thân mới</p></div>
+  </div>
+  <p class="stripnote"><span>Decorator không có gì huyền bí.</span><span>Nó chỉ là phép <em>gán lại tên hàm</em> bằng kết quả của một hàm nhận hàm.</span></p>
   <div class="note key">
     <h4>Vì sao bắt buộc dùng functools.wraps</h4>
     Không có nó, hàm sau khi bọc mang tên <code>wrapper</code>: <code>help()</code> vô dụng, docstring biến mất, log ghi sai tên, và các thư viện dựa vào chữ ký hàm sẽ hỏng — FastAPI đọc annotation để sinh schema, pytest đọc tên để đặt tên test. Thiếu một dòng này gây ra những bug rất khó truy.
@@ -129,14 +136,17 @@ c(); c(); c()                  <span class="cm"># 1, 2, 3</span></code></pre>
 
 <span class="cm"># tương đương: call_api = retry(times=5, delay=0.5)(call_api)</span>
 <span class="cm">#                          └─ tầng 1 ─┘└──── tầng 2 ────┘</span></code></pre>
-  <p>Ba tầng vì có ba nhóm thông tin đến ở ba thời điểm khác nhau: tham số cấu hình lúc trang trí, hàm lúc định nghĩa, và đối số lúc gọi. Nhìn theo dòng "tương đương" ở cuối là hiểu ngay.</p>
+  <div class="stack">
+    <div class="s"><b>Tầng 1 — retry(times, delay)</b><span>nhận tham số cấu hình, ngay lúc trang trí</span></div>
+    <div class="s"><b>Tầng 2 — decorator(fn)</b><span>nhận hàm, lúc hàm được định nghĩa</span></div>
+    <div class="s ok"><b>Tầng 3 — wrapper(*a, **kw)</b><span>nhận đối số, lúc hàm thật sự được gọi</span></div>
+  </div>
+  <p class="stripnote"><span>Ba tầng vì có ba nhóm thông tin đến ở ba thời điểm khác nhau.</span><span><code>call_api = retry(times=5)(call_api)</code> — hai lần gọi liên tiếp, nên phải hai tầng trả về hàm.</span></p>
   <p><strong>Thứ tự khi xếp nhiều decorator</strong> — hay bị hỏi:</p>
-<pre><code>@a
-@b
-<span class="kw">def</span> f(): ...
-
-<span class="cm"># f = a(b(f))  →  b bọc trước (gần hàm nhất), a bọc ngoài</span>
-<span class="cm"># khi GỌI: a chạy trước, rồi tới b, rồi tới f</span></code></pre>
+<div class="cmp two">
+    <div><h5>Lúc bọc</h5><p><code>@a</code> trên <code>@b</code> trên <code>def f</code> nghĩa là <code>f = a(b(f))</code> — <b>b bọc trước</b> vì nó gần hàm nhất, a bọc ngoài cùng.</p></div>
+    <div><h5>Lúc gọi</h5><p>Đi từ ngoài vào: <b>a chạy trước</b>, rồi tới b, cuối cùng mới tới <code>f</code>.</p></div>
+  </div>
 </section>
 
 <section id="deco-s5">
@@ -163,7 +173,14 @@ c(); c(); c()                  <span class="cm"># 1, 2, 3</span></code></pre>
 
 <span class="kw">with</span> timer():
     heavy()</code></pre>
-  <p>Chú ý <code>try/finally</code> bao quanh <code>yield</code>: nếu thiếu, một exception trong khối <code>with</code> sẽ làm phần dọn dẹp không bao giờ chạy. Đây là điểm hay sai nhất khi tự viết context manager bằng generator.</p>
+  <div class="flow">
+    <div class="n"><h5>__enter__</h5><p>trước <code>yield</code> — chuẩn bị</p></div>
+    <div class="a">→</div>
+    <div class="n"><h5>thân khối with</h5><p>chạy tại chỗ <code>yield</code></p></div>
+    <div class="a">→</div>
+    <div class="n ok"><h5>__exit__</h5><p><code>finally</code> — chạy dù có lỗi</p></div>
+  </div>
+  <p class="stripnote"><span>Thiếu <code>try/finally</code> quanh <code>yield</code> thì một exception trong khối <code>with</code> làm phần dọn dẹp không bao giờ chạy.</span><span>Đây là chỗ sai nhiều nhất khi tự viết context manager bằng generator.</span></p>
   <p>Cách này ghép trực tiếp hai chủ đề của bài: <code>@contextmanager</code> là một <em>decorator</em> biến một <em>generator</em> thành context manager.</p>
 </section>
 

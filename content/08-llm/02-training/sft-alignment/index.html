@@ -47,21 +47,19 @@
 </header>
 
 <section id="sft-s1">
-  <div class="sh"><b>01</b><h2>Overview</h2></div>
-<pre><code>PRETRAINING          đoán token kế tiếp trên hàng nghìn tỉ token
-                     → biết ngôn ngữ và kiến thức, nhưng chỉ biết viết tiếp
-   ↓
-SFT                  học từ cặp (yêu cầu, phản hồi mẫu)
-                     → biết LÀM THEO chỉ dẫn thay vì viết tiếp
-   ↓
-ALIGNMENT            học từ SO SÁNH giữa hai phản hồi
-   ├─ RLHF           reward model + PPO — ba bước, phức tạp
-   └─ DPO            tối ưu trực tiếp trên cặp so sánh — một bước
-
-Điều chỉnh khối lượng tham số:
-   full fine-tune    cập nhật MỌI trọng số      → tốn nhất
-   LoRA              thêm hai ma trận nhỏ       → 0.1–1% tham số
-   QLoRA             LoRA trên model nén 4-bit  → chạy được trên một GPU</code></pre>
+  <div class="sh"><b>01</b><h2>Fine-tuning và alignment là gì</h2></div>
+<p class="key">Ba tầng nối tiếp nhau: <em>biết viết → biết làm theo → biết chọn cách trả lời người ta thích</em>.</p>
+  <div class="stack">
+    <div class="s"><b>Pretraining</b><span>đoán token kế tiếp trên hàng nghìn tỉ token → biết ngôn ngữ và kiến thức, nhưng chỉ biết viết tiếp</span></div>
+    <div class="s"><b>SFT</b><span>học từ cặp (yêu cầu, phản hồi mẫu) → biết <strong>làm theo chỉ dẫn</strong> thay vì viết tiếp</span></div>
+    <div class="s ok"><b>Alignment</b><span>học từ <strong>so sánh</strong> giữa hai phản hồi — RLHF (reward model + PPO, ba bước) hoặc DPO (một bước)</span></div>
+  </div>
+  <p>Trục thứ hai, độc lập với ba tầng trên, là <strong>cập nhật bao nhiêu trọng số</strong>:</p>
+  <div class="bars">
+    <div class="b bad"><i>full fine-tune</i><u style="width:100%"></u><b>100% tham số</b></div>
+    <div class="b hi"><i>LoRA · thêm hai ma trận nhỏ</i><u style="width:1%"></u><b>0,1–1% tham số</b></div>
+    <div class="b hi"><i>QLoRA · LoRA trên model nén 4-bit</i><u style="width:1%"></u><b>0,1–1% · chạy được trên một GPU</b></div>
+  </div>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     SFT dạy model <strong>định dạng và hành vi</strong>; alignment dạy nó <strong>sở thích</strong>; và LoRA chỉ là kỹ thuật <strong>tiết kiệm tài nguyên</strong> — nó không thay đổi việc bạn đang làm SFT hay DPO. Trộn lẫn ba trục này là lỗi khái niệm phổ biến nhất khi bàn về fine-tuning.
@@ -71,15 +69,14 @@ ALIGNMENT            học từ SO SÁNH giữa hai phản hồi
 <section id="sft-s2">
   <div class="sh"><b>02</b><h2>Có nên fine-tune không</h2></div>
   <p>Đây là câu phải trả lời trước, và trong phần lớn trường hợp câu trả lời là <em>không</em>.</p>
-  <table>
-    <tr><th>Nhu cầu</th><th>Giải pháp</th><th>Vì sao</th></tr>
-    <tr><td>Model cần <strong>biết</strong> thông tin nội bộ</td><td><strong>RAG</strong></td><td>Kiến thức thay đổi; fine-tune phải huấn luyện lại mỗi lần cập nhật</td></tr>
-    <tr><td>Cần đúng <strong>định dạng đầu ra</strong></td><td>Prompt + structured output</td><td>Rẻ, sửa được ngay, không cần dữ liệu</td></tr>
-    <tr><td>Cần một <strong>văn phong</strong> hoặc giọng điệu cố định</td><td><strong>Fine-tune</strong></td><td>Phong cách khó diễn đạt hết bằng chỉ dẫn</td></tr>
-    <tr><td>Cần model <strong>nhỏ hơn</strong> làm được việc hẹp</td><td><strong>Fine-tune</strong> + chưng cất</td><td>Model 7B fine-tune có thể vượt model lớn trên tác vụ hẹp, mà rẻ hơn nhiều</td></tr>
-    <tr><td>Cần <strong>giảm độ trễ và chi phí</strong></td><td>Fine-tune để bỏ prompt dài</td><td>Không phải gửi 2000 token chỉ dẫn mỗi lần gọi</td></tr>
-    <tr><td>Cần độ chính xác cao trên <strong>miền hẹp</strong></td><td>Fine-tune, sau khi RAG đã hết cách</td><td>Thuật ngữ chuyên ngành, định dạng lạ mà prompt không đủ</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>Model cần <em>biết</em> thông tin nội bộ → RAG</b><span>kiến thức thay đổi; fine-tune phải huấn luyện lại mỗi lần cập nhật</span></div>
+    <div class="s"><b>Cần đúng định dạng đầu ra → prompt + structured output</b><span>rẻ, sửa được ngay, không cần dữ liệu</span></div>
+    <div class="s ok"><b>Cần một văn phong cố định → fine-tune</b><span>phong cách khó diễn đạt hết bằng chỉ dẫn</span></div>
+    <div class="s ok"><b>Cần model nhỏ hơn làm được việc hẹp → fine-tune + chưng cất</b><span>model 7B fine-tune có thể vượt model lớn trên tác vụ hẹp, mà rẻ hơn nhiều</span></div>
+    <div class="s ok"><b>Cần giảm độ trễ và chi phí → fine-tune để bỏ prompt dài</b><span>không phải gửi 2000 token chỉ dẫn mỗi lần gọi</span></div>
+    <div class="s ok"><b>Cần chính xác cao trên miền hẹp → fine-tune, sau khi RAG đã hết cách</b><span>thuật ngữ chuyên ngành, định dạng lạ mà prompt không đủ</span></div>
+  </div>
   <div class="note warn">
     <h4>Ranh giới cần nhớ</h4>
     <strong>Fine-tune dạy hành vi, không nhồi được kiến thức một cách đáng tin.</strong> Model có thể học nói về một sự kiện nhưng vẫn trả lời sai chi tiết, vì huấn luyện chỉ đẩy phân phối chứ không tạo ra một nơi tra cứu chính xác. Kiến thức thay đổi được thì dùng RAG. Đây là câu trả lời sai phổ biến nhất khi được hỏi "khi nào fine-tune".
@@ -105,24 +102,24 @@ Thủ đô Việt Nam là gì?&lt;|im_end|&gt;
 Hà Nội.&lt;|im_end|&gt;
 
 → luôn dùng tokenizer.apply_chat_template() thay vì tự ghép chuỗi.</code></pre>
-  <table>
-    <tr><th>Siêu tham số</th><th>Khoảng thường dùng</th><th>Ghi chú</th></tr>
-    <tr><td>learning rate</td><td><code>1e-5</code> tới <code>2e-5</code> cho full; <code>1e-4</code> tới <code>3e-4</code> cho LoRA</td><td>LoRA chịu được learning rate lớn hơn nhiều</td></tr>
-    <tr><td>số epoch</td><td>1–3</td><td>Quá 3 thường bắt đầu học thuộc dữ liệu</td></tr>
-    <tr><td>batch size hiệu dụng</td><td>32–128</td><td>Dùng gradient accumulation nếu VRAM ít</td></tr>
-    <tr><td>độ dài chuỗi</td><td>Đủ chứa mẫu dài nhất</td><td>Cắt ngắn làm mất phần phản hồi cuối và dạy model dừng sai chỗ</td></tr>
-    <tr><td>warmup</td><td>3–5% số bước</td><td>Tránh phá trọng số ở những bước đầu</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>learning rate — <code>1e-5</code>…<code>2e-5</code> full, <code>1e-4</code>…<code>3e-4</code> LoRA</b><span>LoRA chịu được learning rate lớn hơn nhiều</span></div>
+    <div class="s warn"><b>số epoch — 1–3</b><span>quá 3 thường bắt đầu học thuộc dữ liệu</span></div>
+    <div class="s"><b>batch size hiệu dụng — 32–128</b><span>dùng gradient accumulation nếu VRAM ít</span></div>
+    <div class="s warn"><b>độ dài chuỗi — đủ chứa mẫu dài nhất</b><span>cắt ngắn làm mất phần phản hồi cuối và dạy model dừng sai chỗ</span></div>
+    <div class="s"><b>warmup — 3–5% số bước</b><span>tránh phá trọng số ở những bước đầu</span></div>
+  </div>
 </section>
 
 <section id="sft-s4">
   <div class="sh"><b>04</b><h2>Che mất mát trên phần prompt</h2></div>
-<pre><code>Chuỗi:   [system] [user: câu hỏi] [assistant: câu trả lời]
-
-Nhãn:    -100  -100  -100  ...  |  token thật của câu trả lời
-         └──── bị CHE, không tính mất mát ────┘
-
-Trong PyTorch, giá trị -100 là chỉ số bị CrossEntropyLoss bỏ qua.</code></pre>
+<div class="strip">
+    <div class="c dim"><i>system</i><b>-100</b><u>che</u></div>
+    <div class="c dim"><i>user · câu hỏi</i><b>-100</b><u>che</u></div>
+    <div class="cut"></div>
+    <div class="c t"><i>assistant · câu trả lời</i><b>token thật</b><u>tính mất mát ở đây</u></div>
+  </div>
+  <p class="stripnote"><span>không tính mất mát</span><span><em>-100 là chỉ số PyTorch bỏ qua</em></span><span>phần model phải học sinh ra</span></p>
   <p><strong>Vì sao phải che:</strong> nếu tính mất mát cả trên phần prompt, model đang được dạy <em>sinh ra câu hỏi của người dùng</em> — một việc vô nghĩa và làm loãng tín hiệu học. Với dữ liệu có prompt dài mà phản hồi ngắn, phần lớn gradient sẽ dồn vào việc học thuộc prompt.</p>
   <div class="note">
     <h4>Khi nào KHÔNG che lại là đúng</h4>
@@ -133,19 +130,15 @@ Trong PyTorch, giá trị -100 là chỉ số bị CrossEntropyLoss bỏ qua.</c
 
 <section id="sft-s5">
   <div class="sh"><b>05</b><h2>RLHF — ba bước</h2></div>
-<pre><code>BƯỚC 1 — SFT
-    Huấn luyện trên phản hồi mẫu → được model π_ref (dùng làm mốc tham chiếu)
-
-BƯỚC 2 — Reward model
-    Dữ liệu: cặp (phản hồi được thích, phản hồi bị bỏ) do người chấm
-    Huấn luyện một model cho điểm: r(x, y)
-    Mất mát:  -log σ( r(x, y_thích) - r(x, y_bỏ) )        ← Bradley-Terry
-
-BƯỚC 3 — PPO
-    Tối ưu policy để reward cao, nhưng KHÔNG đi quá xa π_ref:
-
-    max  E[ r(x, y) ]  -  β · KL( π ‖ π_ref )
-                          └──── hình phạt kéo về mốc ────┘</code></pre>
+<div class="stack">
+    <div class="s"><b>Bước 1 · SFT</b><span>huấn luyện trên phản hồi mẫu → được model <code>π_ref</code>, dùng làm mốc tham chiếu</span></div>
+    <div class="s"><b>Bước 2 · Reward model</b><span>người chấm cặp (phản hồi được thích, phản hồi bị bỏ) → huấn luyện một model cho điểm <code>r(x, y)</code></span></div>
+    <div class="s warn"><b>Bước 3 · PPO</b><span>tối ưu policy để reward cao mà không đi quá xa <code>π_ref</code></span></div>
+  </div>
+  <div class="eq">
+    <div class="line"><span class="t"><span>max</span></span><span class="t b"><span>E[ r(x, y) ]</span><em>reward cao</em></span><span class="op">−</span><span class="t r"><span>β · KL( π ‖ π_ref )</span><em>hình phạt kéo về mốc</em></span></div>
+    <div class="line"><span class="t"><span>mất mát reward model</span></span><span class="op">=</span><span class="t p"><span>−log σ( r(x, y_thích) − r(x, y_bỏ) )</span><em>Bradley-Terry</em></span></div>
+  </div>
   <div class="note key">
     <h4>Vì sao cần hình phạt KL</h4>
     Không có nó, policy sẽ tìm ra cách <strong>khai thác lỗ hổng của reward model</strong> — sinh ra những văn bản kỳ dị nhưng được reward model cho điểm cao, gọi là reward hacking. Reward model chỉ là một xấp xỉ của sở thích người, và mọi xấp xỉ đều có lỗ hổng khi bị tối ưu quá mạnh. Hình phạt KL giữ policy trong vùng mà xấp xỉ đó còn đáng tin.
@@ -155,25 +148,29 @@ BƯỚC 3 — PPO
 
 <section id="sft-s6">
   <div class="sh"><b>06</b><h2>DPO — bỏ hẳn reward model</h2></div>
-<pre><code>Nhận xét cốt lõi: bài toán "tối đa reward với ràng buộc KL" có NGHIỆM ĐÓNG.
-Từ nghiệm đó, reward biểu diễn được qua chính policy:
-
-    r(x, y)  =  β · log[ π(y|x) / π_ref(y|x) ]  +  const
-
-Thay biểu thức này vào mất mát Bradley-Terry của reward model
-→ reward model BIẾN MẤT, chỉ còn policy:
-
-    L = -log σ( β·log[π(y_thích)/π_ref(y_thích)] - β·log[π(y_bỏ)/π_ref(y_bỏ)] )</code></pre>
+<p class="key">Bài toán "tối đa reward với ràng buộc KL" có <em>nghiệm đóng</em> — nên reward viết lại được qua chính policy, và reward model biến mất.</p>
+  <div class="eq">
+    <div class="line"><span class="t"><span>r(x, y)</span></span><span class="op">=</span><span class="t b"><span>β · log[ π(y|x) / π_ref(y|x) ]</span><em>reward ẩn trong policy</em></span><span class="op">+</span><span class="t"><span>const</span></span></div>
+    <div class="line"><span class="t"><span>L</span></span><span class="op">=</span><span class="t g"><span>−log σ( β·log[π(y_thích)/π_ref(y_thích)] − β·log[π(y_bỏ)/π_ref(y_bỏ)] )</span><em>thay vào Bradley-Terry, chỉ còn policy</em></span></div>
+    <p class="read">Tăng xác suất của phản hồi được thích, giảm xác suất của phản hồi bị bỏ — cả hai đều đo <strong>tương đối so với model tham chiếu</strong>. Chính phần "tương đối" đó đóng vai trò hình phạt KL, nên không cần số hạng riêng nữa.</p>
+  </div>
   <p>Đọc công thức bằng lời: <em>tăng xác suất của phản hồi được thích và giảm xác suất của phản hồi bị bỏ, nhưng cả hai đều đo tương đối so với model tham chiếu.</em> Phần "tương đối so với tham chiếu" chính là thứ đóng vai trò hình phạt KL — nó đã nằm sẵn trong công thức thay vì là một số hạng riêng.</p>
-  <table>
-    <tr><th></th><th>RLHF (PPO)</th><th>DPO</th></tr>
-    <tr><td>Số model trong bộ nhớ</td><td>4</td><td><strong>2</strong> — policy và tham chiếu</td></tr>
-    <tr><td>Có reward model riêng</td><td>Có</td><td>Không</td></tr>
-    <tr><td>Vòng lặp huấn luyện</td><td>RL — sinh mẫu, chấm điểm, cập nhật</td><td><strong>Supervised learning thông thường</strong></td></tr>
-    <tr><td>Độ ổn định</td><td>Nhạy siêu tham số</td><td>Ổn định hơn nhiều</td></tr>
-    <tr><td>Sinh dữ liệu mới trong lúc huấn luyện</td><td>Có — online</td><td>Không — dùng dữ liệu cố định</td></tr>
-    <tr><td>Chất lượng đỉnh</td><td>Có thể cao hơn nếu làm tốt</td><td>Gần bằng, dễ đạt hơn nhiều</td></tr>
-  </table>
+  <div class="cmp two">
+    <div><h5>RLHF (PPO)</h5>
+      <p><b>Số model trong bộ nhớ</b> 4</p>
+      <p><b>Reward model riêng</b> có</p>
+      <p><b>Vòng lặp</b> RL — sinh mẫu, chấm điểm, cập nhật</p>
+      <p><b>Ổn định</b> nhạy siêu tham số</p>
+      <p><b>Dữ liệu</b> sinh mới trong lúc huấn luyện (online)</p>
+      <p><b>Chất lượng đỉnh</b> có thể cao hơn nếu làm tốt</p></div>
+    <div><h5>DPO</h5>
+      <p><b>Số model trong bộ nhớ</b> 2 — policy và tham chiếu</p>
+      <p><b>Reward model riêng</b> không</p>
+      <p><b>Vòng lặp</b> supervised learning thông thường</p>
+      <p><b>Ổn định</b> ổn định hơn nhiều</p>
+      <p><b>Dữ liệu</b> cố định</p>
+      <p><b>Chất lượng đỉnh</b> gần bằng, dễ đạt hơn nhiều</p></div>
+  </div>
   <div class="note warn">
     <h4>Điểm yếu của DPO</h4>
     Nó học từ tập dữ liệu <strong>cố định</strong>, nên không khám phá được những phản hồi mà policy hiện tại sinh ra — trong khi RLHF chấm điểm chính các mẫu policy vừa sinh. Hệ quả là DPO có thể lệch nếu dữ liệu ưa thích được sinh bởi một model khác hẳn. Các biến thể online DPO ra đời để lấp đúng khoảng này.
@@ -182,15 +179,14 @@ Thay biểu thức này vào mất mát Bradley-Terry của reward model
 
 <section id="sft-s7">
   <div class="sh"><b>07</b><h2>Bảng so sánh các phương pháp alignment</h2></div>
-  <table>
-    <tr><th>Phương pháp</th><th>Cần gì</th><th>Số model</th><th>Đặc điểm</th></tr>
-    <tr><td>SFT</td><td>Phản hồi mẫu</td><td>1</td><td>Nền tảng bắt buộc trước mọi thứ khác</td></tr>
-    <tr><td>RLHF / PPO</td><td>Cặp so sánh</td><td>4</td><td>Mạnh nhất nếu làm tốt; phức tạp, đắt, khó tái lập</td></tr>
-    <tr><td><strong>DPO</strong></td><td>Cặp so sánh</td><td>2</td><td>Mặc định thực tế hiện nay — đơn giản, ổn định</td></tr>
-    <tr><td>ORPO</td><td>Cặp so sánh</td><td><strong>1</strong></td><td>Gộp vào luôn mất mát SFT, không cần model tham chiếu</td></tr>
-    <tr><td>KTO</td><td>Nhãn tốt/xấu <em>không cần cặp</em></td><td>2</td><td>Dùng được khi chỉ có phản hồi like/dislike rời rạc từ người dùng</td></tr>
-    <tr><td>RLAIF</td><td>Cặp so sánh do <em>AI</em> chấm</td><td>4</td><td>Rẻ hơn nhiều so với thuê người chấm; chất lượng phụ thuộc model chấm</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>SFT — phản hồi mẫu · 1 model</b><span>nền tảng bắt buộc trước mọi thứ khác</span></div>
+    <div class="s warn"><b>RLHF / PPO — cặp so sánh · 4 model</b><span>mạnh nhất nếu làm tốt; phức tạp, đắt, khó tái lập</span></div>
+    <div class="s ok"><b>DPO — cặp so sánh · 2 model</b><span>mặc định thực tế hiện nay — đơn giản, ổn định</span></div>
+    <div class="s"><b>ORPO — cặp so sánh · 1 model</b><span>gộp luôn mất mát SFT, không cần model tham chiếu</span></div>
+    <div class="s"><b>KTO — nhãn tốt/xấu không cần cặp · 2 model</b><span>dùng được khi chỉ có like/dislike rời rạc từ người dùng</span></div>
+    <div class="s"><b>RLAIF — cặp so sánh do AI chấm · 4 model</b><span>rẻ hơn thuê người chấm; chất lượng phụ thuộc model chấm</span></div>
+  </div>
   <div class="note">
     <h4>KTO đáng biết vì lý do thực tế</h4>
     Dữ liệu phản hồi thật từ người dùng gần như luôn ở dạng <em>không theo cặp</em> — một lượt bị bấm dislike, một lượt được bấm like, không có hai phản hồi cho cùng một câu hỏi để so. DPO cần cặp nên không dùng được trực tiếp. KTO nhận đúng dạng dữ liệu đó, nên nó là lựa chọn tự nhiên khi bạn có log sản phẩm thật thay vì dữ liệu thuê chấm.
@@ -199,20 +195,19 @@ Thay biểu thức này vào mất mát Bradley-Terry của reward model
 
 <section id="sft-s8">
   <div class="sh"><b>08</b><h2>Dữ liệu — chất lượng quan trọng hơn số lượng</h2></div>
-<pre><code>Thí nghiệm LIMA: 1.000 ví dụ được tuyển chọn RẤT kỹ
-→ khả năng làm theo chỉ dẫn tương đương với model huấn luyện trên
-  hàng chục nghìn ví dụ chất lượng trung bình.
-
-Lý giải: kiến thức đã có từ pretraining. SFT chỉ dạy model
-ĐỊNH DẠNG và PHONG CÁCH phản hồi — việc đó không cần nhiều dữ liệu.</code></pre>
-  <table>
-    <tr><th>Tiêu chí chất lượng</th><th>Vì sao quan trọng</th></tr>
-    <tr><td><strong>Nhất quán về định dạng</strong></td><td>Model học rất nhanh các mẫu bề mặt. Định dạng lộn xộn dạy nó sự lộn xộn</td></tr>
-    <tr><td><strong>Không có phản hồi sai</strong></td><td>Một ví dụ sai gây hại nhiều hơn mười ví dụ đúng bù lại — model không biết cái nào đúng</td></tr>
-    <tr><td><strong>Đa dạng về loại yêu cầu</strong></td><td>1000 ví dụ cùng dạng dạy được một dạng duy nhất</td></tr>
-    <tr><td><strong>Độ dài phản hồi hợp lý</strong></td><td>Toàn phản hồi dài dạy model luôn viết dài, kể cả khi câu hỏi cần một từ</td></tr>
-    <tr><td><strong>Có cả ví dụ từ chối</strong></td><td>Nếu mọi ví dụ đều trả lời được, model học rằng nó phải luôn có câu trả lời — nguồn gốc của việc bịa đặt</td></tr>
-  </table>
+<div class="bars">
+    <div class="b hi"><i>LIMA · 1.000 ví dụ tuyển chọn rất kỹ</i><u style="width:3%"></u><b>làm theo chỉ dẫn: tương đương</b></div>
+    <div class="b"><i>hàng chục nghìn ví dụ chất lượng trung bình</i><u style="width:100%"></u><b>làm theo chỉ dẫn: tương đương</b></div>
+  </div>
+  <p class="stripnote"><span>gấp vài chục lần dữ liệu</span><span><em>mà kết quả ngang nhau</em></span></p>
+  <p>Lý giải: kiến thức đã có sẵn từ pretraining. SFT chỉ dạy model <strong>định dạng và phong cách</strong> phản hồi — việc đó không cần nhiều dữ liệu.</p>
+  <div class="stack">
+    <div class="s"><b>Nhất quán về định dạng</b><span>model học rất nhanh các mẫu bề mặt — định dạng lộn xộn dạy nó sự lộn xộn</span></div>
+    <div class="s ok"><b>Không có phản hồi sai</b><span>một ví dụ sai hại hơn mười ví dụ đúng bù lại — model không biết cái nào đúng</span></div>
+    <div class="s"><b>Đa dạng về loại yêu cầu</b><span>1000 ví dụ cùng dạng dạy được một dạng duy nhất</span></div>
+    <div class="s"><b>Độ dài phản hồi hợp lý</b><span>toàn phản hồi dài dạy model luôn viết dài, kể cả khi câu hỏi cần một từ</span></div>
+    <div class="s warn"><b>Có cả ví dụ từ chối</b><span>mọi ví dụ đều trả lời được → model học rằng nó phải luôn có câu trả lời — nguồn gốc của việc bịa đặt</span></div>
+  </div>
   <div class="note key">
     <h4>Dòng cuối bảng là điều hay bị bỏ qua nhất</h4>
     Nếu dữ liệu SFT chỉ chứa những câu hỏi mà model <em>trả lời được</em>, bạn đang dạy nó rằng <strong>luôn phải có câu trả lời</strong>. Muốn model biết nói "tôi không biết" hoặc "thông tin này không có trong tài liệu", dữ liệu huấn luyện phải chứa những ví dụ như vậy. Đây cũng là điểm nối trực tiếp với hệ thống RAG, nơi việc từ chối khi không có bằng chứng là hành vi mong muốn.
@@ -221,14 +216,13 @@ Lý giải: kiến thức đã có từ pretraining. SFT chỉ dạy model
 
 <section id="sft-s9">
   <div class="sh"><b>09</b><h2>Đánh giá model sau fine-tune</h2></div>
-  <table>
-    <tr><th>Cách</th><th>Đo gì</th><th>Cảnh báo</th></tr>
-    <tr><td>Mất mát trên tập giữ lại</td><td>Model có khớp phân phối dữ liệu không</td><td><strong>Không</strong> tương quan tốt với chất lượng cảm nhận</td></tr>
-    <tr><td>Benchmark theo tác vụ</td><td>Độ chính xác trên bài toán cụ thể</td><td>Chỉ dùng được nếu tác vụ có đáp án đúng rõ ràng</td></tr>
-    <tr><td>Tỉ lệ thắng do người chấm</td><td>So sánh trực tiếp với model gốc</td><td>Chuẩn tin cậy nhất, nhưng chậm và đắt</td></tr>
-    <tr><td>LLM làm trọng tài</td><td>Xấp xỉ tỉ lệ thắng bằng model mạnh hơn</td><td>Thiên vị phản hồi <em>dài</em> và phản hồi cùng phong cách với chính nó</td></tr>
-    <tr><td>Bộ kiểm tra hồi quy</td><td>Có mất khả năng nào không</td><td>Bắt buộc — thứ dễ bỏ qua nhất</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s warn"><b>Mất mát trên tập giữ lại</b><span>đo độ khớp phân phối · <b>không</b> tương quan tốt với chất lượng cảm nhận</span></div>
+    <div class="s"><b>Benchmark theo tác vụ</b><span>đo độ chính xác · chỉ dùng được nếu tác vụ có đáp án đúng rõ ràng</span></div>
+    <div class="s ok"><b>Tỉ lệ thắng do người chấm</b><span>so trực tiếp với model gốc · tin cậy nhất, nhưng chậm và đắt</span></div>
+    <div class="s warn"><b>LLM làm trọng tài</b><span>xấp xỉ tỉ lệ thắng · thiên vị phản hồi dài và phản hồi cùng phong cách với chính nó</span></div>
+    <div class="s ok"><b>Bộ kiểm tra hồi quy</b><span>xem có mất khả năng nào không · bắt buộc, và là thứ dễ bỏ qua nhất</span></div>
+  </div>
   <div class="note warn">
     <h4>Về việc dùng LLM làm trọng tài</h4>
     Nó nhanh và rẻ nên gần như bắt buộc phải dùng, nhưng phải biết hai thiên vị của nó: <strong>ưa phản hồi dài hơn</strong>, và <strong>ưa phong cách giống chính nó</strong>. Cách giảm: đảo thứ tự hai phản hồi rồi chấm hai lần, dùng thang điểm có tiêu chí cụ thể thay vì "cái nào tốt hơn", và luôn xác nhận lại một mẫu nhỏ bằng người thật.

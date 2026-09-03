@@ -70,21 +70,20 @@
 <section id="rest-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Chọn động từ và mã trạng thái</h2></div>
   <p class="key">Method nói <b>ý định</b>, mã trạng thái nói <b>kết quả</b>. Bảng dưới là tra nhanh cho phần thiết kế; ý nghĩa vận hành đầy đủ của mã trạng thái — mã nào an toàn để thử lại, phân biệt 502/503/504 — nằm ở bài <a href="../tcp-http/index.html">TCP &amp; HTTP</a>, không nhắc lại ở đây.</p>
-  <table>
-    <tr><th>Method</th><th>Dùng khi</th><th>Mã thành công</th></tr>
-    <tr><td><code>GET</code></td><td>Đọc, không đổi trạng thái</td><td>200</td></tr>
-    <tr><td><code>POST</code></td><td>Tạo mới một tài nguyên</td><td>201 Created + header <code>Location</code> trỏ tới tài nguyên vừa tạo</td></tr>
-    <tr><td><code>PUT</code></td><td>Thay thế <b>toàn bộ</b> tài nguyên bằng bản mới</td><td>200 (kèm body) hoặc 204 (không body)</td></tr>
-    <tr><td><code>PATCH</code></td><td>Cập nhật <b>một phần</b> tài nguyên</td><td>200 hoặc 204</td></tr>
-    <tr><td><code>DELETE</code></td><td>Xoá</td><td>204 (thường), 200 nếu trả về bản ghi vừa xoá</td></tr>
-  </table>
-  <table>
-    <tr><th>Mã lỗi</th><th>Dùng khi</th></tr>
-    <tr><td>400 Bad Request</td><td>Request sai định dạng hoặc thiếu field bắt buộc — lỗi ở tầng parse, chưa chạm tới nghiệp vụ</td></tr>
-    <tr><td>422 Unprocessable Entity</td><td>Đúng định dạng nhưng sai nghiệp vụ — ví dụ email đã tồn tại, ngày kết thúc trước ngày bắt đầu</td></tr>
-    <tr><td>404 Not Found</td><td>Tài nguyên không tồn tại — id sai, hoặc đã bị xoá</td></tr>
-    <tr><td>409 Conflict</td><td>Xung đột trạng thái — ví dụ optimistic locking thất bại vì có người khác đã sửa trước</td></tr>
-  </table>
+<div class="stack">
+    <div class="s"><b>GET — đọc, không đổi trạng thái</b><span>thành công: <code>200</code></span></div>
+    <div class="s ok"><b>POST — tạo mới một tài nguyên</b><span>thành công: <code>201 Created</code> + header <code>Location</code> trỏ tới tài nguyên vừa tạo</span></div>
+    <div class="s"><b>PUT — thay thế <b>toàn bộ</b> tài nguyên</b><span>thành công: <code>200</code> kèm body, hoặc <code>204</code> không body</span></div>
+    <div class="s"><b>PATCH — cập nhật <b>một phần</b></b><span>thành công: <code>200</code> hoặc <code>204</code></span></div>
+    <div class="s"><b>DELETE — xoá</b><span>thành công: <code>204</code>, hoặc <code>200</code> nếu trả về bản ghi vừa xoá</span></div>
+  </div>
+<div class="strip">
+    <div class="c f"><i>lỗi ở tầng parse</i><b>400</b><u>sai định dạng hoặc thiếu field bắt buộc</u></div>
+    <div class="c on"><i>lỗi ở tầng nghiệp vụ</i><b>422</b><u>đúng định dạng nhưng nghiệp vụ từ chối</u></div>
+    <div class="cut"></div>
+    <div class="c f"><i>không tìm thấy</i><b>404</b><u>id sai, hoặc đã bị xoá</u></div>
+    <div class="c on"><i>xung đột trạng thái</i><b>409</b><u>người khác đã sửa trước</u></div>
+  </div>
   <div class="note">
     <h4>Ranh giới 400 và 422</h4>
     Câu hỏi phân biệt hay gặp: field <code>email</code> thiếu là 400 — request không đủ để hiểu; field <code>email</code> có nhưng trùng với tài khoản đã đăng ký là 422 — request hiểu được, nhưng nghiệp vụ từ chối. Nhiều API gộp cả hai vào 400 cho gọn, nhưng phân biệt được hai lớp lỗi này là dấu hiệu hiểu rõ chỗ ranh giới giữa validate cú pháp và validate nghiệp vụ.
@@ -112,12 +111,11 @@
 
 <section id="rest-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Phiên bản & tương thích ngược</h2></div>
-  <table>
-    <tr><th>Cách</th><th>Ví dụ</th><th>Đánh đổi</th></tr>
-    <tr><td><b>Trong URL</b></td><td><code>/v1/orders</code>, <code>/v2/orders</code></td><td>Rõ ràng nhất, dễ thấy khi debug hay đọc log. Đổi lại: phá cache theo URL khi lên version mới, và phải duy trì nhiều nhánh code song song cho các version còn được dùng.</td></tr>
-    <tr><td><b>Qua header</b></td><td><code>Accept: application/vnd.api+json;version=2</code></td><td>URL sạch, ổn định qua các version. Đổi lại: khó thấy version đang gọi chỉ bằng nhìn URL, phải mở request để kiểm — chậm hơn khi debug nhanh.</td></tr>
-    <tr><td><b>Không versioning</b></td><td>Chỉ thêm field mới, không đổi nghĩa field cũ</td><td>Ít nhánh code nhất phải bảo trì. Đổi lại: đòi kỷ luật thiết kế rất cao — mọi thay đổi phải cộng thêm chứ không được sửa, và không giải quyết được lúc thật sự cần một breaking change.</td></tr>
-  </table>
+<div class="stack">
+    <div class="s ok"><b>Trong URL — <code>/v1/orders</code></b><span>rõ nhất khi debug và đọc log · đổi lại: phá cache theo URL, phải nuôi nhiều nhánh code song song</span></div>
+    <div class="s"><b>Qua header — <code>Accept: …;version=2</code></b><span>URL sạch và ổn định · đổi lại: phải mở request mới biết đang gọi version nào</span></div>
+    <div class="s warn"><b>Không versioning — chỉ thêm field, không đổi nghĩa field cũ</b><span>ít nhánh code nhất · đổi lại: đòi kỷ luật rất cao, và bó tay khi thật sự cần một breaking change</span></div>
+  </div>
   <p>Ba cách không loại trừ nhau: nhiều API dùng versioning trong URL cho breaking change lớn, và giữ nguyên tắc "chỉ cộng thêm" bên trong mỗi version để giảm số lần phải bật version mới.</p>
 </section>
 

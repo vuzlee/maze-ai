@@ -50,15 +50,15 @@
   <div class="sh"><b>01</b><h2>Race condition</h2></div>
   <p>Race condition xảy ra khi kết quả cuối cùng phụ thuộc vào <b>thứ tự thực thi không xác định</b> giữa nhiều luồng cùng truy cập một dữ liệu dùng chung. Đây không phải lỗi hiếm hay khó hình dung — nó nằm ngay trong phép toán tưởng như đơn giản nhất.</p>
   <p>Ví dụ kinh điển: <code>counter += 1</code> <b>không phải</b> một thao tác nguyên tử (atomic). Ở mức máy, nó là ba bước tách rời: đọc giá trị hiện tại, cộng 1, ghi giá trị mới trở lại. Hai thread cùng chạy đoạn này gần như đồng thời có thể cùng <b>đọc được giá trị cũ như nhau</b>, cả hai cùng cộng 1 rồi cùng ghi lại giá trị mới giống nhau — một lần tăng bị mất trắng mà không có exception nào báo.</p>
-  <table>
-    <tr><th>Thời điểm</th><th>Thread A</th><th>Thread B</th><th>counter trong bộ nhớ</th></tr>
-    <tr><td>t0</td><td>đọc counter → 0</td><td>—</td><td>0</td></tr>
-    <tr><td>t1</td><td>—</td><td>đọc counter → 0</td><td>0</td></tr>
-    <tr><td>t2</td><td>tính 0 + 1 = 1</td><td>—</td><td>0</td></tr>
-    <tr><td>t3</td><td>—</td><td>tính 0 + 1 = 1</td><td>0</td></tr>
-    <tr><td>t4</td><td>ghi counter ← 1</td><td>—</td><td>1</td></tr>
-    <tr><td>t5</td><td>—</td><td>ghi counter ← 1</td><td><strong>1</strong> — lẽ ra phải là 2</td></tr>
-  </table>
+  <div class="seq">
+    <div class="who"><span>Thread A</span><span>Thread B</span></div>
+    <div class="m"><i>đọc counter → 0</i><div class="ar r"></div><u>counter = 0</u></div>
+    <div class="m"><i>đọc counter → 0</i><div class="ar l"></div><u>counter = 0 — cả hai thấy cùng giá trị cũ</u></div>
+    <div class="m"><i>tính 0 + 1 = 1</i><div class="ar r"></div><u>counter = 0</u></div>
+    <div class="m"><i>tính 0 + 1 = 1</i><div class="ar l"></div><u>counter = 0</u></div>
+    <div class="m"><i>ghi counter ← 1</i><div class="ar r"></div><u>counter = 1</u></div>
+    <div class="m wait"><i>ghi counter ← 1</i><div class="ar l"></div><u>counter = 1 — lẽ ra phải là 2</u></div>
+  </div>
   <div class="note warn">
     <h4>Mất một lần tăng, không có lỗi nào báo</h4>
     Hai thread cùng tăng biến đúng một lần mỗi bên, kết quả đúng phải là <b>2</b> nhưng thực tế dừng ở <b>1</b>. Không có exception, không có log lỗi — chương trình chạy "bình thường" và trả về số sai. Đoạn code chạm vào dữ liệu dùng chung như thế này gọi là <b>critical section</b>, và nó cần được bảo vệ để chỉ một thread đi trọn vẹn cả ba bước đọc–cộng–ghi tại một thời điểm.
@@ -68,12 +68,11 @@
 <section id="oslock-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Mutex, semaphore, lock đọc-ghi</h2></div>
   <p>Ba công cụ dưới đây đều dùng để bảo vệ critical section khỏi race condition, nhưng khác nhau ở <b>bao nhiêu luồng được vào cùng lúc</b> và <b>ai được phép mở khoá</b>.</p>
-  <table>
-    <tr><th></th><th>Cơ chế</th><th>Số luồng được vào</th><th>Khi nào dùng</th></tr>
-    <tr><td><strong>Mutex</strong><br>(mutual exclusion)</td><td>Khoá nhị phân; luồng nào khoá thì đúng luồng đó phải mở</td><td>Đúng 1</td><td>Bảo vệ một critical section đơn giản — tăng biến đếm, sửa một cấu trúc dữ liệu dùng chung</td></tr>
-    <tr><td><strong>Semaphore</strong></td><td>Một bộ đếm; mỗi lần vào giảm 1, mỗi lần ra tăng 1. Đếm về 1 thì hành xử như mutex nhị phân, nhưng <b>không bắt buộc</b> đúng luồng đã lấy phải là luồng trả lại</td><td>N (cấu hình được)</td><td>Giới hạn số luồng dùng chung một tài nguyên hữu hạn — ví dụ connection pool tối đa N kết nối cùng lúc</td></tr>
-    <tr><td><strong>Read-write lock</strong></td><td>Tách hai chế độ: nhiều luồng <b>đọc</b> đồng thời được, nhưng <b>ghi</b> phải độc quyền — không ai khác được đọc lẫn ghi khi có một luồng đang ghi</td><td>Nhiều luồng đọc <em>hoặc</em> đúng 1 luồng ghi</td><td>Dữ liệu đọc nhiều hơn ghi rất nhiều — cache dùng chung, cấu hình ít khi đổi</td></tr>
-  </table>
+  <div class="stack">
+    <div class="s"><b>Mutex — đúng 1 luồng vào</b><span>khoá nhị phân, luồng nào khoá thì đúng luồng đó phải mở · bảo vệ một critical section đơn giản</span></div>
+    <div class="s"><b>Semaphore — N luồng vào (cấu hình được)</b><span>một bộ đếm, vào giảm 1 ra tăng 1; <b>không bắt buộc</b> đúng luồng đã lấy phải trả · giới hạn số luồng dùng chung tài nguyên hữu hạn, ví dụ connection pool</span></div>
+    <div class="s ok"><b>Read-write lock — nhiều luồng đọc <em>hoặc</em> đúng 1 luồng ghi</b><span>đọc đồng thời được, ghi phải độc quyền · hợp với dữ liệu đọc nhiều hơn ghi rất nhiều</span></div>
+  </div>
   <div class="note key">
     <h4>Semaphore không phải "mutex nhiều slot hơn"</h4>
     Điểm khác cốt lõi không phải ở con số N — mà ở chỗ mutex mã hoá <b>quyền sở hữu</b> (ai khoá, người đó mở), còn semaphore chỉ mã hoá <b>số lượng</b> (còn bao nhiêu slot trống). Dùng semaphore đếm = 1 để thay mutex vẫn chạy được, nhưng mất đi ràng buộc "đúng luồng đã khoá mới được mở" — dễ mở nhầm từ một luồng khác nếu code không cẩn thận.
@@ -83,22 +82,38 @@
 <section id="oslock-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Deadlock</h2></div>
   <p>Deadlock xảy ra khi các luồng chờ nhau vô thời hạn, không luồng nào có thể tiến tiếp. Theo mô hình Coffman, deadlock chỉ xảy ra khi <b>cả bốn</b> điều kiện sau cùng đúng một lúc:</p>
-  <table>
-    <tr><th>#</th><th>Điều kiện</th><th>Ý nghĩa</th></tr>
-    <tr><td>1</td><td><strong>Mutual exclusion</strong></td><td>Tài nguyên không chia sẻ được — tại một thời điểm chỉ một luồng giữ nó</td></tr>
-    <tr><td>2</td><td><strong>Hold and wait</strong></td><td>Một luồng đang giữ tài nguyên này thì lại đi xin thêm tài nguyên khác</td></tr>
-    <tr><td>3</td><td><strong>No preemption</strong></td><td>Không ai có quyền cưỡng chế lấy lại tài nguyên đang bị giữ — chỉ luồng đang giữ mới tự trả</td></tr>
-    <tr><td>4</td><td><strong>Circular wait</strong></td><td>Tồn tại một vòng chờ khép kín: luồng này chờ tài nguyên của luồng kia, và ngược lại</td></tr>
-  </table>
-<pre><code>Thread A ──giữ──▶ Lock 1
-   ▲                  │
-   │ chờ Lock 2        │ chờ (Lock 2 đang bị B giữ)
-   │                  ▼
-Lock 2 ◀──giữ── Thread B
+  <div class="stack">
+    <div class="s"><b>1 · Mutual exclusion</b><span>tài nguyên không chia sẻ được — một thời điểm chỉ một luồng giữ nó</span></div>
+    <div class="s"><b>2 · Hold and wait</b><span>đang giữ tài nguyên này lại đi xin thêm tài nguyên khác</span></div>
+    <div class="s"><b>3 · No preemption</b><span>không ai cưỡng chế lấy lại được — chỉ luồng đang giữ mới tự trả</span></div>
+    <div class="s warn"><b>4 · Circular wait</b><span>vòng chờ khép kín: luồng này chờ tài nguyên của luồng kia và ngược lại</span></div>
+  </div>
+<figure>
+    <svg viewBox="0 0 760 230" role="img" aria-label="Hai thread giữ chéo hai khoá và chờ nhau thành một vòng khép kín">
+      <defs><marker id="dl1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5BCFA0"/></marker>
+      <marker id="dl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#F2718A"/></marker></defs>
 
-A giữ Lock 1, xin thêm Lock 2 → phải chờ B.
-B giữ Lock 2, xin thêm Lock 1 → phải chờ A.
-Không ai nhường, không ai bị cưỡng chế nhả khoá → kẹt vĩnh viễn.</code></pre>
+      <rect x="40" y="30" width="180" height="52" rx="6" class="sv-b"/>
+      <text x="130" y="62" class="sv-t" text-anchor="middle">Thread A</text>
+      <rect x="530" y="30" width="180" height="52" rx="6" class="sv-b"/>
+      <text x="620" y="62" class="sv-t" text-anchor="middle">Lock 2</text>
+      <rect x="40" y="148" width="180" height="52" rx="6" class="sv-b"/>
+      <text x="130" y="180" class="sv-t" text-anchor="middle">Lock 1</text>
+      <rect x="530" y="148" width="180" height="52" rx="6" class="sv-b"/>
+      <text x="620" y="180" class="sv-t" text-anchor="middle">Thread B</text>
+
+      <line x1="130" y1="86" x2="130" y2="144" stroke="#5BCFA0" marker-end="url(#dl1)"/>
+      <text x="142" y="120" class="sv-l" fill="#5BCFA0">giữ</text>
+      <line x1="620" y1="144" x2="620" y2="86" stroke="#5BCFA0" marker-end="url(#dl1)"/>
+      <text x="632" y="120" class="sv-l" fill="#5BCFA0">giữ</text>
+
+      <line x1="224" y1="52" x2="526" y2="52" stroke="#F2718A" stroke-dasharray="5 4" marker-end="url(#dl2)"/>
+      <text x="375" y="42" class="sv-l" fill="#F2718A" text-anchor="middle">A xin thêm Lock 2 → phải chờ B</text>
+      <line x1="526" y1="178" x2="224" y2="178" stroke="#F2718A" stroke-dasharray="5 4" marker-end="url(#dl2)"/>
+      <text x="375" y="200" class="sv-l" fill="#F2718A" text-anchor="middle">B xin thêm Lock 1 → phải chờ A</text>
+    </svg>
+    <figcaption>Hai mũi tên đỏ khép thành một vòng: không ai nhường, không ai bị cưỡng chế nhả khoá → kẹt vĩnh viễn.</figcaption>
+  </figure>
   <div class="note key">
     <h4>Phá bất kỳ một điều kiện là hết deadlock</h4>
     Không cần phá cả bốn — chỉ cần loại bỏ được <b>một</b> điều kiện là chuỗi kẹt bị cắt. Cách thực tế phổ biến nhất là phá <b>circular wait</b>: quy ước một <b>thứ tự lấy khoá cố định</b> trên toàn hệ thống (ví dụ luôn lấy khoá có id nhỏ hơn trước), để không thể tồn tại hai luồng chờ nhau theo hai chiều ngược nhau.

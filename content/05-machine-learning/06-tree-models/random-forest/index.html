@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Random forest & bagging — MazeAI</title>
-<meta name="description" content="Vì sao trung bình nhiều cây giảm variance, tập con đặc trưng, OOB score miễn phí, và cái bẫy của feature importance.">
+<title>Random forest &amp; bagging — MazeAI</title>
+<meta name="description" content="Hỏi một cây thì hay sai — random forest trồng hàng trăm cây rồi cho bỏ phiếu. Ba bước của thuật toán, vì sao nó chạy được, và cái bẫy của bảng feature importance.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/random-forest/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Random forest &amp; bagging">
-<meta property="og:description" content="Vì sao trung bình nhiều cây giảm variance, tập con đặc trưng, OOB score miễn phí, và cái bẫy của feature importance.">
+<meta property="og:description" content="Hỏi một cây thì hay sai — random forest trồng hàng trăm cây rồi cho bỏ phiếu. Ba bước của thuật toán, vì sao nó chạy được, và cái bẫy của bảng feature importance.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,68 +39,345 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-rf" data-title="Random forest & bagging" data-tag="Ensemble" data-blurb="Vì sao trung bình nhiều cây giảm variance, tập con đặc trưng, OOB score miễn phí, và cái bẫy của feature importance.">
+      <article class="doc" id="art-rf" data-title="Random forest &amp; bagging" data-tag="Ensemble" data-blurb="Hỏi một cây thì hay sai — random forest trồng hàng trăm cây rồi cho bỏ phiếu. Ba bước của thuật toán, vì sao nó chạy được, và cái bẫy của bảng feature importance.">
         <header class="hero">
-  <p class="eyebrow">Deep dive · Machine learning · nhánh cây</p>
+  <p class="eyebrow">Machine learning · Tree models</p>
   <h1>Random forest <em>&amp; bagging</em></h1>
-  <p class="lede">Gộp cây theo hướng <b>song song</b>: nhiều cây sâu học độc lập rồi lấy trung bình. Bài này giải thích vì sao phải lấy tập con đặc trưng ở mỗi lần chia, vì sao có tập kiểm tra miễn phí, và vì sao cột ID hay đứng đầu bảng importance dù vô dụng.</p>
+  <p class="lede">Hỏi <b>một</b> cây thì hay sai. Random forest trồng hàng trăm cây khác nhau rồi cho chúng <b>bỏ phiếu</b>. Bài này đi ba bước của thuật toán, rồi mới tới vì sao cách đó chạy được và cái bẫy của bảng feature importance.</p>
 </header>
 
 <section id="rf-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Vì sao phải gộp nhiều cây</h2></div>
+  <div class="sh"><b>01</b><h2>Random forest là gì</h2></div>
 
-  <p class="key">Một cây sâu <em>gần như không có bias nhưng variance rất cao</em>: đổi vài dòng dữ liệu là ra một cây khác hẳn.</p>
-
-  <ul class="why">
-    <li>Cách sửa của bagging: <b>lấy trung bình nhiều cây học trên các mẫu bootstrap khác nhau</b>. Trung bình của n biến ngẫu nhiên độc lập có variance nhỏ hơn n lần.</li>
-    <li>Nhưng các cây học trên cùng bộ dữ liệu thì <b>tương quan với nhau</b>, nên mức giảm thực tế ít hơn. Random Forest sinh ra để phá tương quan đó.</li>
-  </ul>
+  <p class="key">Hỏi một cây thì hay sai. <em>Random forest trồng hàng trăm cây khác nhau rồi cho chúng bỏ phiếu.</em></p>
 
   <div class="note">
-    <h4>Bài này giả định bạn đã đọc</h4>
-    Cách một cây chọn điểm chia, Gini, và ba núm hãm cây nằm ở bài
-    <a href="../decision-tree/index.html">Decision Tree — một cây học thế nào</a>.
-    Bản đồ cả nhánh ở <a href="../tree-family-overview/index.html">Bản đồ nhánh cây</a>.
+    <h4>Cần đọc trước</h4>
+    Bài này giả định bạn đọc được <b>một</b> cây, gồm ba tầng: <b>root node</b> là câu hỏi đầu tiên, <b>internal node</b> là các câu hỏi tiếp theo, <b>leaf node</b> là kết luận. Chưa quen thì qua <a href="../decision-tree/index.html">Decision tree</a> trước.
   </div>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 900 392" role="img" aria-label="Toàn cảnh random forest: một bộ dữ liệu rút thành nhiều mẫu, mỗi mẫu trồng một cây, các cây bỏ phiếu ra kết quả">
+      <text class="sv-h" x="62"  y="22" text-anchor="middle">DỮ LIỆU</text>
+      <text class="sv-h" x="222" y="22" text-anchor="middle">① RÚT MẪU</text>
+      <text class="sv-h" x="425" y="22" text-anchor="middle">② TRỒNG CÂY</text>
+      <text class="sv-h" x="603" y="22" text-anchor="middle">③ BỎ PHIẾU</text>
+      <text class="sv-h" x="785" y="22" text-anchor="middle">KẾT QUẢ</text>
+
+      <rect x="16" y="152" width="92" height="64" rx="8" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"></rect>
+      <text class="sv-t" x="62" y="180" text-anchor="middle" fill="#8CA9F2">1000</text>
+      <text class="sv-l" x="62" y="198" text-anchor="middle" fill="#8CA9F2">khách hàng</text>
+
+      <line x1="108" y1="184" x2="170" y2="92"  stroke="#3D352C"></line>
+      <line x1="108" y1="184" x2="170" y2="184" stroke="#3D352C"></line>
+      <line x1="108" y1="184" x2="170" y2="276" stroke="#3D352C"></line>
+
+      <g>
+        <rect x="170" y="71" width="104" height="42" rx="7" fill="rgba(140,169,242,.10)" stroke="#3D352C"></rect>
+        <text class="sv-l" x="222" y="88"  text-anchor="middle">mẫu 1</text>
+        <text class="sv-l" x="222" y="104" text-anchor="middle" fill="#7A6F63">1000 dòng rút lại</text>
+        <line x1="274" y1="92" x2="330" y2="92" stroke="#3D352C"></line>
+
+        <rect x="379" y="54" width="92" height="22" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+        <text class="sv-l" x="425" y="69" text-anchor="middle" fill="#A8BEF6">thu nhập ?</text>
+        <line x1="425" y1="76" x2="385" y2="94" stroke="#2E2822"></line>
+        <line x1="425" y1="76" x2="465" y2="94" stroke="#2E2822"></line>
+        <rect x="353" y="94" width="64" height="18" rx="5" class="sv-b"></rect>
+        <rect x="433" y="94" width="64" height="18" rx="5" class="sv-b"></rect>
+        <line x1="385" y1="112" x2="367" y2="126" stroke="#2E2822"></line>
+        <line x1="385" y1="112" x2="403" y2="126" stroke="#2E2822"></line>
+        <line x1="465" y1="112" x2="447" y2="126" stroke="#2E2822"></line>
+        <line x1="465" y1="112" x2="483" y2="126" stroke="#2E2822"></line>
+        <circle cx="367" cy="132" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <circle cx="403" cy="132" r="7" fill="rgba(242,113,138,.20)" stroke="#F2718A"></circle>
+        <circle cx="447" cy="132" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <circle cx="483" cy="132" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <text class="sv-l" x="518" y="97" text-anchor="middle" fill="#7A6F63">cây 1</text>
+
+        <line x1="546" y1="92" x2="578" y2="92" stroke="#3D352C"></line>
+        <rect x="578" y="77" width="86" height="30" rx="7" fill="rgba(91,207,160,.14)" stroke="#5BCFA0"></rect>
+        <text class="sv-t" x="621" y="97" text-anchor="middle" fill="#8EE0BE">mua</text>
+        <line x1="664" y1="92" x2="712" y2="170" stroke="#3D352C"></line>
+      </g>
+
+      <g>
+        <rect x="170" y="163" width="104" height="42" rx="7" fill="rgba(140,169,242,.10)" stroke="#3D352C"></rect>
+        <text class="sv-l" x="222" y="180" text-anchor="middle">mẫu 2</text>
+        <text class="sv-l" x="222" y="196" text-anchor="middle" fill="#7A6F63">1000 dòng rút lại</text>
+        <line x1="274" y1="184" x2="330" y2="184" stroke="#3D352C"></line>
+
+        <rect x="379" y="146" width="92" height="22" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+        <text class="sv-l" x="425" y="161" text-anchor="middle" fill="#A8BEF6">tuổi ?</text>
+        <line x1="425" y1="168" x2="385" y2="186" stroke="#2E2822"></line>
+        <line x1="425" y1="168" x2="465" y2="186" stroke="#2E2822"></line>
+        <rect x="353" y="186" width="64" height="18" rx="5" class="sv-b"></rect>
+        <rect x="433" y="186" width="64" height="18" rx="5" class="sv-b"></rect>
+        <line x1="385" y1="204" x2="367" y2="218" stroke="#2E2822"></line>
+        <line x1="385" y1="204" x2="403" y2="218" stroke="#2E2822"></line>
+        <line x1="465" y1="204" x2="447" y2="218" stroke="#2E2822"></line>
+        <line x1="465" y1="204" x2="483" y2="218" stroke="#2E2822"></line>
+        <circle cx="367" cy="224" r="7" fill="rgba(242,113,138,.20)" stroke="#F2718A"></circle>
+        <circle cx="403" cy="224" r="7" fill="rgba(242,113,138,.20)" stroke="#F2718A"></circle>
+        <circle cx="447" cy="224" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <circle cx="483" cy="224" r="7" fill="rgba(242,113,138,.20)" stroke="#F2718A"></circle>
+        <text class="sv-l" x="518" y="189" text-anchor="middle" fill="#7A6F63">cây 2</text>
+
+        <line x1="546" y1="184" x2="578" y2="184" stroke="#3D352C"></line>
+        <rect x="578" y="169" width="86" height="30" rx="7" fill="rgba(242,113,138,.13)" stroke="#F2718A"></rect>
+        <text class="sv-t" x="621" y="189" text-anchor="middle" fill="#F79BAB">không</text>
+        <line x1="664" y1="184" x2="712" y2="184" stroke="#3D352C"></line>
+      </g>
+
+      <g>
+        <rect x="170" y="255" width="104" height="42" rx="7" fill="rgba(140,169,242,.10)" stroke="#3D352C"></rect>
+        <text class="sv-l" x="222" y="272" text-anchor="middle">mẫu 3</text>
+        <text class="sv-l" x="222" y="288" text-anchor="middle" fill="#7A6F63">1000 dòng rút lại</text>
+        <line x1="274" y1="276" x2="330" y2="276" stroke="#3D352C"></line>
+
+        <rect x="379" y="238" width="92" height="22" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+        <text class="sv-l" x="425" y="253" text-anchor="middle" fill="#A8BEF6">đã mua trước ?</text>
+        <line x1="425" y1="260" x2="385" y2="278" stroke="#2E2822"></line>
+        <line x1="425" y1="260" x2="465" y2="278" stroke="#2E2822"></line>
+        <rect x="353" y="278" width="64" height="18" rx="5" class="sv-b"></rect>
+        <rect x="433" y="278" width="64" height="18" rx="5" class="sv-b"></rect>
+        <line x1="385" y1="296" x2="367" y2="310" stroke="#2E2822"></line>
+        <line x1="385" y1="296" x2="403" y2="310" stroke="#2E2822"></line>
+        <line x1="465" y1="296" x2="447" y2="310" stroke="#2E2822"></line>
+        <line x1="465" y1="296" x2="483" y2="310" stroke="#2E2822"></line>
+        <circle cx="367" cy="316" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <circle cx="403" cy="316" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <circle cx="447" cy="316" r="7" fill="rgba(242,113,138,.20)" stroke="#F2718A"></circle>
+        <circle cx="483" cy="316" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+        <text class="sv-l" x="518" y="281" text-anchor="middle" fill="#7A6F63">cây 3</text>
+
+        <line x1="546" y1="276" x2="578" y2="276" stroke="#3D352C"></line>
+        <rect x="578" y="261" width="86" height="30" rx="7" fill="rgba(91,207,160,.14)" stroke="#5BCFA0"></rect>
+        <text class="sv-t" x="621" y="281" text-anchor="middle" fill="#8EE0BE">mua</text>
+        <line x1="664" y1="276" x2="712" y2="198" stroke="#3D352C"></line>
+      </g>
+
+      <rect x="712" y="152" width="172" height="64" rx="8" fill="rgba(91,207,160,.16)" stroke="#5BCFA0" stroke-width="2"></rect>
+      <text class="sv-l" x="798" y="176" text-anchor="middle">2 phiếu mua · 1 không</text>
+      <text class="sv-t" x="798" y="200" text-anchor="middle" fill="#8EE0BE">→ mua</text>
+
+      <line x1="16" y1="336" x2="884" y2="336" stroke="#2E2822"></line>
+      <text class="sv-h" x="16" y="360">BA TẦNG CỦA MỘT CÂY</text>
+      <rect x="212" y="350" width="20" height="13" rx="4" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="240" y="361">root node · câu hỏi đầu tiên</text>
+      <rect x="428" y="350" width="20" height="13" rx="4" class="sv-b"></rect>
+      <text class="sv-l" x="456" y="361">internal node · câu hỏi tiếp theo</text>
+      <circle cx="682" cy="356" r="7" fill="rgba(91,207,160,.22)" stroke="#5BCFA0"></circle>
+      <text class="sv-l" x="698" y="361">leaf node · kết luận của cây đó</text>
+    </svg>
+    <figcaption>Mỗi cây có đúng ba tầng như bài <a href="../decision-tree/index.html">Decision tree</a>: <strong>root node</strong> ở trên, <strong>internal node</strong> ở giữa, <strong>leaf node</strong> là chấm xanh/đỏ dưới cùng. Điểm cần nhìn: ba <strong>root node</strong> hỏi ba câu <em>khác nhau</em> — đó là chỗ chữ <em>random</em> nằm.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Toàn bộ thuật toán là ba bước trong hình: <b>rút mẫu → trồng cây → bỏ phiếu</b>. Ba mục sau đi vào từng bước.</li>
+    <li>Hình vẽ 3 cây cho dễ nhìn. Thật thì <b>300–500 cây</b>.</li>
+    <li>Cây 2 đoán sai, nhưng hai cây kia đúng nên <b>phiếu sai bị thiểu số</b>. Đó là lý do cả rừng đúng hơn từng cây.</li>
+  </ul>
 </section>
 
 <section id="rf-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Bagging và Random Forest</h2></div>
+  <div class="sh"><b>02</b><h2>Bước 1 — Bootstrap: rút mẫu có hoàn lại</h2></div>
 
-  <p class="key">Lấy trung bình chỉ xoá được phần variance <em>không tương quan</em>. Muốn giảm nữa thì phải làm các cây <em>khác nhau</em> đi.</p>
+  <p class="key">Chỉ có một bộ dữ liệu. Muốn nhiều cây khác nhau thì <em>rút lại dữ liệu, rút xong bỏ vào rút tiếp</em>.</p>
 
-<pre class="core"><code>Var(trung bình của B cây) = ρσ² + (1 - ρ)σ²/B
-                            └──┬──┘   └────┬────┘
-                          KHÔNG giảm     → 0 khi B lớn
-                          khi thêm cây</code></pre>
-
-  <div class="bars">
-    <div class="b"><i>1 cây</i><u style="width:100%"></u><b>variance 1,00</b></div>
-    <div class="b"><i>10 cây</i><u style="width:37%"></u><b>0,37</b></div>
-    <div class="b"><i>100 cây</i><u style="width:31%"></u><b>0,31</b></div>
-    <div class="b hi"><i>vô hạn cây</i><u style="width:30%"></u><b>0,30 — sàn = ρσ²</b></div>
+  <div class="strip">
+    <div class="c t"><i>gốc</i><b>1</b></div><div class="c t"><i></i><b>2</b></div><div class="c t"><i></i><b>3</b></div><div class="c t"><i></i><b>4</b></div><div class="c t"><i></i><b>5</b></div><div class="c t"><i></i><b>6</b></div><div class="c t"><i></i><b>7</b></div><div class="c t"><i></i><b>8</b></div>
   </div>
-  <p class="stripnote"><span>ví dụ với ρ = 0,3</span><span><em>thêm cây mãi cũng không xuống dưới sàn — phải hạ ρ</em></span></p>
+  <div class="strip">
+    <div class="c on"><i>mẫu</i><b>3</b></div><div class="c on"><i></i><b>1</b></div><div class="c on"><i></i><b>7</b></div><div class="c on"><i></i><b>3</b></div><div class="c on"><i></i><b>5</b></div><div class="c on"><i></i><b>8</b></div><div class="c on"><i></i><b>1</b></div><div class="c on"><i></i><b>5</b></div>
+  </div>
+  <p class="stripnote"><span>rút đúng 8 lần</span><span><em>dòng 1, 3, 5 trúng hai lần · dòng 2, 4, 6 không trúng lần nào</em></span><span>vẫn đủ 8 dòng</span></p>
 
   <ul class="why">
-    <li>Bootstrap một mình <b>chưa đủ</b>: mọi cây vẫn chọn cùng một đặc trưng mạnh làm gốc nên rất giống nhau, ρ cao.</li>
-    <li>Random Forest thêm <code>max_features</code> — mỗi lần chia chỉ xét <b>√p đặc trưng ngẫu nhiên</b>, ép các cây phải khác nhau.</li>
-    <li>Hệ quả: Random Forest <b>gần như không overfit khi tăng số cây</b>, nên số cây không phải siêu tham số cần dò.</li>
+    <li>Mỗi lần rút cho một bộ dữ liệu <b>hơi lệch</b> so với bộ gốc — gọi là một <b>mẫu bootstrap</b>.</li>
+    <li>Dữ liệu lệch thì cây mọc ra cũng khác. Rút bao nhiêu lần thì có bấy nhiêu cây.</li>
+    <li>Tên <b>bagging</b> viết tắt từ <b>B</b>ootstrap <b>agg</b>regat<b>ing</b>: rút mẫu ở bước này, gộp phiếu ở bước 3.</li>
   </ul>
-
-  <pre><code>Bagging = Bootstrap AGGregatING
-
-Với mỗi cây trong B cây:
-  1. Lấy mẫu bootstrap: rút n mẫu CÓ HOÀN LẠI từ n mẫu gốc
-  2. Huấn luyện một cây SÂU, không cắt tỉa
-  3. Mỗi lần chia chỉ xét √p đặc trưng ngẫu nhiên   ← phần Random Forest thêm vào
-Dự đoán: phân loại thì bỏ phiếu, hồi quy thì lấy trung bình</code></pre>
 </section>
 
 <section id="rf-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>OOB score — tập kiểm tra miễn phí</h2></div>
+  <div class="sh"><b>03</b><h2>Bước 2 — Trồng cây, mỗi lần chia chỉ nhìn vài cột</h2></div>
 
-  <p class="key">Mỗi cây bỏ sót khoảng <em>36,8%</em> dữ liệu. Dùng đúng phần bị bỏ sót đó để chấm điểm — không phải huấn luyện lại lần nào.</p>
+  <p class="key">Rút mẫu thôi <em>chưa đủ</em>: có một cột rất mạnh thì cây nào cũng chọn nó làm gốc, và các cây lại giống nhau.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 176" role="img" aria-label="Nhìn đủ cột thì ba cây cùng một gốc; bịt bớt cột thì ba cây ba gốc khác nhau">
+      <text class="sv-h" x="220" y="20" text-anchor="middle">CÂY NÀO CŨNG NHÌN ĐỦ CỘT</text>
+      <text class="sv-h" x="680" y="20" text-anchor="middle">MỖI LẦN CHIA CHỈ NHÌN VÀI CỘT</text>
+      <line x1="450" y1="34" x2="450" y2="150" stroke="#2E2822" stroke-dasharray="4 4"></line>
+      <text class="sv-h" x="4" y="62">ROOT</text>
+      <text class="sv-h" x="4" y="108">LEAF</text>
+
+      <rect x="52"  y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <rect x="164" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <rect x="276" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="100" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <text class="sv-l" x="212" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <text class="sv-l" x="324" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <line x1="100" y1="72" x2="76"  y2="100" stroke="#2E2822"></line>
+      <line x1="100" y1="72" x2="124" y2="100" stroke="#2E2822"></line>
+      <line x1="212" y1="72" x2="188" y2="100" stroke="#2E2822"></line>
+      <line x1="212" y1="72" x2="236" y2="100" stroke="#2E2822"></line>
+      <line x1="324" y1="72" x2="300" y2="100" stroke="#2E2822"></line>
+      <line x1="324" y1="72" x2="348" y2="100" stroke="#2E2822"></line>
+      <circle cx="76"  cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="124" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="188" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="236" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="300" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="348" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <text class="sv-t" x="220" y="140" text-anchor="middle" fill="#F79BAB">ba cây gần như trùng nhau</text>
+
+      <rect x="512" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <rect x="624" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <rect x="736" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-l" x="560" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <text class="sv-l" x="672" y="62" text-anchor="middle" fill="#A8BEF6">tuổi</text>
+      <text class="sv-l" x="784" y="62" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
+      <line x1="560" y1="72" x2="536" y2="100" stroke="#2E2822"></line>
+      <line x1="560" y1="72" x2="584" y2="100" stroke="#2E2822"></line>
+      <line x1="672" y1="72" x2="648" y2="100" stroke="#2E2822"></line>
+      <line x1="672" y1="72" x2="696" y2="100" stroke="#2E2822"></line>
+      <line x1="784" y1="72" x2="760" y2="100" stroke="#2E2822"></line>
+      <line x1="784" y1="72" x2="808" y2="100" stroke="#2E2822"></line>
+      <circle cx="536" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="584" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="648" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="696" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="760" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <circle cx="808" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
+      <text class="sv-t" x="680" y="140" text-anchor="middle" fill="#8EE0BE">ba cây khác nhau thật</text>
+    </svg>
+    <figcaption>Ô xanh là <strong>root node</strong> của từng cây. Bên trái cột mạnh nhất luôn thắng nên ba root node ghi <em>cùng một chữ</em>. Bên phải cột mạnh nhất hay vắng mặt trong nhóm cột được bốc, cây buộc phải hỏi câu khác — ba root node ba chữ khác nhau.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Ở <b>mỗi lần chia</b> lại bốc một nhóm cột mới, không phải bốc một lần rồi dùng cho cả cây.</li>
+    <li>Bốc bao nhiêu cột là tham số <code>max_features</code>. Mặc định <b>√p cho phân loại</b>, <b>p/3 cho dự đoán số</b> — p là tổng số cột.</li>
+    <li>Từng cây yếu đi vì không được nhìn đủ, nhưng cả rừng mạnh lên. Đây chính là chỗ <b>random forest khác bagging thuần</b>: bootstrap cho <b>dữ liệu</b> khác nhau, bốc cột cho <b>cấu trúc cây</b> khác nhau. Sách vở gọi việc làm các cây bớt giống nhau này là <b>decorrelate</b> — từ hay bị hỏi thẳng khi phỏng vấn.</li>
+  </ul>
+</section>
+
+<section id="rf-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Bước 3 — Gộp câu trả lời của cả rừng</h2></div>
+
+  <p class="key">Cho dòng cần đoán chạy qua <em>tất cả</em> các cây, rồi gộp câu trả lời lại thành một.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Phân loại — đếm phiếu</h5>
+      <p><b>Câu hỏi:</b> khách này mua hay không?</p>
+      <p><b>500 cây trả lời:</b> 380 mua · 120 không.</p>
+      <p><b>Kết quả:</b> mua — và tiện thể có luôn xác suất 380/500 = 0,76.</p>
+    </div>
+    <div>
+      <h5>Dự đoán số — lấy trung bình</h5>
+      <p><b>Câu hỏi:</b> căn nhà này giá bao nhiêu?</p>
+      <p><b>500 cây trả lời:</b> 2,1 tỉ · 2,4 tỉ · 2,2 tỉ · …</p>
+      <p><b>Kết quả:</b> trung bình của 500 con số đó.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Các cây <b>không cần biết nhau</b>, nên trồng song song được — có bao nhiêu nhân CPU dùng hết bấy nhiêu.</li>
+    <li>Đây là chữ <b>aggregating</b> trong <em>bagging</em>. Hết ba bước, thuật toán chỉ có vậy.</li>
+  </ul>
+</section>
+
+<section id="rf-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Vì sao nhiều cây lại đúng hơn một cây</h2></div>
+
+  <p class="key">Vì <em>mỗi cây sai một kiểu khác nhau</em>. Nhiều cái sai đi các hướng khác nhau thì trung bình triệt tiêu bớt, còn phần đúng thì cây nào cũng đúng nên giữ nguyên.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 190" role="img" aria-label="Ba mẫu dữ liệu gần giống nhau cho ra ba cây có gốc khác hẳn">
+      <text class="sv-l" x="150" y="18" text-anchor="middle">bỏ ra 5 dòng</text>
+      <text class="sv-l" x="450" y="18" text-anchor="middle">bỏ ra 5 dòng khác</text>
+      <text class="sv-l" x="750" y="18" text-anchor="middle">bỏ ra 5 dòng khác nữa</text>
+
+      <line x1="150" y1="74" x2="95"  y2="114" stroke="#2E2822"></line>
+      <line x1="150" y1="74" x2="205" y2="114" stroke="#2E2822"></line>
+      <rect x="75" y="40" width="150" height="34" rx="7" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-t" x="150" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập &lt; 20tr ?</text>
+      <rect x="45"  y="114" width="100" height="30" rx="6" class="sv-b"></rect>
+      <rect x="155" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="95"  y="133" text-anchor="middle">tuổi &lt; 30 ?</text>
+      <text class="sv-l" x="205" y="133" text-anchor="middle">mua</text>
+
+      <line x1="450" y1="74" x2="395" y2="114" stroke="#2E2822"></line>
+      <line x1="450" y1="74" x2="505" y2="114" stroke="#2E2822"></line>
+      <rect x="375" y="40" width="150" height="34" rx="7" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-t" x="450" y="62" text-anchor="middle" fill="#A8BEF6">tuổi &lt; 30 ?</text>
+      <rect x="345" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
+      <rect x="455" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="395" y="133" text-anchor="middle">không mua</text>
+      <text class="sv-l" x="505" y="133" text-anchor="middle">thu nhập ?</text>
+
+      <line x1="750" y1="74" x2="695" y2="114" stroke="#2E2822"></line>
+      <line x1="750" y1="74" x2="805" y2="114" stroke="#2E2822"></line>
+      <rect x="675" y="40" width="150" height="34" rx="7" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
+      <text class="sv-t" x="750" y="62" text-anchor="middle" fill="#A8BEF6">đã mua trước ?</text>
+      <rect x="645" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
+      <rect x="755" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="695" y="133" text-anchor="middle">mua</text>
+      <text class="sv-l" x="805" y="133" text-anchor="middle">mã vùng ?</text>
+
+      <text class="sv-t" x="450" y="172" text-anchor="middle"><tspan fill="#A8BEF6">root node</tspan> đổi thì <tspan fill="#EDE7DE">cả cây bên dưới đổi theo</tspan></text>
+    </svg>
+    <figcaption>Cùng một tập khách, chỉ khác vài dòng, mà <strong>root node</strong> đã đổi — đổi root node là đổi luôn mọi <strong>internal node</strong> bên dưới. Cây quyết định nhạy tới mức đó; ở đây sự nhạy lại thành có lợi.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Nói theo <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">Bias–variance</a>: cây sâu gần như không có bias, sai số nằm hết ở <b>variance</b> — và variance đúng là thứ lấy trung bình chữa được.</li>
+    <li>Ngược lại, lấy trung bình <b>không</b> chữa được bias. Đó là lý do rừng chỉ ghép cây <em>sâu</em>, không ghép cây cụt.</li>
+  </ul>
+</section>
+
+<section id="rf-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Thêm cây tới đâu thì hết tác dụng</h2></div>
+
+  <p class="key">Thêm cây không bao giờ làm tệ đi, <em>nhưng chỉ hạ được tới một cái sàn</em>.</p>
+
+  <div class="bars">
+    <div class="b"><i>1 cây</i><u style="width:100%"></u><b>sai số 1,00</b></div>
+    <div class="b"><i>10 cây</i><u style="width:37%"></u><b>0,37</b></div>
+    <div class="b"><i>100 cây</i><u style="width:31%"></u><b>0,31</b></div>
+    <div class="b hi"><i>vô hạn cây</i><u style="width:30%"></u><b>0,30 — sàn</b></div>
+  </div>
+  <p class="stripnote"><span>1 → 10 cây: giảm mạnh</span><span><em>100 → vô hạn: gần như không đổi</em></span><span>nên 300–500 cây là đủ</span></p>
+
+  <p>Cái sàn tới từ chỗ <b>các cây vẫn còn giống nhau</b> — chúng rút từ cùng một bộ dữ liệu. Lấy trung bình của những cây giống nhau thì kết quả vẫn y như một cây. Muốn hạ sàn thì phải làm các cây <b>bớt giống nhau</b>, tức là chỉnh <code>max_features</code> ở bước 2.</p>
+
+  <details class="deep">
+    <summary>Viết ra bằng công thức</summary>
+    <div class="body">
+      <div class="eq">
+        <div class="line">
+          <span class="t"><span>sai số của cả rừng</span></span>
+          <span class="op">=</span>
+          <span class="t r"><span>ρσ<sup>2</sup></span><em>cái sàn</em></span>
+          <span class="op">+</span>
+          <span class="t p"><span>(1 − ρ)σ<sup>2</sup> / B</span><em>phần thêm cây xoá được</em></span>
+        </div>
+        <dl>
+          <dt>B</dt><dd>số cây</dd>
+          <dt>σ<sup>2</sup></dt><dd>một cây dao động mạnh tới đâu</dd>
+          <dt>ρ</dt><dd><b>các cây giống nhau tới mức nào</b> — 0 là khác hẳn, 1 là y hệt</dd>
+        </dl>
+        <p class="read">B chỉ nằm ở mẫu số của phần thứ hai, nên thêm cây chỉ xoá được phần đó. Phần đầu không có B — thêm bao nhiêu cây cũng không hạ được, chỉ hạ ρ mới hạ được.</p>
+      </div>
+    </div>
+  </details>
+</section>
+
+<section id="rf-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>OOB score — tập kiểm tra miễn phí</h2></div>
+
+  <p class="key">Rút có hoàn lại thì luôn có dòng <em>không trúng lần nào</em>. Dùng đúng chúng để chấm điểm.</p>
 
   <div class="strip">
     <div class="c t"><i>1</i><b>✓</b></div>
@@ -114,84 +391,124 @@ Dự đoán: phân loại thì bỏ phiếu, hồi quy thì lấy trung bình</c
     <div class="c t"><i>9</i><b>✓</b></div>
     <div class="c t"><i>10</i><b>✓</b></div>
   </div>
-  <p class="stripnote"><span>63,2% lọt vào túi bootstrap của cây này</span><span><em>36,8% nằm ngoài → chấm điểm cây này bằng đúng chúng</em></span></p>
+  <p class="stripnote"><span>63,2% lọt vào mẫu của cây này</span><span><em>36,8% nằm ngoài — cây này chưa từng thấy chúng</em></span><span>mỗi cây một danh sách khác</span></p>
 
-<pre class="core"><code>(1 - 1/n)ⁿ  →  1/e  ≈  0,368        <span class="cm"># xác suất một mẫu không được rút lần nào</span></code></pre>
+  <p>Với mỗi dòng, gom những cây <em>không</em> có nó trong mẫu rồi cho riêng nhóm cây đó dự đoán. Dự đoán ấy hoàn toàn ngoài mẫu, nên gộp lại được một con số gần bằng cross-validation mà <b>không tốn thêm lần huấn luyện nào</b>.</p>
+
+<pre><code>rf = RandomForestClassifier(n_estimators=<span class="st">500</span>, oob_score=<span class="kw">True</span>).fit(X, y)
+rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễn phí</span></code></pre>
 
   <ul class="why">
-    <li>Mỗi mẫu được dự đoán bởi <b>chỉ những cây không hề thấy nó</b> — gộp lại thành một ước lượng ngoài mẫu.</li>
-    <li>Gần tương đương cross-validation nhưng <b>miễn phí</b>: <code>oob_score=True</code> là xong.</li>
-    <li><b>Hỏng khi mẫu không độc lập</b>: chuỗi thời gian, nhiều dòng cùng một khách, tương quan không gian — điểm sẽ quá lạc quan.</li>
+    <li>Tiện nhất khi <b>dữ liệu ít</b>: không phải cắt ra một tập validation vốn đã hiếm dòng.</li>
+    <li><b>Không tin được khi các dòng dính nhau</b> — chuỗi thời gian, hay nhiều dòng của cùng một khách. Dòng nằm ngoài khi đó vẫn gần trùng dòng bên trong nên điểm quá đẹp.</li>
+    <li>Muốn so nhiều bộ siêu tham số thì vẫn dùng <a href="../../04-core-concepts/train-val-test-cv/index.html">cross-validation</a> thật.</li>
   </ul>
-
-  <pre><code><span class="kw">from</span> sklearn.ensemble <span class="kw">import</span> RandomForestClassifier
-rf = RandomForestClassifier(n_estimators=<span class="st">500</span>, oob_score=<span class="kw">True</span>)
-rf.fit(X, y)
-rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễn phí</span></code></pre>
 </section>
 
-<section id="rf-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Feature importance — và cái bẫy</h2></div>
+<section id="rf-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Feature importance — và cái bẫy</h2></div>
 
-  <p class="key">Cột ID ngẫu nhiên có <em>rất nhiều ngưỡng để thử</em>, nên gần như luôn tìm được điểm chia — và đứng đầu bảng importance dù vô dụng.</p>
+  <p class="key">Cột ID có <em>rất nhiều ngưỡng để thử</em> nên gần như luôn chia được — nên nó đứng đầu bảng dù không mang thông tin gì.</p>
 
   <div class="bars">
-    <div class="b bad"><i>user_id</i><u style="width:100%"></u><b>0,31 ← vô dụng</b></div>
+    <div class="b bad"><i>user_id</i><u style="width:100%"></u><b>0,31 ← vô dụng mà đứng đầu</b></div>
     <div class="b"><i>số lần mua</i><u style="width:61%"></u><b>0,19</b></div>
     <div class="b"><i>tuổi</i><u style="width:39%"></u><b>0,12</b></div>
     <div class="b hi"><i>cột NGẪU NHIÊN<br>tự thêm vào</i><u style="width:26%"></u><b>0,08 ← vạch chuẩn</b></div>
     <div class="b"><i>mã vùng</i><u style="width:19%"></u><b>0,06</b></div>
     <div class="b"><i>ngày trong tuần</i><u style="width:13%"></u><b>0,04</b></div>
   </div>
-  <p class="stripnote"><span>tự thêm một cột số ngẫu nhiên vào dữ liệu làm mốc</span><span><em>mọi đặc trưng xếp dưới nó = nhiễu</em></span></p>
+  <p class="stripnote"><span>mẹo: tự thêm một cột số ngẫu nhiên vào dữ liệu làm mốc</span><span><em>đặc trưng nào xếp dưới nó thì coi như nhiễu</em></span></p>
+
+  <div class="stack">
+    <div class="s warn"><b>Gain — MDI, mặc định của thư viện</b><span>đo tổng mức giảm độ lẫn lộn do cột đó tạo ra · <em>thiên vị cột nhiều giá trị</em>, và tính trên chính dữ liệu đã học</span></div>
+    <div class="s ok"><b>Permutation — MDA, trên tập kiểm tra</b><span>đo điểm tụt bao nhiêu khi xáo trộn cột đó · chậm hơn, và chia đôi công giữa hai cột giống nhau</span></div>
+    <div class="s"><b>SHAP</b><span>đo đóng góp của cột vào <em>từng</em> dự đoán · chậm nhất, đổi lại xem được cả từng ca</span></div>
+  </div>
 
   <ul class="why">
-    <li><b>Gain importance</b> (mặc định của thư viện) thiên vị đặc trưng nhiều giá trị — đây là cái bẫy hay gặp nhất.</li>
-    <li><b>Permutation importance trên tập kiểm tra</b> là cách kiểm chứng: xáo trộn cột đó rồi xem hiệu năng tụt bao nhiêu.</li>
-    <li><b>SHAP</b> cho cả mức toàn cục lẫn từng dự đoán, nhưng chậm nhất.</li>
-    <li>Đúng với cả ba cách: <b>importance không phải nhân quả</b>. Nó nói model đang dựa vào gì, không nói can thiệp vào đó thì kết quả đổi thế nào.</li>
+    <li>Đúng với cả ba cách: <b>importance không phải nhân quả</b>. Nó nói model đang dựa vào cột nào, không nói can thiệp vào cột đó thì ngoài đời đổi gì.</li>
   </ul>
-
-  <table>
-    <tr><th>Cách</th><th>Đo gì</th><th>Nhược điểm</th></tr>
-    <tr><td>Gain / impurity<br><span class="cm">mặc định của thư viện</span></td><td>Tổng mức giảm độ vẩn do đặc trưng đó tạo ra</td><td><strong>Thiên vị đặc trưng nhiều giá trị</strong></td></tr>
-    <tr><td>Permutation</td><td>Hiệu năng tụt bao nhiêu khi xáo trộn ngẫu nhiên cột đó</td><td>Chậm; chia đôi tầm quan trọng giữa các cột tương quan</td></tr>
-    <tr><td>SHAP</td><td>Đóng góp của đặc trưng vào <em>từng dự đoán</em></td><td>Chậm nhất, nhưng cho cả mức toàn cục và cục bộ</td></tr>
-  </table>
 </section>
 
-<section id="rf-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lỗi hay gặp</h2></div>
+<section id="rf-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Siêu tham số</h2></div>
 
-  <p class="key">Random Forest khoan dung với người dùng, nhưng bốn chỗ này vẫn sai được.</p>
+  <p class="key">Chỉ <em>một</em> núm đáng dò: <code>max_features</code> — chính là núm ở bước 2, mục 03.</p>
+
+  <div class="stack">
+    <div class="s ok"><b><code>max_features</code> — núm chính</b><span>số cột được nhìn ở mỗi lần chia. Nhỏ thì các cây khác nhau hơn nhưng từng cây yếu hơn · bắt đầu từ mặc định rồi dò quanh đó</span></div>
+    <div class="s"><b><code>n_estimators</code></b><span>số cây · tăng tới khi OOB không nhích nữa, thường 300–1000</span></div>
+    <div class="s"><b><code>min_samples_leaf</code></b><span>hãm từng cây lại · để mặc định 1, chỉ nâng khi nhãn nhiễu hoặc rừng quá nặng</span></div>
+    <div class="s"><b><code>class_weight</code></b><span>bù dữ liệu lệch lớp · đặt <code>balanced</code> khi lớp hiếm dưới ~10%</span></div>
+    <div class="s"><b><code>n_jobs</code></b><span>số nhân CPU · đặt <code>-1</code>, các cây độc lập nên chia việc rất dễ</span></div>
+  </div>
+
+  <ul class="why">
+    <li>Danh sách ngắn bất ngờ so với boosting — đó chính là lý do Random Forest hay được dùng làm <b>mốc đầu tiên</b>: chạy mặc định đã gần tốt nhất của nó.</li>
+  </ul>
+</section>
+
+<section id="rf-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Đánh đổi và khi nào chọn nó</h2></div>
+
+  <p class="key">Đổi <em>tính giải thích và tốc độ</em> lấy <em>sự ổn định</em>. Một cây đọc được bằng mắt; năm trăm cây thì không.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Được</h5>
+      <p><b>Chạy tốt ngay với mặc định</b> — gần như không cần chỉnh</p>
+      <p><b>Chịu nhiễu nhãn tốt</b> — mỗi cây chỉ thấy một phần dữ liệu</p>
+      <p><b>Có OOB score</b> — không cần cắt tập validation</p>
+      <p><b>Song song hoá dễ</b> — các cây độc lập</p>
+      <p><b>Không cần chuẩn hoá thang đo</b> — cây chỉ so lớn nhỏ, nhận cả cột số lẫn cột hạng mục</p>
+    </div>
+    <div>
+      <h5>Mất</h5>
+      <p><b>Thường thua boosting</b> đã chỉnh kỹ trên dữ liệu bảng</p>
+      <p><b>Model nặng</b> — hàng trăm cây sâu, chậm khi chạy thật</p>
+      <p><b>Mất tính giải thích</b> của một cây đơn lẻ</p>
+      <p><b>Không ngoại suy</b> ngoài khoảng đã thấy, như mọi model cây</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li><b>Chọn nó khi</b> cần một mốc đáng tin trong vài phút, khi nhãn có nhiễu, hoặc khi không có thời gian dò tham số.</li>
+    <li><b>Đổi sang boosting khi</b> đã có mốc và cần thêm vài phần trăm cuối — so sánh hai hướng ở <a href="../tree-family-overview/index.html">Tree models overview</a>.</li>
+    <li><b>Extra Trees</b> đẩy ngẫu nhiên thêm một bậc: ngưỡng chia cũng bốc bừa thay vì đi tìm. Nhanh hơn hẳn, ρ thấp hơn nữa, từng cây yếu hơn. Gọi hàm gần y hệt nên đáng thử ngay sau.</li>
+  </ul>
+</section>
+
+<section id="rf-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Lỗi hay gặp</h2></div>
 
   <div class="grid2">
-    <div class="card bad"><h4>Tin vào gain importance</h4><p>Thiên vị đặc trưng nhiều giá trị. Kiểm chứng bằng permutation trên tập kiểm tra.</p></div>
-    <div class="card bad"><h4>Tin OOB score trên chuỗi thời gian</h4><p>Nó giả định mẫu độc lập nên cho điểm quá lạc quan. Chia theo thời gian.</p></div>
-    <div class="card bad"><h4>Dùng cây cho dữ liệu có xu hướng</h4><p>Cây không ngoại suy được. Chuỗi thời gian tăng dần thì phải khử xu hướng trước.</p></div>
-    <div class="card bad"><h4>Chuẩn hoá đặc trưng cho cây</h4><p>Không sai nhưng vô ích, chỉ thêm một bước có thể gây lỗi. Cây bất biến với phép đổi thang đo đơn điệu.</p></div>
+    <div class="card bad"><h4>Đặt <code>max_features</code> bằng tổng số cột</h4><p>Là quay về bagging thuần — mất đúng thứ khiến Random Forest tốt hơn. Các cây lại giống nhau.</p></div>
+    <div class="card bad"><h4>Tin OOB score trên chuỗi thời gian</h4><p>Nó giả định các dòng độc lập nên cho điểm quá đẹp. Chia theo thời gian và chấm bằng đoạn sau.</p></div>
+    <div class="card bad"><h4>Dùng cây cho dữ liệu có xu hướng</h4><p>Ngoài khoảng đã học, cây trả về hằng số. Doanh thu tăng dần thì phải khử xu hướng trước.</p></div>
+    <div class="card bad"><h4>Đọc bảng importance như kết luận</h4><p>Kiểm lại bằng permutation importance và cột ngẫu nhiên làm mốc trước khi tin.</p></div>
   </div>
 </section>
 
-<section id="rf-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="rf-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
-  <details class="qa"><summary>Vì sao Random Forest lấy tập con đặc trưng ở mỗi lần chia?</summary>
-  <p>Vì bagging thuần vẫn cho các cây <b>tương quan mạnh</b>: nếu có một đặc trưng rất mạnh thì gần như cây nào cũng chọn nó làm gốc, và trung bình của những cây giống nhau thì không giảm được variance. Ép mỗi lần chia chỉ được nhìn một tập con ngẫu nhiên (<code>sqrt(d)</code> cho phân loại) buộc các cây phải khác nhau. Đây chính là điểm phân biệt Random Forest với bagging cây thuần.</p></details>
+  <details class="qa"><summary>Vì sao Random Forest bốc tập con cột ở mỗi lần chia?</summary>
+  <p>Vì bagging thuần vẫn cho các cây <b>giống nhau</b>: có một cột rất mạnh thì gần như cây nào cũng chọn nó làm gốc, mà trung bình của những cây giống nhau thì không giảm được sai số. Giới hạn số cột ở mỗi lần chia ép các cây phải hỏi câu khác nhau, và đó là điểm phân biệt Random Forest với bagging cây thuần. Chi tiết ở mục 03 và mục 06.</p></details>
+
+  <details class="qa"><summary>Tăng số cây mãi thì có overfit không?</summary>
+  <p>Không. Thêm cây chỉ làm trung bình chính xác hơn, tức chỉ đánh vào phần sai số mà trung bình xoá được — đường hiệu năng phẳng dần rồi dừng chứ không quay đầu. Giá phải trả chỉ là thời gian và bộ nhớ, nên thực tế người ta tăng tới khi OOB score không nhích nữa. Đây là khác biệt then chốt so với boosting, nơi cây thứ n có thể làm model tệ đi và phải có early stopping.</p></details>
 
   <details class="qa"><summary>OOB score là gì và khi nào không tin được?</summary>
-  <p>Mỗi cây học trên một mẫu bootstrap, nên trung bình khoảng <b>37%</b> số dòng không lọt vào mẫu đó — dự đoán cho một dòng bằng riêng những cây <em>không</em> thấy nó cho ta một ước lượng gần như cross-validation mà <b>không tốn thêm lần huấn luyện nào</b>. Không tin được khi mẫu không độc lập: chuỗi thời gian, hoặc dữ liệu theo cụm như nhiều dòng của cùng một người dùng — lúc đó OOB lạc quan quá mức và phải chia theo thời gian hoặc theo nhóm.</p></details>
+  <p>Mỗi cây học trên một mẫu bootstrap nên trung bình khoảng <b>37%</b> số dòng không lọt vào túi của nó. Dự đoán một dòng bằng riêng những cây <em>không</em> thấy nó cho ta một con số ngoài mẫu gần bằng cross-validation mà <b>không tốn thêm lần huấn luyện nào</b>. Không tin được khi các dòng không độc lập: chuỗi thời gian, hoặc nhiều dòng của cùng một người dùng — lúc đó OOB lạc quan quá mức, phải chia theo thời gian hoặc theo nhóm.</p></details>
 
-  <details class="qa"><summary>Random Forest và Gradient Boosting khác nhau thế nào?</summary>
-  <p>Random Forest gộp các cây <b>sâu</b> học <b>song song</b> để giảm <b>variance</b>; boosting cộng các cây <b>nông</b> học <b>tuần tự</b> để giảm <b>bias</b>. Hệ quả thực tế: tăng số cây của Random Forest thì an toàn, còn của boosting thì phải có early stopping. Rừng cũng chịu nhiễu nhãn tốt hơn vì mỗi cây chỉ thấy một phần dữ liệu, trong khi cây sau của boosting sẽ cố học cả nhãn sai.</p></details>
-
-  <details class="qa"><summary>Feature importance cho thấy cột ID là quan trọng nhất — bạn nghĩ sao?</summary>
-  <p>Đó là cái bẫy kinh điển của <b>gain importance</b>: cột ID có rất nhiều giá trị nên có rất nhiều ngưỡng để thử, gần như luôn tìm được một điểm chia làm giảm độ vẩn — kể cả khi nó chỉ đang khớp nhiễu. Tôi sẽ kiểm chứng bằng <b>permutation importance trên tập kiểm tra</b>, và thêm hẳn một cột số ngẫu nhiên vào dữ liệu làm vạch chuẩn: mọi đặc trưng xếp dưới nó coi như nhiễu.</p></details>
+  <details class="qa"><summary>Bảng importance nói cột ID quan trọng nhất — bạn nghĩ sao?</summary>
+  <p>Đó là cái bẫy kinh điển của <b>gain importance</b>: cột ID có rất nhiều giá trị nên có rất nhiều ngưỡng để thử, gần như luôn tìm được một điểm chia làm giảm độ lẫn lộn, kể cả khi nó chỉ đang khớp nhiễu. Tôi sẽ kiểm lại bằng <b>permutation importance trên tập kiểm tra</b>, và thêm hẳn một cột số ngẫu nhiên vào dữ liệu làm vạch chuẩn: cột nào xếp dưới nó coi như nhiễu. Và dù dùng cách nào thì importance vẫn không phải bằng chứng nhân quả.</p></details>
 </section>
 
-<footer>Deep dive · random forest &amp; bagging · nhánh gộp cây theo hướng tuần tự nằm ở bài <a href="../gradient-boosting/index.html">Gradient boosting</a>.</footer>
+<footer>Machine learning · Tree models · hướng gộp cây tuần tự nằm ở <a href="../gradient-boosting/index.html">Gradient boosting</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>
