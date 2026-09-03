@@ -36,6 +36,14 @@ những chữ thật sự nằm trong bài.
 3. **Bài con dùng lại thuật ngữ của bài prerequisite**, và nói thẳng ở khối "Cần đọc trước" —
    ví dụ `random-forest` mở đầu bằng đúng ba từ root/internal/leaf mà `decision-tree` vừa dạy.
    Đó là cách người mới thấy được "rừng là nhiều cây" chứ không phải một khái niệm mới.
-4. Quy ước cũ vẫn giữ nguyên: ít chữ, nhiều hình ([[it-chu-nhieu-hinh]]), câu tiếng Việt thường,
+4. **Một khái niệm — một chữ, dùng y hệt từ đầu tới cuối bài.** Nhãn trong hình, tiêu đề mục,
+   câu dẫn và các chỗ trỏ ngược lại sau này phải **lặp đúng chữ đó**, không đổi sang từ đồng
+   nghĩa cho "đỡ lặp". Ví dụ đã sửa ở `random-forest`: hình toàn cảnh ghi ① BOOTSTRAP ·
+   ② RANDOM FEATURES · ③ AGGREGATING thì ba tiêu đề mục sau phải mang đúng ba chữ đó (trước đó
+   hình ghi "rút mẫu / trồng cây / bỏ phiếu" còn tiêu đề ghi kiểu khác — người đọc phải tự đoán
+   mục nào ứng với bước nào). Chữ dùng phải là **thuật ngữ quốc tế** của chủ đề (majority vote,
+   averaging, bagging, decorrelate), không tự chế cách gọi.
+
+5. Quy ước cũ vẫn giữ nguyên: ít chữ, nhiều hình ([[it-chu-nhieu-hinh]]), câu tiếng Việt thường,
    **chỉ giữ tiếng Anh ở cụm danh từ chuyên ngành**, và mở bài bằng "nó là gì" trước khi bàn vì
    sao cần nó.

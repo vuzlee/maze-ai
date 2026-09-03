@@ -43,7 +43,7 @@
         <header class="hero">
   <p class="eyebrow">Machine learning · Tree models</p>
   <h1>Random forest <em>&amp; bagging</em></h1>
-  <p class="lede">Hỏi <b>một</b> cây thì hay sai. Random forest trồng hàng trăm cây khác nhau rồi cho chúng <b>bỏ phiếu</b>. Bài này đi ba bước của thuật toán, rồi mới tới vì sao cách đó chạy được và cái bẫy của bảng feature importance.</p>
+  <p class="lede">Hỏi <b>một</b> cây thì hay sai. Random forest trồng hàng trăm cây khác nhau rồi cho chúng <b>bỏ phiếu</b>. Bài này đi ba bước <b>bootstrap → random features → aggregating</b>, rồi mới tới vì sao cách đó chạy được và cái bẫy của bảng feature importance.</p>
 </header>
 
 <section id="rf-s1" class="lesson">
@@ -53,15 +53,15 @@
 
   <div class="note">
     <h4>Cần đọc trước</h4>
-    Bài này giả định bạn đọc được <b>một</b> cây, gồm ba tầng: <b>root node</b> là câu hỏi đầu tiên, <b>internal node</b> là các câu hỏi tiếp theo, <b>leaf node</b> là kết luận. Chưa quen thì qua <a href="../decision-tree/index.html">Decision tree</a> trước.
+    <a href="../decision-tree/index.html">Decision tree</a> — bài này giả định bạn đọc được <b>một</b> cây.
   </div>
 
   <figure class="scrollx">
     <svg viewBox="0 0 900 392" role="img" aria-label="Toàn cảnh random forest: một bộ dữ liệu rút thành nhiều mẫu, mỗi mẫu trồng một cây, các cây bỏ phiếu ra kết quả">
       <text class="sv-h" x="62"  y="22" text-anchor="middle">DỮ LIỆU</text>
-      <text class="sv-h" x="222" y="22" text-anchor="middle">① RÚT MẪU</text>
-      <text class="sv-h" x="425" y="22" text-anchor="middle">② TRỒNG CÂY</text>
-      <text class="sv-h" x="603" y="22" text-anchor="middle">③ BỎ PHIẾU</text>
+      <text class="sv-h" x="222" y="22" text-anchor="middle">① BOOTSTRAP</text>
+      <text class="sv-h" x="425" y="22" text-anchor="middle">② RANDOM FEATURES</text>
+      <text class="sv-h" x="603" y="22" text-anchor="middle">③ AGGREGATING</text>
       <text class="sv-h" x="785" y="22" text-anchor="middle">KẾT QUẢ</text>
 
       <rect x="16" y="152" width="92" height="64" rx="8" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"></rect>
@@ -173,7 +173,7 @@
   </figure>
 
   <ul class="why">
-    <li>Toàn bộ thuật toán là ba bước trong hình: <b>rút mẫu → trồng cây → bỏ phiếu</b>. Ba mục sau đi vào từng bước.</li>
+    <li>Toàn bộ thuật toán là ba bước trong hình: <b>bootstrap → random features → aggregating</b>. Ba mục sau đi đúng thứ tự đó.</li>
     <li>Hình vẽ 3 cây cho dễ nhìn. Thật thì <b>300–500 cây</b>.</li>
     <li>Cây 2 đoán sai, nhưng hai cây kia đúng nên <b>phiếu sai bị thiểu số</b>. Đó là lý do cả rừng đúng hơn từng cây.</li>
   </ul>
@@ -184,75 +184,193 @@
 
   <p class="key">Chỉ có một bộ dữ liệu. Muốn nhiều cây khác nhau thì <em>rút lại dữ liệu, rút xong bỏ vào rút tiếp</em>.</p>
 
-  <div class="strip">
-    <div class="c t"><i>gốc</i><b>1</b></div><div class="c t"><i></i><b>2</b></div><div class="c t"><i></i><b>3</b></div><div class="c t"><i></i><b>4</b></div><div class="c t"><i></i><b>5</b></div><div class="c t"><i></i><b>6</b></div><div class="c t"><i></i><b>7</b></div><div class="c t"><i></i><b>8</b></div>
+  <figure class="scrollx">
+    <svg viewBox="0 0 900 336" role="img" aria-label="Tám khách gốc, rút tám lần có trả lại thành mẫu bootstrap; có khách vào mẫu hai lần, có khách không trúng lần nào">
+      <text class="sv-h" x="40" y="34">BỘ DỮ LIỆU GỐC · MỖI Ô LÀ MỘT KHÁCH</text>
+      <rect x="40" y="64" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="56" y="80" fill="#EDB44A">khách 1</text>
+      <text class="sv-l" x="176" y="80" text-anchor="end" fill="#EDB44A">×2</text>
+      <text class="sv-l" x="204" y="80" fill="#EDB44A">vào mẫu 2 lần</text>
+      <rect x="40" y="94" width="152" height="24" rx="6" fill="rgba(242,113,138,.14)" stroke="#F2718A"></rect>
+      <text class="sv-l" x="56" y="110" fill="#F79BAB">khách 2</text>
+      <text class="sv-l" x="176" y="110" text-anchor="end" fill="#F79BAB">×0</text>
+      <text class="sv-l" x="204" y="110" fill="#F79BAB">out-of-bag</text>
+      <rect x="40" y="124" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="56" y="140" fill="#EDB44A">khách 3</text>
+      <text class="sv-l" x="176" y="140" text-anchor="end" fill="#EDB44A">×2</text>
+      <text class="sv-l" x="204" y="140" fill="#EDB44A">vào mẫu 2 lần</text>
+      <rect x="40" y="154" width="152" height="24" rx="6" fill="rgba(242,113,138,.14)" stroke="#F2718A"></rect>
+      <text class="sv-l" x="56" y="170" fill="#F79BAB">khách 4</text>
+      <text class="sv-l" x="176" y="170" text-anchor="end" fill="#F79BAB">×0</text>
+      <text class="sv-l" x="204" y="170" fill="#F79BAB">out-of-bag</text>
+      <rect x="40" y="184" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="56" y="200" fill="#EDB44A">khách 5</text>
+      <text class="sv-l" x="176" y="200" text-anchor="end" fill="#EDB44A">×2</text>
+      <text class="sv-l" x="204" y="200" fill="#EDB44A">vào mẫu 2 lần</text>
+      <rect x="40" y="214" width="152" height="24" rx="6" fill="rgba(242,113,138,.14)" stroke="#F2718A"></rect>
+      <text class="sv-l" x="56" y="230" fill="#F79BAB">khách 6</text>
+      <text class="sv-l" x="176" y="230" text-anchor="end" fill="#F79BAB">×0</text>
+      <text class="sv-l" x="204" y="230" fill="#F79BAB">out-of-bag</text>
+      <rect x="40" y="244" width="152" height="24" rx="6" fill="rgba(140,169,242,.07)" stroke="#3D352C"></rect>
+      <text class="sv-l" x="56" y="260" fill="#7A6F63">khách 7</text>
+      <text class="sv-l" x="176" y="260" text-anchor="end" fill="#7A6F63">×1</text>
+      <rect x="40" y="274" width="152" height="24" rx="6" fill="rgba(140,169,242,.07)" stroke="#3D352C"></rect>
+      <text class="sv-l" x="56" y="290" fill="#7A6F63">khách 8</text>
+      <text class="sv-l" x="176" y="290" text-anchor="end" fill="#7A6F63">×1</text>
+      <text class="sv-h" x="348" y="150">RÚT 8 LẦN</text>
+      <text class="sv-h" x="348" y="168">MỖI LẦN RÚT XONG</text>
+      <text class="sv-h" x="348" y="186">TRẢ KHÁCH LẠI</text>
+      <line x1="348" y1="212" x2="452" y2="212" stroke="#EDB44A" stroke-width="2"></line>
+      <path d="M452 212 l-9 -5 v10 z" fill="#EDB44A"></path>
+      <text class="sv-h" x="484" y="34">MẪU BOOTSTRAP CỦA CÂY 1 · VẪN ĐỦ 8 DÒNG</text>
+      <rect x="484" y="64" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="500" y="80" fill="#EDB44A">khách 3</text>
+      <rect x="484" y="94" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="500" y="110" fill="#EDB44A">khách 1</text>
+      <rect x="484" y="124" width="152" height="24" rx="6" fill="rgba(140,169,242,.07)" stroke="#3D352C"></rect>
+      <text class="sv-l" x="500" y="140" fill="#7A6F63">khách 7</text>
+      <rect x="484" y="154" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="500" y="170" fill="#EDB44A">khách 3</text>
+      <text class="sv-l" x="648" y="170" fill="#EDB44A">lần thứ 2</text>
+      <rect x="484" y="184" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="500" y="200" fill="#EDB44A">khách 5</text>
+      <rect x="484" y="214" width="152" height="24" rx="6" fill="rgba(140,169,242,.07)" stroke="#3D352C"></rect>
+      <text class="sv-l" x="500" y="230" fill="#7A6F63">khách 8</text>
+      <rect x="484" y="244" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="500" y="260" fill="#EDB44A">khách 1</text>
+      <text class="sv-l" x="648" y="260" fill="#EDB44A">lần thứ 2</text>
+      <rect x="484" y="274" width="152" height="24" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="500" y="290" fill="#EDB44A">khách 5</text>
+      <text class="sv-l" x="648" y="290" fill="#EDB44A">lần thứ 2</text>
+      <line x1="40" y1="312" x2="860" y2="312" stroke="#2E2822"></line>
+      <text class="sv-t" x="40" y="330">Rút xong <tspan fill="#EDB44A">trả khách đó lại</tspan> nên có người vào mẫu hai lần — bù lại có người <tspan fill="#F79BAB">không trúng lần nào</tspan>.</text>
+    </svg>
+    <figcaption>Một <strong>dòng</strong> ở đây là một khách hàng. Rút đủ 8 lần nên mẫu vẫn có 8 dòng, chỉ là <strong>thành phần khác đi</strong>. Số khách bị bỏ ngoài thường vào khoảng <strong>1/3</strong> — đó chính là phần <strong>out-of-bag</strong> mà mục 07 đem ra chấm điểm.</figcaption>
+  </figure>
+
+
+  <p>Bấm thử — rút đủ 8 ô thì <b>một cây mọc lên</b>, mọc vài cây là thành rừng:</p>
+
+  <div class="lab" id="bootlab">
+    <div id="bview"></div>
+    <div class="slider" id="bslider"></div>
+
+    <p class="labsay" id="bexp"></p>
+
+    <div class="labbar">
+      <button id="bstep">Rút một lần</button>
+      <button class="ghost" id="bauto">Rút cho đầy</button>
+      <button id="bgrow">Trồng cây này</button>
+      <button class="ghost" id="brst">Làm lại</button>
+      <span id="bstat"></span>
+    </div>
+
+    <p class="verdict" id="bverdict" hidden></p>
   </div>
-  <div class="strip">
-    <div class="c on"><i>mẫu</i><b>3</b></div><div class="c on"><i></i><b>1</b></div><div class="c on"><i></i><b>7</b></div><div class="c on"><i></i><b>3</b></div><div class="c on"><i></i><b>5</b></div><div class="c on"><i></i><b>8</b></div><div class="c on"><i></i><b>1</b></div><div class="c on"><i></i><b>5</b></div>
-  </div>
-  <p class="stripnote"><span>rút đúng 8 lần</span><span><em>dòng 1, 3, 5 trúng hai lần · dòng 2, 4, 6 không trúng lần nào</em></span><span>vẫn đủ 8 dòng</span></p>
 
   <ul class="why">
-    <li>Mỗi lần rút cho một bộ dữ liệu <b>hơi lệch</b> so với bộ gốc — gọi là một <b>mẫu bootstrap</b>.</li>
-    <li>Dữ liệu lệch thì cây mọc ra cũng khác. Rút bao nhiêu lần thì có bấy nhiêu cây.</li>
-    <li>Tên <b>bagging</b> viết tắt từ <b>B</b>ootstrap <b>agg</b>regat<b>ing</b>: rút mẫu ở bước này, gộp phiếu ở bước 3.</li>
+    <li>Mỗi lần rút cho một bộ dữ liệu <b>hơi lệch</b> so với bộ gốc — gọi là một <b>mẫu bootstrap</b>. Dữ liệu lệch thì cây mọc ra cũng khác nhau.</li>
+    <li>Muốn 500 cây thì rút 500 lần. Các lần rút <b>độc lập nhau</b>.</li>
+    <li>Những khách màu đỏ ở trên có tên riêng: <b>out-of-bag</b> — cây 1 chưa từng học họ. Mục 07 dùng đúng họ để chấm điểm cây 1.</li>
+    <li>Tên <b>bagging</b> viết tắt từ <b>B</b>ootstrap <b>agg</b>regat<b>ing</b>: rút mẫu ở bước 1, gộp phiếu ở bước 3.</li>
   </ul>
 </section>
 
 <section id="rf-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Bước 2 — Trồng cây, mỗi lần chia chỉ nhìn vài cột</h2></div>
+  <div class="sh"><b>03</b><h2>Bước 2 — Random features: mỗi lần chia chỉ bốc vài cột</h2></div>
 
   <p class="key">Rút mẫu thôi <em>chưa đủ</em>: có một cột rất mạnh thì cây nào cũng chọn nó làm gốc, và các cây lại giống nhau.</p>
 
-  <figure>
-    <svg viewBox="0 0 900 176" role="img" aria-label="Nhìn đủ cột thì ba cây cùng một gốc; bịt bớt cột thì ba cây ba gốc khác nhau">
-      <text class="sv-h" x="220" y="20" text-anchor="middle">CÂY NÀO CŨNG NHÌN ĐỦ CỘT</text>
-      <text class="sv-h" x="680" y="20" text-anchor="middle">MỖI LẦN CHIA CHỈ NHÌN VÀI CỘT</text>
-      <line x1="450" y1="34" x2="450" y2="150" stroke="#2E2822" stroke-dasharray="4 4"></line>
-      <text class="sv-h" x="4" y="62">ROOT</text>
-      <text class="sv-h" x="4" y="108">LEAF</text>
-
-      <rect x="52"  y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <rect x="164" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <rect x="276" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-l" x="100" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
-      <text class="sv-l" x="212" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
-      <text class="sv-l" x="324" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
-      <line x1="100" y1="72" x2="76"  y2="100" stroke="#2E2822"></line>
-      <line x1="100" y1="72" x2="124" y2="100" stroke="#2E2822"></line>
-      <line x1="212" y1="72" x2="188" y2="100" stroke="#2E2822"></line>
-      <line x1="212" y1="72" x2="236" y2="100" stroke="#2E2822"></line>
-      <line x1="324" y1="72" x2="300" y2="100" stroke="#2E2822"></line>
-      <line x1="324" y1="72" x2="348" y2="100" stroke="#2E2822"></line>
-      <circle cx="76"  cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="124" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="188" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="236" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="300" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="348" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <text class="sv-t" x="220" y="140" text-anchor="middle" fill="#F79BAB">ba cây gần như trùng nhau</text>
-
-      <rect x="512" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <rect x="624" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <rect x="736" y="44" width="96" height="28" rx="6" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-l" x="560" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
-      <text class="sv-l" x="672" y="62" text-anchor="middle" fill="#A8BEF6">tuổi</text>
-      <text class="sv-l" x="784" y="62" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
-      <line x1="560" y1="72" x2="536" y2="100" stroke="#2E2822"></line>
-      <line x1="560" y1="72" x2="584" y2="100" stroke="#2E2822"></line>
-      <line x1="672" y1="72" x2="648" y2="100" stroke="#2E2822"></line>
-      <line x1="672" y1="72" x2="696" y2="100" stroke="#2E2822"></line>
-      <line x1="784" y1="72" x2="760" y2="100" stroke="#2E2822"></line>
-      <line x1="784" y1="72" x2="808" y2="100" stroke="#2E2822"></line>
-      <circle cx="536" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="584" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="648" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="696" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="760" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <circle cx="808" cy="104" r="5" fill="#241F1A" stroke="#2E2822"></circle>
-      <text class="sv-t" x="680" y="140" text-anchor="middle" fill="#8EE0BE">ba cây khác nhau thật</text>
+  <figure class="scrollx">
+    <svg viewBox="0 0 900 236" role="img" aria-label="Bagging thuần: cả ba cây đều nhìn đủ bốn cột nên root node nào cũng chọn thu nhập">
+      <text class="sv-h" x="104" y="34">CỘT ĐƯỢC PHÉP NHÌN Ở LẦN CHIA ĐẦU</text>
+      <text class="sv-h" x="530" y="34">ROOT NODE CHỌN</text>
+      <text class="sv-l" x="8" y="77" fill="#7A6F63">cây 1</text>
+      <rect x="104" y="62" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="147" y="77" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <rect x="198" y="62" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="241" y="77" text-anchor="middle" fill="#A8BEF6">tuổi</text>
+      <rect x="292" y="62" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="335" y="77" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
+      <rect x="386" y="62" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="429" y="77" text-anchor="middle" fill="#A8BEF6">mã vùng</text>
+      <text class="sv-l" x="490" y="77" fill="#4A423A">→</text>
+      <rect x="530" y="62" width="150" height="22" rx="5" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"></rect>
+      <text class="sv-t" x="605" y="78" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <text class="sv-l" x="8" y="131" fill="#7A6F63">cây 2</text>
+      <rect x="104" y="116" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="147" y="131" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <rect x="198" y="116" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="241" y="131" text-anchor="middle" fill="#A8BEF6">tuổi</text>
+      <rect x="292" y="116" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="335" y="131" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
+      <rect x="386" y="116" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="429" y="131" text-anchor="middle" fill="#A8BEF6">mã vùng</text>
+      <text class="sv-l" x="490" y="131" fill="#4A423A">→</text>
+      <rect x="530" y="116" width="150" height="22" rx="5" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"></rect>
+      <text class="sv-t" x="605" y="132" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <text class="sv-l" x="8" y="185" fill="#7A6F63">cây 3</text>
+      <rect x="104" y="170" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="147" y="185" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <rect x="198" y="170" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="241" y="185" text-anchor="middle" fill="#A8BEF6">tuổi</text>
+      <rect x="292" y="170" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="335" y="185" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
+      <rect x="386" y="170" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="429" y="185" text-anchor="middle" fill="#A8BEF6">mã vùng</text>
+      <text class="sv-l" x="490" y="185" fill="#4A423A">→</text>
+      <rect x="530" y="170" width="150" height="22" rx="5" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"></rect>
+      <text class="sv-t" x="605" y="186" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <line x1="8" y1="196" x2="892" y2="196" stroke="#2E2822"></line>
+      <text class="sv-t" x="450" y="222" text-anchor="middle" fill="#F79BAB">ba root node giống hệt → ba cây gần như là một</text>
     </svg>
-    <figcaption>Ô xanh là <strong>root node</strong> của từng cây. Bên trái cột mạnh nhất luôn thắng nên ba root node ghi <em>cùng một chữ</em>. Bên phải cột mạnh nhất hay vắng mặt trong nhóm cột được bốc, cây buộc phải hỏi câu khác — ba root node ba chữ khác nhau.</figcaption>
+    <figcaption><strong>Bagging thuần</strong> — cây nào cũng nhìn đủ 4 cột. Cột <b>thu nhập</b> mạnh nhất nên lần nào nó cũng thắng, và cả ba cây bắt đầu y hệt nhau.</figcaption>
+  </figure>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 900 236" role="img" aria-label="Random features: mỗi cây chỉ được bốc 2 trong 4 cột nên root node khác nhau">
+      <text class="sv-h" x="104" y="34">CHỈ 2 CỘT ĐƯỢC BỐC · MỜ = KHÔNG ĐƯỢC NHÌN</text>
+      <text class="sv-h" x="530" y="34">ROOT NODE CHỌN</text>
+      <text class="sv-l" x="8" y="77" fill="#7A6F63">cây 1</text>
+      <rect x="104" y="62" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="147" y="77" text-anchor="middle" fill="#A8BEF6">thu nhập</text>
+      <rect x="198" y="62" width="86" height="22" rx="5" fill="none" stroke="#2E2822" stroke-dasharray="3 3"></rect>
+      <text class="sv-l" x="241" y="77" text-anchor="middle" fill="#4A423A">tuổi</text>
+      <rect x="292" y="62" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="335" y="77" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
+      <rect x="386" y="62" width="86" height="22" rx="5" fill="none" stroke="#2E2822" stroke-dasharray="3 3"></rect>
+      <text class="sv-l" x="429" y="77" text-anchor="middle" fill="#4A423A">mã vùng</text>
+      <text class="sv-l" x="490" y="77" fill="#4A423A">→</text>
+      <rect x="530" y="62" width="150" height="22" rx="5" fill="rgba(237,180,74,.16)" stroke="#EDB44A"></rect>
+      <text class="sv-t" x="605" y="78" text-anchor="middle" fill="#EDB44A">thu nhập</text>
+      <text class="sv-l" x="8" y="131" fill="#7A6F63">cây 2</text>
+      <rect x="104" y="116" width="86" height="22" rx="5" fill="none" stroke="#2E2822" stroke-dasharray="3 3"></rect>
+      <text class="sv-l" x="147" y="131" text-anchor="middle" fill="#4A423A">thu nhập</text>
+      <rect x="198" y="116" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="241" y="131" text-anchor="middle" fill="#A8BEF6">tuổi</text>
+      <rect x="292" y="116" width="86" height="22" rx="5" fill="none" stroke="#2E2822" stroke-dasharray="3 3"></rect>
+      <text class="sv-l" x="335" y="131" text-anchor="middle" fill="#4A423A">số lần mua</text>
+      <rect x="386" y="116" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="429" y="131" text-anchor="middle" fill="#A8BEF6">mã vùng</text>
+      <text class="sv-l" x="490" y="131" fill="#4A423A">→</text>
+      <rect x="530" y="116" width="150" height="22" rx="5" fill="rgba(237,180,74,.16)" stroke="#EDB44A"></rect>
+      <text class="sv-t" x="605" y="132" text-anchor="middle" fill="#EDB44A">tuổi</text>
+      <text class="sv-l" x="8" y="185" fill="#7A6F63">cây 3</text>
+      <rect x="104" y="170" width="86" height="22" rx="5" fill="none" stroke="#2E2822" stroke-dasharray="3 3"></rect>
+      <text class="sv-l" x="147" y="185" text-anchor="middle" fill="#4A423A">thu nhập</text>
+      <rect x="198" y="170" width="86" height="22" rx="5" fill="none" stroke="#2E2822" stroke-dasharray="3 3"></rect>
+      <text class="sv-l" x="241" y="185" text-anchor="middle" fill="#4A423A">tuổi</text>
+      <rect x="292" y="170" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="335" y="185" text-anchor="middle" fill="#A8BEF6">số lần mua</text>
+      <rect x="386" y="170" width="86" height="22" rx="5" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"></rect>
+      <text class="sv-l" x="429" y="185" text-anchor="middle" fill="#A8BEF6">mã vùng</text>
+      <text class="sv-l" x="490" y="185" fill="#4A423A">→</text>
+      <rect x="530" y="170" width="150" height="22" rx="5" fill="rgba(237,180,74,.16)" stroke="#EDB44A"></rect>
+      <text class="sv-t" x="605" y="186" text-anchor="middle" fill="#EDB44A">số lần mua</text>
+      <line x1="8" y1="196" x2="892" y2="196" stroke="#2E2822"></line>
+      <text class="sv-t" x="450" y="222" text-anchor="middle" fill="#8EE0BE">ba root node khác nhau → ba cây khác nhau thật</text>
+    </svg>
+    <figcaption><strong>Random features</strong> — mỗi lần chia chỉ bốc 2 trong 4 cột. Cây 2 không bốc trúng <b>thu nhập</b> nên buộc phải hỏi <b>tuổi</b>. Ép các cây khác nhau như vậy gọi là <strong>decorrelate</strong>.</figcaption>
   </figure>
 
   <ul class="why">
@@ -263,94 +381,98 @@
 </section>
 
 <section id="rf-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Bước 3 — Gộp câu trả lời của cả rừng</h2></div>
+  <div class="sh"><b>04</b><h2>Bước 3 — Aggregating: gộp câu trả lời của cả rừng</h2></div>
 
   <p class="key">Cho dòng cần đoán chạy qua <em>tất cả</em> các cây, rồi gộp câu trả lời lại thành một.</p>
 
   <div class="cmp two">
     <div>
-      <h5>Phân loại — đếm phiếu</h5>
+      <h5>Phân loại — majority vote</h5>
       <p><b>Câu hỏi:</b> khách này mua hay không?</p>
       <p><b>500 cây trả lời:</b> 380 mua · 120 không.</p>
-      <p><b>Kết quả:</b> mua — và tiện thể có luôn xác suất 380/500 = 0,76.</p>
+      <p><b>Kết quả:</b> phe đông hơn thắng — mua, kèm xác suất 380/500 = 0,76.</p>
     </div>
     <div>
-      <h5>Dự đoán số — lấy trung bình</h5>
+      <h5>Dự đoán số — averaging</h5>
       <p><b>Câu hỏi:</b> căn nhà này giá bao nhiêu?</p>
       <p><b>500 cây trả lời:</b> 2,1 tỉ · 2,4 tỉ · 2,2 tỉ · …</p>
-      <p><b>Kết quả:</b> trung bình của 500 con số đó.</p>
+      <p><b>Kết quả:</b> trung bình cộng của 500 con số đó.</p>
     </div>
   </div>
 
   <ul class="why">
     <li>Các cây <b>không cần biết nhau</b>, nên trồng song song được — có bao nhiêu nhân CPU dùng hết bấy nhiêu.</li>
-    <li>Đây là chữ <b>aggregating</b> trong <em>bagging</em>. Hết ba bước, thuật toán chỉ có vậy.</li>
+    <li>Đây là chữ <b>aggregating</b> trong <em>bagging</em> — bước 3, cũng là bước cuối. Hết ba bước, thuật toán chỉ có vậy.</li>
   </ul>
 </section>
 
 <section id="rf-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Vì sao nhiều cây lại đúng hơn một cây</h2></div>
 
-  <p class="key">Vì <em>mỗi cây sai một kiểu khác nhau</em>. Nhiều cái sai đi các hướng khác nhau thì trung bình triệt tiêu bớt, còn phần đúng thì cây nào cũng đúng nên giữ nguyên.</p>
+  <p class="key">Vì <em>mỗi cây sai một kiểu khác nhau</em>. Chỗ đúng thì cây nào cũng đúng nên giữ nguyên; chỗ sai thì mỗi cây sai một hướng nên trung bình trừ bớt nhau.</p>
 
-  <figure>
-    <svg viewBox="0 0 900 190" role="img" aria-label="Ba mẫu dữ liệu gần giống nhau cho ra ba cây có gốc khác hẳn">
-      <text class="sv-l" x="150" y="18" text-anchor="middle">bỏ ra 5 dòng</text>
-      <text class="sv-l" x="450" y="18" text-anchor="middle">bỏ ra 5 dòng khác</text>
-      <text class="sv-l" x="750" y="18" text-anchor="middle">bỏ ra 5 dòng khác nữa</text>
+  <figure class="scrollx">
+    <svg viewBox="0 0 900 268" role="img" aria-label="Năm cây đoán giá nhà lệch về hai phía giá thật, trung bình của chúng rơi đúng vào giá thật">
+      <text class="sv-h" x="8" y="26">GIÁ THẬT CỦA CĂN NHÀ: 2,30 TỈ</text>
 
-      <line x1="150" y1="74" x2="95"  y2="114" stroke="#2E2822"></line>
-      <line x1="150" y1="74" x2="205" y2="114" stroke="#2E2822"></line>
-      <rect x="75" y="40" width="150" height="34" rx="7" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-t" x="150" y="62" text-anchor="middle" fill="#A8BEF6">thu nhập &lt; 20tr ?</text>
-      <rect x="45"  y="114" width="100" height="30" rx="6" class="sv-b"></rect>
-      <rect x="155" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
-      <text class="sv-l" x="95"  y="133" text-anchor="middle">tuổi &lt; 30 ?</text>
-      <text class="sv-l" x="205" y="133" text-anchor="middle">mua</text>
+      <line x1="470" y1="40" x2="470" y2="212" stroke="#5BCFA0" stroke-width="2"></line>
+      <text class="sv-l" x="470" y="52" text-anchor="middle" fill="#8EE0BE">giá thật</text>
 
-      <line x1="450" y1="74" x2="395" y2="114" stroke="#2E2822"></line>
-      <line x1="450" y1="74" x2="505" y2="114" stroke="#2E2822"></line>
-      <rect x="375" y="40" width="150" height="34" rx="7" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-t" x="450" y="62" text-anchor="middle" fill="#A8BEF6">tuổi &lt; 30 ?</text>
-      <rect x="345" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
-      <rect x="455" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
-      <text class="sv-l" x="395" y="133" text-anchor="middle">không mua</text>
-      <text class="sv-l" x="505" y="133" text-anchor="middle">thu nhập ?</text>
+      <text class="sv-l" x="270" y="240" text-anchor="middle" fill="#7A6F63">đoán thấp hơn</text>
+      <text class="sv-l" x="670" y="240" text-anchor="middle" fill="#7A6F63">đoán cao hơn</text>
+      <line x1="120" y1="222" x2="820" y2="222" stroke="#2E2822"></line>
 
-      <line x1="750" y1="74" x2="695" y2="114" stroke="#2E2822"></line>
-      <line x1="750" y1="74" x2="805" y2="114" stroke="#2E2822"></line>
-      <rect x="675" y="40" width="150" height="34" rx="7" fill="rgba(140,169,242,.18)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-t" x="750" y="62" text-anchor="middle" fill="#A8BEF6">đã mua trước ?</text>
-      <rect x="645" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
-      <rect x="755" y="114" width="100" height="30" rx="6" class="sv-b"></rect>
-      <text class="sv-l" x="695" y="133" text-anchor="middle">mua</text>
-      <text class="sv-l" x="805" y="133" text-anchor="middle">mã vùng ?</text>
+      <line x1="470" y1="78" x2="230" y2="78" stroke="#3D352C" stroke-dasharray="3 3"></line>
+      <circle cx="230" cy="78" r="6" fill="rgba(140,169,242,.22)" stroke="#8CA9F2"></circle>
+      <text class="sv-l" x="230" y="68" text-anchor="middle" fill="#7A6F63">1,82</text>
+      <text class="sv-l" x="106" y="82" text-anchor="end" fill="#7A6F63">cây 1</text>
+      <line x1="470" y1="100" x2="680" y2="100" stroke="#3D352C" stroke-dasharray="3 3"></line>
+      <circle cx="680" cy="100" r="6" fill="rgba(140,169,242,.22)" stroke="#8CA9F2"></circle>
+      <text class="sv-l" x="680" y="90" text-anchor="middle" fill="#7A6F63">2,72</text>
+      <text class="sv-l" x="106" y="104" text-anchor="end" fill="#7A6F63">cây 2</text>
+      <line x1="470" y1="122" x2="345" y2="122" stroke="#3D352C" stroke-dasharray="3 3"></line>
+      <circle cx="345" cy="122" r="6" fill="rgba(140,169,242,.22)" stroke="#8CA9F2"></circle>
+      <text class="sv-l" x="345" y="112" text-anchor="middle" fill="#7A6F63">2,05</text>
+      <text class="sv-l" x="106" y="126" text-anchor="end" fill="#7A6F63">cây 3</text>
+      <line x1="470" y1="144" x2="625" y2="144" stroke="#3D352C" stroke-dasharray="3 3"></line>
+      <circle cx="625" cy="144" r="6" fill="rgba(140,169,242,.22)" stroke="#8CA9F2"></circle>
+      <text class="sv-l" x="625" y="134" text-anchor="middle" fill="#7A6F63">2,61</text>
+      <text class="sv-l" x="106" y="148" text-anchor="end" fill="#7A6F63">cây 4</text>
+      <line x1="470" y1="166" x2="470" y2="166" stroke="#3D352C" stroke-dasharray="3 3"></line>
+      <circle cx="470" cy="166" r="6" fill="rgba(140,169,242,.22)" stroke="#8CA9F2"></circle>
+      <text class="sv-l" x="470" y="156" text-anchor="middle" fill="#7A6F63">2,3</text>
+      <text class="sv-l" x="106" y="170" text-anchor="end" fill="#7A6F63">cây 5</text>
 
-      <text class="sv-t" x="450" y="172" text-anchor="middle"><tspan fill="#A8BEF6">root node</tspan> đổi thì <tspan fill="#EDE7DE">cả cây bên dưới đổi theo</tspan></text>
+      <circle cx="470" cy="196" r="9" fill="rgba(91,207,160,.28)" stroke="#5BCFA0" stroke-width="2"></circle>
+      <text class="sv-t" x="488" y="201" fill="#8EE0BE">trung bình 5 cây = 2,3 tỉ</text>
+      <text class="sv-l" x="106" y="200" text-anchor="end" fill="#8EE0BE">cả rừng</text>
+
+      <text class="sv-t" x="450" y="262" text-anchor="middle">cây lệch trái + cây lệch phải → <tspan fill="#8EE0BE">triệt tiêu nhau</tspan></text>
     </svg>
-    <figcaption>Cùng một tập khách, chỉ khác vài dòng, mà <strong>root node</strong> đã đổi — đổi root node là đổi luôn mọi <strong>internal node</strong> bên dưới. Cây quyết định nhạy tới mức đó; ở đây sự nhạy lại thành có lợi.</figcaption>
+    <figcaption>Năm cây đoán năm số, không cây nào trúng. Nhưng chúng lệch về <strong>hai phía khác nhau</strong> nên khi lấy trung bình, phần lệch trừ bớt phần lệch — kết quả của cả rừng sát giá thật hơn mọi cây riêng lẻ.</figcaption>
   </figure>
 
   <ul class="why">
-    <li>Nói theo <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">Bias–variance</a>: cây sâu gần như không có bias, sai số nằm hết ở <b>variance</b> — và variance đúng là thứ lấy trung bình chữa được.</li>
-    <li>Ngược lại, lấy trung bình <b>không</b> chữa được bias. Đó là lý do rừng chỉ ghép cây <em>sâu</em>, không ghép cây cụt.</li>
+    <li>Cách này chỉ ăn thua khi các cây <b>lệch khác hướng nhau</b>. Năm cây cùng lệch cao thì trung bình vẫn lệch cao — nên bước 2 mới phải ép chúng khác nhau.</li>
+    <li>Gọi tên theo <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">Bias–variance</a>: kiểu sai "mỗi lần một hướng" là <b>variance</b>, và đó đúng là thứ lấy trung bình chữa được.</li>
+    <li>Kiểu sai "lần nào cũng lệch một hướng" là <b>bias</b> — trung bình <em>không</em> chữa được. Vì vậy rừng chỉ ghép cây <b>sâu</b> (variance cao, bias thấp), không ghép cây cụt.</li>
   </ul>
 </section>
 
 <section id="rf-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Thêm cây tới đâu thì hết tác dụng</h2></div>
 
-  <p class="key">Thêm cây không bao giờ làm tệ đi, <em>nhưng chỉ hạ được tới một cái sàn</em>.</p>
+  <p class="key">Thêm cây không bao giờ làm tệ đi. Nhưng sai số <em>chỉ giảm tới một mức rồi đứng im</em> — thêm nữa cũng vô ích.</p>
 
   <div class="bars">
     <div class="b"><i>1 cây</i><u style="width:100%"></u><b>sai số 1,00</b></div>
     <div class="b"><i>10 cây</i><u style="width:37%"></u><b>0,37</b></div>
     <div class="b"><i>100 cây</i><u style="width:31%"></u><b>0,31</b></div>
-    <div class="b hi"><i>vô hạn cây</i><u style="width:30%"></u><b>0,30 — sàn</b></div>
+    <div class="b hi"><i>vô hạn cây</i><u style="width:30%"></u><b>0,30 — không xuống nữa</b></div>
   </div>
   <p class="stripnote"><span>1 → 10 cây: giảm mạnh</span><span><em>100 → vô hạn: gần như không đổi</em></span><span>nên 300–500 cây là đủ</span></p>
 
-  <p>Cái sàn tới từ chỗ <b>các cây vẫn còn giống nhau</b> — chúng rút từ cùng một bộ dữ liệu. Lấy trung bình của những cây giống nhau thì kết quả vẫn y như một cây. Muốn hạ sàn thì phải làm các cây <b>bớt giống nhau</b>, tức là chỉnh <code>max_features</code> ở bước 2.</p>
+  <p>Vì sao lại đứng im? Mục 05 nói trung bình chỉ chữa được phần các cây <b>lệch khác hướng nhau</b>. Phần các cây <b>cùng lệch một hướng</b> thì thêm bao nhiêu cây cũng không chữa — đó chính là mức sàn. Muốn hạ nó thì phải làm các cây khác nhau hơn, tức chỉnh <code>max_features</code> ở bước 2.</p>
 
   <details class="deep">
     <summary>Viết ra bằng công thức</summary>
@@ -359,7 +481,7 @@
         <div class="line">
           <span class="t"><span>sai số của cả rừng</span></span>
           <span class="op">=</span>
-          <span class="t r"><span>ρσ<sup>2</sup></span><em>cái sàn</em></span>
+          <span class="t r"><span>ρσ<sup>2</sup></span><em>phần các cây cùng lệch — không xuống được</em></span>
           <span class="op">+</span>
           <span class="t p"><span>(1 − ρ)σ<sup>2</sup> / B</span><em>phần thêm cây xoá được</em></span>
         </div>
@@ -375,40 +497,109 @@
 </section>
 
 <section id="rf-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>OOB score — tập kiểm tra miễn phí</h2></div>
+  <div class="sh"><b>07</b><h2>OOB score — chấm điểm bằng dòng cây chưa thấy</h2></div>
 
-  <p class="key">Rút có hoàn lại thì luôn có dòng <em>không trúng lần nào</em>. Dùng đúng chúng để chấm điểm.</p>
+  <p class="key">OOB = <b>out-of-bag</b>, nghĩa đen là <em>nằm ngoài túi</em>. "Túi" là mẫu bootstrap của một cây; dòng không được rút vào túi đó thì cây <em>chưa từng học</em> nó.</p>
 
-  <div class="strip">
-    <div class="c t"><i>1</i><b>✓</b></div>
-    <div class="c t"><i>2</i><b>✓</b></div>
-    <div class="c on"><i>3</i><b>oob</b></div>
-    <div class="c t"><i>4</i><b>✓</b></div>
-    <div class="c t"><i>5</i><b>✓</b></div>
-    <div class="c on"><i>6</i><b>oob</b></div>
-    <div class="c t"><i>7</i><b>✓</b></div>
-    <div class="c on"><i>8</i><b>oob</b></div>
-    <div class="c t"><i>9</i><b>✓</b></div>
-    <div class="c t"><i>10</i><b>✓</b></div>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>OOB score</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>số dòng đoán đúng</span><em>chỉ hỏi những cây chưa học dòng đó</em></span>
+      <span class="op">/</span>
+      <span class="t"><span>tổng số dòng</span></span>
+    </div>
+    <p class="read">Đó là <b>độ chính xác trên dữ liệu chưa học</b> — cùng ý nghĩa với điểm trên tập test, nhưng không phải cắt dữ liệu ra và không phải huấn luyện thêm lần nào.</p>
   </div>
-  <p class="stripnote"><span>63,2% lọt vào mẫu của cây này</span><span><em>36,8% nằm ngoài — cây này chưa từng thấy chúng</em></span><span>mỗi cây một danh sách khác</span></p>
 
-  <p>Với mỗi dòng, gom những cây <em>không</em> có nó trong mẫu rồi cho riêng nhóm cây đó dự đoán. Dự đoán ấy hoàn toàn ngoài mẫu, nên gộp lại được một con số gần bằng cross-validation mà <b>không tốn thêm lần huấn luyện nào</b>.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 900 296" role="img" aria-label="Bảng 5 dòng dữ liệu nhân 5 cây: ô vàng là dòng cây đó không được học, chỉ những cây đó mới được chấm dòng ấy">
+      <text class="sv-h" x="184" y="46" text-anchor="middle">CÂY 1</text>
+      <text class="sv-h" x="280" y="46" text-anchor="middle">CÂY 2</text>
+      <text class="sv-h" x="376" y="46" text-anchor="middle">CÂY 3</text>
+      <text class="sv-h" x="472" y="46" text-anchor="middle">CÂY 4</text>
+      <text class="sv-h" x="568" y="46" text-anchor="middle">CÂY 5</text>
+      <text class="sv-l" x="126" y="81" text-anchor="end">dòng 1</text>
+      <text class="sv-l" x="126" y="121" text-anchor="end">dòng 2</text>
+      <text class="sv-l" x="126" y="161" text-anchor="end" fill="#EDB44A">dòng 3</text>
+      <text class="sv-l" x="126" y="201" text-anchor="end">dòng 4</text>
+      <text class="sv-l" x="126" y="241" text-anchor="end">dòng 5</text>
+      <rect x="140" y="60" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="184" y="81" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="236" y="60" width="88" height="32" rx="6" fill="rgba(237,180,74,.18)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="280" y="81" text-anchor="middle" fill="#EDB44A">out-of-bag</text>
+      <rect x="332" y="60" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="376" y="81" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="428" y="60" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="472" y="81" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="524" y="60" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="568" y="81" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="140" y="100" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="184" y="121" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="236" y="100" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="280" y="121" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="332" y="100" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="376" y="121" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="428" y="100" width="88" height="32" rx="6" fill="rgba(237,180,74,.18)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="472" y="121" text-anchor="middle" fill="#EDB44A">out-of-bag</text>
+      <rect x="524" y="100" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="568" y="121" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="140" y="140" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="184" y="161" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="236" y="140" width="88" height="32" rx="6" fill="rgba(237,180,74,.18)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="280" y="161" text-anchor="middle" fill="#EDB44A">out-of-bag</text>
+      <rect x="332" y="140" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="376" y="161" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="428" y="140" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="472" y="161" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="524" y="140" width="88" height="32" rx="6" fill="rgba(237,180,74,.18)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="568" y="161" text-anchor="middle" fill="#EDB44A">out-of-bag</text>
+      <rect x="140" y="180" width="88" height="32" rx="6" fill="rgba(237,180,74,.18)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="184" y="201" text-anchor="middle" fill="#EDB44A">out-of-bag</text>
+      <rect x="236" y="180" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="280" y="201" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="332" y="180" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="376" y="201" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="428" y="180" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="472" y="201" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="524" y="180" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="568" y="201" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="140" y="220" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="184" y="241" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="236" y="220" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="280" y="241" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="332" y="220" width="88" height="32" rx="6" fill="rgba(237,180,74,.18)" stroke="#EDB44A"></rect>
+      <text class="sv-l" x="376" y="241" text-anchor="middle" fill="#EDB44A">out-of-bag</text>
+      <rect x="428" y="220" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="472" y="241" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="524" y="220" width="88" height="32" rx="6" class="sv-b"></rect>
+      <text class="sv-l" x="568" y="241" text-anchor="middle" fill="#7A6F63">đã học</text>
+      <rect x="130" y="132" width="490" height="48" rx="9" fill="none" stroke="#EDB44A" stroke-width="2" stroke-dasharray="5 4"></rect>
+      <line x1="624" y1="156" x2="652" y2="156" stroke="#EDB44A" stroke-width="2"></line>
+      <rect x="656" y="112" width="234" height="88" rx="9" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"></rect>
+      <text class="sv-l" x="672" y="136" fill="#EDB44A">cây 2 và cây 5 chưa thấy dòng 3</text>
+      <text class="sv-l" x="672" y="158">→ chỉ hỏi 2 cây đó: <tspan fill="#EDE7DE">mua</tspan></text>
+      <text class="sv-l" x="672" y="180">→ nhãn thật: mua <tspan fill="#8EE0BE">✓ đúng</tspan></text>
+      <text class="sv-t" x="450" y="272" text-anchor="middle">chấm y hệt cho <tspan fill="#EDE7DE">mọi dòng</tspan> → tỉ lệ đúng = <tspan fill="#8EE0BE">OOB score</tspan></text>
+    </svg>
+    <figcaption>Mỗi cột là một cây, mỗi hàng là một dòng dữ liệu. Ô xám: cây đó <strong>đã học</strong> dòng này — hỏi lại thì nó thuộc bài, điểm không đáng tin. Ô vàng: dòng này <strong>out-of-bag</strong> với cây đó, tức cây chưa từng thấy. Chấm một dòng thì chỉ cho những cây ô vàng của hàng đó bỏ phiếu.</figcaption>
+  </figure>
 
 <pre><code>rf = RandomForestClassifier(n_estimators=<span class="st">500</span>, oob_score=<span class="kw">True</span>).fit(X, y)
-rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễn phí</span></code></pre>
+rf.oob_score_          <span class="cm"># điểm trên dữ liệu cây chưa thấy</span></code></pre>
 
   <ul class="why">
-    <li>Tiện nhất khi <b>dữ liệu ít</b>: không phải cắt ra một tập validation vốn đã hiếm dòng.</li>
-    <li><b>Không tin được khi các dòng dính nhau</b> — chuỗi thời gian, hay nhiều dòng của cùng một khách. Dòng nằm ngoài khi đó vẫn gần trùng dòng bên trong nên điểm quá đẹp.</li>
-    <li>Muốn so nhiều bộ siêu tham số thì vẫn dùng <a href="../../04-core-concepts/train-val-test-cv/index.html">cross-validation</a> thật.</li>
+    <li>Con số này gần bằng <a href="../../04-core-concepts/train-val-test-cv/index.html">cross-validation</a> mà <b>không mất thêm thời gian</b> — tiện nhất khi dữ liệu ít, khỏi phải cắt ra một tập validation.</li>
+    <li><b>Không tin được khi các dòng dính nhau</b> — chuỗi thời gian, hay nhiều dòng của cùng một khách. Dòng bị bỏ sót khi đó vẫn gần trùng dòng đã học, nên điểm đẹp giả.</li>
+    <li>Con số 1/3 chính xác là <b>36,8%</b>, và nó không đổi dù dữ liệu to nhỏ thế nào.</li>
   </ul>
 </section>
 
 <section id="rf-s8" class="lesson">
   <div class="sh"><b>08</b><h2>Feature importance — và cái bẫy</h2></div>
 
-  <p class="key">Cột ID có <em>rất nhiều ngưỡng để thử</em> nên gần như luôn chia được — nên nó đứng đầu bảng dù không mang thông tin gì.</p>
+  <p class="key">Rừng chấm điểm cho từng cột: <em>cột nào giúp chia dữ liệu nhiều nhất thì điểm cao nhất</em>. Bảng điểm đó gọi là <b>feature importance</b> — và nó có một cái bẫy.</p>
 
   <div class="bars">
     <div class="b bad"><i>user_id</i><u style="width:100%"></u><b>0,31 ← vô dụng mà đứng đầu</b></div>
@@ -418,7 +609,9 @@ rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễ
     <div class="b"><i>mã vùng</i><u style="width:19%"></u><b>0,06</b></div>
     <div class="b"><i>ngày trong tuần</i><u style="width:13%"></u><b>0,04</b></div>
   </div>
-  <p class="stripnote"><span>mẹo: tự thêm một cột số ngẫu nhiên vào dữ liệu làm mốc</span><span><em>đặc trưng nào xếp dưới nó thì coi như nhiễu</em></span></p>
+  <p class="stripnote"><span>đây là bảng điểm cách đo mặc định trả về</span><span><em>user_id đứng đầu, mà nó chỉ là số thứ tự khách hàng</em></span></p>
+
+  <p><b>Cái bẫy:</b> <code>user_id</code> có cả nghìn giá trị khác nhau nên chỗ nào cắt cũng chia được dữ liệu — cách đo mặc định thấy vậy là cho điểm cao, dù cột đó chẳng nói lên điều gì. Cách kiểm: <b>tự thêm một cột số ngẫu nhiên</b> vào dữ liệu; cột thật nào xếp dưới nó thì coi như nhiễu.</p>
 
   <div class="stack">
     <div class="s warn"><b>Gain — MDI, mặc định của thư viện</b><span>đo tổng mức giảm độ lẫn lộn do cột đó tạo ra · <em>thiên vị cột nhiều giá trị</em>, và tính trên chính dữ liệu đã học</span></div>
@@ -432,9 +625,9 @@ rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễ
 </section>
 
 <section id="rf-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Siêu tham số</h2></div>
+  <div class="sh"><b>09</b><h2>Hyperparameter — những núm cần chỉnh</h2></div>
 
-  <p class="key">Chỉ <em>một</em> núm đáng dò: <code>max_features</code> — chính là núm ở bước 2, mục 03.</p>
+  <p class="key">Random forest có ít núm phải chỉnh. Chỉ <em>một</em> núm thật sự đáng dò: <code>max_features</code> — chính là núm ở bước 2, random features.</p>
 
   <div class="stack">
     <div class="s ok"><b><code>max_features</code> — núm chính</b><span>số cột được nhìn ở mỗi lần chia. Nhỏ thì các cây khác nhau hơn nhưng từng cây yếu hơn · bắt đầu từ mặc định rồi dò quanh đó</span></div>
@@ -452,7 +645,7 @@ rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễ
 <section id="rf-s10" class="lesson">
   <div class="sh"><b>10</b><h2>Đánh đổi và khi nào chọn nó</h2></div>
 
-  <p class="key">Đổi <em>tính giải thích và tốc độ</em> lấy <em>sự ổn định</em>. Một cây đọc được bằng mắt; năm trăm cây thì không.</p>
+  <p class="key">Được <em>ổn định</em>, mất <em>tính giải thích và tốc độ</em>. Một cây vẽ ra đọc được bằng mắt; năm trăm cây thì không.</p>
 
   <div class="cmp two">
     <div>
@@ -521,5 +714,6 @@ rf.oob_score_          <span class="cm"># điểm ngoài mẫu, gần như miễ
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
 </body>
 </html>
