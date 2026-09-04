@@ -1,6 +1,6 @@
 ---
 name: chuan-bai-mau
-description: "Random forest & bagging là bài mẫu của kho — tám luật rút ra từ nó, dùng để sửa mọi bài khác"
+description: "Random forest & bagging là bài mẫu của kho — chín luật rút ra từ nó, dùng để sửa mọi bài khác"
 metadata:
   type: feedback
 updated: 2026-09-04
@@ -24,6 +24,29 @@ dài nhất 24 · 13 mục · **0 khối `<pre>`**.
    lại chúng suốt bài. Người đọc học cách đọc hình **một lần**, không phải học lại ở mỗi mục.
    Hình dạng chọn theo chủ đề: DSA thì mảng + con trỏ, database thì bảng + sơ đồ quan hệ,
    networking thì `.seq` + `.stack`.
+
+   **Dạng mạnh nhất của luật này: một bản đồ duy nhất, mỗi mục sáng đúng một ô.** Ý của người dùng,
+   2026-09-04: mental model là tổng quan, mỗi mục dưới là **phóng to một ô của chính nó**. Cách vẽ:
+   bản đồ được vẽ lại **nguyên xi ở mọi hình**; ô đang học đủ màu, phần còn lại xám (`--rule` +
+   `--faint` + nền `--panel`), và một đường gạch nối sang panel phóng to bên phải. Người đọc học
+   cách đọc hình đúng một lần, và **luôn biết mình đang đứng ở đâu** trong bức tranh chung.
+   Cài bằng một hàm `frame(hl)` trả về danh sách phần tử — thêm mục mới chỉ là gọi với ô khác,
+   không vẽ lại bố cục. Mẫu:
+   [Memory management & GC](../../../content/02-python/02-language-core/memory-management-gc/index.html)
+   — tám hình, một bản đồ bốn ô.
+
+   **Người dùng chốt lại sau khi thấy bản làm xong** (2026-09-04): *"1 hình mental, xong bóc tách
+   dần nó rất liên kết tuần tự và dễ hiểu, đúng như ý tưởng học dễ, tuyến tính mà tôi cố gắng
+   truyền tải"*. Nên đây **không phải quy ước vẽ hình, mà là thứ tự học**: hình mental model ở mục
+   01 là *toàn bộ bài nói trước một lần*, mỗi mục sau **bóc ra đúng một ô** theo thứ tự đã có sẵn
+   trên hình. Người đọc không bao giờ gặp khái niệm rơi từ trên trời — trước khi học nó, họ đã
+   nhìn thấy ô của nó và biết nó nằm cạnh cái gì.
+
+   Hệ quả về cách soạn: **thứ tự các mục phải đọc ra được từ chính bản đồ**. Vẽ bản đồ trước, dàn ý
+   là hệ quả — không phải viết mục trước rồi vẽ hình minh hoạ sau. Bố cục bản đồ mà không gợi ra
+   được một đường đi tuyến tính thì bản đồ sai, không phải dàn ý sai. Ở bài mẫu: bản đồ hai nhánh
+   nên bài đi *cơ chế chính (03) → lỗ hổng của nó (04) → thứ vá lỗ hổng (05)*, và ba mục cuối là ba
+   ô còn lại của bản đồ.
 
 2. **Bullet ngắn nhất có thể** — *"nội dung các bullet cả bài cần ngắn gọn nhất, tối giản nhất"*.
    Mốc: **trung bình ≤ 15 từ, không câu nào quá 25**. Cả kho hiện có 737 bullet, **50% đang quá
@@ -49,6 +72,14 @@ dài nhất 24 · 13 mục · **0 khối `<pre>`**.
 7. **Mỗi bài đóng bằng một mục "Tổng kết một hình"** — một hình duy nhất ráp lại toàn bài,
    dán đúng thuật ngữ chuẩn ([[thuat-ngu-chuan-va-nguon-tham-khao]]), rồi 3–4 bullet nối các
    khái niệm đã học vào đúng vị trí của chúng trên hình.
+
+   **Ngoại lệ — bài cheatsheet ôn phỏng vấn thì hình đó lên mục 01, tên là *Mental model*.**
+   Ngày 2026-09-04, người dùng: *"phải để lên đầu mới hợp lý, cho cả người mới và người học lại,
+   nhìn cái thì não trigger ngay"*. Bài dạng ôn thì người học lại **chỉ mở bài, nhìn hình, đóng** —
+   mở bài mới là chỗ đắt nhất, chốt lại ở cuối thì không ai đọc tới. Bài như vậy không có mục tổng
+   kết cuối; `figure.gist` chính là mental model, và mục cuối là Hỏi đáp. Xem
+   [Memory management & GC](../../../content/02-python/02-language-core/memory-management-gc/index.html)
+   và [[sua-bai-memory-management-gc]].
 
 8. **Mặt bài là cheatsheet, chiều sâu nằm trong `details.deep`.** Ngày 2026-09-04, người dùng:
    *"bị quá nhiều chữ, ví dụ bài Gradient boosting, tôi muốn phong cách như cheatsheet nhưng chi
@@ -86,10 +117,22 @@ Ba thứ dễ hỏng, đã dính đủ cả ba ở nhóm tree-models:
   ngân sách lá". Số nào hình khoe thì phải `assert` trong script sinh, hoặc tính lại từ chính
   thuật toán của lab.
 - **Chữ trong hình quá dài.** Nhãn dài tràn khỏi khung ở màn hẹp. Nhãn là *nhãn*, không phải câu
-  văn — câu văn để `figcaption`.
+  văn — câu văn để `figcaption`. Mốc thực dụng rút ra ở bài memory-management-gc: **nhãn phải ngắn
+  tới mức không cần đo**; dài quá thì tách hai dòng, hoặc đẩy hẳn xuống `figcaption`.
+- **`viewBox` thấp hơn hình.** Ô cuối bị cắt cụt mà markup vẫn đúng hoàn toàn. Hàm sinh khung nên
+  **trả về `y` cuối cùng** để chiều cao tính ra từ đó, đừng chép số cứng.
 
 Sinh bằng script Python dùng chung (`box/txt/arrow/tree/put`), `put()` phải idempotent (xoá
 `figure.gist` cũ trước khi chèn) để chỉnh toạ độ rồi chạy lại thoải mái.
+
+**Soát overlap bằng máy, đừng soát bằng mắt.** Ước lượng bề rộng chữ từ class
+(`sv-t` ≈ 0,55 × cỡ chữ mỗi ký tự, `sv-d` ≈ 0,52, `sv-l` ≈ 0,60, `sv-h` ≈ 0,72) rồi kiểm bốn thứ:
+chữ đè chữ · chữ thò khỏi `rect` bao nó · `rect` đè `rect` không lồng nhau · tràn khỏi `viewBox`.
+Thêm một lượt **vạch cắt chữ** — mũi tên vòng hai chiều rất hay chạy xuyên qua nhãn trong ô,
+mắt nhìn ảnh chụp cả trang thu nhỏ thì không thấy. Cách chụp để soát: render **một hình một trang**
+(nhúng `assets/style.css` vào file tạm) rồi
+`google-chrome --headless --force-device-scale-factor=2 --screenshot` — phóng to gấp đôi và không
+có chữ xung quanh, lỗi 2–3px hiện ra ngay.
 
 **Áp dụng thế nào.** Trước khi sửa một bài, đo bằng script ở [[it-chu-nhieu-hinh]] và script đếm
 bullet dưới đây; sau khi sửa đo lại. Thứ tự việc: (1) bullet dài → cắt; (2) `<pre>` khái niệm →

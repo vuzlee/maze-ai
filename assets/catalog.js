@@ -337,8 +337,8 @@ window.CATALOG = [
       "slug": "memgc",
       "title": "Memory management & GC",
       "tag": "Python internals",
-      "blurb": "Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.",
-      "n": 6,
+      "blurb": "Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.",
+      "n": 9,
       "path": "content/02-python/02-language-core/memory-management-gc/index.html",
       "skeleton": false,
       "lc": 0

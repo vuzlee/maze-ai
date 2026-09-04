@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Memory management &amp; GC — MazeAI</title>
-<meta name="description" content="Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.">
+<meta name="description" content="Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/memory-management-gc/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Memory management &amp; GC">
-<meta property="og:description" content="Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.">
+<meta property="og:description" content="Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,220 +39,629 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-memgc" data-title="Memory management &amp; GC" data-tag="Python internals" data-blurb="Đếm tham chiếu, chu trình, bộ thu gom theo thế hệ, bộ nhớ thật của object và bốn nguồn rò rỉ.">
-        <header class="hero">
+      <article class="doc" id="art-memgc" data-title="Memory management &amp; GC" data-tag="Python internals" data-blurb="Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.">
+<header class="hero">
   <p class="eyebrow">Deep dive · Python internals · bộ nhớ</p>
   <h1>Memory management &amp; <em>GC</em></h1>
-  <p class="lede">Bài trước trả lời <b>object là gì và ai đang trỏ tới nó</b>. Bài này trả lời câu tiếp theo: <b>khi nào object đó biến mất</b> — ai đếm, ai dọn, và vì sao có bộ dọn rác rồi mà service vẫn ăn RAM tăng dần.</p>
+  <p class="lede"><b>GC</b> viết tắt của <b>garbage collection</b> — <em>thu gom rác</em>: máy tự tìm những object không ai còn dùng tới rồi thu hồi ô nhớ của chúng, thay vì bắt bạn tự giải phóng như trong C. Cả bài gói trong <b>một bản đồ hai nhánh</b>: <em>reference counting</em> là cơ chế chính, <em>cyclic GC</em> chỉ vá đúng một lỗ hổng của nó. Mỗi mục dưới đây phóng to đúng một ô của bản đồ đó.</p>
 </header>
 
+
 <section id="memgc-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Python quản lý bộ nhớ thế nào</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-  <p class="key">Python dọn bộ nhớ bằng <em>hai cơ chế chồng lên nhau</em>, không phải một.</p>
+  <p class="key">Nhớ đúng <em>một hình</em> này là trả lời được gần hết câu hỏi về bộ nhớ Python. Mọi mục sau chỉ là phóng to một ô của nó.</p>
 
-  <div class="flow">
-    <div class="n"><b>Đếm tham chiếu</b><span>mỗi object giữ một số đếm · về 0 là giải phóng <b>ngay</b></span></div>
-    <div class="n"><b>Bộ thu gom theo thế hệ</b><span>chạy định kỳ · dọn nốt những nhóm object <b>chỉ còn trỏ lẫn nhau</b></span></div>
-    <div class="n ok"><b>Của bạn</b><span>cả hai đều bó tay khi code còn giữ tham chiếu thật — đó là <b>rò rỉ</b></span></div>
-  </div>
+<figure class="gist">
+<svg viewBox="0 0 860 360" role="img" aria-label="Bản đồ bốn ô: code của bạn, reference counting là cơ chế chính, cyclic GC xử lý reference cycle, và vạch GC lo bộ nhớ còn file socket dùng with; bên phải là câu trả lời phỏng vấn mẫu và bốn ý cốt lõi">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="47" fill="var(--tomb)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--dim)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--tomb)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--text)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="135" fill="var(--ok)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--dim)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="183" fill="var(--filled)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--dim)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="243" fill="var(--probe)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--dim)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<text class="sv-h" x="360" y="22">CÂU TRẢ LỜI THUỘC LÒNG</text>
+<rect x="360" y="30" width="500" height="76" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="50" fill="var(--probe)">&quot;Python primarily uses reference counting,</text>
+<text class="sv-t" x="376" y="70" fill="var(--probe)">supplemented by a cyclic garbage collector</text>
+<text class="sv-t" x="376" y="90" fill="var(--probe)">to detect reference cycles.&quot;</text>
+<text class="sv-h" x="360" y="132">BỐN Ý &#8212; HẾT</text>
+<rect x="360" y="142" width="500" height="44" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="376" y="162" fill="var(--ok)">Reference counting là CƠ CHẾ CHÍNH</text>
+<text class="sv-d" x="376" y="178" fill="var(--faint)">refcount = 0  &#8594;  giải phóng ngay tại chỗ</text>
+<rect x="360" y="194" width="500" height="44" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="376" y="214" fill="var(--filled)">Cyclic GC chỉ BỔ SUNG</text>
+<text class="sv-d" x="376" y="230" fill="var(--faint)">sinh ra để vá đúng một lỗ hổng: reference cycle</text>
+<rect x="360" y="246" width="500" height="44" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="266" fill="var(--tomb)">Có GC vẫn LEAK được</text>
+<text class="sv-d" x="376" y="282" fill="var(--faint)">vì chính code của bạn còn giữ tham chiếu</text>
+<rect x="360" y="298" width="500" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="318" fill="var(--probe)">GC ≠ resource management</text>
+<text class="sv-d" x="376" y="334" fill="var(--faint)">file, socket, connection &#8594; dùng with, đừng chờ GC</text>
+</svg>
+<figcaption>Bản đồ bên trái lặp lại ở <b>mọi mục</b> của bài — mỗi lần chỉ sáng đúng ô đang học, phần còn lại xám đi. Học cách đọc nó một lần là đọc được cả bài.</figcaption>
+</figure>
 
   <ul class="why">
-    <li>Cơ chế một giải thích vì sao Python trả bộ nhớ rất <b>kịp thời</b> — và vì sao có <a href="../../04-concurrency/thread-process-gil/index.html">GIL</a>.</li>
-    <li>Cơ chế hai tồn tại chỉ vì <b>một lỗ hổng duy nhất</b> của cơ chế một: vòng tham chiếu.</li>
-    <li>Rò rỉ trong Python gần như luôn là <b>lỗi thiết kế</b>, không phải lỗi bộ dọn rác.</li>
+    <li><b>Reference counting</b> là cơ chế chính — dọn gần hết rác, dọn ngay tại chỗ.</li>
+    <li><b>Cyclic GC</b> chỉ bổ sung — sinh ra để vá <em>một</em> lỗ hổng: reference cycle.</li>
+    <li>Có GC <b>vẫn rò rỉ được</b>, vì rò rỉ nằm ở tầng trên: code còn giữ tham chiếu.</li>
+    <li>GC lo <b>bộ nhớ</b>, không lo file và socket — thứ đó dùng <code>with</code>.</li>
   </ul>
 
   <p class="stripnote"><span>bài này nối tiếp <a href="../memory-model-mutability/index.html"><em>Memory model &amp; mutability</em></a></span><span>ở đó: tên, object, mutability, copy — <em>đọc trước bài này</em></span></p>
 </section>
 
 <section id="memgc-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Đếm tham chiếu</h2></div>
-<pre><code><span class="kw">import</span> sys
-a = [<span class="st">1</span>, <span class="st">2</span>]
-sys.getrefcount(a)     <span class="cm"># 2 — một từ a, một từ đối số tạm của hàm này</span>
-b = a
-sys.getrefcount(a)     <span class="cm"># 3</span>
-<span class="kw">del</span> b
-sys.getrefcount(a)     <span class="cm"># 2</span></code></pre>
-  <p>Cơ chế chính là <strong>đếm tham chiếu</strong>: mỗi object giữ một biến đếm, về 0 thì được giải phóng ngay lập tức. Đây là lý do Python giải phóng bộ nhớ rất kịp thời — và cũng là lý do có GIL, như đã nói ở bài trước.</p>
-  <h3>Vấn đề chu trình</h3>
-<figure>
-    <svg viewBox="0 0 700 190" role="img" aria-label="Hai dict trỏ vòng vào nhau">
-      <defs><marker id="gc1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#8CA9F2"/></marker></defs>
-      <rect class="sv-b" x="60" y="60" width="150" height="56" rx="6" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="135" y="84" text-anchor="middle" fill="#EDE7DE">dict A</text>
-      <text class="sv-l" x="135" y="103" text-anchor="middle" fill="#EDB44A">refcount = 1</text>
-      <rect class="sv-b" x="430" y="60" width="150" height="56" rx="6" fill="rgba(140,169,242,.16)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="505" y="84" text-anchor="middle" fill="#EDE7DE">dict B</text>
-      <text class="sv-l" x="505" y="103" text-anchor="middle" fill="#EDB44A">refcount = 1</text>
-      <path d="M215 78 L425 78" stroke="#8CA9F2" stroke-width="2" marker-end="url(#gc1)"/>
-      <path d="M425 100 L215 100" stroke="#8CA9F2" stroke-width="2" marker-end="url(#gc1)"/>
-      <text class="sv-l" x="320" y="70" text-anchor="middle" fill="#7A6F63">a["b"] = b</text>
-      <text class="sv-l" x="320" y="122" text-anchor="middle" fill="#7A6F63">b["a"] = a</text>
-      <text class="sv-l" x="60" y="158" fill="#F2718A">del a, b — hai cái tên biến mất, nhưng mỗi dict vẫn còn đúng 1 tham chiếu từ dict kia.</text>
-      <text class="sv-l" x="60" y="176" fill="#F2718A">Bộ đếm không bao giờ về 0 → đếm tham chiếu một mình không dọn được.</text>
-    </svg>
-    <figcaption>Đây là <b>lỗ hổng duy nhất</b> của đếm tham chiếu, và là lý do Python cần thêm bộ thu gom theo thế hệ.</figcaption>
-  </figure>
-  <p>Vì vậy Python có thêm một <strong>bộ thu gom theo thế hệ</strong> chạy định kỳ để phát hiện những nhóm object chỉ còn trỏ lẫn nhau. Nó chỉ quét các object kiểu container, chạy theo ba thế hệ với tần suất giảm dần — object sống lâu thì bị quét ít hơn.</p>
-  <div class="note">
-    <h4>Khi nào chuyện này thành vấn đề thật</h4>
-    Với chương trình có nhiều object lồng nhau và vòng tham chiếu, lần chạy GC có thể gây ra khoảng dừng đáng chú ý. Dịch vụ độ trễ thấp đôi khi tắt GC tự động bằng <code>gc.disable()</code> rồi tự gọi <code>gc.collect()</code> vào lúc rảnh. Chỉ nên làm khi đã đo và thấy đúng nguyên nhân.
-  </div>
+  <div class="sh"><b>02</b><h2>Garbage collection</h2></div>
+
+  <p class="key">Máy không đoán được bạn <em>còn cần</em> object nào. Nó chỉ trả lời được một câu cơ học: <em>từ chỗ chương trình đang đứng, còn đường đi tới object này không?</em></p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng cả cây; bên phải: root set là điểm xuất phát, object còn đường đi tới thì sống, cụm chỉ trỏ vào nhau mà không có đường từ root là rác">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="47" fill="var(--tomb)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--dim)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--tomb)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--text)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="135" fill="var(--ok)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--dim)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="183" fill="var(--filled)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--dim)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="243" fill="var(--probe)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--dim)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<text class="sv-h" x="360" y="22">RÁC = KHÔNG CÒN ĐƯỜNG ĐI TỪ ROOT TỚI NÓ</text>
+<rect x="360" y="30" width="130" height="140" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="52" fill="var(--probe)">ROOT SET</text>
+<text class="sv-d" x="374" y="76" fill="var(--dim)">biến toàn cục</text>
+<text class="sv-d" x="374" y="98" fill="var(--dim)">biến cục bộ</text>
+<text class="sv-d" x="374" y="120" fill="var(--dim)">nội bộ</text>
+<text class="sv-d" x="374" y="156" fill="var(--faint)">điểm xuất phát</text>
+<rect x="516" y="30" width="180" height="140" rx="6" fill="var(--panel)" stroke="var(--ok)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-h" x="530" y="50" fill="var(--ok)">CÒN TỚI ĐƯỢC &#8594; SỐNG</text>
+<rect x="530" y="60" width="152" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="544" y="81" fill="var(--ok)">list dữ liệu</text>
+<text class="sv-d" x="544" y="97" fill="var(--faint)">còn đường đi tới</text>
+<rect x="530" y="116" width="152" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="544" y="137" fill="var(--ok)">dict con</text>
+<text class="sv-d" x="544" y="153" fill="var(--faint)">sống theo</text>
+<line x1="490" y1="78" x2="518.0" y2="79.6" stroke="var(--probe)" stroke-width="1.3"/><polygon points="526.0,80.0 517.8,83.7 518.2,75.4" fill="var(--probe)"/>
+<line x1="606" y1="106" x2="606.0" y2="106.0" stroke="var(--ok)" stroke-width="1.3"/><polygon points="606.0,114.0 601.8,106.0 610.2,106.0" fill="var(--ok)"/>
+<line x1="712" y1="30" x2="712" y2="170" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 4"/>
+<rect x="724" y="30" width="132" height="140" rx="6" fill="var(--panel)" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-h" x="736" y="50" fill="var(--tomb)">RÁC</text>
+<rect x="736" y="60" width="92" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="750" y="81" fill="var(--tomb)">node C</text>
+<text class="sv-d" x="750" y="97" fill="var(--faint)">không ai tới</text>
+<rect x="736" y="116" width="92" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="750" y="137" fill="var(--tomb)">node D</text>
+<text class="sv-d" x="750" y="153" fill="var(--faint)">không ai tới</text>
+<line x1="836" y1="84" x2="836.0" y2="104.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="836.0,112.0 831.8,104.0 840.2,104.0" fill="var(--tomb)"/>
+<line x1="846" y1="112" x2="846.0" y2="92.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="846.0,84.0 850.2,92.0 841.8,92.0" fill="var(--tomb)"/>
+<text class="sv-d" x="360" y="190" fill="var(--muted)">Máy không đoán được bạn CÒN CẦN gì. Nó chỉ trả lời được</text>
+<text class="sv-d" x="360" y="208" fill="var(--muted)">một câu: có đường đi từ root tới object này không.</text>
+<text class="sv-d" x="360" y="236" fill="var(--ok)">Garbage collection = tự tìm những object hết đường tới,</text>
+<text class="sv-d" x="360" y="254" fill="var(--ok)">rồi thu hồi ô nhớ.</text>
+<text class="sv-d" x="360" y="282" fill="var(--probe)">Python làm việc đó bằng HAI cơ chế trong bản đồ bên trái.</text>
+</svg>
+<figcaption>Điểm xuất phát gọi là <b>root set</b>: biến toàn cục, biến cục bộ của các hàm đang chạy, vài chỗ nội bộ của interpreter. Còn đường tới thì sống, hết đường là <b>rác</b> — thu hồi an toàn tuyệt đối.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li>Trong C bạn tự gọi <code>free</code>; quên là rò rỉ, gọi hai lần là sập.</li>
+    <li>Python bỏ hẳn việc đó — <b>bạn không bao giờ giải phóng object bằng tay</b>.</li>
+    <li>Python làm điều đó bằng <b>hai cơ chế</b> trong bản đồ, hai mục sau đi vào từng nhánh.</li>
+  </ul>
+
+  <details class="deep"><summary>"Không với tới được" khác "không còn dùng nữa" thế nào?</summary>
+  <div class="body">
+    <p>Máy chỉ đo được vế thứ nhất. Một list bạn đã dùng xong nhưng vẫn còn nằm trong một biến toàn cục thì <b>vẫn với tới được</b>, nên không bộ thu gom nào dám đụng vào — biết đâu dòng sau bạn lại dùng.</p>
+    <p>Khoảng cách giữa hai vế đó chính là chỗ mọi rò rỉ trong Python sinh ra: không phải máy dọn sót, mà là <b>code còn giữ tham chiếu</b>. Đó là ô trên cùng của bản đồ, và là nội dung của mục cuối.</p>
+  </div></details>
 </section>
 
 <section id="memgc-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Bộ nhớ thật của object</h2></div>
+  <div class="sh"><b>03</b><h2>Reference counting</h2></div>
 
-  <p class="key">Biết khi nào object bị dọn rồi, còn một câu hỏi nữa: <em>mỗi object tốn bao nhiêu</em>.</p>
-<pre><code><span class="kw">import</span> sys
-sys.getsizeof(<span class="st">0</span>)            <span class="cm"># khoảng 28 byte — một int cũng là object đầy đủ</span>
-sys.getsizeof([])           <span class="cm"># khoảng 56 byte cho list rỗng</span>
-sys.getsizeof([<span class="st">1</span>,<span class="st">2</span>,<span class="st">3</span>])      <span class="cm"># khoảng 88 — chỉ tính con trỏ, KHÔNG tính các int bên trong</span>
-sys.getsizeof({})           <span class="cm"># khoảng 64 byte</span></code></pre>
-  <p><code>getsizeof</code> chỉ đo lớp ngoài. Một list một triệu số nguyên tốn khoảng 8 MB cho mảng con trỏ, cộng khoảng 28 MB cho các object int — tức khoảng 36 MB, so với 4 MB nếu dùng <code>array</code> hoặc NumPy. Đây là lý do NumPy tồn tại.</p>
-  <h3><code>__slots__</code> — cắt bộ nhớ của object tự viết</h3>
-<pre><code><span class="kw">class</span> Point:
-    <span class="kw">def</span> __init__(self, x, y): self.x, self.y = x, y
-<span class="cm"># mỗi instance có một __dict__ riêng: khoảng 100+ byte mỗi object</span>
+  <p class="key">Mỗi object mang sẵn một bộ đếm <em>ob_refcnt</em>, và mọi dòng code chỉ làm đúng một việc với nó: <em>thêm một tên, hoặc bớt một tên</em>. Về 0 là giải phóng ngay.</p>
 
-<span class="kw">class</span> PointSlim:
-    __slots__ = (<span class="st">"x"</span>, <span class="st">"y"</span>)      <span class="cm"># bỏ __dict__, lưu vào ô cố định</span>
-    <span class="kw">def</span> __init__(self, x, y): self.x, self.y = x, y
-<span class="cm"># tiết kiệm khoảng 40–50% bộ nhớ và truy cập thuộc tính nhanh hơn</span></code></pre>
-  <p>Cái mất: không thêm được thuộc tính động, và kế thừa phức tạp hơn. Chỉ đáng dùng khi tạo hàng triệu instance — ví dụ node của cây, điểm dữ liệu, bản ghi trong bộ đệm.</p>
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng nhánh reference counting; bên phải bốn bước: gán tạo object refcount 1, gán thêm tên lên 2, del một tên xuống 1, del nốt về 0 thì giải phóng ngay">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="24" y="47" fill="var(--faint)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--faint)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--rule)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--rule)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--faint)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="135" fill="var(--ok)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--dim)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="183" fill="var(--faint)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--faint)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="243" fill="var(--faint)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--faint)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<path d="M304 150 H 328 V 118 H 350" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<line x1="350" y1="118" x2="349.0" y2="118.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="357.0,118.0 349.0,122.2 349.0,113.8" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="22">BỘ ĐẾM CỦA MỘT OBJECT QUA BỐN DÒNG CODE</text>
+<rect x="360" y="30" width="118" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="419" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2]</text>
+<rect x="372" y="66" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="392.0" y="81" fill="var(--filled)" text-anchor="middle">a</text>
+<line x1="392" y1="88" x2="392.0" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="392.0,100.0 387.8,92.0 396.2,92.0" fill="var(--filled)"/>
+<rect x="360" y="104" width="118" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="125" fill="var(--filled)">[1, 2]</text>
+<text class="sv-d" x="374" y="141" fill="var(--faint)">ob_refcnt = 1</text>
+<text class="sv-d" x="360" y="168" fill="var(--faint)">object sinh ra</text>
+<rect x="488" y="30" width="118" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="547" y="47" fill="var(--dim)" text-anchor="middle">b = a</text>
+<rect x="500" y="66" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="520.0" y="81" fill="var(--filled)" text-anchor="middle">a</text>
+<line x1="520" y1="88" x2="520.0" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="520.0,100.0 515.8,92.0 524.2,92.0" fill="var(--filled)"/>
+<rect x="546" y="66" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="566.0" y="81" fill="var(--filled)" text-anchor="middle">b</text>
+<line x1="566" y1="88" x2="566.0" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="566.0,100.0 561.8,92.0 570.2,92.0" fill="var(--filled)"/>
+<rect x="488" y="104" width="118" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="502" y="125" fill="var(--filled)">[1, 2]</text>
+<text class="sv-d" x="502" y="141" fill="var(--faint)">ob_refcnt = 2</text>
+<text class="sv-d" x="488" y="168" fill="var(--faint)">chép ĐỊA CHỈ,</text>
+<text class="sv-d" x="488" y="183" fill="var(--faint)">không chép list</text>
+<rect x="616" y="30" width="118" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="675" y="47" fill="var(--dim)" text-anchor="middle">del a</text>
+<rect x="628" y="66" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="648.0" y="81" fill="var(--filled)" text-anchor="middle">b</text>
+<line x1="648" y1="88" x2="648.0" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="648.0,100.0 643.8,92.0 652.2,92.0" fill="var(--filled)"/>
+<rect x="616" y="104" width="118" height="46" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="630" y="125" fill="var(--probe)">[1, 2]</text>
+<text class="sv-d" x="630" y="141" fill="var(--faint)">ob_refcnt = 1</text>
+<text class="sv-d" x="616" y="168" fill="var(--probe)">bớt một tên,</text>
+<text class="sv-d" x="616" y="183" fill="var(--probe)">object vẫn sống</text>
+<rect x="744" y="30" width="118" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="803" y="47" fill="var(--dim)" text-anchor="middle">del b</text>
+<text class="sv-d" x="803" y="82" fill="var(--faint)" text-anchor="middle">&#8212; hết tên &#8212;</text>
+<rect x="744" y="104" width="118" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="sv-t" x="758" y="125" fill="var(--ok)">[1, 2]</text>
+<text class="sv-d" x="758" y="141" fill="var(--faint)">ob_refcnt = 0</text>
+<text class="sv-d" x="744" y="168" fill="var(--ok)">về 0 &#8594;</text>
+<text class="sv-d" x="744" y="183" fill="var(--ok)">giải phóng NGAY</text>
+<text class="sv-d" x="360" y="212" fill="var(--ok)">Không có lượt quét nào ở đây &#8212; object biến mất ngay tại dòng lệnh làm bộ đếm về 0.</text>
+<text class="sv-d" x="360" y="232" fill="var(--faint)">Cái giá: mọi thread đều sửa bộ đếm, muốn an toàn phải có GIL.</text>
+<text class="sv-d" x="360" y="258" fill="var(--tomb)">Và đúng một trường hợp bộ đếm KHÔNG BAO GIỜ về 0 &#8212; mục sau.</text>
+</svg>
+<figcaption>Bốn dòng code, bốn giá trị của bộ đếm. Object biến mất <b>ngay tại dòng <code>del b</code></b>, không chờ một lượt quét nào — đó là nghĩa của chữ <em>kịp thời</em>.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><b>Kịp thời</b> — trả lại ngay tại chỗ, không có khoảng dừng.</li>
+    <li><b>Dự đoán được</b> — biết chính xác lúc nào object bị huỷ.</li>
+    <li><b>Cái giá</b> — mọi thread đều sửa bộ đếm, nên phải có <a href="../../04-concurrency/thread-process-gil/index.html">GIL</a>.</li>
+  </ul>
+
+  <details class="deep"><summary>Vì sao <code>sys.getrefcount</code> luôn trả về số lớn hơn?</summary>
+  <div class="body">
+    <p>Chính lời gọi hàm đó cũng tạo một tham chiếu tạm: object được truyền vào làm đối số, nên trong lúc hàm chạy có thêm đúng một cái tên nữa trỏ tới nó. Đếm được 2 nghĩa là thật ra chỉ có 1.</p>
+    <p>Từ Python 3.12, các object hằng dùng nhiều — <code>None</code>, <code>True</code>, số nguyên nhỏ — đã thành <em>immortal</em>: bộ đếm của chúng không thay đổi nữa, nên đừng ngạc nhiên khi thấy một con số khổng lồ.</p>
+  </div></details>
 </section>
 
 <section id="memgc-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Rò rỉ bộ nhớ trong Python</h2></div>
-  <p>Có bộ thu gom rác không có nghĩa là không rò rỉ. Bốn nguồn thường gặp nhất:</p>
-<div class="stack">
-    <div class="s warn"><b>Cache không giới hạn</b><span><code>lru_cache(maxsize=None)</code> giữ mọi đối số và kết quả mãi mãi → đặt <code>maxsize</code>, hoặc dùng TTL cache</span></div>
-    <div class="s warn"><b><code>lru_cache</code> đặt trên phương thức</b><span>cache giữ luôn <code>self</code> nên instance không bao giờ được giải phóng → dùng <code>cached_property</code></span></div>
-    <div class="s warn"><b>Biến toàn cục dồn dữ liệu</b><span>list/dict ở cấp module chỉ thêm mà không xoá → giới hạn kích thước, hoặc <code>deque(maxlen=n)</code></span></div>
-    <div class="s warn"><b>Đăng ký callback / observer</b><span>object bị giữ trong danh sách listener sau khi đã hết dùng → huỷ đăng ký, hoặc <code>weakref</code></span></div>
-  </div>
-<pre><code><span class="kw">import</span> weakref
-<span class="cm"># weakref: trỏ tới object mà KHÔNG tăng bộ đếm tham chiếu</span>
-r = weakref.ref(obj)
-r()          <span class="cm"># trả về obj, hoặc None nếu obj đã bị giải phóng</span></code></pre>
-  <div class="note">
-    <h4>Cách truy rò rỉ</h4>
-    <code>tracemalloc</code> có trong thư viện chuẩn: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết dòng code nào cấp phát thêm. Đó là câu trả lời nên nói khi bị hỏi "service của em ăn RAM tăng dần, làm sao tìm nguyên nhân".
-  </div>
-</section>
+  <div class="sh"><b>04</b><h2>Reference cycle</h2></div>
 
-<section id="memgc-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+  <p class="key">Reference counting hỏng đúng một chỗ: <em>các object trỏ vòng vào nhau</em> thì bộ đếm không bao giờ về 0, dù không ai còn với tới chúng.</p>
 
-  <p class="key">Hai cơ chế chồng lên nhau dọn được gần hết, và đúng cái chúng không dọn được — tham chiếu thật mà code còn giữ — mới là chỗ rò rỉ.</p>
-
-  <figure class="scrollx">
-  <svg viewBox="0 0 860 530" role="img" aria-label="Tổng kết memory management và GC: đếm tham chiếu, vòng tham chiếu và bộ thu gom theo thế hệ, kích thước object thật, và bốn nguồn rò rỉ">
-    <text class="sv-h" x="0" y="12">&#9312; HAI CƠ CHẾ CHỒNG LÊN NHAU — VÀ MỘT VÙNG KHÔNG CƠ CHẾ NÀO CHẠM TỚI</text>
-
-    <rect x="8" y="24" width="272" height="76" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
-    <text class="sv-l" x="20" y="44" fill="#8EE0BE">Đếm tham chiếu — cơ chế CHÍNH</text>
-    <text class="sv-d" x="20" y="62">mỗi object giữ một số đếm</text>
-    <text class="sv-d" x="20" y="78">về 0 là giải phóng NGAY</text>
-    <text class="sv-d" x="20" y="94">kịp thời, dự đoán được — và là lý do có GIL</text>
-
-    <rect x="292" y="24" width="272" height="76" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
-    <text class="sv-l" x="304" y="44" fill="#A8BEF6">Bộ thu gom theo thế hệ</text>
-    <text class="sv-d" x="304" y="62">chạy định kỳ, chỉ quét object CONTAINER</text>
-    <text class="sv-d" x="304" y="78">ba thế hệ, tần suất giảm dần</text>
-    <text class="sv-d" x="304" y="94">tồn tại chỉ vì MỘT lỗ hổng — xem &#9313;</text>
-
-    <rect x="576" y="24" width="276" height="76" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
-    <text class="sv-l" x="588" y="44" fill="#F79BAB">Của bạn — cả hai đều bó tay</text>
-    <text class="sv-d" x="588" y="62">khi code còn giữ tham chiếu THẬT</text>
-    <text class="sv-d" x="588" y="78">đó là rò rỉ — xem &#9315;</text>
-    <text class="sv-d" x="588" y="94">lỗi thiết kế, không phải lỗi bộ dọn rác</text>
-
-    <text class="sv-h" x="0" y="138">&#9313; LỖ HỔNG DUY NHẤT CỦA ĐẾM THAM CHIẾU — VÒNG THAM CHIẾU</text>
-
-    <rect x="120" y="152" width="180" height="52" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="132" y="172" fill="#EDB44A">dict A</text>
-    <text class="sv-d" x="132" y="190">refcount = 1</text>
-    <rect x="460" y="152" width="180" height="52" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="472" y="172" fill="#EDB44A">dict B</text>
-    <text class="sv-d" x="472" y="190">refcount = 1</text>
-    <path d="M300 168 L456 168" stroke="#3D352C" stroke-width="1.5" marker-end="url(#gca)"/>
-    <defs><marker id="gca" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 z" fill="#3D352C"/></marker></defs>
-    <path d="M460 192 L304 192" stroke="#3D352C" stroke-width="1.5" marker-end="url(#gca)"/>
-    <text class="sv-d" x="330" y="162">a[&quot;b&quot;] = b</text>
-    <text class="sv-d" x="330" y="210">b[&quot;a&quot;] = a</text>
-
-    <text class="sv-d" x="0" y="232">del a, b &#8594; hai cái TÊN biến mất, nhưng mỗi dict vẫn còn đúng 1 tham chiếu từ dict kia &#8594; bộ đếm không bao giờ về 0</text>
-
-    <text class="sv-h" x="0" y="266">&#9314; MỖI OBJECT TỐN BAO NHIÊU — CPYTHON 64-BIT</text>
-    <rect x="8" y="278" width="204" height="46" rx="4" fill="#8CA9F2" fill-opacity="0.10" stroke="#8CA9F2"/>
-    <text class="sv-l" x="20" y="296" fill="#A8BEF6">một int</text>
-    <text class="sv-d" x="20" y="314">~28 byte — cũng là object đầy đủ</text>
-    <rect x="220" y="278" width="204" height="46" rx="4" fill="#8CA9F2" fill-opacity="0.10" stroke="#8CA9F2"/>
-    <text class="sv-l" x="232" y="296" fill="#A8BEF6">list rỗng</text>
-    <text class="sv-d" x="232" y="314">~56 byte</text>
-    <rect x="432" y="278" width="204" height="46" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
-    <text class="sv-l" x="444" y="296" fill="#F79BAB">object thường</text>
-    <text class="sv-d" x="444" y="314">~152 byte — có __dict__ riêng</text>
-    <rect x="644" y="278" width="208" height="46" rx="4" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
-    <text class="sv-l" x="656" y="296" fill="#8EE0BE">object có __slots__</text>
-    <text class="sv-d" x="656" y="314">~56 byte — bỏ __dict__</text>
-
-    <text class="sv-d" x="0" y="344">getsizeof chỉ đo LỚP NGOÀI: list một triệu int tốn ~8 MB con trỏ + ~28 MB các object int &#8594; ~36 MB, so với ~4 MB nếu dùng NumPy</text>
-    <text class="sv-d" x="0" y="360">__slots__ tiết kiệm 40&#8211;50% và truy cập nhanh hơn &#183; cái mất: không thêm thuộc tính động, kế thừa phức tạp hơn &#8594; chỉ đáng khi có HÀNG TRIỆU instance</text>
-
-    <text class="sv-h" x="0" y="394">&#9315; BỐN NGUỒN RÒ RỈ — ĐỀU LÀ THAM CHIẾU THẬT MÀ CODE QUÊN BỎ</text>
-    <rect x="8" y="406" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
-    <text class="sv-l" x="20" y="424" fill="#F79BAB">Cache không giới hạn</text>
-    <text class="sv-d" x="20" y="442">lru_cache(maxsize=None) &#8594; đặt maxsize, hoặc TTL cache</text>
-    <rect x="442" y="406" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
-    <text class="sv-l" x="454" y="424" fill="#F79BAB">lru_cache đặt trên phương thức</text>
-    <text class="sv-d" x="454" y="442">cache giữ luôn self &#8594; dùng cached_property</text>
-    <rect x="8" y="458" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
-    <text class="sv-l" x="20" y="476" fill="#F79BAB">Biến toàn cục dồn dữ liệu</text>
-    <text class="sv-d" x="20" y="494">chỉ thêm không xoá &#8594; giới hạn, hoặc deque(maxlen=n)</text>
-    <rect x="442" y="458" width="410" height="46" rx="4" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
-    <text class="sv-l" x="454" y="476" fill="#F79BAB">Callback / observer đã hết dùng</text>
-    <text class="sv-d" x="454" y="494">còn nằm trong danh sách listener &#8594; huỷ đăng ký, hoặc weakref</text>
-
-    <text class="sv-l" x="0" y="522" fill="#8EE0BE">truy nguyên nhân bằng tracemalloc: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết DÒNG nào đang cấp phát thêm</text>
-  </svg>
-  <figcaption>&#9312; ai dọn cái gì, &#9313; thứ cơ chế một không dọn được, &#9314; mỗi object đáng giá bao nhiêu, &#9315; và thứ không cơ chế nào dọn hộ.</figcaption>
-  </figure>
+<figure class="scrollx">
+<svg viewBox="0 0 860 310" role="img" aria-label="Bản đồ sáng nhánh reference counting; bên phải hai list trỏ vòng vào nhau, sau khi del hết tên ngoài thì bộ đếm vẫn là 1 nên không object nào được giải phóng">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="24" y="47" fill="var(--faint)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--faint)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--rule)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--rule)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--faint)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="135" fill="var(--ok)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--dim)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="183" fill="var(--faint)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--faint)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="243" fill="var(--faint)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--faint)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<path d="M304 150 H 328 V 96 H 350" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<line x1="350" y1="96" x2="349.0" y2="96.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="357.0,96.0 349.0,100.2 349.0,91.8" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="22">CÙNG MỘT CẶP OBJECT &#8212; TRƯỚC VÀ SAU KHI BỎ HẾT TÊN</text>
+<text class="sv-l" x="360" y="46" fill="var(--filled)">a.append(b) &#183; b.append(a)</text>
+<rect x="370" y="56" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="390.0" y="71" fill="var(--filled)" text-anchor="middle">a</text>
+<line x1="390" y1="78" x2="390.0" y2="80.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="390.0,88.0 385.8,80.0 394.2,80.0" fill="var(--filled)"/>
+<rect x="360" y="92" width="150" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="113" fill="var(--filled)">list A</text>
+<text class="sv-d" x="374" y="129" fill="var(--faint)">ob_refcnt = 2</text>
+<rect x="570" y="56" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="590.0" y="71" fill="var(--filled)" text-anchor="middle">b</text>
+<line x1="590" y1="78" x2="590.0" y2="80.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="590.0,88.0 585.8,80.0 594.2,80.0" fill="var(--filled)"/>
+<rect x="560" y="92" width="150" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="574" y="113" fill="var(--filled)">list B</text>
+<text class="sv-d" x="574" y="129" fill="var(--faint)">ob_refcnt = 2</text>
+<line x1="512" y1="104" x2="550.0" y2="104.0" stroke="var(--filled)" stroke-width="1.3"/><polygon points="558.0,104.0 550.0,108.2 550.0,99.8" fill="var(--filled)"/>
+<line x1="558" y1="126" x2="520.0" y2="126.0" stroke="var(--filled)" stroke-width="1.3"/><polygon points="512.0,126.0 520.0,121.8 520.0,130.2" fill="var(--filled)"/>
+<text class="sv-d" x="360" y="154" fill="var(--filled)">còn tên ngoài trỏ vào &#8212; sống thật</text>
+<text class="sv-l" x="360" y="170" fill="var(--tomb)">del a &#183; del b</text>
+<rect x="370" y="180" width="40" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="390.0" y="195" fill="var(--tomb)" text-anchor="middle">a</text>
+<line x1="374" y1="183" x2="406" y2="199" stroke="var(--tomb)" stroke-width="1.4"/>
+<rect x="360" y="216" width="150" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="237" fill="var(--tomb)">list A</text>
+<text class="sv-d" x="374" y="253" fill="var(--faint)">ob_refcnt = 1</text>
+<rect x="570" y="180" width="40" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="590.0" y="195" fill="var(--tomb)" text-anchor="middle">b</text>
+<line x1="574" y1="183" x2="606" y2="199" stroke="var(--tomb)" stroke-width="1.4"/>
+<rect x="560" y="216" width="150" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="574" y="237" fill="var(--tomb)">list B</text>
+<text class="sv-d" x="574" y="253" fill="var(--faint)">ob_refcnt = 1</text>
+<line x1="512" y1="228" x2="550.0" y2="228.0" stroke="var(--tomb)" stroke-width="1.3"/><polygon points="558.0,228.0 550.0,232.2 550.0,223.8" fill="var(--tomb)"/>
+<line x1="558" y1="250" x2="520.0" y2="250.0" stroke="var(--tomb)" stroke-width="1.3"/><polygon points="512.0,250.0 520.0,245.8 520.0,254.2" fill="var(--tomb)"/>
+<text class="sv-d" x="360" y="278" fill="var(--tomb)">không ai với tới nữa, nhưng bộ đếm không về 0 &#8212; không được giải phóng</text>
+<text class="sv-d" x="360" y="296" fill="var(--probe)">Đây là lỗ hổng DUY NHẤT của reference counting.</text>
+</svg>
+<figcaption>Hàng dưới là <b>rác</b> theo mọi nghĩa — không code nào chạm tới được nữa — nhưng mỗi object vẫn còn một tham chiếu đến từ object kia, nên bộ đếm dừng ở 1.</figcaption>
+</figure>
 
   <ul class="why">
-    <li><b>Đếm tham chiếu</b> — ở &#9312;: dọn kịp thời và dự đoán được, đổi lại là GIL.</li>
-    <li><b>Bộ thu gom theo thế hệ</b> — ở &#9313;: tồn tại chỉ để dọn các cụm object chỉ còn trỏ lẫn nhau.</li>
-    <li><b>__slots__</b> — ở &#9314;: bỏ __dict__ của instance, chỉ đáng khi số instance đủ lớn.</li>
-    <li><b>weakref &amp; tracemalloc</b> — ở &#9315;: một cái để không giữ object, một cái để tìm ra ai đang giữ.</li>
+    <li>Không cần cố tình: <b>cây có con trỏ ngược lên cha</b> là đã có vòng.</li>
+    <li>Đồ thị, linked list hai chiều, object giữ callback trỏ về chính nó.</li>
+    <li>Script vài giây thì không sao; <b>service vài tháng</b> thì đây là rò rỉ thật.</li>
   </ul>
 </section>
 
-<section id="memgc-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="memgc-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Cyclic GC</h2></div>
 
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
+  <p class="key">Đây là thứ vá đúng lỗ hổng vừa thấy — và là thứ duy nhất mà module <code>gc</code> điều khiển. Khi tài liệu Python nói <em>"the garbage collector"</em>, nó nói về nhánh này.</p>
 
-  <details class="qa"><summary>Python quản lý bộ nhớ thế nào?</summary>
-  <p>Cơ chế chính là đếm tham chiếu: mỗi object giữ số tham chiếu tới nó, về 0 thì giải phóng ngay. Ưu điểm là kịp thời và dự đoán được; nhược điểm là không xử lý được chu trình tham chiếu, và việc phải cập nhật bộ đếm an toàn giữa nhiều luồng chính là lý do có GIL. Nên Python có thêm bộ thu gom theo thế hệ chạy định kỳ để tìm các nhóm object chỉ còn trỏ lẫn nhau.</p></details>
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng nhánh cyclic GC; bên phải cụm trỏ vòng được GC cắt liên kết nên bộ đếm về 0 và cả cụm được giải phóng, dưới là ba generation quét thưa dần">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="24" y="47" fill="var(--faint)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--faint)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--rule)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--rule)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--faint)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="135" fill="var(--faint)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--faint)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="183" fill="var(--filled)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--dim)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="243" fill="var(--faint)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--faint)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<path d="M304 198 H 328 V 92 H 350" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<line x1="350" y1="92" x2="349.0" y2="92.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="357.0,92.0 349.0,96.2 349.0,87.8" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="22">CÁI MÀ REFERENCE COUNTING BỎ SÓT, GC ĐI NHẶT</text>
+<rect x="360" y="30" width="232" height="96" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="374" y="50" fill="var(--tomb)">cụm trỏ vòng, không root nào tới</text>
+<rect x="374" y="60" width="92" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="81" fill="var(--tomb)">A</text>
+<text class="sv-d" x="388" y="97" fill="var(--faint)">refcnt = 1</text>
+<rect x="478" y="60" width="92" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="492" y="81" fill="var(--tomb)">B</text>
+<text class="sv-d" x="492" y="97" fill="var(--faint)">refcnt = 1</text>
+<line x1="468" y1="74" x2="468.0" y2="74.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="476.0,74.0 468.0,78.2 468.0,69.8" fill="var(--tomb)"/>
+<line x1="476" y1="96" x2="476.0" y2="96.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="468.0,96.0 476.0,91.8 476.0,100.2" fill="var(--tomb)"/>
+<line x1="600" y1="78" x2="632.0" y2="78.0" stroke="var(--ok)" stroke-width="1.4"/><polygon points="640.0,78.0 632.0,82.2 632.0,73.8" fill="var(--ok)"/>
+<text class="sv-h" x="620" y="68" fill="var(--ok)" text-anchor="middle">gc</text>
+<rect x="648" y="30" width="204" height="96" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="662" y="50" fill="var(--ok)">GC cắt liên kết bên trong</text>
+<text class="sv-t" x="662" y="80" fill="var(--ok)">refcount &#8594; 0</text>
+<text class="sv-d" x="662" y="102" fill="var(--faint)">cả cụm được giải phóng</text>
+<text class="sv-h" x="360" y="158">BA GENERATION &#8212; CÀNG GIÀ QUÉT CÀNG THƯA</text>
+<rect x="360" y="168" width="148" height="44" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="372" y="188" fill="var(--filled)">gen 0</text>
+<text class="sv-d" x="372" y="204" fill="var(--faint)">ngưỡng 700</text>
+<line x1="510" y1="190" x2="518.0" y2="190.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="526.0,190.0 518.0,194.2 518.0,185.8" fill="var(--probe)"/>
+<rect x="528" y="168" width="148" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="540" y="188" fill="var(--probe)">gen 1</text>
+<text class="sv-d" x="540" y="204" fill="var(--faint)">sau 10 lượt gen 0</text>
+<line x1="678" y1="190" x2="686.0" y2="190.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="694.0,190.0 686.0,194.2 686.0,185.8" fill="var(--probe)"/>
+<rect x="696" y="168" width="148" height="44" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="708" y="188" fill="var(--ok)">gen 2</text>
+<text class="sv-d" x="708" y="204" fill="var(--faint)">sau 10 lượt gen 1</text>
+<text class="sv-d" x="360" y="240" fill="var(--muted)">Object mới chết sớm, nên quét gen 0 thật thường xuyên là bắt được</text>
+<text class="sv-d" x="360" y="256" fill="var(--muted)">gần hết rác; cụm nào sống sót mới bị đẩy lên gen già hơn.</text>
+<text class="sv-d" x="360" y="284" fill="var(--probe)">gc.disable() chỉ tắt phần này &#8212; reference counting vẫn chạy.</text>
+</svg>
+<figcaption>GC <b>cắt các liên kết bên trong</b> cụm, bộ đếm nhờ đó mới tụt về 0 và cơ chế đếm thông thường lo nốt phần giải phóng. Dưới là ba <b>generation</b>: sống sót một lượt quét thì bị quét thưa hơn.</figcaption>
+</figure>
 
-  <details class="qa"><summary>Vì sao cần bộ thu gom khi đã đếm tham chiếu?</summary>
-  <p>Vì đếm tham chiếu không bao giờ đưa được về 0 với các object trỏ vòng vào nhau — hai dict cùng chứa nhau, hoặc cây có con trỏ ngược lên cha. Xoá hết tên biến bên ngoài rồi thì mỗi object vẫn còn đúng một tham chiếu đến từ object kia, nên không cái nào được giải phóng. Bộ thu gom quét các object kiểu container để phát hiện đúng những cụm đó. Nó chạy theo ba thế hệ với tần suất giảm dần, dựa trên quan sát rằng object sống qua vài lần quét thì thường sống lâu.</p></details>
+  <ul class="why">
+    <li>Chỉ quét object <b>tracked</b> — thứ chứa được object khác: list, dict, set, instance.</li>
+    <li><code>int</code>, <code>str</code>, <code>float</code> <b>không bao giờ</b> bị quét — không tạo được vòng.</li>
+    <li>Ngưỡng mặc định <code>(700, 10, 10)</code>; chỉnh bằng <code>gc.set_threshold</code>.</li>
+    <li><code>gc.collect()</code> gọi tay, <code>gc.disable()</code> tắt — nhưng <b>chỉ tắt nhánh này</b>.</li>
+  </ul>
 
-  <details class="qa"><summary>Service Python ăn RAM tăng dần — bạn tìm nguyên nhân thế nào?</summary>
-  <p>Dùng <code>tracemalloc</code>: chụp ảnh bộ nhớ ở hai thời điểm rồi so sánh để biết dòng code nào đang cấp phát thêm. Bốn nghi phạm quen mặt là cache không giới hạn kích thước, <code>lru_cache</code> trên phương thức khiến instance không được giải phóng vì cache giữ <code>self</code>, biến toàn cục chỉ thêm mà không xoá, và callback đã đăng ký nhưng không huỷ. Với nhóm cuối thì <code>weakref</code> là cách chữa gọn.</p></details>
-
-  <details class="qa"><summary>Khi nào bạn dùng <code>__slots__</code>?</summary>
-  <p>Khi tạo rất nhiều instance của cùng một class nhỏ — node của cây, điểm dữ liệu, bản ghi trong bộ đệm. Nó bỏ <code>__dict__</code> của mỗi instance, tiết kiệm khoảng 40–50% bộ nhớ và truy cập thuộc tính cũng nhanh hơn một chút. Đổi lại thì không gắn thêm được thuộc tính động và kế thừa phức tạp hơn, nên với class thường thì không đáng.</p></details>
-
-  <details class="qa"><summary>Có nên tắt GC không?</summary>
-  <p>Chỉ khi đã đo và thấy đúng nguyên nhân. Với dịch vụ độ trễ thấp mà lần quét GC gây ra khoảng dừng thấy được, cách làm là <code>gc.disable()</code> rồi tự gọi <code>gc.collect()</code> vào lúc rảnh. Nhưng tắt GC không tắt đếm tham chiếu — phần lớn rác vẫn được dọn bình thường, chỉ những cụm trỏ vòng là tồn lại, nên phải chắc code không sinh ra nhiều cụm như vậy.</p></details>
+  <details class="deep"><summary>GC biết cụm nào là rác bằng cách nào — và khi nào nên tắt nó</summary>
+  <div class="body">
+    <p>Nó không đi tìm rác mà <b>giả định mọi thứ đều là rác</b>: chép <code>ob_refcnt</code> sang một ô tạm <code>gc_refs</code>, rồi trừ đi mỗi liên kết đến từ bên trong cụm đang xét. Object nào còn dư nghĩa là có ai đó <b>ngoài cụm</b> giữ, nên nó sống, và mọi thứ nó với tới cũng sống. Phần còn lại là rác vòng; GC gọi <code>tp_clear</code> để cắt liên kết trong đó.</p>
+    <p>Một tối ưu đáng kể: <code>gc.is_tracked</code> cho thấy tuple và dict chỉ chứa giá trị immutable được <b>gỡ khỏi danh sách theo dõi</b>, nên GC chỉ phải đi qua đúng những object có khả năng tạo vòng.</p>
+    <p>Với dịch vụ độ trễ thấp, một lượt quét gen 2 có thể gây khoảng dừng thấy được — cách xử lý quen thuộc là tắt GC rồi tự gọi <code>gc.collect()</code> lúc rảnh. Nhưng nói cho rõ trong phỏng vấn: <b>tắt GC không tắt reference counting</b>, phần lớn rác vẫn được dọn như thường, chỉ cụm trỏ vòng là tồn lại.</p>
+  </div></details>
 </section>
 
-<footer>Deep dive · quản lý bộ nhớ &amp; GC · nối tiếp <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a> · số liệu kích thước là mức điển hình của CPython 64-bit.</footer>
+<section id="memgc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>del</h2></div>
 
+  <p class="key"><code>del x</code> <em>không</em> xoá object. Nó xoá <b>cái tên</b> — tức bớt đúng một tham chiếu ở ô refcount vừa học. Object đi hay ở là hệ quả, không phải lệnh của bạn.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 332" role="img" aria-label="Bản đồ sáng nhánh reference counting; bên phải del a chỉ bỏ tên a nên object vẫn sống nhờ tên b, del b mới là tên cuối cùng và object được giải phóng">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="24" y="47" fill="var(--faint)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--faint)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--rule)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--rule)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--faint)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="38" y="135" fill="var(--ok)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--dim)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="183" fill="var(--faint)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--faint)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="243" fill="var(--faint)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--faint)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<path d="M304 150 H 328 V 92 H 350" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<line x1="350" y1="92" x2="349.0" y2="92.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="357.0,92.0 349.0,96.2 349.0,87.8" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="22">del XOÁ CÁI TÊN, KHÔNG XOÁ OBJECT</text>
+<rect x="360" y="32" width="240" height="28" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="51" fill="var(--dim)">a = MyObject() &#183; b = a &#183; del a</text>
+<rect x="372" y="70" width="40" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="392.0" y="85" fill="var(--tomb)" text-anchor="middle">a</text>
+<line x1="376" y1="73" x2="408" y2="89" stroke="var(--tomb)" stroke-width="1.4"/>
+<rect x="430" y="70" width="40" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="450.0" y="85" fill="var(--filled)" text-anchor="middle">b</text>
+<line x1="450" y1="92" x2="450.0" y2="94.0" stroke="var(--filled)" stroke-width="1.2"/><polygon points="450.0,102.0 445.8,94.0 454.2,94.0" fill="var(--filled)"/>
+<rect x="360" y="106" width="240" height="46" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="127" fill="var(--probe)">MyObject()</text>
+<text class="sv-d" x="374" y="143" fill="var(--faint)">ob_refcnt = 1</text>
+<text class="sv-d" x="616" y="124" fill="var(--faint)">còn b trỏ vào &#8594;</text>
+<text class="sv-t" x="616" y="142" fill="var(--probe)">object VẪN SỐNG</text>
+<rect x="360" y="174" width="240" height="28" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="193" fill="var(--dim)">… rồi del b</text>
+<rect x="372" y="212" width="40" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="392.0" y="227" fill="var(--tomb)" text-anchor="middle">a</text>
+<line x1="376" y1="215" x2="408" y2="231" stroke="var(--tomb)" stroke-width="1.4"/>
+<rect x="430" y="212" width="40" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="450.0" y="227" fill="var(--tomb)" text-anchor="middle">b</text>
+<line x1="434" y1="215" x2="466" y2="231" stroke="var(--tomb)" stroke-width="1.4"/>
+<rect x="360" y="248" width="240" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="sv-t" x="374" y="269" fill="var(--ok)">MyObject()</text>
+<text class="sv-d" x="374" y="285" fill="var(--faint)">ob_refcnt = 0</text>
+<text class="sv-d" x="616" y="266" fill="var(--faint)">tên cuối cùng mất &#8594;</text>
+<text class="sv-t" x="616" y="284" fill="var(--ok)">giải phóng NGAY</text>
+<text class="sv-d" x="360" y="318" fill="var(--probe)">Câu trả lời chuẩn: del removes the reference, not the object.</text>
+</svg>
+<figcaption>Cùng một object, hai lần <code>del</code>. Lần đầu chỉ bớt một tên nên object vẫn sống nhờ <code>b</code>; lần sau mới là tên cuối cùng, bộ đếm về 0 và object được giải phóng.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li>Câu trả lời chuẩn: <b><code>del</code> removes the reference, not the object</b>.</li>
+    <li>Nên <code>del</code> <b>không phải</b> là gọi GC, và cũng không đảm bảo giải phóng.</li>
+    <li><code>__del__</code> là chuyện khác: phương thức chạy lúc object sắp bị huỷ, <b>không rõ lúc nào</b> — đừng đóng file trong đó.</li>
+  </ul>
+</section>
+
+<section id="memgc-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>GC vs resource management</h2></div>
+
+  <p class="key">Vạch dưới cùng của bản đồ là ranh giới hay bị hỏi nhất: GC là bộ quản lý <em>bộ nhớ</em>, không phải bộ quản lý <em>tài nguyên</em>.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng vạch GC lo bộ nhớ; bên phải open không có with thì file mở tới lúc GC đụng tới, còn with đóng ngay cuối khối">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="24" y="47" fill="var(--faint)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--faint)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--rule)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--rule)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--faint)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="135" fill="var(--faint)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--faint)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="183" fill="var(--faint)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--faint)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="243" fill="var(--probe)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--dim)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<path d="M304 258 H 328 V 116 H 350" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<line x1="350" y1="116" x2="349.0" y2="116.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="357.0,116.0 349.0,120.2 349.0,111.8" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="22">CÙNG MỘT FILE &#8212; HAI CÁCH VIẾT, HAI LÚC ĐÓNG</text>
+<rect x="360" y="32" width="204" height="30" rx="4" fill="var(--sunk)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="372" y="52" fill="var(--tomb)">f = open(&quot;data.txt&quot;)</text>
+<line x1="564" y1="47" x2="578.0" y2="47.0" stroke="var(--tomb)" stroke-width="1.3"/><polygon points="586.0,47.0 578.0,51.2 578.0,42.8" fill="var(--tomb)"/>
+<rect x="590" y="32" width="130" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-d" x="602" y="52" fill="var(--dim)">file MỞ &#183; chờ GC</text>
+<line x1="720" y1="47" x2="734.0" y2="47.0" stroke="var(--tomb)" stroke-width="1.3"/><polygon points="742.0,47.0 734.0,51.2 734.0,42.8" fill="var(--tomb)"/>
+<rect x="746" y="32" width="114" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="803" y="52" fill="var(--tomb)" text-anchor="middle">đóng lúc nào?</text>
+<text class="sv-d" x="360" y="84" fill="var(--faint)">Không dự đoán được &#8212; mở nhiều file sẽ chạm trần file descriptor.</text>
+<rect x="360" y="124" width="204" height="30" rx="4" fill="var(--sunk)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="372" y="144" fill="var(--ok)">with open(&quot;data.txt&quot;) as f:</text>
+<line x1="564" y1="139" x2="578.0" y2="139.0" stroke="var(--ok)" stroke-width="1.3"/><polygon points="586.0,139.0 578.0,143.2 578.0,134.8" fill="var(--ok)"/>
+<rect x="590" y="124" width="130" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="602" y="144" fill="var(--dim)">file MỞ &#183; trong khối</text>
+<line x1="720" y1="139" x2="734.0" y2="139.0" stroke="var(--ok)" stroke-width="1.3"/><polygon points="742.0,139.0 734.0,143.2 734.0,134.8" fill="var(--ok)"/>
+<rect x="746" y="124" width="114" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="803" y="144" fill="var(--ok)" text-anchor="middle">đóng NGAY</text>
+<text class="sv-d" x="360" y="176" fill="var(--faint)">Dự đoán được, không phụ thuộc GC &#8212; kể cả khi có exception.</text>
+<text class="sv-t" x="360" y="224" fill="var(--probe)">GC là bộ quản lý BỘ NHỚ, không phải bộ quản lý TÀI NGUYÊN.</text>
+<text class="sv-d" x="360" y="250" fill="var(--ok)">Memory &#8594; GC lo.</text>
+<text class="sv-d" x="360" y="268" fill="var(--ok)">File &#183; socket &#183; DB connection &#183; khoá &#8594; BẠN lo, bằng with.</text>
+</svg>
+<figcaption>Cùng một file, hai cách viết. Không có <code>with</code> thì file mở tới lúc nào <b>không ai biết</b>; có <code>with</code> thì đóng ngay cuối khối, kể cả khi giữa chừng có exception.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><b>Memory</b> → GC lo, bạn không phải làm gì.</li>
+    <li><b>File · socket · DB connection · khoá</b> → bạn lo, bằng <code>with</code>.</li>
+    <li>Câu ăn điểm: <b>GC does not guarantee timely resource cleanup</b>.</li>
+  </ul>
+</section>
+
+<section id="memgc-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Memory leak trong Python</h2></div>
+
+  <p class="key">Cả hai cơ chế đều bó tay với đúng một thứ: <em>tham chiếu thật mà code còn cố giữ</em>. Đó là ô trên cùng của bản đồ — và là chỗ mọi rò rỉ sinh ra.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng ô code của bạn; bên phải bốn nguồn rò rỉ quen thuộc là cache không giới hạn, lru_cache trên phương thức, biến toàn cục dồn dữ liệu và callback chưa huỷ, kèm cách chữa từng cái">
+<text class="sv-h" x="0" y="18">BẢN ĐỒ</text>
+<rect x="10" y="26" width="280" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="47" fill="var(--tomb)">CODE CỦA BẠN</text>
+<text class="sv-d" x="24" y="63" fill="var(--dim)">giữ tham chiếu</text>
+<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--tomb)"/>
+<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="99" fill="var(--faint)" text-anchor="middle">Python memory management</text>
+<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
+<rect x="24" y="114" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="135" fill="var(--faint)">Reference counting</text>
+<text class="sv-d" x="38" y="151" fill="var(--faint)">cơ chế CHÍNH</text>
+<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
+<rect x="24" y="162" width="276" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="38" y="183" fill="var(--faint)">Cyclic GC &#183; 3 generation</text>
+<text class="sv-d" x="38" y="199" fill="var(--faint)">xử lý reference cycle</text>
+<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
+<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="222" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="243" fill="var(--faint)">GC lo BỘ NHỚ</text>
+<text class="sv-d" x="14" y="259" fill="var(--faint)">file &#183; socket &#183; DB &#8594; dùng with</text>
+<path d="M304 46 H 328 V 96 H 350" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<line x1="350" y1="96" x2="349.0" y2="96.0" stroke="var(--probe)" stroke-width="1.2"/><polygon points="357.0,96.0 349.0,100.2 349.0,91.8" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="22">CÓ GC MÀ VẪN LEAK &#8212; VÌ THAM CHIẾU LÀ THẬT</text>
+<rect x="360" y="30" width="490" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="47" fill="var(--tomb)">cache không giới hạn</text>
+<text class="sv-d" x="374" y="61" fill="var(--faint)">cứ thêm vào, không bao giờ xoá</text>
+<text class="sv-d" x="836" y="54" fill="var(--ok)" text-anchor="end">&#8594; maxsize &#183; TTL</text>
+<rect x="360" y="76" width="490" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="93" fill="var(--tomb)">lru_cache trên phương thức</text>
+<text class="sv-d" x="374" y="107" fill="var(--faint)">cache giữ luôn self</text>
+<text class="sv-d" x="836" y="100" fill="var(--ok)" text-anchor="end">&#8594; cached_property</text>
+<rect x="360" y="122" width="490" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="139" fill="var(--tomb)">biến toàn cục dồn dữ liệu</text>
+<text class="sv-d" x="374" y="153" fill="var(--faint)">list cấp module chỉ thêm</text>
+<text class="sv-d" x="836" y="146" fill="var(--ok)" text-anchor="end">&#8594; deque(maxlen=n)</text>
+<rect x="360" y="168" width="490" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="185" fill="var(--tomb)">callback đã hết dùng</text>
+<text class="sv-d" x="374" y="199" fill="var(--faint)">còn nằm trong danh sách listener</text>
+<text class="sv-d" x="836" y="192" fill="var(--ok)" text-anchor="end">&#8594; weakref</text>
+<text class="sv-d" x="360" y="234" fill="var(--probe)">Cả bốn KHÔNG phải lỗi của GC &#8212; tham chiếu là thật, giữ lại là đúng.</text>
+<text class="sv-d" x="360" y="262" fill="var(--muted)">Và nhớ: RSS cao ≠ rò rỉ. Python giữ lại bộ nhớ đã cấp phát để dùng</text>
+<text class="sv-d" x="360" y="280" fill="var(--muted)">tiếp &#8212; đo bằng tracemalloc, đừng nhìn top.</text>
+</svg>
+<figcaption>Bốn nguồn quen mặt. Không cái nào là lỗi của GC: tham chiếu <b>có thật</b>, nên giữ lại là đúng — máy không có cách nào biết bạn đã hết cần.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><code>weakref</code> trỏ mà <b>không tăng bộ đếm</b> — đúng thuốc cho cache và listener.</li>
+    <li>Dùng <code>weakref</code> cho con trỏ ngược lên cha là <b>cắt luôn vòng</b> ở mục 04.</li>
+    <li><b>RSS cao ≠ rò rỉ</b>: Python giữ lại bộ nhớ đã cấp phát để dùng tiếp.</li>
+    <li>Nên đo bằng <code>tracemalloc</code>, đừng kết luận từ <code>top</code>.</li>
+  </ul>
+
+  <details class="deep"><summary>Truy rò rỉ bằng <code>tracemalloc</code> — câu trả lời cho "service em ăn RAM tăng dần"</summary>
+  <div class="body">
+    <p>Ý tưởng là <b>chụp hai thời điểm rồi so sánh</b>, chứ không nhìn một con số tuyệt đối. Gọi <code>tracemalloc.start()</code>, lấy <code>take_snapshot()</code> trước và sau khi chạy tải, rồi <code>snap2.compare_to(snap1, "lineno")</code> — kết quả chỉ thẳng ra dòng code đang cấp phát thêm mà không nhả.</p>
+    <p>Phải so sánh vì con số tuyệt đối đã mất ý nghĩa: Python gom object nhỏ vào các vùng nhớ lớn và chỉ trả về hệ điều hành khi cả vùng rỗng sạch — một object 40 byte còn sống đủ giữ nguyên cả vùng. Đó là lý do pod xoá dữ liệu xong mà RSS gần như không nhúc nhích.</p>
+    <p>Muốn biết <em>ai đang giữ</em> một object cụ thể thì dùng <code>gc.get_referrers(obj)</code>. Còn <code>objgraph</code> (thư viện ngoài) vẽ được đồ thị tham chiếu, tiện khi chuỗi giữ dài nhiều tầng.</p>
+  </div></details>
+</section>
+
+<section id="memgc-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Hỏi đáp</h2></div>
+
+  <p class="key">Mười câu hay gặp nhất. Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
+
+  <details class="qa"><summary>Garbage collection là gì?</summary>
+  <p>Là việc runtime <b>tự động</b> tìm những object chương trình không còn với tới được rồi thu hồi ô nhớ của chúng, thay cho việc tự gọi <code>free</code> như trong C. Tiêu chuẩn máy dùng là <b>reachability</b>: xuất phát từ root set — biến toàn cục, biến cục bộ của các hàm đang chạy, vài chỗ nội bộ của interpreter — cái gì còn đường đi tới thì sống, còn lại là rác.</p></details>
+
+  <details class="qa"><summary>Python quản lý bộ nhớ thế nào?</summary>
+  <p>Câu thuộc lòng: <em>Python primarily uses reference counting, supplemented by a cyclic garbage collector to detect reference cycles.</em> Cơ chế chính là đếm tham chiếu — mỗi object giữ số tham chiếu tới nó, về 0 là giải phóng ngay. Cyclic GC chạy định kỳ chỉ để dọn nốt các cụm object trỏ lẫn nhau.</p></details>
+
+  <details class="qa"><summary>Vì sao reference counting một mình là chưa đủ?</summary>
+  <p>Vì bộ đếm không bao giờ về 0 với các object trỏ vòng vào nhau — hai list cùng chứa nhau, hoặc cây có con trỏ ngược lên cha. Xoá hết tên bên ngoài rồi thì mỗi object vẫn còn đúng một tham chiếu đến từ object kia. Đó là <b>lỗ hổng duy nhất</b>, và cũng là toàn bộ lý do cyclic GC tồn tại.</p></details>
+
+  <details class="qa"><summary>Cyclic GC biết cụm nào là rác bằng cách nào?</summary>
+  <p>Nó chép bộ đếm sang một ô tạm rồi <b>trừ đi các tham chiếu đến từ bên trong cụm</b> đang xét. Object nào còn dư nghĩa là có root ngoài giữ, nên nó và mọi thứ nó với tới đều sống. Phần còn lại là rác vòng: GC cắt các liên kết bên trong, bộ đếm tụt về 0 và cơ chế đếm thông thường giải phóng nốt.</p></details>
+
+  <details class="qa"><summary>Generational GC nghĩa là gì?</summary>
+  <p>Object mới luôn vào gen 0. Sống sót một lượt quét thì lên gen 1, rồi gen 2, càng già càng bị quét thưa. Cơ sở là <em>most objects die young</em> — phần lớn object chết rất sớm, nên quét gen 0 thường xuyên là đủ bắt hầu hết rác mà không phải đi qua toàn bộ heap. Ngưỡng mặc định <code>(700, 10, 10)</code>: số đầu là hiệu cấp phát trừ giải phóng, hai số sau là số lượt quét của thế hệ trẻ hơn.</p></details>
+
+  <details class="qa"><summary><code>del</code> có phải là gọi GC không?</summary>
+  <p>Không. <code>del x</code> chỉ xoá <b>cái tên</b> <code>x</code>, tức bớt một tham chiếu. Nếu đó tình cờ là tham chiếu cuối cùng thì bộ đếm về 0 và object được giải phóng ngay — nhưng đó là hệ quả của reference counting, không phải của <code>del</code>. Còn tên khác trỏ vào thì object vẫn sống nguyên.</p></details>
+
+  <details class="qa"><summary>Có nên gọi <code>gc.collect()</code> hay tắt GC không?</summary>
+  <p>Chỉ khi đã đo và thấy đúng nguyên nhân. Với dịch vụ độ trễ thấp mà lượt quét gây khoảng dừng thấy được thì tắt GC rồi tự gọi <code>gc.collect()</code> vào lúc rảnh là cách quen thuộc. Điểm phải nói rõ: <b>tắt GC không tắt reference counting</b> — phần lớn rác vẫn được dọn bình thường, chỉ cụm trỏ vòng là tồn lại.</p></details>
+
+  <details class="qa"><summary><code>weakref</code> dùng để làm gì?</summary>
+  <p>Để trỏ tới một object mà <b>không tăng bộ đếm</b> của nó — object vẫn được giải phóng bình thường khi hết tham chiếu thật, và weakref lúc đó trả về <code>None</code>. Ba chỗ dùng điển hình: cache không muốn giữ object sống, danh sách listener, và con trỏ ngược từ con lên cha để khỏi tạo reference cycle.</p></details>
+
+  <details class="qa"><summary>Có GC rồi thì Python còn rò rỉ bộ nhớ được không?</summary>
+  <p>Được, và đó là loại rò rỉ duy nhất còn lại: <b>tham chiếu thật mà code còn giữ</b>. Bốn nguồn quen mặt là cache không giới hạn, <code>lru_cache</code> đặt trên phương thức khiến instance không bao giờ được giải phóng vì cache giữ <code>self</code>, biến toàn cục chỉ thêm mà không xoá, và callback đã đăng ký nhưng không huỷ. Không cái nào là lỗi của GC.</p></details>
+
+  <details class="qa"><summary>Service Python ăn RAM tăng dần — bạn tìm nguyên nhân thế nào?</summary>
+  <p>Trước hết phân biệt hai chuyện: <b>RSS cao chưa chắc là rò rỉ</b>, vì Python giữ lại bộ nhớ đã cấp phát để dùng tiếp thay vì trả về hệ điều hành. Nên đo bằng <code>tracemalloc</code>: chụp bộ nhớ ở hai thời điểm rồi so sánh để biết dòng nào đang cấp phát thêm mà không nhả. Có nghi phạm rồi thì dùng <code>gc.get_referrers</code> để xem ai đang giữ.</p></details>
+</section>
+
+<footer>Deep dive · quản lý bộ nhớ &amp; GC · nối tiếp <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a> · kiểm trên CPython 3.12, 64-bit.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>
