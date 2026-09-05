@@ -8,21 +8,28 @@ Hai thư mục, phân theo tuổi thọ:
 
 ## chuan/ — luật viết bài
 
-- [Bài mẫu: Random forest & bagging](chuan/chuan-bai-mau.md) — **đọc đầu tiên**; chín luật + số đo cụ thể để so
+- [Bài mẫu: Random forest & bagging](chuan/chuan-bai-mau.md) — **đọc đầu tiên**; chín luật + số đo cụ thể để so. Luật 1 = mục 01 gồm câu định nghĩa + một hình mental model 3–5 ô, mỗi mục sau bóc một ô (overview và kệ DSA miễn)
+- [Bố cục hình phải nói đúng quan hệ](chuan/chuan-bai-mau.md) — trong bài mẫu: chứa / rồi tới / hay / dựng trên / sinh ra — mỗi quan hệ một bố cục; che chữ đi phải đọc ra câu định nghĩa
 - [Ít chữ, nhiều hình](chuan/it-chu-nhieu-hinh.md) — đo bằng chữ/hình; chỉ số "tỉ lệ văn xuôi" cũ là sai hướng
-- [Thuật ngữ chuẩn & nguồn tham khảo](chuan/thuat-ngu-chuan-va-nguon-tham-khao.md) — tên tiếng Anh chuẩn dán lên hình, mỗi tầng một màu; rút gọn được cắt câu, không cắt tên
+- [Thuật ngữ chuẩn & nguồn tham khảo](chuan/thuat-ngu-chuan-va-nguon-tham-khao.md) — tên tiếng Anh chuẩn dán lên hình; dịch ngược ra đúng một cụm tiếng Anh thì là thuật ngữ, giữ nguyên
 - [Quy ước viết bài overview](chuan/quy-uoc-viet-overview.md) — macro→micro, không ép khuôn, không nhồi timeline
 - [Khuôn .eq cho công thức](chuan/khuon-eq-cong-thuc.md) — chọn HTML thay KaTeX; ranh giới .eq vs `<pre>`; vẽ đường cong bằng SVG
 - [Cách trả lời: thật ngắn](chuan/cach-tra-loi-ngan-gon.md) — phần giao diện nói kết quả nhìn thấy, đừng kể tên class
+- [Soát tự động: 8 phép](chuan/soat-tu-dong-8-phep.md) — luật kiểm được bằng máy thì nằm ở `tools/soat.py`; thuật ngữ sống trên 5 bề mặt; cách quyết định một chữ có phải thuật ngữ
+- [Bộ vẽ hình svgkit](chuan/bo-ve-hinh-svgkit.md) — `tools/svgkit` dùng chung, đừng chép sang `/tmp`; ba chỗ máy soát KHÔNG bắt: hình đúng hình học mà sai ý, số bịa, chạy trên cả `index.html`
 - [Sửa nhanh, ít vòng kiểm](chuan/sua-nhanh-it-vong-kiem.md) — chụp ảnh xác minh chỉ khi đổi hình học, không phải mọi lần sửa chữ
 
 ## nhat-ky/ — tiến độ
 
 - [Tiến độ nội dung](nhat-ky/tien-do-noi-dung.md) — bài đã viết / khung còn lại theo từng kệ
-- [Đợt sửa theo chuẩn bài mẫu](nhat-ky/dot-sua-theo-chuan-bai-mau.md) — kệ 01→05: bullet, mục tổng kết một hình, và đoạn văn quá 33 từ đều đã về 0; mật độ hình còn xa [[chuan-bai-mau]]
+- [Đợt sửa theo chuẩn bài mẫu](nhat-ky/dot-sua-theo-chuan-bai-mau.md) — kệ 01→05: bullet và đoạn văn quá 33 từ đã về 0; **83 bài còn nợ luật 1**, riêng 01→05 là **71** (69 bài để *Tổng kết một hình* ở cuối; 39/127 bài là ngoại lệ có chủ ý)
 - [Soát kệ 02-python](nhat-ky/soat-ke-02-python.md) — 2026-09-02: tách bài memory, gộp mục trùng, thêm 2 bài
-- [Sửa bài Memory management & GC](nhat-ky/sua-bai-memory-management-gc.md) — 2026-09-04: một bản đồ vẽ lại ở mọi mục, mental model lên 01, bóc dần từng ô thành thứ tự học; ngoại lệ luật 7
+- [Sửa bài Memory management & GC](nhat-ky/sua-bai-memory-management-gc.md) — 2026-09-04: một bản đồ vẽ lại ở mọi mục, mental model lên 01, bóc dần từng ô thành thứ tự học — chỗ khai sinh ra luật 1
 - [Sửa 3 bài kệ 02-python](nhat-ky/sua-3-bai-ke-02-python.md) — 2026-09-05: dict, iterator, memory-model theo khuôn một bản đồ; cách đo để chọn bài cần sửa
+- [Thí điểm luật 1 — transaction-isolation](nhat-ky/thi-diem-transaction-isolation.md) — 2026-09-05: bài khó nhất (16 mục) làm trước; bộ công cụ frame/check/apply dùng lại được + bốn bẫy
+- [Áp luật 1 cho kệ 02-python](nhat-ky/dot-luat-1-ke-02-python.md) — 2026-09-05: xong `thread-process-gil`, `asyncio`, `oop-python` (7/17 bài); ba bẫy mới: ô nửa bề rộng, regex bắt nhầm `<path>`, check sạch mà hình vẫn đè nhau
+- [Áp luật 1 cho kệ 04-database](nhat-ky/dot-luat-1-ke-04-database.md) — 2026-09-05: xong `sql-window-functions` (bài dài nhất 01→05); có hình rồi thì phải cắt chữ hình đã nói; danh sách nợ còn lại
+- [Áp luật 1 cho kệ 05-machine-learning](nhat-ky/dot-luat-1-ke-05-ml.md) — 2026-09-05: xong `gradient-boosting`; hình dạng bản đồ phải tương phản với bài anh em (vòng lặp đóng vs xếp thẳng)
 - [Soát kệ 04-database](nhat-ky/soat-ke-04-database.md) — 2026-09-02: 2 khung cuối, 2 chỗ trùng, 4 lỗ hổng
 - [Soát kệ 05-machine-learning](nhat-ky/soat-ke-05-machine-learning.md) — 2026-09-03: viết lại tree-models, đồng bộ cả kệ
 - [Tách bài overfitting → Core concepts](nhat-ky/tach-bai-overfitting-core-concepts.md) — trùng thì tách, đừng viết mới

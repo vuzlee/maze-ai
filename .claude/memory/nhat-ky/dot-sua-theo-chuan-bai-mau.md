@@ -25,7 +25,7 @@ Hai regex đúng, dùng lại khi cần đo:
 - **Bullet**: bảy lượt cắt, ~145 bullet ở kệ 02→05. Giờ 1011 bullet, trung bình **20,8 từ**,
   dài nhất **25**, không còn bullet nào quá giới hạn. Cắt câu chứ không cắt tên —
   xem [[thuat-ngu-chuan-va-nguon-tham-khao]].
-- **Mục *Tổng kết một hình*** thêm cho 74 bài, đúng khuôn §11 của `random-forest`:
+- **Mục *Tổng kết một hình*** thêm cho 74 bài, đúng khuôn mục 11 của `random-forest`:
   `.key` một câu → `<figure class="scrollx">` bọc SVG tự vẽ, vùng đánh dấu ①②③④⑤ →
   `<figcaption>` chỉ cách đọc → `.why` bốn bullet, mỗi bullet gọi tên một khái niệm kèm số vùng.
 - **Sửa lỗi hình**: 34 SVG có chữ rơi khỏi `viewBox` (bị cắt âm thầm) — nâng chiều cao lên
@@ -82,7 +82,7 @@ Kiểm bằng Chrome headless: 6 bài, 0 lỗi JS, `scrollWidth` 480 ≤ 490 (kh
 
 ### Hình mở bài cho cả nhóm tree-models
 
-Sáu bài của `06-tree-models` giờ đều có một `figure.gist` ngay dưới lede — xem luật 9 ở
+Sáu bài của `06-tree-models` giờ đều có một `figure.gist` ngay dưới lede — xem luật 1 ở
 [[chuan-bai-mau]]. Mỗi hình vẽ lại đúng câu lede của bài đó:
 
 | Bài | Hình nói gì |
@@ -95,7 +95,7 @@ Sáu bài của `06-tree-models` giờ đều có một `figure.gist` ngay dư�
 | lightgbm | cột trái là vòng lặp boosting làm mờ, **chỉ ô cây tô sáng**, mũi tên "phóng to" sang hai cách mọc cây cùng 8 lá + khung "cái giá phải trả" |
 
 Script sinh nằm ở `/tmp/gist_*.py` dùng chung `/tmp/gist_lib.py` — không commit, viết lại được
-từ luật 9 nếu cần. CSS: `figure.gist` trong `assets/style.css`.
+từ luật 1 nếu cần. CSS: `figure.gist` trong `assets/style.css`.
 
 ### Sửa lần hai: hình phải vẽ *cơ chế đang chạy*, không phải ba khung tĩnh
 
@@ -179,5 +179,58 @@ Regex trong [[chuan-bai-mau]] đã được vá: thiếu `(?!re\b)` thì `<pre>`
 thổi lên. Bản trong bản ghi chuẩn giờ đã đúng.
 
 **Còn lại:** đợt này chỉ mới quét bốn thứ cơ học (`.flow`, margin, `sv-s`, đoạn dài). Các luật
-định tính khác của [[chuan-bai-mau]] — đầu mục mơ hồ, thuật ngữ, chi tiết mức triển khai, cấu trúc
-mental-model-first — chưa soát lại cho 01→05.
+định tính khác của [[chuan-bai-mau]] — đầu mục mơ hồ, thuật ngữ, chi tiết mức triển khai — chưa
+soát lại cho 01→05.
+
+## 2026-09-05 — luật 1 đổi, và món nợ nó để lại
+
+Người dùng chốt **mental model và *Tổng kết một hình* là một thứ**: mental model là cách hiểu
+trong đầu, hình là cách vẽ cách hiểu đó ra. Nên chỉ còn **một** mục, tên *Mental model*, nằm ở
+**mục 01**. Luật 7 cũ (đóng bài bằng hình tổng kết, mental-model-lên-đầu chỉ là ngoại lệ cho bài
+cheatsheet) **đã bỏ**; [[chuan-bai-mau]] viết lại thành luật 1.
+
+Điều đó biến chính đợt sửa 03/09 ở trên thành **nợ**: 74 bài được thêm mục *Tổng kết một hình* ở
+**cuối** giờ đang ngược chuẩn. Số đo ngày 2026-09-05:
+
+| | Số bài |
+|---|---|
+| Đã theo luật 1 (Mental model ở mục 01) | **5** — `memory-management-gc`, `dict-hash-table`, `iterator-generator`, `memory-model-mutability`, `transaction-isolation` |
+| Còn để *Tổng kết một hình* ở cuối | **69** |
+| Không có cả hai | **53** (23 bài của kệ 01-DSA theo khuôn riêng, còn lại là overview và bài 06→10) |
+| Tổng bài có nội dung | **127** |
+
+Nợ còn lại của **01→05: 71 bài** — 02 Python 11 · 03 CS 11 · 04 Database 18 · 05 ML 31.
+Ngoài phạm vi đợt này còn 12 bài của kệ 06→10.
+
+**Cách đếm cho đúng** (dùng lại được, đừng đếm bằng tên mục): bài coi là xong khi
+`<section id="…-s1">` chứa `figure class="gist"` **và** số `<svg>` ≥ số mục nội dung. Đếm bằng
+tên mục *Mental model* thì trượt — `transaction-isolation` đặt tên mục 01 là *Transaction là gì*,
+`logistic-regression` có `gist` nhưng chỉ 4 hình cho 10 mục nên **chưa** tính là xong.
+
+**Trong 127 bài đó, 42 bài là ngoại lệ có chủ ý** — 19 bài `*-overview` (15 bài chỉ 2–4 mục) và
+23 bài kệ 01-DSA. Nợ thật vì vậy là **85 bài**, không phải 123. Đã ghi vào luật 1 của
+[[chuan-bai-mau]].
+
+**Sáu bài `06-tree-models` đặt `figure.gist` sai chỗ** — ngoài mọi `<section>`, lơ lửng dưới lede,
+nên mục lục không trỏ tới được. Đúng luật 1 thì hình phải nằm *trong* mục 01. Sửa rẻ (di chuyển
+markup), chưa làm.
+
+Hai việc, đừng lẫn: **đổi tên + đẩy lên đầu** là cơ học, rẻ. **Vẽ lại một hình xuyên suốt rồi mỗi
+mục bóc một ô** là viết lại toàn bộ 8–11 hình của bài, và dàn ý phải đọc ra được từ hình — đó mới
+là phần đắt. Bốn bài đã làm mất khoảng một phiên mỗi bài.
+
+
+## 2026-09-05 — ba bài kệ 02-python
+
+Sau bài thí điểm, người dùng cho áp tiếp lên các bài khó của Python: `thread-process-gil`,
+`asyncio`, `oop-python` đã xong. Nợ luật 1 của 01→05 còn **68 bài**. Số đo và ba bẫy công cụ
+mới: [[dot-luat-1-ke-02-python]].
+
+## 2026-09-05 — bài thí điểm đầu tiên của đợt luật 1
+
+`transaction-isolation` (16 mục, 2 SVG — bài khó nhất kệ 01→05) đã làm xong: 14 hình, 2.656 chữ,
+190 chữ/hình. Chi tiết bộ công cụ và bốn bẫy: [[thi-diem-transaction-isolation]].
+
+Kết luận cho phần còn lại: **một phiên một bài vẫn đúng**, nhưng phần đắt không phải vẽ hình —
+`frame.py` viết một lần dùng cho cả bài. Phần đắt là **đọc lại bài để tìm ra 3–6 ô**, và ráp
+HTML. Vẽ sai bản đồ thì lộ ngay ở chỗ có mục không thuộc ô nào.

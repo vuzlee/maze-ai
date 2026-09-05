@@ -47,16 +47,52 @@
 </header>
 
 <section id="async-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Async giải quyết chuyện gì mà thread không</h2></div>
+  <div class="sh"><b>01</b><h2>Event loop và await</h2></div>
 
-  <p class="key">Cùng là để chờ I/O, nhưng async đổi <em>đơn vị chờ</em> từ luồng hệ điều hành sang một object vài trăm byte.</p>
-
-  <div class="bars">
-    <div class="b bad"><i>1.000 luồng hệ điều hành</i><u style="width:100%"></u><b>~8 GB stack</b></div>
-    <div class="b hi"><i>1.000 coroutine</i><u style="width:1%"></u><b>vài MB</b></div>
-  </div>
-  <p class="stripnote"><span>Mỗi lần chuyển luồng còn phải đi qua nhân; chuyển coroutine chỉ là một lần gọi hàm.</span><span>Đổi lại: chỉ cần <em>một</em> lệnh chặn là treo cả vòng lặp, ảnh hưởng mọi request khác.</span></p>
-
+  <p class="key">Async là đồng thời <em>hợp tác</em>: một luồng, một danh sách tác vụ, và chính code của bạn nhường lượt tại mỗi <code>await</code>.</p>
+  <figure class="gist">
+<svg viewBox="0 0 860 314" role="img" aria-label="Bản đồ năm ô: event loop, await, cái được là task rẻ, cái mất là chặn treo hết, và hệ thống thật; bên phải bốn ý cốt lõi">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--text)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--text)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--text)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--text)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--filled)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--ok)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--ok)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--tomb)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--ok)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--tomb)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--probe)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">BỐN Ý — HẾT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Một luồng, nhiều tác vụ tự nguyện nhường lượt</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">không phải OS cắt lượt — chính code của bạn nhường tại mỗi await</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Đơn vị chờ rẻ đi bốn bậc: 8 MB stack → vài KB object</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">nên mười nghìn kết nối đồng thời là chuyện bình thường</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Đổi lại: một lệnh chặn treo mọi request đang chờ</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">triệu chứng là server chậm bất thường trong khi CPU vẫn thấp</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Hệ thống thật dùng cả ba, mỗi thứ một việc</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">process lấy đủ lõi · async lo phần chờ · thread chứa thư viện đồng bộ</text>
+</svg>
+  <figcaption>Bản đồ cả bài. <b>Event loop</b> giữ danh sách tác vụ; <b>await</b> là chỗ duy nhất nó giành lại quyền. Từ đó rẽ hai nhánh: <b>được</b> — đơn vị chờ rẻ đi bốn bậc; <b>mất</b> — một lệnh chặn treo hết. Ô cuối là cách ba mô hình sống chung trong một service. Mỗi mục dưới đây phóng to đúng một ô.</figcaption>
+  </figure>
   <div class="note">
     <h4>Bài này nối tiếp</h4>
     Phần GIL, thread, process và race condition nằm ở bài
@@ -64,9 +100,118 @@
   </div>
 </section>
 
-<section id="async-s2">
-  <div class="sh"><b>02</b><h2>async/await</h2></div>
-  <p>Đồng thời <em>hợp tác</em> trên một luồng duy nhất: mỗi tác vụ tự nguyện nhường quyền tại điểm <code>await</code>.</p>
+<section id="async-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Vì sao async chứ không thread</h2></div>
+
+  <p class="key">Cùng là để chờ I/O, nhưng async đổi <em>đơn vị chờ</em> từ luồng hệ điều hành sang một object vài KB.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 314" role="img" aria-label="Ô task rẻ sáng lên; bên phải hai vạch so bộ nhớ nghìn luồng với nghìn coroutine">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--muted)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--muted)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--ok)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--ok)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--rule-hi)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--ok)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--muted)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--muted)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — VÌ SAO ASYNC RẺ</text>
+<path d="M342 240 C 356 240, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-t" x="372" y="40" fill="var(--ok)">1.000 kết nối chờ cùng lúc tốn bao nhiêu</text>
+<text class="sv-d" x="372" y="68" fill="var(--muted)">1.000 luồng OS</text>
+<rect x="484" y="56" width="272.0" height="18" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="860" y="70" fill="var(--tomb)" text-anchor="end">~8 GB stack</text>
+<text class="sv-d" x="372" y="98" fill="var(--muted)">1.000 coroutine</text>
+<rect x="484" y="86" width="3" height="18" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="860" y="100" fill="var(--ok)" text-anchor="end">vài MB</text>
+<rect x="372" y="122" width="124" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="143.0" fill="var(--ok)">đổi luồng</text>
+<text class="sv-d" x="510" y="143.0" fill="var(--muted)">phải đi qua nhân hệ điều hành</text>
+<rect x="372" y="162" width="124" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="183.0" fill="var(--ok)">đổi coroutine</text>
+<text class="sv-d" x="510" y="183.0" fill="var(--muted)">chỉ là một lần gọi hàm trong Python</text>
+<rect x="372" y="202" width="124" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="223.0" fill="var(--ok)">10.000 kết nối</text>
+<text class="sv-d" x="510" y="223.0" fill="var(--muted)">thread cần ~80 GB · async cần vài chục MB</text>
+<rect x="372" y="246" width="488" height="48" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="268" fill="var(--filled)">Nối tiếp bài Thread, process &amp; GIL</text>
+<text class="sv-s" x="388" y="286" fill="var(--dim)">ở đó async chỉ là một ô; ở đây nó là cả bản đồ</text>
+</svg>
+  <figcaption>Con số trả lời thẳng câu hỏi kinh điển của phỏng vấn. Chênh lệch không đến từ thuật toán — nó đến từ chỗ mỗi đơn vị chờ tốn bao nhiêu, và đổi lượt phải đi qua nhân hay không.</figcaption>
+  </figure>
+</section>
+
+<section id="async-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>async và await</h2></div>
+
+  <p>Năm cái tên là đủ để đọc mọi đoạn code async. Chúng đều xoay quanh một điểm: <code>await</code>.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 316" role="img" aria-label="Ô await sáng lên; bên phải năm khái niệm coroutine, await, event loop, Task và gather">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--muted)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--filled)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--rule-hi)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--rule-hi)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--muted)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--muted)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--muted)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — ASYNC VÀ AWAIT</text>
+<path d="M342 120 C 356 120, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-t" x="372" y="40" fill="var(--filled)">Năm cái tên, không hơn</text>
+<rect x="372" y="50" width="104" height="32" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-l" x="384" y="71.0" fill="var(--rule-hi)">coroutine</text>
+<text class="sv-d" x="490" y="71.0" fill="var(--muted)">hàm async def — gọi nó KHÔNG chạy gì cả</text>
+<rect x="372" y="90" width="104" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="384" y="111.0" fill="var(--filled)">await</text>
+<text class="sv-d" x="490" y="111.0" fill="var(--muted)">điểm nhường quyền: tôi chờ, loop chạy việc khác</text>
+<rect x="372" y="130" width="104" height="32" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-l" x="384" y="151.0" fill="var(--rule-hi)">event loop</text>
+<text class="sv-d" x="490" y="151.0" fill="var(--muted)">giữ danh sách tác vụ, chạy cái nào đã sẵn sàng</text>
+<rect x="372" y="170" width="104" height="32" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-l" x="384" y="191.0" fill="var(--rule-hi)">Task</text>
+<text class="sv-d" x="490" y="191.0" fill="var(--muted)">coroutine đã giao cho loop, chạy nền độc lập</text>
+<rect x="372" y="210" width="104" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="384" y="231.0" fill="var(--ok)">gather</text>
+<text class="sv-d" x="490" y="231.0" fill="var(--muted)">phát hết ra rồi chờ chung — chỗ tạo ra tốc độ</text>
+<rect x="372" y="254" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-t" x="388" y="276" fill="var(--probe)">await là chỗ DUY NHẤT loop giành lại quyền</text>
+<text class="sv-s" x="388" y="294" fill="var(--dim)">giữa hai await, code của bạn độc chiếm cả tiến trình</text>
+</svg>
+  <figcaption>Điều dễ quên nhất nằm ở dải cuối: giữa hai <code>await</code>, code của bạn độc chiếm cả tiến trình. Vì vậy một vòng lặp tính toán dài không có <code>await</code> nào cũng làm mọi request khác đứng chờ.</figcaption>
+  </figure>
 <pre><code><span class="kw">import</span> asyncio
 
 <span class="kw">async def</span> fetch(session, url):
@@ -78,184 +223,233 @@
         <span class="kw">return</span> <span class="kw">await</span> asyncio.gather(*[fetch(s, u) <span class="kw">for</span> u <span class="kw">in</span> urls])
 
 asyncio.run(main(urls))                <span class="cm"># 1000 request đồng thời trên MỘT luồng</span></code></pre>
-  <div class="stack">
-    <div class="s"><b>coroutine</b><span>hàm khai báo <code>async def</code> — gọi nó <b>không chạy gì cả</b>, chỉ tạo một object chờ được await</span></div>
-    <div class="s ok"><b>await</b><span>điểm nhường quyền: "tôi chờ ở đây, event loop cứ chạy việc khác"</span></div>
-    <div class="s"><b>event loop</b><span>bộ điều phối: giữ danh sách tác vụ, chạy cái nào đã sẵn sàng</span></div>
-    <div class="s"><b>Task</b><span>coroutine đã giao cho event loop, chạy nền độc lập</span></div>
-    <div class="s"><b>gather</b><span>chạy nhiều thứ đồng thời rồi chờ tất cả xong</span></div>
-  </div>
-  <div class="note key">
-    <h4>Vì sao async nhẹ hơn thread nhiều lần</h4>
-    Một luồng hệ điều hành tốn khoảng vài MB ngăn xếp và mỗi lần chuyển luồng phải đi qua kernel. Một task async chỉ là một object Python vài KB, và chuyển đổi chỉ là một lần gọi hàm trong không gian người dùng. Đó là lý do 10.000 kết nối đồng thời khả thi với async nhưng vô vọng với thread.
-  </div>
 </section>
 
-<section id="async-s3">
-  <div class="sh"><b>03</b><h2>Lỗi async hay gặp</h2></div>
-  <h3>1. Gọi hàm chặn trong event loop</h3>
-<pre><code><span class="kw">async def</span> handler():
-    time.sleep(<span class="st">2</span>)              <span class="cm">← ĐÓNG BĂNG TOÀN BỘ event loop 2 giây</span>
-    data = requests.get(url)   <span class="cm">← cũng vậy: thư viện đồng bộ</span>
-    row = cursor.execute(sql)  <span class="cm">← driver DB đồng bộ cũng vậy</span>
+<section id="async-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Ba lỗi async hay gặp</h2></div>
 
-<span class="cm"># đúng:</span>
-<span class="kw">async def</span> handler():
-    <span class="kw">await</span> asyncio.sleep(<span class="st">2</span>)
-    data = <span class="kw">await</span> client.get(url)                     <span class="cm"># thư viện async</span>
-    row = <span class="kw">await</span> asyncio.to_thread(cursor.execute, sql) <span class="cm"># đẩy hàm chặn sang thread</span></code></pre>
-  <p>Lỗi nặng nhất: hậu quả không nằm ở một request, nó treo <em>mọi</em> request đang chờ. Triệu chứng là server chậm bất thường dưới tải mà CPU vẫn thấp.</p>
-  <h3>2. Quên await</h3>
-<pre><code>result = fetch(url)          <span class="cm">← không chạy gì, result là một coroutine object</span>
-result = <span class="kw">await</span> fetch(url)    <span class="cm"># đúng</span></code></pre>
-  <p>Python cảnh báo <code>coroutine was never awaited</code> — nhưng chỉ khi bộ thu gom rác dọn tới nó, nên cảnh báo hiện muộn và ở chỗ khác hẳn nơi gây lỗi.</p>
-  <h3>3. Tuần tự hoá vô tình</h3>
-<pre><code><span class="cm"># SAI: chờ xong từng cái → không nhanh hơn tuần tự</span>
-<span class="kw">for</span> url <span class="kw">in</span> urls:
-    results.append(<span class="kw">await</span> fetch(url))
+  <p class="key">Ba lỗi này làm code async chạy đúng nhưng chậm như tuần tự, hoặc treo cả server.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 314" role="img" aria-label="Ô chặn treo hết sáng lên; bên phải ba lỗi kinh điển, mỗi lỗi một dòng sai và một dòng đúng">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--muted)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--muted)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--rule-hi)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--tomb)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--muted)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--tomb)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--muted)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BA LỖI ASYNC</text>
+<path d="M342 240 C 356 240, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<rect x="372" y="40" width="488" height="66" rx="5" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-t" x="386" y="60" fill="var(--tomb)">1 · Gọi hàm chặn trong loop</text>
+<text class="sv-l" x="386" y="79" fill="var(--muted)">time.sleep · requests.get · cursor.execute</text>
+<text class="sv-l" x="386" y="97" fill="var(--ok)">await asyncio.sleep · client.get · asyncio.to_thread</text>
+<rect x="372" y="114" width="488" height="66" rx="5" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-t" x="386" y="134" fill="var(--tomb)">2 · Quên await</text>
+<text class="sv-d" x="386" y="153" fill="var(--muted)">result = fetch(url) — chỉ tạo coroutine object</text>
+<text class="sv-l" x="386" y="171" fill="var(--ok)">result = await fetch(url)</text>
+<rect x="372" y="188" width="488" height="66" rx="5" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-t" x="386" y="208" fill="var(--tomb)">3 · Tuần tự hoá vô tình</text>
+<text class="sv-l" x="386" y="227" fill="var(--muted)">for u in urls: await fetch(u)</text>
+<text class="sv-l" x="386" y="245" fill="var(--ok)">await asyncio.gather(*[fetch(u) for u in urls])</text>
+<text class="sv-s" x="372" y="278" fill="var(--dim)">Lỗi 1 nặng nhất: nó không hỏng một request, nó treo tất cả.</text>
+</svg>
+  <figcaption>Dòng đỏ là bản viết sai, dòng xanh là bản thay thế. Lỗi 1 khó thấy nhất vì server vẫn trả lời — chỉ chậm bất thường trong khi CPU vẫn thấp.</figcaption>
+  </figure>
+  <p>Lỗi 2 có cảnh báo <code>coroutine was never awaited</code>, nhưng chỉ hiện khi garbage collection dọn tới nó — muộn và ở chỗ khác hẳn nơi gây lỗi.</p>
+</section>
 
-<span class="cm"># ĐÚNG: phát hết ra rồi chờ chung</span>
-results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="kw">for</span> u <span class="kw">in</span> urls])</code></pre>
-  <figure>
-    <svg viewBox="0 0 840 200" role="img" aria-label="Ba request chạy nối đuôi nhau so với ba request chồng lấn nhau">
-      <text x="40" y="28" class="sv-l" fill="#F2718A">AWAIT TRONG VÒNG LẶP — NỐI ĐUÔI</text>
-      <rect x="40" y="38" width="220" height="26" rx="4" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
-      <rect x="266" y="38" width="220" height="26" rx="4" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
-      <rect x="492" y="38" width="220" height="26" rx="4" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
-      <text x="150" y="56" class="sv-l" fill="#F2718A" text-anchor="middle">fetch 1</text>
-      <text x="376" y="56" class="sv-l" fill="#F2718A" text-anchor="middle">fetch 2</text>
-      <text x="602" y="56" class="sv-l" fill="#F2718A" text-anchor="middle">fetch 3</text>
-      <text x="730" y="56" class="sv-t" fill="#F2718A">300 ms</text>
+<section id="async-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Nối đuôi hay chồng lấn</h2></div>
 
-      <text x="40" y="110" class="sv-l" fill="#5BCFA0">GATHER — CHỒNG LẤN</text>
-      <rect x="40" y="120" width="220" height="20" rx="4" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
-      <rect x="40" y="144" width="220" height="20" rx="4" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
-      <rect x="40" y="168" width="220" height="20" rx="4" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
-      <text x="150" y="135" class="sv-l" fill="#5BCFA0" text-anchor="middle">fetch 1</text>
-      <text x="150" y="159" class="sv-l" fill="#5BCFA0" text-anchor="middle">fetch 2</text>
-      <text x="150" y="183" class="sv-l" fill="#5BCFA0" text-anchor="middle">fetch 3</text>
-      <text x="278" y="159" class="sv-t" fill="#5BCFA0">100 ms</text>
-      <line x1="270" y1="110" x2="270" y2="196" stroke="#2E2822" stroke-dasharray="4 4"/>
-    </svg>
-    <figcaption>Nếu một tác vụ trong <code>gather</code> ném lỗi, những tác vụ khác <b>vẫn chạy tiếp</b> và lỗi được ném lên ngay. Dùng <code>return_exceptions=True</code> để nhận lỗi như một giá trị kết quả thay vì làm sập cả nhóm.</figcaption>
+  <p class="key">Ba request 100 ms mất 300 ms hay 100 ms — khác nhau ở chỗ đặt <code>await</code>.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 314" role="img" aria-label="Ô chặn treo hết sáng lên; bên phải ba request nối đuôi mất 300 ms so với gather chồng lấn mất 100 ms">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--muted)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--muted)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--rule-hi)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--tomb)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--muted)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--tomb)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--muted)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — NỐI ĐUÔI HAY CHỒNG LẤN</text>
+<path d="M342 240 C 356 240, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-t" x="372" y="40" fill="var(--text)">Ba request, cùng 100 ms mỗi cái</text>
+<text class="sv-d" x="372" y="64" fill="var(--tomb)">await trong vòng lặp — nối đuôi</text>
+<rect x="372.0" y="72" width="124.0" height="24" rx="4" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="434.0" y="89" fill="var(--tomb)" text-anchor="middle">fetch 1</text>
+<rect x="504.0" y="72" width="124.0" height="24" rx="4" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="566.0" y="89" fill="var(--tomb)" text-anchor="middle">fetch 2</text>
+<rect x="636.0" y="72" width="124.0" height="24" rx="4" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="698.0" y="89" fill="var(--tomb)" text-anchor="middle">fetch 3</text>
+<text class="sv-t" x="860" y="89" fill="var(--tomb)" text-anchor="end">300 ms</text>
+<text class="sv-d" x="372" y="126" fill="var(--ok)">gather — chồng lấn</text>
+<rect x="372" y="134" width="124.0" height="22" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="434.0" y="150" fill="var(--ok)" text-anchor="middle">fetch 1</text>
+<rect x="372" y="160" width="124.0" height="22" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="434.0" y="176" fill="var(--ok)" text-anchor="middle">fetch 2</text>
+<rect x="372" y="186" width="124.0" height="22" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="434.0" y="202" fill="var(--ok)" text-anchor="middle">fetch 3</text>
+<text class="sv-t" x="512.0" y="176" fill="var(--ok)">100 ms</text>
+<rect x="372" y="218" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="240" fill="var(--probe)">Một task trong gather ném lỗi thì các task khác vẫn chạy</text>
+<text class="sv-s" x="388" y="258" fill="var(--dim)">lỗi được ném lên ngay · return_exceptions=True để nhận lỗi như một kết quả</text>
+</svg>
+  <figcaption>Vòng lặp có <code>await</code> bên trong thì mỗi lượt chờ xong mới phát lượt sau, nên không nhanh hơn code đồng bộ. <code>gather</code> phát hết ra trước rồi mới chờ chung.</figcaption>
   </figure>
 </section>
 
-<section id="async-s4">
-  <div class="sh"><b>04</b><h2>Chi phí thật của từng mô hình</h2></div>
-  <div class="strip">
-    <div class="c f"><i>Process</i><b>~30 MB trở lên</b><u>tạo mất hàng chục–trăm ms · chỉ chạy được bằng số lõi</u></div>
-    <div class="c on"><i>Thread</i><b>~8 MB ngăn xếp</b><u>tạo dưới 1 ms · chuyển qua kernel · hàng trăm là hết</u></div>
-    <div class="c t"><i>Async task</i><b>vài KB</b><u>tạo mất micro giây · chuyển là gọi hàm · hàng chục nghìn</u></div>
-  </div>
-  <p>Câu "tại sao async chứ không thread" có câu trả lời bằng số: cùng 10.000 kết nối đồng thời, thread cần khoảng <b>80 GB RAM</b>, async cần <b>vài chục MB</b>.</p>
-</section>
+<section id="async-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Chọn mô hình nào</h2></div>
 
-<section id="async-s5">
-  <div class="sh"><b>05</b><h2>Bảng chọn mô hình</h2></div>
-  <table>
-    <tr><th>Tình huống</th><th>Chọn</th><th>Vì sao</th></tr>
-    <tr><td>Gọi nhiều API, có thư viện async</td><td><strong>asyncio</strong></td><td>Nhẹ nhất, chồng lấn tối đa</td></tr>
-    <tr><td>Gọi nhiều API nhưng chỉ có SDK đồng bộ</td><td>ThreadPoolExecutor</td><td>Không phải viết lại; thư viện chặn vẫn nhả GIL khi chờ mạng</td></tr>
-    <tr><td>Tính toán nặng bằng Python thuần</td><td><strong>multiprocessing</strong></td><td>Cách duy nhất thoát GIL</td></tr>
-    <tr><td>Tính toán nặng bằng NumPy/PyTorch</td><td>Một luồng là đủ</td><td>Thư viện đã nhả GIL và tự song song trong C</td></tr>
-    <tr><td>Web server nhiều kết nối chờ</td><td>asyncio, hoặc nhiều tiến trình mỗi cái một event loop</td><td>Mô hình chuẩn của uvicorn với nhiều worker</td></tr>
-    <tr><td>Tiền xử lý dữ liệu cho huấn luyện</td><td>multiprocessing</td><td>Chính là <code>num_workers</code> của DataLoader</td></tr>
-    <tr><td>Vừa chờ nhiều vừa tính nhiều</td><td>asyncio + <code>to_thread</code> hoặc process pool</td><td>Tầng async lo chờ, tầng process lo tính</td></tr>
-  </table>
-</section>
-
-<section id="async-s6">
-  <div class="sh"><b>06</b><h2>Trong hệ thống thật</h2></div>
-<div class="stack">
-    <div class="s ok"><b>uvicorn --workers 4</b><span>4 tiến trình — thoát GIL, dùng đủ 4 lõi</span></div>
-    <div class="s"><b>mỗi tiến trình: 1 event loop</b><span>bộ điều phối riêng cho các coroutine của nó</span></div>
-    <div class="s"><b>async</b><span>nhận request, gọi vector DB, gọi LLM API, stream về client</span></div>
-    <div class="s warn"><b>to_thread</b><span>driver DB đồng bộ, đọc file, xử lý ảnh — những thư viện chưa có bản async</span></div>
-  </div>
-  <p>Gần như mọi service Python hiện đại dựng theo kiến trúc này — dùng <em>cả ba</em> mô hình, mỗi cái đúng chỗ:</p>
-
-  <ul class="why">
-    <li><b>Process</b> — dùng hết số lõi.</li>
-    <li><b>Async</b> — chồng lấn hàng nghìn lần chờ.</li>
-    <li><b>Thread</b> — chứa những thư viện chưa có bản async.</li>
-  </ul>
-  <div class="note">
-    <h4>Câu hỏi hay gặp ở vòng system design</h4>
-    <em>Service của em xử lý được bao nhiêu request đồng thời?</em> Câu trả lời tốt bắt đầu bằng việc phân loại: nếu chủ yếu là chờ, giới hạn nằm ở kết nối và bộ nhớ nên async cho phép hàng nghìn; nếu chủ yếu là tính, giới hạn nằm ở số lõi và không mô hình nào vượt qua được — phải scale ngang.
-  </div>
+  <p class="key">Phân loại tác vụ trước, chọn mô hình sau — so thời gian CPU với thời gian thực tế.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 364" role="img" aria-label="Ô hệ thống thật sáng lên; bên phải sáu tình huống và mô hình đi kèm">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--muted)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--muted)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--rule-hi)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--rule-hi)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--muted)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--muted)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--probe)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CHỌN MÔ HÌNH NÀO</text>
+<path d="M342 300 C 356 300, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-d" x="372" y="54" fill="var(--muted)">nhiều API, có thư viện async</text>
+<rect x="372" y="60" width="200" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="77" fill="var(--ok)">asyncio</text>
+<text class="sv-d" x="586" y="77" fill="var(--muted)">nhẹ nhất, chồng lấn tối đa</text>
+<text class="sv-d" x="372" y="104" fill="var(--muted)">nhiều API, chỉ có SDK đồng bộ</text>
+<rect x="372" y="110" width="200" height="24" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="127" fill="var(--filled)">ThreadPoolExecutor</text>
+<text class="sv-d" x="586" y="127" fill="var(--muted)">không phải viết lại</text>
+<text class="sv-d" x="372" y="154" fill="var(--muted)">tính nặng bằng Python thuần</text>
+<rect x="372" y="160" width="200" height="24" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="177" fill="var(--filled)">multiprocessing</text>
+<text class="sv-d" x="586" y="177" fill="var(--muted)">cách duy nhất thoát GIL</text>
+<text class="sv-d" x="372" y="204" fill="var(--muted)">tính nặng bằng NumPy · PyTorch</text>
+<rect x="372" y="210" width="200" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="227" fill="var(--ok)">một luồng là đủ</text>
+<text class="sv-d" x="586" y="227" fill="var(--muted)">thư viện đã tự song song trong C</text>
+<text class="sv-d" x="372" y="254" fill="var(--muted)">web server nhiều kết nối chờ</text>
+<rect x="372" y="260" width="200" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="277" fill="var(--ok)">asyncio × nhiều worker</text>
+<text class="sv-d" x="586" y="277" fill="var(--muted)">mô hình chuẩn của uvicorn</text>
+<text class="sv-d" x="372" y="304" fill="var(--muted)">vừa chờ nhiều vừa tính nhiều</text>
+<rect x="372" y="310" width="200" height="24" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="327" fill="var(--probe)">asyncio + to_thread</text>
+<text class="sv-d" x="586" y="327" fill="var(--muted)">tầng async lo chờ, tầng kia lo tính</text>
+<text class="sv-s" x="372" y="350" fill="var(--dim)">Không có mô hình tốt nhất — chỉ có mô hình hợp với dạng tải.</text>
+</svg>
+  <figcaption>Hai dòng cuối là chỗ hay sai ở phỏng vấn: NumPy và PyTorch đã tự song song trong C nên thêm luồng chỉ tốn thêm; còn tải vừa chờ vừa tính thì không có một mô hình nào đủ, phải ghép hai tầng.</figcaption>
+  </figure>
 </section>
 
 <section id="async-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Tổng kết một hình</h2></div>
+  <div class="sh"><b>07</b><h2>Trong hệ thống thật</h2></div>
 
-  <p class="key">Async đổi đơn vị chờ từ luồng hệ điều hành sang object vài KB — nên nó rẻ, và nên <em>một</em> lệnh chặn cũng đủ treo tất cả.</p>
-
+  <p class="key">Gần như mọi service Python hiện đại dùng <em>cả ba</em> mô hình, mỗi cái đúng một chỗ.</p>
   <figure class="scrollx">
-    <svg viewBox="0 0 860 372" role="img" aria-label="So chi phí ba mô hình, event loop nhường quyền tại await, ba lỗi async hay gặp, và cách chọn mô hình">
-
-      <text class="sv-h" x="8" y="16">&#9312; ĐƠN VỊ CHỜ RẺ ĐI BAO NHIÊU LẦN</text>
-      <rect x="8" y="26" width="400" height="20" rx="3" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
-      <text class="sv-t" x="18" y="41" fill="#F79BAB">Process &#183; ~30 MB</text>
-      <text class="sv-d" x="416" y="41" fill="#7A6F63">tạo mất hàng chục ms &#183; chỉ chạy được bằng số lõi</text>
-      <rect x="8" y="52" width="110" height="20" rx="3" fill="rgba(237,180,74,.18)" stroke="#EDB44A"/>
-      <text class="sv-t" x="18" y="67" fill="#EDB44A">Thread &#183; ~8 MB</text>
-      <text class="sv-d" x="126" y="67" fill="#7A6F63">tạo dưới 1 ms &#183; chuyển qua kernel &#183; hàng trăm là hết</text>
-      <rect x="8" y="78" width="14" height="20" rx="3" fill="rgba(91,207,160,.20)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="30" y="93" fill="#8EE0BE">Async task &#183; vài KB</text>
-      <text class="sv-d" x="180" y="93" fill="#7A6F63">tạo mất micro giây &#183; chuyển là gọi hàm &#183; hàng chục nghìn</text>
-      <text class="sv-l" x="8" y="118">10.000 kết nối đồng thời: thread cần khoảng 80 GB RAM, async cần vài chục MB</text>
-
-      <text class="sv-h" x="8" y="148">&#9313; MỘT LUỒNG, NHIỀU TÁC VỤ — NHƯỜNG QUYỀN TẠI ĐIỂM AWAIT</text>
-      <rect x="8" y="158" width="140" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="18" y="178" fill="#A8BEF6">async def</text>
-      <text class="sv-d" x="8" y="204" fill="#7A6F63">gọi vào không chạy gì</text>
-      <path d="M148 173 h20" stroke="#7A6F63"/><path d="M168 173 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="170" y="158" width="150" height="30" rx="4" fill="rgba(237,180,74,.12)" stroke="#EDB44A"/>
-      <text class="sv-t" x="180" y="178" fill="#EDB44A">await</text>
-      <text class="sv-d" x="170" y="204" fill="#7A6F63">tôi chờ, cứ chạy việc khác</text>
-      <path d="M320 173 h20" stroke="#7A6F63"/><path d="M340 173 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="342" y="158" width="150" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="352" y="178" fill="#A8BEF6">event loop</text>
-      <text class="sv-d" x="342" y="204" fill="#7A6F63">chạy cái nào đã sẵn sàng</text>
-      <path d="M492 173 h20" stroke="#7A6F63"/><path d="M512 173 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="514" y="158" width="150" height="30" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="524" y="178" fill="#8EE0BE">gather</text>
-      <text class="sv-d" x="514" y="204" fill="#7A6F63">phát hết rồi chờ chung</text>
-      <text class="sv-l" x="686" y="172">hợp tác, không</text>
-      <text class="sv-l" x="686" y="188">phải cưỡng chế —</text>
-      <text class="sv-l" x="686" y="204">tự nguyện nhường</text>
-
-      <rect x="8" y="222" width="840" height="86" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-h" x="20" y="242" fill="#F79BAB">&#9314; BA LỖI — ĐỀU KHÔNG NÉM EXCEPTION Ở ĐÚNG CHỖ GÂY RA</text>
-      <rect x="20" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="30" y="268" fill="#F79BAB">1 &#183; gọi hàm chặn trong loop</text>
-      <text class="sv-l" x="30" y="284">time.sleep &#183; requests &#183; driver DB</text>
-      <text class="sv-d" x="30" y="296" fill="#7A6F63">chậm dưới tải mà CPU vẫn thấp</text>
-      <rect x="296" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="306" y="268" fill="#F79BAB">2 &#183; quên await</text>
-      <text class="sv-l" x="306" y="284">result là coroutine object</text>
-      <text class="sv-d" x="306" y="296" fill="#7A6F63">cảnh báo hiện muộn, ở chỗ khác</text>
-      <rect x="572" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="582" y="268" fill="#F79BAB">3 &#183; tuần tự hoá vô tình</text>
-      <text class="sv-s" x="582" y="284">await trong vòng lặp &#8594; nối đuôi</text>
-      <text class="sv-d" x="582" y="296" fill="#7A6F63">300 ms thay vì 100 ms</text>
-
-      <text class="sv-h" x="8" y="330">&#9315; CHỌN MÔ HÌNH NÀO</text>
-      <text class="sv-l" x="8" y="348" fill="#8EE0BE">chờ I/O, có thư viện async &#8594; asyncio</text>
-      <text class="sv-l" x="300" y="348">chờ I/O, chỉ có SDK đồng bộ &#8594; thread pool hoặc to_thread</text>
-      <text class="sv-l" x="8" y="364" fill="#EDB44A">tính nặng bằng Python thuần &#8594; multiprocessing</text>
-      <text class="sv-l" x="300" y="364">vừa chờ vừa tính &#8594; async lo chờ, process lo tính</text>
-    </svg>
-    <figcaption>Đọc theo số: async rẻ hơn thread và process nhiều bậc &#9312;, cơ chế là nhường quyền tại <code>await</code> &#9313;, ba lỗi đều xuất phát từ việc phá vỡ sự nhường đó &#9314;, và cách chọn giữa ba mô hình &#9315;.</figcaption>
+<svg viewBox="0 0 860 324" role="img" aria-label="Ô hệ thống thật sáng lên; bên phải bốn tầng của một service: nhiều worker, một event loop mỗi worker, async và to_thread">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="340" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="47" fill="var(--muted)">Event loop</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">một luồng · một danh sách tác vụ</text>
+<line x1="170.0" y1="70" x2="170.0" y2="82" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,90 165.8,82 174.2,82" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="86" fill="var(--muted)">nhường quyền tại</text>
+<rect x="0" y="94" width="340" height="56" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="115" fill="var(--muted)">await</text>
+<text class="sv-d" x="13" y="132" fill="var(--muted)">điểm nhường quyền</text>
+<text class="sv-d" x="13" y="146" fill="var(--muted)">coroutine · Task · gather</text>
+<line x1="81.5" y1="152" x2="81.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="81.5,170 77.3,162 85.7,162" fill="var(--rule-hi)"/>
+<line x1="258.5" y1="152" x2="258.5" y2="162" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="258.5,170 254.3,162 262.7,162" fill="var(--rule-hi)"/>
+<text class="sv-d" x="170.0" y="182" fill="var(--muted)" text-anchor="middle">đánh đổi</text>
+<rect x="0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="211" fill="var(--muted)">Được: task vài KB</text>
+<text class="sv-d" x="13" y="228" fill="var(--muted)">đổi lượt = một lần gọi hàm</text>
+<text class="sv-d" x="13" y="242" fill="var(--muted)">hàng chục nghìn kết nối</text>
+<rect x="177.0" y="190" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="190.0" y="211" fill="var(--muted)">Mất: chặn là treo hết</text>
+<text class="sv-d" x="190.0" y="228" fill="var(--muted)">một lệnh đồng bộ đóng băng</text>
+<text class="sv-d" x="190.0" y="242" fill="var(--muted)">mọi request đang chờ</text>
+<line x1="0" y1="256" x2="340" y2="256" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="262" width="340" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="283" fill="var(--probe)">Trong hệ thống thật</text>
+<text class="sv-d" x="13" y="300" fill="var(--muted)">process + async + thread — mỗi thứ một việc</text>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — TRONG HỆ THỐNG THẬT</text>
+<path d="M342 300 C 356 300, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-t" x="372" y="40" fill="var(--probe)">Một service Python hiện đại dùng cả ba</text>
+<rect x="372" y="52" width="488" height="44" rx="5" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="386" y="71" fill="var(--filled)">uvicorn --workers 4</text>
+<text class="sv-d" x="386" y="87" fill="var(--muted)">bốn tiến trình — thoát GIL, dùng đủ bốn lõi</text>
+<rect x="372" y="104" width="488" height="44" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-d" x="386" y="123" fill="var(--rule-hi)">mỗi tiến trình 1 event loop</text>
+<text class="sv-d" x="386" y="139" fill="var(--muted)">bộ điều phối riêng cho các coroutine của nó</text>
+<rect x="372" y="156" width="488" height="44" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="386" y="175" fill="var(--ok)">async</text>
+<text class="sv-d" x="386" y="191" fill="var(--muted)">nhận request · gọi vector DB · gọi LLM · stream về client</text>
+<rect x="372" y="208" width="488" height="44" rx="5" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="386" y="227" fill="var(--probe)">to_thread</text>
+<text class="sv-d" x="386" y="243" fill="var(--muted)">driver DB đồng bộ, đọc file, xử lý ảnh — thư viện chưa async</text>
+<rect x="372" y="262" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-t" x="388" y="284" fill="var(--ok)">Hỏi ở vòng system design: chịu được bao nhiêu request đồng thời</text>
+<text class="sv-s" x="388" y="302" fill="var(--dim)">chủ yếu chờ thì trần là bộ nhớ; chủ yếu tính thì trần là số lõi</text>
+</svg>
+  <figcaption>Đọc từ trên xuống là đọc một request đi vào: tiến trình nào nhận, event loop nào điều phối, phần nào chạy async và phần nào bị đẩy sang thread vì thư viện chưa có bản async.</figcaption>
   </figure>
-
-  <ul class="why">
-    <li><strong><code>to_thread</code></strong> là cầu nối giữa &#9314;-1 và &#9315;: đẩy một hàm chặn sang luồng riêng để nó không giữ event loop.</li>
-    <li><strong><code>return_exceptions=True</code></strong> đổi hành vi của <code>gather</code> ở &#9313; — lỗi thành một giá trị kết quả thay vì làm sập cả nhóm.</li>
-    <li><strong>Task</strong> là coroutine đã giao cho event loop chạy nền, khác một coroutine chưa được await ở &#9314;-2 vốn chưa chạy dòng nào.</li>
-    <li><strong>GIL</strong> là lý do &#9315; vẫn cần multiprocessing — async không giúp gì khi tác vụ bị chặn bởi CPU chứ không phải I/O.</li>
-  </ul>
 </section>
 
 <section id="async-s8" class="lesson">

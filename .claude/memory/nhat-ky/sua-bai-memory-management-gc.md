@@ -10,7 +10,7 @@ Người dùng: *"vẫn hơi nhiều chữ ít hình, phải có hình tổng th
 dễ hiểu chứ"*. Bài đi từ **249 → 158 chữ/hình** (17 hình, mốc bài mẫu là 123), 6 → 10 mục,
 bullet trung bình 14,3 từ, không còn khối code nào ngoài `details.deep`.
 
-**Khung "bốn tầng" là thứ giữ cả bài lại.** Hình mở bài và mục *Tổng kết một hình* vẽ **cùng một
+**Khung "bốn tầng" là thứ giữ cả bài lại.** Hình mental model và hình chốt lúc đó vẽ **cùng một
 bốn tầng** — cấp phát → reference counting → cyclic GC → pymalloc — mỗi tầng đưa một câu hỏi
 xuống tầng dưới. Bảy hình giữa bài là bảy lát cắt của đúng khung đó, nên đọc xong nhìn lại hình
 cuối là ráp được. Trước đây bài kể bốn cơ chế rời nhau, đó mới là lý do "khó hiểu", không phải
@@ -37,7 +37,7 @@ thuộc tính, 29% cho tám** — càng nhiều thuộc tính càng ít lợi, v
 chứ không phải dữ liệu.
 
 **Rút ra:** mọi số hiện trên hình đều `assert` trong script sinh, chạy trên chính máy này
-(CPython 3.12, 64-bit) — xem luật 9 ở [[chuan-bai-mau]]. Và bắt buộc chụp màn hình soát: hình mở
+(CPython 3.12, 64-bit) — xem [[chuan-bai-mau]]. Và bắt buộc chụp màn hình soát: hình mở
 bài lúc đầu **mất hẳn tầng thứ tư** vì vòng lặp chỉ cộng `y` bên trong nhánh có mũi tên; đọc markup
 không đời nào thấy.
 
@@ -56,11 +56,14 @@ mental model, nói chung là core ngắn gọn"*. Bài từ **12 mục → 9 m�
 `gc.freeze()`/copy-on-write — gập hết vào `details.deep`. Ba thế hệ thôi làm mục riêng, gộp
 vào Cyclic GC còn ba dòng.
 
-**Ngoại lệ luật 7 của [[chuan-bai-mau]]: hình tổng kết chuyển lên mục 01.** Người dùng:
+**Chỗ khai sinh ra luật 1 của [[chuan-bai-mau]]: hình tổng kết chuyển lên mục 01.** Người dùng:
 *"nên thay Tổng kết một hình thành mental model cho đúng thuật ngữ, và phải để lên đầu mới hợp lý,
 cho cả người mới và người học lại, nhìn cái thì não trigger ngay"*. Với bài dạng cheatsheet ôn
 phỏng vấn thì mở bài **là** chỗ đắt nhất — người học lại chỉ mở bài, nhìn hình, đóng. Nên bài này
 không có mục tổng kết cuối; `figure.gist` chính là mental model, và mục 09 là Hỏi đáp.
+
+*(Lúc đó ghi là ngoại lệ cho bài cheatsheet. Ngày 2026-09-05 người dùng chốt mental model và hình
+tổng kết vốn là một thứ, nên nó thành mặc định cho mọi bài — xem luật 1 của [[chuan-bai-mau]].)*
 
 **Ý lớn nhất, do người dùng nghĩ ra: một bản đồ duy nhất, mỗi mục sáng đúng một ô.** Bản đồ bốn ô
 — *code của bạn · reference counting · cyclic GC · vạch GC lo bộ nhớ* — được vẽ lại **nguyên xi ở
@@ -87,5 +90,5 @@ bảy ô) nhưng thứ thật sự đem lại kết quả là bài **có một �
 **hiện sẵn trên hình mở bài**. Trước khi học một khái niệm, người đọc đã thấy ô của nó và biết nó
 nằm cạnh cái gì — nên không mục nào rơi từ trên trời.
 
-Luật đã ghi vào luật 1 của [[chuan-bai-mau]]: vẽ bản đồ trước, dàn ý là hệ quả. Bản đồ không gợi
+Luật đã ghi vào luật 1 của [[chuan-bai-mau]]: vẽ hình trước, dàn ý là hệ quả. Bản đồ không gợi
 ra được một đường đi tuyến tính thì bản đồ sai, không phải dàn ý sai.

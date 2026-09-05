@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Thread, process & GIL — MazeAI</title>
-<meta name="description" content="Process và thread khác nhau ở bộ nhớ và chi phí chuyển ngữ cảnh — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.">
+<meta name="description" content="Process và thread khác nhau ở bộ nhớ và chi phí context switching — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/04-concurrency/thread-process-gil/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Thread, process &amp; GIL">
-<meta property="og:description" content="Process và thread khác nhau ở bộ nhớ và chi phí chuyển ngữ cảnh — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.">
+<meta property="og:description" content="Process và thread khác nhau ở bộ nhớ và chi phí context switching — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,7 +39,7 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-gil" data-title="Thread, process &amp; GIL" data-tag="Concurrency" data-blurb="Process và thread khác nhau ở bộ nhớ và chi phí chuyển ngữ cảnh — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.">
+      <article class="doc" id="art-gil" data-title="Thread, process &amp; GIL" data-tag="Concurrency" data-blurb="Process và thread khác nhau ở bộ nhớ và chi phí context switching — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.">
         <header class="hero">
   <p class="eyebrow">Python · concurrency</p>
   <h1>Thread, process <em>&amp; GIL</em></h1>
@@ -47,41 +47,137 @@
 </header>
 
 <section id="gil-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Process là gì</h2></div>
+  <div class="sh"><b>01</b><h2>Process, thread và GIL</h2></div>
+
+  <p class="key">Process là chương trình <em>đang chạy</em> với bộ nhớ riêng; thread là nhiều luồng chạy <em>bên trong một process</em>, dùng chung bộ nhớ đó.</p>
+
+  <figure class="gist">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Bản đồ sáu ô: process và thread, hai cái giá context switching và race condition, GIL riêng của Python, và câu hỏi chờ hay tính; bên phải bốn ý cốt lõi">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--filled)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--ok)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--ok)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--ok)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--filled)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--filled)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--ok)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--ok)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--probe)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--tomb)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--probe)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--text)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--text)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">BỐN Ý — HẾT</text>
+    <rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="50" fill="var(--filled)">Khác nhau đúng một chỗ: bộ nhớ riêng hay chung</text>
+    <text class="sv-s" x="388" y="68" fill="var(--dim)">mọi khác biệt còn lại — chi phí, cách ly, nhu cầu khoá — suy ra từ đó</text>
+    <rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="112" fill="var(--tomb)">Dùng chung bộ nhớ thì nhanh, nhưng sinh race condition</text>
+    <text class="sv-s" x="388" y="130" fill="var(--dim)">sai kết quả mà không ném lỗi nào — chạy trăm lần đúng chín mươi chín</text>
+    <rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="174" fill="var(--probe)">GIL là chuyện riêng của CPython, nằm ở mức process</text>
+    <text class="sv-s" x="388" y="192" fill="var(--dim)">một khoá cho cả process — thread Python không dùng được nhiều lõi</text>
+    <rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="236" fill="var(--ok)">Chọn mô hình bằng một câu hỏi: đang chờ hay đang tính</text>
+    <text class="sv-s" x="388" y="254" fill="var(--dim)">chờ thì async hoặc thread; tính thì process, hoặc đẩy xuống thư viện C</text>
+    </svg>
+  <figcaption>Bản đồ của cả bài. Mỗi mục sau tô sáng một ô rồi phóng to ô đó ra bên phải.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Khác nhau <b>đúng một chỗ</b> — bộ nhớ riêng hay chung. Chi phí, cách ly và nhu cầu khoá đều suy ra từ đó.</li>
+    <li>Bộ nhớ chung là điểm mạnh của thread, cũng là chỗ sinh <b>race condition</b>.</li>
+    <li><b>GIL</b> là chuyện riêng của CPython, nằm ở mức process — nên nó không phải chỗ bắt đầu, mà là ô áp chót.</li>
+    <li>Ô cuối là thứ dùng hằng ngày: <b>đang chờ hay đang tính</b>, và mô hình nào hợp.</li>
+  </ul>
+</section>
+
+<section id="gil-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Process</h2></div>
 
   <p class="key">Một chương trình <em>đang chạy</em>, được hệ điều hành cấp cho <em>không gian địa chỉ riêng</em>.</p>
 
-  <figure>
-    <svg viewBox="0 0 900 240" role="img" aria-label="Hai process với vùng nhớ riêng biệt">
-      <rect x="60"  y="40" width="330" height="170" rx="10" fill="rgba(140,169,242,.08)" stroke="#8CA9F2"></rect>
-      <rect x="510" y="40" width="330" height="170" rx="10" fill="rgba(91,207,160,.08)" stroke="#5BCFA0"></rect>
-      <text class="sv-t" x="225" y="30" text-anchor="middle" fill="#8CA9F2">Process A</text>
-      <text class="sv-t" x="675" y="30" text-anchor="middle" fill="#5BCFA0">Process B</text>
-
-      <rect x="90" y="64"  width="270" height="30" rx="5" class="sv-b"></rect>
-      <rect x="90" y="100" width="270" height="30" rx="5" class="sv-b"></rect>
-      <rect x="90" y="136" width="270" height="30" rx="5" class="sv-b"></rect>
-      <rect x="90" y="172" width="270" height="26" rx="5" class="sv-b"></rect>
-      <text class="sv-l" x="225" y="84"  text-anchor="middle">code — lệnh của chương trình</text>
-      <text class="sv-l" x="225" y="120" text-anchor="middle">heap — object cấp phát động</text>
-      <text class="sv-l" x="225" y="156" text-anchor="middle">stack — biến cục bộ, khung hàm</text>
-      <text class="sv-l" x="225" y="190" text-anchor="middle">file đang mở · socket · quyền</text>
-
-      <rect x="540" y="64"  width="270" height="30" rx="5" class="sv-b"></rect>
-      <rect x="540" y="100" width="270" height="30" rx="5" class="sv-b"></rect>
-      <rect x="540" y="136" width="270" height="30" rx="5" class="sv-b"></rect>
-      <rect x="540" y="172" width="270" height="26" rx="5" class="sv-b"></rect>
-      <text class="sv-l" x="675" y="84"  text-anchor="middle">code</text>
-      <text class="sv-l" x="675" y="120" text-anchor="middle">heap</text>
-      <text class="sv-l" x="675" y="156" text-anchor="middle">stack</text>
-      <text class="sv-l" x="675" y="190" text-anchor="middle">tài nguyên riêng</text>
-
-      <path d="M400 125 L500 125" stroke="#E06C7A" stroke-width="2" stroke-dasharray="5 4"></path>
-      <path d="M500 125 L400 125" stroke="#E06C7A" stroke-width="2" stroke-dasharray="5 4"></path>
-      <text class="sv-l" x="450" y="112" text-anchor="middle" fill="#F2718A">không</text>
-      <text class="sv-l" x="450" y="146" text-anchor="middle" fill="#F2718A">đọc được của nhau</text>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ô process sáng lên; bên phải hai process với vùng nhớ riêng và ba đặc điểm cách ly, trao đổi, chi phí tạo">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--filled)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--muted)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--muted)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--muted)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--filled)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--filled)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--muted)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — PROCESS</text>
+    <path d="M342 60 C 356 60, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--filled)">Mỗi process một không gian địa chỉ riêng</text>
+    <rect x="372.0" y="50" width="237.0" height="74" rx="5" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.4"/>
+    <text class="sv-t" x="384.0" y="70" fill="var(--filled)">Process A</text>
+    <text class="sv-d" x="384.0" y="90" fill="var(--muted)">code · heap · stack</text>
+    <text class="sv-d" x="384.0" y="108" fill="var(--muted)">file đang mở riêng</text>
+    <rect x="623.0" y="50" width="237.0" height="74" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="635.0" y="70" fill="var(--ok)">Process B</text>
+    <text class="sv-d" x="635.0" y="90" fill="var(--muted)">code · heap · stack</text>
+    <text class="sv-d" x="635.0" y="108" fill="var(--muted)">file đang mở riêng</text>
+    <text class="sv-s" x="616.0" y="146" fill="var(--dim)" text-anchor="middle">không đọc được bộ nhớ của nhau</text>
+    <rect x="372" y="158" width="110" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="179.0" fill="var(--filled)">cách ly</text>
+    <text class="sv-d" x="496" y="179.0" fill="var(--muted)">một process sập, process kia vẫn sống</text>
+    <rect x="372" y="198" width="110" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="219.0" fill="var(--filled)">trao đổi</text>
+    <text class="sv-d" x="496" y="219.0" fill="var(--muted)">phải đóng gói rồi gửi qua pipe hay socket</text>
+    <rect x="372" y="238" width="110" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="259.0" fill="var(--filled)">chi phí tạo</text>
+    <text class="sv-d" x="496" y="259.0" fill="var(--muted)">10–50 ms · vài chục MB cho mỗi process</text>
     </svg>
-    <figcaption>Địa chỉ <code>0x1000</code> trong A và trong B là <strong>hai ô nhớ vật lý khác nhau</strong> — hệ điều hành dịch địa chỉ riêng cho từng process.</figcaption>
+  <figcaption>Hai process không đọc được bộ nhớ của nhau — cách ly, và cái giá đi kèm.</figcaption>
   </figure>
 
   <ul class="why">
@@ -91,35 +187,75 @@
   </ul>
 </section>
 
-<section id="gil-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Thread là gì</h2></div>
+<section id="gil-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Thread</h2></div>
 
   <p class="key">Nhiều luồng thực thi <em>bên trong cùng một process</em>. Dùng chung bộ nhớ, chỉ riêng ngăn xếp.</p>
 
-  <figure>
-    <svg viewBox="0 0 900 250" role="img" aria-label="Một process chứa ba thread dùng chung heap">
-      <rect x="80" y="34" width="740" height="190" rx="10" fill="rgba(140,169,242,.06)" stroke="#8CA9F2"></rect>
-      <text class="sv-t" x="450" y="24" text-anchor="middle" fill="#8CA9F2">Một process</text>
-
-      <rect x="110" y="60" width="680" height="46" rx="6" fill="rgba(237,180,74,.12)" stroke="#EDB44A"></rect>
-      <text class="sv-t" x="450" y="80"  text-anchor="middle" fill="#EDB44A">heap · code · file đang mở</text>
-      <text class="sv-s" x="450" y="98"  text-anchor="middle">DÙNG CHUNG — mọi thread thấy cùng object</text>
-
-      <rect x="130" y="128" width="200" height="76" rx="7" class="sv-b"></rect>
-      <rect x="350" y="128" width="200" height="76" rx="7" class="sv-b"></rect>
-      <rect x="570" y="128" width="200" height="76" rx="7" class="sv-b"></rect>
-      <text class="sv-t" x="230" y="152" text-anchor="middle">Thread 1</text>
-      <text class="sv-t" x="450" y="152" text-anchor="middle">Thread 2</text>
-      <text class="sv-t" x="670" y="152" text-anchor="middle">Thread 3</text>
-      <text class="sv-l" x="230" y="172" text-anchor="middle">stack riêng</text>
-      <text class="sv-l" x="450" y="172" text-anchor="middle">stack riêng</text>
-      <text class="sv-l" x="670" y="172" text-anchor="middle">stack riêng</text>
-      <text class="sv-l" x="230" y="190" text-anchor="middle">thanh ghi riêng</text>
-      <text class="sv-l" x="450" y="190" text-anchor="middle">thanh ghi riêng</text>
-      <text class="sv-l" x="670" y="190" text-anchor="middle">thanh ghi riêng</text>
-
-      <text class="sv-l" x="450" y="242" text-anchor="middle" fill="#7A6F63">chia sẻ bộ nhớ là điểm mạnh — và cũng là nguồn của race condition</text>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ô thread sáng lên; bên phải một process chứa ba thread dùng chung heap, mỗi thread một stack riêng">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--ok)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--ok)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--ok)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--rule-hi)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--ok)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--ok)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--muted)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — THREAD</text>
+    <path d="M342 100 C 356 100, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--ok)">Nhiều luồng bên trong cùng một process</text>
+    <rect x="372" y="50" width="488" height="106" rx="5" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+    <rect x="384" y="62" width="464" height="34" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="616.0" y="76" fill="var(--probe)" text-anchor="middle">heap · code · file đang mở</text>
+    <text class="sv-d" x="616.0" y="90" fill="var(--muted)" text-anchor="middle">DÙNG CHUNG — mọi thread thấy cùng object</text>
+    <rect x="384.0" y="104" width="149.33333333333334" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="458.6666666666667" y="120" fill="var(--text)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="458.6666666666667" y="135" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="541.3333333333334" y="104" width="149.33333333333334" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="616.0" y="120" fill="var(--text)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="616.0" y="135" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="698.6666666666667" y="104" width="149.33333333333334" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="773.3333333333334" y="120" fill="var(--text)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="773.3333333333334" y="135" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="372" y="168" width="110" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="189.0" fill="var(--ok)">trao đổi</text>
+    <text class="sv-d" x="496" y="189.0" fill="var(--muted)">miễn phí — chỉ cần cùng trỏ một object</text>
+    <rect x="372" y="208" width="110" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="229.0" fill="var(--ok)">không cách ly</text>
+    <text class="sv-d" x="496" y="229.0" fill="var(--muted)">một thread ghi bậy là cả process hỏng</text>
+    <rect x="372" y="248" width="110" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="269.0" fill="var(--ok)">chi phí tạo</text>
+    <text class="sv-d" x="496" y="269.0" fill="var(--muted)">~0,1 ms · vài MB — rẻ hơn process một bậc</text>
     </svg>
+  <figcaption>Ba thread cùng thấy một heap; mỗi thread chỉ riêng stack và thanh ghi.</figcaption>
   </figure>
 
   <ul class="why">
@@ -129,125 +265,494 @@
   </ul>
 </section>
 
-<section id="gil-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Khác nhau ở đâu</h2></div>
+<section id="gil-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Khác nhau ở đâu</h2></div>
 
   <p class="key">Một dòng quyết định mọi thứ còn lại: <em>bộ nhớ riêng hay bộ nhớ chung</em>.</p>
 
-  <table>
-    <tr><th></th><th>Process</th><th>Thread</th></tr>
-    <tr><td>Không gian địa chỉ</td><td><b>riêng</b></td><td><b>chung</b></td></tr>
-    <tr><td>Chia sẻ dữ liệu</td><td>phải đóng gói, sao chép qua kênh OS</td><td>trỏ chung object — miễn phí</td></tr>
-    <tr><td>Chi phí tạo</td><td>~10–50 ms · vài chục MB</td><td>~0,1 ms · vài MB</td></tr>
-    <tr><td>Chuyển ngữ cảnh</td><td><b>đắt</b> — đổi bảng trang, xả TLB</td><td><b>rẻ</b> — chỉ đổi thanh ghi và stack</td></tr>
-    <tr><td>Một cái sập</td><td>cái kia sống</td><td><b>có thể kéo cả process</b></td></tr>
-    <tr><td>Cần khoá không</td><td>hiếm — không dùng chung bộ nhớ</td><td><b>có</b> — mọi dữ liệu chung đều phải bảo vệ</td></tr>
-    <tr><td>Dùng nhiều lõi CPU</td><td>được</td><td>được ở C/Java — <b>không ở Python</b> (mục 05)</td></tr>
-  </table>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Hai ô process và thread cùng sáng; bên phải bảy dòng đối chiếu từ bộ nhớ tới nhu cầu khoá">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--filled)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--ok)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--ok)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--ok)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--filled)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--filled)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--ok)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--ok)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--muted)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">HAI Ô CẠNH NHAU — KHÁC NHAU Ở ĐÂU</text>
+    <text class="sv-d" x="372" y="34"></text>
+    <text class="sv-t" x="563.5" y="40" fill="var(--filled)" text-anchor="middle">Process</text>
+    <text class="sv-t" x="764.5" y="40" fill="var(--ok)" text-anchor="middle">Thread</text>
+    <text class="sv-d" x="372" y="66" fill="var(--muted)">bộ nhớ</text>
+    <rect x="468.0" y="50" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="67" fill="var(--filled)" text-anchor="middle">riêng</text>
+    <rect x="669.0" y="50" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="67" fill="var(--ok)" text-anchor="middle">chung</text>
+    <text class="sv-d" x="372" y="96" fill="var(--muted)">chia sẻ</text>
+    <rect x="468.0" y="80" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="97" fill="var(--filled)" text-anchor="middle">phải sao chép</text>
+    <rect x="669.0" y="80" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="97" fill="var(--ok)" text-anchor="middle">trỏ chung, rẻ</text>
+    <text class="sv-d" x="372" y="126" fill="var(--muted)">tạo mới</text>
+    <rect x="468.0" y="110" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="127" fill="var(--filled)" text-anchor="middle">vài chục MB</text>
+    <rect x="669.0" y="110" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="127" fill="var(--ok)" text-anchor="middle">vài MB</text>
+    <text class="sv-d" x="372" y="156" fill="var(--muted)">đổi lượt</text>
+    <rect x="468.0" y="140" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="157" fill="var(--filled)" text-anchor="middle">đắt — xả TLB</text>
+    <rect x="669.0" y="140" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="157" fill="var(--ok)" text-anchor="middle">rẻ — đổi thanh ghi</text>
+    <text class="sv-d" x="372" y="186" fill="var(--muted)">một cái sập</text>
+    <rect x="468.0" y="170" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="187" fill="var(--filled)" text-anchor="middle">cái kia sống</text>
+    <rect x="669.0" y="170" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="187" fill="var(--ok)" text-anchor="middle">kéo cả process</text>
+    <text class="sv-d" x="372" y="216" fill="var(--muted)">cần khoá</text>
+    <rect x="468.0" y="200" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="217" fill="var(--filled)" text-anchor="middle">hiếm khi</text>
+    <rect x="669.0" y="200" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="217" fill="var(--ok)" text-anchor="middle">luôn luôn</text>
+    <text class="sv-d" x="372" y="246" fill="var(--muted)">nhiều lõi</text>
+    <rect x="468.0" y="230" width="191.0" height="24" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="563.5" y="247" fill="var(--filled)" text-anchor="middle">được</text>
+    <rect x="669.0" y="230" width="191.0" height="24" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="764.5" y="247" fill="var(--ok)" text-anchor="middle">không, ở Python</text>
+    <text class="sv-s" x="372" y="276" fill="var(--dim)">Một dòng đầu quyết định sáu dòng dưới — nhớ dòng đầu là đủ.</text>
+    </svg>
+  <figcaption>Hai ô của bản đồ đặt cạnh nhau. Dòng đầu là nguyên nhân, sáu dòng dưới là hệ quả.</figcaption>
+  </figure>
 
   <p class="stripnote"><span>process = <em>cách ly, đắt</em></span><span>thread = <em>chia sẻ, rẻ, nguy hiểm</em></span></p>
-</section>
-
-<section id="gil-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Chuyển ngữ cảnh</h2></div>
-
-  <p class="key">CPU chỉ chạy được một thứ mỗi lõi. "Chạy song song" trên máy một lõi thật ra là <em>đổi qua đổi lại rất nhanh</em>.</p>
-
-  <div class="bars">
-    <div class="b"><i>gọi một hàm</i><u style="width:0.2%"></u><b>~vài nano giây</b></div>
-    <div class="b hi"><i>đổi thread</i><u style="width:8%"></u><b>~1–5 micro giây</b></div>
-    <div class="b bad"><i>đổi process</i><u style="width:100%"></u><b>~5–50 micro giây</b></div>
-  </div>
-  <p class="stripnote"><span>số ước lượng trên máy để bàn hiện nay</span><span><em>đổi process đắt vì phải đổi bảng trang, và cache với TLB mất hết dữ liệu nóng</em></span></p>
 
   <ul class="why">
-    <li>Mỗi lần đổi, OS phải <b>cất thanh ghi và con trỏ ngăn xếp</b> của luồng cũ rồi nạp của luồng mới.</li>
-    <li>Đổi <b>thread cùng process</b> thì bảng trang giữ nguyên → rẻ. Đổi <b>process</b> thì đổi cả ánh xạ bộ nhớ → cache nguội, chậm hẳn.</li>
-    <li>Vì vậy tạo <b>hàng nghìn thread</b> không làm chương trình nhanh hơn — phần lớn thời gian trôi vào việc đổi qua đổi lại.</li>
+    <li>Dòng "nhiều lõi" là chỗ Python khác C và Java — nguyên nhân nằm ở <b>GIL</b>, mục 06.</li>
+    <li>Dòng "cần khoá" là lý do mục 07 tồn tại: chia sẻ bộ nhớ thì phải tự bảo vệ dữ liệu chung.</li>
   </ul>
 </section>
 
 <section id="gil-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>GIL — một khoá cho cả process</h2></div>
+  <div class="sh"><b>05</b><h2>Context switching</h2></div>
 
-  <p class="key">Trong <em>một process Python</em> có một khoá. Giữ khoá mới được chạy bytecode — nên <em>chỉ một thread chạy tại một thời điểm</em>.</p>
+  <p class="key">CPU chỉ chạy được một thứ mỗi lõi. "Chạy song song" trên máy một lõi thật ra là <em>đổi qua đổi lại rất nhanh</em>.</p>
 
-  <figure>
-    <svg viewBox="0 0 900 210" role="img" aria-label="Bốn lõi CPU nhưng chỉ một thread Python chạy được">
-      <text class="sv-l" x="230" y="24" text-anchor="middle" fill="#8CA9F2">4 thread trong 1 process Python</text>
-      <rect x="60" y="40" width="340" height="140" rx="10" fill="rgba(140,169,242,.06)" stroke="#8CA9F2"></rect>
-      <rect x="86"  y="66" width="140" height="34" rx="6" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></rect>
-      <text class="sv-l" x="156" y="88" text-anchor="middle" fill="#5BCFA0">T1 · đang chạy</text>
-      <rect x="240" y="66" width="140" height="34" rx="6" class="sv-b"></rect>
-      <text class="sv-l" x="310" y="88" text-anchor="middle">T2 · chờ khoá</text>
-      <rect x="86"  y="112" width="140" height="34" rx="6" class="sv-b"></rect>
-      <text class="sv-l" x="156" y="134" text-anchor="middle">T3 · chờ khoá</text>
-      <rect x="240" y="112" width="140" height="34" rx="6" class="sv-b"></rect>
-      <text class="sv-l" x="310" y="134" text-anchor="middle">T4 · chờ khoá</text>
-      <text class="sv-t" x="230" y="168" text-anchor="middle" fill="#EDB44A">một GIL cho cả process</text>
-
-      <text class="sv-l" x="670" y="24" text-anchor="middle" fill="#7A6F63">CPU 4 lõi</text>
-      <rect x="500" y="40" width="340" height="140" rx="10" class="sv-b"></rect>
-      <rect x="526" y="66"  width="140" height="34" rx="6" fill="rgba(91,207,160,.2)" stroke="#5BCFA0"></rect>
-      <text class="sv-l" x="596" y="88" text-anchor="middle" fill="#5BCFA0">lõi 1 · bận</text>
-      <rect x="680" y="66"  width="140" height="34" rx="6" fill="rgba(224,108,122,.12)" stroke="#F2718A"></rect>
-      <text class="sv-l" x="750" y="88" text-anchor="middle" fill="#F2718A">lõi 2 · rảnh</text>
-      <rect x="526" y="112" width="140" height="34" rx="6" fill="rgba(224,108,122,.12)" stroke="#F2718A"></rect>
-      <text class="sv-l" x="596" y="134" text-anchor="middle" fill="#F2718A">lõi 3 · rảnh</text>
-      <rect x="680" y="112" width="140" height="34" rx="6" fill="rgba(224,108,122,.12)" stroke="#F2718A"></rect>
-      <text class="sv-l" x="750" y="134" text-anchor="middle" fill="#F2718A">lõi 4 · rảnh</text>
-      <text class="sv-t" x="670" y="168" text-anchor="middle" fill="#F2718A">ba lõi ngồi không</text>
-
-      <text class="sv-l" x="450" y="202" text-anchor="middle" fill="#7A6F63">GIL nằm ở mức PROCESS — nên mỗi process có GIL riêng, và nhiều process thì dùng đủ lõi</text>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ô context switching sáng lên; bên phải ba vạch chi phí gọi hàm, đổi thread và đổi process">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--muted)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--muted)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--muted)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--rule-hi)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--probe)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--muted)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — CONTEXT SWITCHING</text>
+    <path d="M342 212 C 356 212, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">CPU mỗi lõi chạy một thứ — còn lại là đổi qua đổi lại</text>
+    <text class="sv-d" x="372" y="68" fill="var(--muted)">gọi một hàm</text>
+    <rect x="476" y="56" width="3" height="18" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="860" y="70" fill="var(--muted)" text-anchor="end">vài nano giây</text>
+    <text class="sv-d" x="372" y="98" fill="var(--muted)">đổi thread</text>
+    <rect x="476" y="86" width="26.0" height="18" rx="3" fill="rgba(var(--amber-a),.30)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-d" x="860" y="100" fill="var(--probe)" text-anchor="end">1–5 micro giây</text>
+    <text class="sv-d" x="372" y="128" fill="var(--muted)">đổi process</text>
+    <rect x="476" y="116" width="260.0" height="18" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="860" y="130" fill="var(--tomb)" text-anchor="end">5–50 micro giây</text>
+    <rect x="372" y="150" width="110" height="32" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="171.0" fill="var(--probe)">cất và nạp</text>
+    <text class="sv-d" x="496" y="171.0" fill="var(--muted)">thanh ghi cùng con trỏ ngăn xếp của hai luồng</text>
+    <rect x="372" y="190" width="110" height="32" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="211.0" fill="var(--probe)">đổi thread</text>
+    <text class="sv-d" x="496" y="211.0" fill="var(--muted)">bảng trang giữ nguyên nên cache vẫn còn nóng</text>
+    <rect x="372" y="230" width="110" height="32" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="251.0" fill="var(--probe)">đổi process</text>
+    <text class="sv-d" x="496" y="251.0" fill="var(--muted)">đổi cả ánh xạ bộ nhớ — cache và TLB mất sạch</text>
+    <text class="sv-s" x="372" y="288" fill="var(--dim)">Nên vài nghìn thread không nhanh hơn — thời gian trôi vào đổi lượt.</text>
     </svg>
+  <figcaption>Ba mức chi phí, và vì sao đổi process đắt hơn đổi thread một bậc.</figcaption>
   </figure>
 
   <ul class="why">
-    <li>Bộ đếm tham chiếu của CPython <b>không an toàn với nhiều luồng</b> — một khoá lớn là cách rẻ nhất để giữ đúng.</li>
-    <li>GIL <b>được nhả ra</b> khi thread chờ I/O, hoặc khi vào thư viện C tính toán như NumPy.</li>
-    <li>Hệ quả trực tiếp của mục 01: GIL thuộc về <b>một process</b>, nên <code>multiprocessing</code> né được — mỗi process một GIL riêng.</li>
-    <li>Python 3.13 có bản thử nghiệm <b>không GIL</b>, nhưng chưa mặc định và thư viện C phải sửa lại.</li>
+    <li>Mỗi lần đổi, OS phải <b>cất thanh ghi và con trỏ ngăn xếp</b> của luồng cũ rồi nạp của luồng mới.</li>
+    <li>Số trên là mức <b>ước lượng</b> trên máy để bàn hiện nay, không phải đo trên máy của bạn.</li>
   </ul>
 </section>
 
 <section id="gil-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Chờ hay tính</h2></div>
+  <div class="sh"><b>06</b><h2>GIL</h2></div>
+
+  <p class="key">Trong <em>một process Python</em> có một khoá. Giữ khoá mới được chạy bytecode — nên <em>chỉ một thread chạy tại một thời điểm</em>.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ô GIL sáng lên; bên phải bốn thread mà chỉ một chạy, bốn lõi mà ba ngồi không, cùng ba ghi chú về khoá">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--muted)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--muted)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--muted)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--rule-hi)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--probe)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--muted)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — GIL</text>
+    <path d="M342 276 C 356 276, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">Giữ khoá mới được chạy bytecode</text>
+    <rect x="372" y="50" width="237.0" height="84" rx="5" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
+    <text class="sv-d" x="384" y="68" fill="var(--filled)">1 process · 4 thread</text>
+    <rect x="384.0" y="76" width="102.5" height="24" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="435.25" y="93" fill="var(--ok)" text-anchor="middle">T1 · chạy</text>
+    <rect x="494.5" y="76" width="102.5" height="24" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="545.75" y="93" fill="var(--tomb)" text-anchor="middle">T2 · chờ</text>
+    <rect x="384.0" y="106" width="102.5" height="24" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="435.25" y="123" fill="var(--tomb)" text-anchor="middle">T3 · chờ</text>
+    <rect x="494.5" y="106" width="102.5" height="24" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="545.75" y="123" fill="var(--tomb)" text-anchor="middle">T4 · chờ</text>
+    <rect x="623.0" y="50" width="237.0" height="84" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="635.0" y="68" fill="var(--muted)">CPU 4 lõi</text>
+    <rect x="635.0" y="76" width="102.5" height="24" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="686.25" y="93" fill="var(--ok)" text-anchor="middle">lõi 1 · bận</text>
+    <rect x="745.5" y="76" width="102.5" height="24" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="796.75" y="93" fill="var(--tomb)" text-anchor="middle">lõi 2 · rảnh</text>
+    <rect x="635.0" y="106" width="102.5" height="24" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="686.25" y="123" fill="var(--tomb)" text-anchor="middle">lõi 3 · rảnh</text>
+    <rect x="745.5" y="106" width="102.5" height="24" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="796.75" y="123" fill="var(--tomb)" text-anchor="middle">lõi 4 · rảnh</text>
+    <rect x="372" y="146" width="488" height="50" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="168" fill="var(--filled)">Vì sao có: bộ đếm tham chiếu không an toàn nhiều luồng</text>
+    <text class="sv-s" x="388" y="186" fill="var(--dim)">một khoá lớn là cách rẻ nhất để CPython giữ đúng</text>
+    <rect x="372" y="204" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="226" fill="var(--ok)">GIL được nhả khi thread chờ I/O hoặc vào thư viện C</text>
+    <text class="sv-s" x="388" y="244" fill="var(--dim)">nên NumPy và socket vẫn chạy song song thật được</text>
+    <rect x="372" y="262" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="284" fill="var(--probe)">Khoá thuộc về MỘT process — nên nhiều process là né được</text>
+    <text class="sv-s" x="388" y="302" fill="var(--dim)">Python 3.13 có bản thử nghiệm không GIL, chưa mặc định</text>
+    </svg>
+  <figcaption>Bốn thread mà chỉ một chạy được, nên ba lõi ngồi không. Khoá thuộc về process, không phải về máy.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Hệ quả trực tiếp của mục 02: GIL thuộc về <b>một process</b>, nên <code>multiprocessing</code> né được — mỗi process một GIL riêng.</li>
+    <li>GIL <b>được nhả ra</b> khi thread chờ I/O, hoặc khi vào thư viện C tính toán như NumPy.</li>
+    <li>Python 3.13 có bản thử nghiệm <b>không GIL</b>, nhưng chưa mặc định và thư viện C phải sửa lại.</li>
+  </ul>
+</section>
+
+<section id="gil-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Race condition</h2></div>
+
+  <p class="key">GIL đảm bảo <em>một bytecode một lúc</em>, không phải <em>một dòng Python một lúc</em>.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ô race condition sáng lên; bên phải một dòng x cộng một tách thành ba bytecode và ba bước hai thread xen kẽ">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--muted)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--muted)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--muted)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--rule-hi)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--tomb)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--muted)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — RACE CONDITION</text>
+    <path d="M342 212 C 356 212, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--tomb)">Một dòng Python không phải một bước</text>
+    <rect x="372" y="50" width="488" height="32" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-l" x="386" y="71" fill="var(--text)">x += 1</text>
+    <text class="sv-d" x="452" y="71" fill="var(--muted)">đọc x  →  cộng 1  →  ghi lại x</text>
+    <rect x="372" y="92" width="40" height="28" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="392" y="111" fill="var(--muted)" text-anchor="middle">A</text>
+    <rect x="420" y="92" width="440" height="28" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="432" y="111" fill="var(--muted)">đọc x = 5, chưa kịp ghi thì bị đổi lượt</text>
+    <rect x="372" y="126" width="40" height="28" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="392" y="145" fill="var(--muted)" text-anchor="middle">B</text>
+    <rect x="420" y="126" width="440" height="28" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="432" y="145" fill="var(--muted)">đọc x = 5 · cộng · ghi x = 6</text>
+    <rect x="372" y="160" width="40" height="28" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="392" y="179" fill="var(--muted)" text-anchor="middle">A</text>
+    <rect x="420" y="160" width="440" height="28" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="432" y="179" fill="var(--tomb)">quay lại, ghi x = 6 — mất một lần cộng</text>
+    <text class="sv-s" x="372" y="210" fill="var(--tomb)">Kết quả sai mà không có lỗi nào ném ra.</text>
+    <rect x="372" y="220" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="242" fill="var(--probe)">GIL khoá bytecode, không khoá dòng lệnh của bạn</text>
+    <text class="sv-s" x="388" y="260" fill="var(--dim)">nên có GIL rồi vẫn phải tự khoá mọi thao tác đọc–sửa–ghi</text>
+    <rect x="372" y="278" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="300" fill="var(--ok)">Chữa: threading.Lock, hoặc queue.Queue an toàn sẵn</text>
+    <text class="sv-s" x="388" y="318" fill="var(--dim)">bug loại này chạy trăm lần đúng chín mươi chín — đắt nhất khi lọt ra thật</text>
+    </svg>
+  <figcaption>Một dòng tách thành ba bytecode, nên OS xen được vào giữa và một lần cộng biến mất.</figcaption>
+  </figure>
+
+<pre class="core"><code>x += <span class="st">1</span>        <span class="cm"># một dòng Python = BA bytecode</span>
+                <span class="cm"># OS có thể đổi thread ngay giữa bước đọc và bước ghi</span></code></pre>
+
+  <ul class="why">
+    <li>Chữa bằng <code>threading.Lock()</code>, hoặc dùng cấu trúc <b>an toàn sẵn</b> như <code>queue.Queue</code>.</li>
+    <li>Cùng cơ chế đó ở mức hệ điều hành: <a href="../../../03-cs-fundamentals/02-os/lock-deadlock-race/index.html">Lock, deadlock &amp; race condition</a>.</li>
+  </ul>
+</section>
+
+<section id="gil-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Chờ hay tính</h2></div>
 
   <p class="key">Chỉ cần trả lời <em>một câu</em>: tác vụ của bạn phần lớn thời gian đang <em>chờ</em> hay đang <em>tính</em>?</p>
 
-  <div class="cmp two">
-    <div>
-      <h5>Đang chờ — I/O-bound</h5>
-      <p>gọi API, đọc file, truy vấn database</p>
-      <p>Thread <b>nhả GIL khi chờ</b> → nhiều thread chờ song song được.</p>
-      <p><b>Chọn:</b> <code>asyncio</code> nếu nhiều tác vụ nhỏ · <code>ThreadPoolExecutor</code> nếu thư viện không hỗ trợ async</p>
-    </div>
-    <div>
-      <h5>Đang tính — CPU-bound</h5>
-      <p>vòng lặp lớn, xử lý ảnh, nén dữ liệu</p>
-      <p>Thread <b>tranh nhau GIL</b> → thêm thread không nhanh hơn, có khi chậm đi.</p>
-      <p><b>Chọn:</b> <code>ProcessPoolExecutor</code> · hoặc đẩy phép tính xuống NumPy/thư viện C</p>
-    </div>
-  </div>
-
-  <table>
-    <tr><th>Mô hình</th><th>Chạy nhiều lõi</th><th>Chi phí mỗi đơn vị</th><th>Hợp với</th></tr>
-    <tr><td>tuần tự</td><td>không</td><td>0</td><td>ít việc, code đơn giản nhất</td></tr>
-    <tr><td><code>threading</code></td><td><b>không</b> (GIL)</td><td>~vài MB</td><td>chờ I/O, thư viện đồng bộ</td></tr>
-    <tr><td><code>multiprocessing</code></td><td><b>có</b></td><td>~vài chục MB</td><td>tính nặng bằng Python thuần</td></tr>
-    <tr><td><code>asyncio</code></td><td>không (1 luồng)</td><td>~vài KB</td><td>rất nhiều tác vụ chờ cùng lúc</td></tr>
-  </table>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ô chờ hay tính sáng lên; bên phải hai cột I/O-bound và CPU-bound cùng bảng bốn mô hình">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--muted)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--muted)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--muted)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--rule-hi)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--text)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--text)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — CHỜ HAY TÍNH</text>
+    <path d="M342 352 C 356 352, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <rect x="372.0" y="40" width="237.0" height="92" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="384.0" y="60" fill="var(--ok)">ĐANG CHỜ — I/O-bound</text>
+    <text class="sv-d" x="384.0" y="78" fill="var(--muted)">gọi API · đọc file · truy vấn DB</text>
+    <text class="sv-d" x="384.0" y="96" fill="var(--muted)">thread nhả GIL khi chờ</text>
+    <text class="sv-d" x="384.0" y="118" fill="var(--dim)">asyncio · ThreadPoolExecutor</text>
+    <rect x="623.0" y="40" width="237.0" height="92" rx="5" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-d" x="635.0" y="60" fill="var(--probe)">ĐANG TÍNH — CPU-bound</text>
+    <text class="sv-d" x="635.0" y="78" fill="var(--muted)">vòng lặp lớn · xử lý ảnh · nén</text>
+    <text class="sv-d" x="635.0" y="96" fill="var(--muted)">thread tranh nhau GIL</text>
+    <text class="sv-d" x="635.0" y="118" fill="var(--dim)">ProcessPoolExecutor · NumPy</text>
+    <text class="sv-d" x="710.0" y="154" fill="var(--muted)" text-anchor="middle">nhiều lõi</text>
+    <text class="sv-d" x="806.0" y="154" fill="var(--muted)" text-anchor="middle">chi phí</text>
+    <text class="sv-d" x="372" y="176" fill="var(--rule-hi)">tuần tự</text>
+    <text class="sv-d" x="372" y="190" fill="var(--muted)">ít việc, code gọn nhất</text>
+    <rect x="666" y="164" width="88" height="24" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="710.0" y="181" fill="var(--tomb)" text-anchor="middle">không</text>
+    <rect x="762" y="164" width="88" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="806.0" y="181" fill="var(--muted)" text-anchor="middle">0</text>
+    <text class="sv-d" x="372" y="214" fill="var(--ok)">threading</text>
+    <text class="sv-d" x="372" y="228" fill="var(--muted)">chờ I/O, thư viện đồng bộ</text>
+    <rect x="666" y="202" width="88" height="24" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="710.0" y="219" fill="var(--tomb)" text-anchor="middle">không</text>
+    <rect x="762" y="202" width="88" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="806.0" y="219" fill="var(--muted)" text-anchor="middle">vài MB</text>
+    <text class="sv-d" x="372" y="252" fill="var(--filled)">multiprocessing</text>
+    <text class="sv-d" x="372" y="266" fill="var(--muted)">tính nặng bằng Python thuần</text>
+    <rect x="666" y="240" width="88" height="24" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="710.0" y="257" fill="var(--ok)" text-anchor="middle">có</text>
+    <rect x="762" y="240" width="88" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="806.0" y="257" fill="var(--muted)" text-anchor="middle">vài chục MB</text>
+    <text class="sv-d" x="372" y="290" fill="var(--ok)">asyncio</text>
+    <text class="sv-d" x="372" y="304" fill="var(--muted)">rất nhiều tác vụ chờ cùng lúc</text>
+    <rect x="666" y="278" width="88" height="24" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-d" x="710.0" y="295" fill="var(--tomb)" text-anchor="middle">không</text>
+    <rect x="762" y="278" width="88" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="806.0" y="295" fill="var(--muted)" text-anchor="middle">vài KB</text>
+    <text class="sv-s" x="372" y="328" fill="var(--dim)">Chờ thì async hoặc thread; tính thì process, hoặc đẩy xuống C.</text>
+    </svg>
+  <figcaption>Hai nhánh của câu hỏi, và bốn mô hình xếp theo khả năng dùng nhiều lõi cùng chi phí mỗi đơn vị.</figcaption>
+  </figure>
 
   <div class="note key">
     <h4>Nhớ một câu</h4>
     <strong>Chờ</strong> thì dùng async hoặc thread. <strong>Tính</strong> thì dùng process, hoặc đẩy phép tính xuống thư viện C.
   </div>
+
+  <ul class="why">
+    <li><code>asyncio</code> rẻ hơn thread hai bậc vì không có stack riêng cho mỗi tác vụ — xem <a href="../asyncio/index.html">Asyncio</a>.</li>
+    <li>Thư viện đồng bộ không sửa được thì dùng <code>ThreadPoolExecutor</code>, không phải viết lại thành async.</li>
+  </ul>
 </section>
 
-<section id="gil-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lab: bốn mô hình trên cùng một tải</h2></div>
+<section id="gil-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Lab: bốn mô hình trên cùng một tải</h2></div>
 
   <p class="key">Đổi tỉ lệ <em>chờ</em> và <em>tính</em> rồi xem mô hình nào thắng.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 384" role="img" aria-label="Ba ô process, thread và chờ hay tính cùng sáng; bên phải nói lab ghép ba ô đó cho người học tự vặn tỉ lệ">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="106" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--filled)">Process</text>
+    <text class="sv-d" x="13" y="63" fill="var(--muted)">bộ nhớ riêng · cách ly · tạo tốn vài chục MB</text>
+    <line x1="13" y1="72" x2="327" y2="72" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="13.0" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="62.666666666666664" y="98" fill="var(--ok)" text-anchor="middle">Thread 1</text>
+    <text class="sv-d" x="62.666666666666664" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="120.33333333333333" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="170.0" y="98" fill="var(--ok)" text-anchor="middle">Thread 2</text>
+    <text class="sv-d" x="170.0" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <rect x="227.66666666666666" y="80" width="99.33333333333333" height="40" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-d" x="277.3333333333333" y="98" fill="var(--ok)" text-anchor="middle">Thread 3</text>
+    <text class="sv-d" x="277.3333333333333" y="112" fill="var(--muted)" text-anchor="middle">stack riêng</text>
+    <text class="sv-d" x="13" y="150" fill="var(--muted)">ba thread dùng chung bộ nhớ của process bọc ngoài</text>
+    <line x1="85.0" y1="156" x2="85.0" y2="166" stroke="var(--filled)" stroke-width="1.2"/><polygon points="85.0,174 80.8,166 89.2,166" fill="var(--filled)"/>
+    <line x1="255.0" y1="156" x2="255.0" y2="166" stroke="var(--ok)" stroke-width="1.2"/><polygon points="255.0,174 250.8,166 259.2,166" fill="var(--ok)"/>
+    <text class="sv-d" x="170.0" y="172" fill="var(--muted)" text-anchor="middle">cái giá</text>
+    <rect x="0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="203" fill="var(--muted)">Context switching</text>
+    <text class="sv-d" x="13" y="220" fill="var(--muted)">OS đổi lượt · cache nguội</text>
+    <text class="sv-d" x="13" y="234" fill="var(--muted)">đổi process đắt hơn</text>
+    <rect x="177.0" y="182" width="163.0" height="60" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="190.0" y="203" fill="var(--muted)">Race condition</text>
+    <text class="sv-d" x="190.0" y="220" fill="var(--muted)">đọc–sửa–ghi xen kẽ nhau</text>
+    <text class="sv-d" x="190.0" y="234" fill="var(--muted)">sai mà không báo lỗi</text>
+    <line x1="0" y1="248" x2="340" y2="248" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="254" width="340" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="275" fill="var(--muted)">GIL — riêng CPython</text>
+    <text class="sv-d" x="13" y="292" fill="var(--muted)">một khoá mỗi process — chỉ 1 thread chạy bytecode</text>
+    <line x1="170.0" y1="300" x2="170.0" y2="310" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,318 165.8,310 174.2,310" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="316" fill="var(--muted)">nên câu hỏi duy nhất</text>
+    <rect x="0" y="328" width="340" height="48" rx="6" fill="none" stroke="var(--text)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="349" fill="var(--text)">Chờ hay tính</text>
+    <text class="sv-d" x="13" y="366" fill="var(--muted)">async · thread · process — chọn theo tác vụ</text>
+    <text class="sv-hv" x="372" y="18">TỰ CHẠY — BA Ô CÙNG LÚC</text>
+    <text class="sv-t" x="372" y="40" fill="var(--text)">Lab ghép ba ô lại: một tải, bốn mô hình</text>
+    <rect x="372" y="50" width="132" height="34" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="72.0" fill="var(--filled)">ô Process</text>
+    <text class="sv-d" x="518" y="72.0" fill="var(--muted)">multiprocessing — dùng đủ lõi, trả bằng bộ nhớ</text>
+    <rect x="372" y="92" width="132" height="34" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="114.0" fill="var(--ok)">ô Thread</text>
+    <text class="sv-d" x="518" y="114.0" fill="var(--muted)">threading — rẻ, nhưng vướng GIL khi phải tính</text>
+    <rect x="372" y="134" width="132" height="34" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="156.0" fill="var(--probe)">ô Chờ hay tính</text>
+    <text class="sv-d" x="518" y="156.0" fill="var(--muted)">vặn tỉ lệ chờ · tính rồi xem mô hình nào thắng</text>
+    <rect x="372" y="182" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="204" fill="var(--ok)">Kéo phần chờ lên cao thì async bỏ xa cả ba</text>
+    <text class="sv-s" x="388" y="222" fill="var(--dim)">kéo phần tính lên cao thì chỉ process nhúc nhích — thread đứng yên</text>
+    </svg>
+  <figcaption>Lab đứng trên ba ô: process, thread và câu hỏi chờ hay tính.</figcaption>
+  </figure>
 
   <div class="lab">
     <div class="bar">
@@ -267,97 +772,6 @@
     <div id="cview"></div>
     <p class="stripnote"><span>đây là <em>mô hình ước lượng</em>, không phải đo thật</span><span><em>chờ nhiều → async thắng đậm · tính nhiều → chỉ process giúp được</em></span></p>
   </div>
-</section>
-
-<section id="gil-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Race condition — GIL không cứu bạn</h2></div>
-
-  <p class="key">GIL đảm bảo <em>một bytecode một lúc</em>, không phải <em>một dòng Python một lúc</em>.</p>
-
-<pre class="core"><code>x += <span class="st">1</span>        <span class="cm"># một dòng Python = BA bytecode:</span>
-                <span class="cm">#   1. đọc x   2. cộng 1   3. ghi lại x</span>
-                <span class="cm"># OS có thể đổi thread ngay giữa bước 1 và 3</span></code></pre>
-
-  <div class="stack">
-    <div class="s"><b>Thread A đọc x = 5</b><span>chưa kịp ghi thì bị đổi lượt</span></div>
-    <div class="s"><b>Thread B đọc x = 5, cộng, ghi x = 6</b><span>xong lượt của B</span></div>
-    <div class="s warn"><b>Thread A quay lại, ghi x = 6</b><span>mất một lần cộng — <b>kết quả sai mà không có lỗi nào</b></span></div>
-  </div>
-
-  <ul class="why">
-    <li>Chữa bằng <code>threading.Lock()</code>, hoặc dùng cấu trúc <b>an toàn sẵn</b> như <code>queue.Queue</code>.</li>
-    <li>Bug loại này <b>không tái hiện đều</b> — chạy 100 lần đúng 99 lần. Đó là lý do nó đắt nhất khi lọt lên production.</li>
-  </ul>
-</section>
-
-<section id="gil-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Một câu hỏi duy nhất — <em>đang chờ hay đang tính</em> — và mọi lựa chọn còn lại rơi ra từ đó.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 360" role="img" aria-label="Tổng kết thread, process và GIL: GIL nằm ở mức process, chờ thì dùng thread hoặc async, tính thì dùng process">
-      <text class="sv-h" x="16" y="26">&#9312; GIL NẰM Ở MỨC PROCESS</text>
-
-      <rect x="16" y="42" width="298" height="118" rx="8" fill="rgba(140,169,242,.08)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-d" x="36" y="64">1 process · 4 thread</text>
-      <rect x="36" y="74" width="122" height="28" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="97" y="93" text-anchor="middle" fill="#5BCFA0">T1 chạy</text>
-      <rect x="168" y="74" width="122" height="28" rx="5" fill="rgba(242,113,138,.12)" stroke="#F2718A" stroke-width="2"></rect>
-      <text class="sv-l" x="229" y="93" text-anchor="middle" fill="#F2718A">T2 chờ khoá</text>
-      <rect x="36" y="108" width="122" height="28" rx="5" fill="rgba(242,113,138,.12)" stroke="#F2718A" stroke-width="2"></rect>
-      <text class="sv-l" x="97" y="127" text-anchor="middle" fill="#F2718A">T3 chờ khoá</text>
-      <rect x="168" y="108" width="122" height="28" rx="5" fill="rgba(242,113,138,.12)" stroke="#F2718A" stroke-width="2"></rect>
-      <text class="sv-l" x="229" y="127" text-anchor="middle" fill="#F2718A">T4 chờ khoá</text>
-      <text class="sv-l" x="36" y="152" fill="#EDB44A">một GIL — 3 lõi ngồi không</text>
-
-      <text class="sv-h" x="340" y="26">MỖI PROCESS MỘT GIL RIÊNG</text>
-      <rect x="340" y="42" width="504" height="118" rx="8" fill="rgba(91,207,160,.08)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <rect x="360" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="414" y="100" text-anchor="middle" fill="#5BCFA0">P1</text>
-      <text class="sv-d" x="414" y="118" text-anchor="middle">lõi 1</text>
-      <rect x="478" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="532" y="100" text-anchor="middle" fill="#5BCFA0">P2</text>
-      <text class="sv-d" x="532" y="118" text-anchor="middle">lõi 2</text>
-      <rect x="596" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="650" y="100" text-anchor="middle" fill="#5BCFA0">P3</text>
-      <text class="sv-d" x="650" y="118" text-anchor="middle">lõi 3</text>
-      <rect x="714" y="74" width="108" height="62" rx="5" fill="rgba(91,207,160,.18)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="768" y="100" text-anchor="middle" fill="#5BCFA0">P4</text>
-      <text class="sv-d" x="768" y="118" text-anchor="middle">lõi 4</text>
-      <text class="sv-l" x="360" y="152" fill="#8EE0BE">bộ nhớ tách rời — trao đổi phải qua pickle</text>
-
-      <text class="sv-h" x="16" y="192">&#9313; CÂU HỎI DUY NHẤT</text>
-      <rect x="16" y="204" width="404" height="112" rx="8" fill="rgba(237,180,74,.08)" stroke="#EDB44A" stroke-width="2"></rect>
-      <text class="sv-l" x="36" y="228" fill="#EDB44A">ĐANG CHỜ — I/O-bound</text>
-      <text class="sv-d" x="36" y="246">gọi API · đọc file · truy vấn database</text>
-      <text class="sv-d" x="36" y="264">thread nhả GIL khi chờ → chờ song song được</text>
-      <rect x="36" y="274" width="176" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="52" y="293" fill="#8EE0BE">asyncio · ~vài KB</text>
-      <rect x="222" y="274" width="180" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="238" y="293" fill="#8EE0BE">threading · ~vài MB</text>
-
-      <rect x="440" y="204" width="404" height="112" rx="8" fill="rgba(242,113,138,.08)" stroke="#F2718A" stroke-width="2"></rect>
-      <text class="sv-l" x="460" y="228" fill="#F2718A">ĐANG TÍNH — CPU-bound</text>
-      <text class="sv-d" x="460" y="246">vòng lặp lớn · xử lý ảnh · nén dữ liệu</text>
-      <text class="sv-d" x="460" y="264">thread tranh nhau GIL → thêm thread còn chậm hơn</text>
-      <rect x="460" y="274" width="188" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="476" y="293" fill="#8EE0BE">multiprocessing · ~vài chục MB</text>
-      <rect x="658" y="274" width="168" height="28" rx="5" fill="rgba(91,207,160,.14)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="674" y="293" fill="#8EE0BE">đẩy xuống NumPy / C</text>
-
-      <line x1="16" y1="330" x2="844" y2="330" stroke="#2E2822"></line>
-      <text class="sv-l" x="16" y="352" fill="#7A6F63">&#9312; GIL <tspan fill="#EDB44A">không phải khoá dữ liệu của bạn</tspan> — race condition vẫn xảy ra, vẫn phải tự khoá</text>
-    </svg>
-    <figcaption>Hàng trên nói vì sao thêm thread không nhanh hơn; hàng dưới nói lấy gì thay vào, tuỳ tác vụ đang chờ hay đang tính.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li>GIL <b>được nhả</b> khi chờ I/O hoặc khi vào thư viện C — đó là lý do cột trái &#9313; vẫn dùng thread được.</li>
-    <li>Cột phải &#9313; chạy được nhiều lõi vì mỗi process có GIL riêng, nhưng trả giá bằng bộ nhớ và chi phí pickle.</li>
-    <li>Một thao tác trông như một dòng vẫn tách thành nhiều bytecode, nên vẫn cần <code>Lock</code> — xem <a href="../../../03-cs-fundamentals/02-os/lock-deadlock-race/index.html">Lock, deadlock &amp; race condition</a>.</li>
-    <li>Cột <code>asyncio</code> rẻ hơn thread hai bậc vì không có stack riêng cho mỗi tác vụ — chi tiết ở <a href="../asyncio/index.html">Asyncio</a>.</li>
-  </ul>
 </section>
 
 <section id="gil-s10" class="lesson">
@@ -380,7 +794,7 @@
   <details class="qa"><summary>Process khác thread ở đâu?</summary>
   <p>Process có <b>không gian địa chỉ riêng</b>, thread dùng chung bộ nhớ của process chứa nó. Từ đó suy ra: process cách ly và đắt, thread chia sẻ và rẻ nhưng cần khoá.</p></details>
 
-  <details class="qa"><summary>Vì sao chuyển ngữ cảnh giữa process đắt hơn giữa thread?</summary>
+  <details class="qa"><summary>Vì sao context switching giữa process đắt hơn giữa thread?</summary>
   <p>Đổi process phải <b>đổi cả bảng trang</b>, làm cache và TLB mất dữ liệu nóng. Đổi thread cùng process chỉ đổi thanh ghi và ngăn xếp.</p></details>
 
   <details class="qa"><summary>GIL khoá cái gì?</summary>

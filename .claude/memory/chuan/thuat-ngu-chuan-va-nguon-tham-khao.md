@@ -3,7 +3,7 @@ name: thuat-ngu-chuan-va-nguon-tham-khao
 description: "Bài phải chứa phần kiến thức phổ biến nhất của chủ đề, và hình phải dán đúng thuật ngữ chuẩn lên từng bộ phận"
 metadata:
   type: feedback
-updated: 2026-09-03
+updated: 2026-09-05
 ---
 
 Ngày 2026-09-03, sau khi tôi vẽ lại hình cho `random-forest` mà chỉ chú thích bằng tiếng Việt
@@ -17,6 +17,17 @@ chú thích bằng lời thường ngày thì hiểu được lúc đọc, nhưn
 (bài giảng, câu hỏi phỏng vấn, tài liệu thư viện) là không nhận ra. Từ khoá chuẩn chính là thứ
 giúp nối bài trong kho với cả phần còn lại của thế giới — và `search-index.js` cũng chỉ tìm được
 những chữ thật sự nằm trong bài.
+
+**Đừng dịch thuật ngữ ra tiếng Việt rồi tưởng là đang viết cho dễ hiểu.** *"Chuyển ngữ cảnh là
+thuật ngữ context switching, mà thuật ngữ thì phải tiếng anh, có rule rồi mà"* — bản đầu của
+`thread-process-gil` đặt tên mục 05 và nhãn hình là *Chuyển ngữ cảnh*. Cách nhận ra: **dịch ngược
+thử — ra được đúng một cụm tiếng Anh có tên riêng thì đó là thuật ngữ, phải giữ nguyên.**
+"Chuyển ngữ cảnh" → `context switching`, "khoá chết" → `deadlock`, "điều kiện tranh" →
+`race condition`. Còn *sắp xếp, ràng buộc, khởi tạo, suy luận* dịch ngược ra nhiều cụm khác nhau —
+đó là từ thông thường, để nguyên tiếng Việt.
+
+Quét cả kho khi sửa, đừng sửa mỗi chỗ nhìn thấy: nhãn trong SVG, đầu mục, `data-blurb`, meta trong
+`<head>`, câu hỏi trong `details.qa`. Một chỗ sót là `search-index.js` vẫn còn từ sai.
 
 **Áp dụng thế nào.**
 

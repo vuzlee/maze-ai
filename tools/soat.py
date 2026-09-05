@@ -57,5 +57,72 @@ for cd,b in W:
         else: continue
         break
 print("   tổng:",n); issues+=n
+# ── 6. Thuật ngữ bị dịch ─────────────────────────────────────────────────────
+# Vào danh sách này khi: dịch ngược ra ĐÚNG MỘT cụm tiếng Anh có tên riêng.
+# Từ tiếng Việt thường (sắp xếp, chuẩn hoá, phân cụm, giảm chiều, nhân bản,
+# phân trang, lập lịch, hàm đơn điệu) KHÔNG vào — xem chuan/thuat-ngu-chuan.
+DICH = {
+ 'chia để trị':'divide and conquer', 'danh sách liên kết':'linked list',
+ 'hai con trỏ':'two pointers', 'cửa sổ trượt':'sliding window',
+ 'quy hoạch động':'dynamic programming', 'vét cạn':'brute force',
+ 'tham lam':'greedy', 'duyệt cây':'tree traversal',
+ 'cây nhị phân tìm kiếm':'binary search tree', 'bảng băm':'hash table',
+ 'đồ thị có hướng':'directed graph', 'đồ thị vô hướng':'undirected graph',
+ 'cây quyết định':'decision tree', 'hàm mất mát':'loss function',
+ 'quá khớp':'overfitting', 'lan truyền ngược':'backpropagation',
+ 'bắt tay ba bước':'three-way handshake', 'cân bằng tải':'load balancing',
+ 'bộ nhớ ảo':'virtual memory', 'chuyển ngữ cảnh':'context switching',
+ 'khoá chết':'deadlock', 'điều kiện tranh':'race condition',
+ 'đa luồng':'multithreading', 'đa tiến trình':'multiprocessing',
+ 'vòng lặp sự kiện':'event loop', 'thu gom rác':'garbage collection',
+}
+# Chỗ cố ý giữ: nêu tên tiếng Anh rồi chú nghĩa MỘT lần thì được.
+MIEN = {('memory-management-gc','thu gom rác'), ('sql-subquery-cte','duyệt cây')}
+print("\n== 6. Thuật ngữ bị dịch ra tiếng Việt ==")
+n=0
+for cd,b in B:
+    p=b['path']; h=open(p,encoding='utf-8').read(); slug=os.path.basename(os.path.dirname(p))
+    # năm mặt: văn xuôi · đầu mục · nhãn SVG · aria-label · data-blurb
+    mat = {'văn xuôi': re.sub(r'<(svg|pre|style)[^>]*>.*?</\1>','',h,flags=re.S),
+           'nhãn SVG': ' '.join(re.findall(r'<(?:svg|style)[^>]*>.*?</(?:svg|style)>',h,re.S)),
+           'aria-label': ' '.join(re.findall(r'aria-label="([^"]*)"',h)),
+           'data-blurb': ' '.join(re.findall(r'data-(?:blurb|title)="([^"]*)"',h))}
+    for vi,en in DICH.items():
+        if (slug,vi) in MIEN: continue
+        for mat_ten,txt in mat.items():
+            if vi in txt.lower():
+                print(f"   {p.replace('content/','')} [{mat_ten}] «{vi}» -> {en}"); n+=1
+print("   tổng:",n); issues+=n
+
+# ── 7. Một bài, một chính tả tên ─────────────────────────────────────────────
+# <title> phải MỞ ĐẦU bằng data-title; phụ đề sau dấu — thì được ("— mọi biến thể").
+# Sai là khi chính cái TÊN khác nhau (stack-monotonic-queue từng thừa chữ "& queue").
+# <h1> tự do hơn nữa: được thay hẳn phụ đề ("DSA — bản đồ").
+print("\n== 7. Tên bài lệch giữa <title> và data-title ==")
+n=0
+for cd,b in B:
+    p=b['path']; h=open(p,encoding='utf-8').read()
+    def flat(x): return re.sub(r'\s+',' ',re.sub(r'<[^>]+>','',x.replace('&amp;','&'))).strip().lower()
+    dt=flat(re.search(r'data-title="([^"]+)"',h).group(1))
+    ti=flat(re.search(r'<title>(.*?)</title>',h,re.S).group(1)).replace(' — mazeai','')
+    if not (ti==dt or ti.startswith(dt+" —")): print(f"   {p.replace('content/','')}\n      data-title «{dt}»  ≠  title «{ti}»"); n+=1
+print("   tổng:",n); issues+=n
+
+# ── 8. Nợ luật 1: bài dài mà chưa có bản đồ ──────────────────────────────────
+# Ngưỡng: >2500 từ HOẶC >10 mục. Đủ hình = nsvg >= nsec-2.
+print("\n== 8. Nợ luật 1 — bài dài chưa có figure.gist (dài trước) ==")
+no=[]
+for cd,b in W:
+    p=b['path']; h=open(p,encoding='utf-8').read()
+    nsec=len(re.findall(r'<section id="',h)); nsvg=len(re.findall(r'<svg',h))
+    words=len(re.sub(r'<[^>]+>',' ',h).split())
+    gist='class="gist"' in h
+    if gist and nsvg>=nsec-2: continue
+    if words>2500 or nsec>10:
+        no.append((words,nsec,nsvg,gist,p))
+for w,ns,nv,g,p in sorted(no,reverse=True):
+    print(f"   {w:5} từ · {ns:2} mục · {nv:2} hình · {'thiếu hình bóc ô' if g else 'chưa có bản đồ '} · {p.replace('content/','')}")
+print("   tổng:",len(no)); issues+=len(no)
+
 print("\n=> tổng số chỗ cần sửa:",issues)
 sys.exit(1 if issues else 0)

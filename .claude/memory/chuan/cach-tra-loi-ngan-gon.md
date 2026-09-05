@@ -3,7 +3,7 @@ name: cach-tra-loi-ngan-gon
 description: "Người dùng muốn giải thích thật ngắn, tiếng thường — không rành phần front-end/CSS của kho"
 metadata:
   type: feedback
-  updated: 2026-09-03
+updated: 2026-09-03
 ---
 
 Ngày 2026-09-03, sau hai lần tôi tóm tắt vẫn còn dài và đầy thuật ngữ, người dùng nói thẳng:

@@ -1,12 +1,9 @@
 ---
 name: khuon-eq-cong-thuc
 description: "Vì sao MazeAI chọn khuôn .eq thay vì KaTeX cho công thức toán, ranh giới .eq vs <pre>, và quy ước vẽ đường cong bằng SVG"
-metadata: 
-  node_type: memory
-  updated: 2026-09-03
-  type: project
-  originSessionId: 67c14496-7d56-4b8a-9a84-4fc5d86311e9
-  modified: 2026-09-02T18:42:57.165Z
+metadata:
+  type: feedback
+updated: 2026-09-03
 ---
 
 Ngày 2026-09-03 chốt: công thức display trong kho dùng khuôn HTML `.eq` (khuôn thứ 9 trong

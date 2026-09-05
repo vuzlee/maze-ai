@@ -12,7 +12,7 @@ phải nhặt từng khái niệm rời rồi ghép lại.
 
 **Vì sao:** Sau nhiều lượt sửa `python-overview`, `oop-python`, `language-core-overview`, lỗi lặp
 nhiều nhất là ép mọi overview vào đúng một khuôn *Vấn đề → Ý tưởng đầu tiên → Vì sao chưa đủ →
-Dòng thời gian → Các nhánh*. Khuôn đó sinh ra cho [[tree-family-overview]], nơi thật sự có nhiều
+Dòng thời gian → Các nhánh*. Khuôn đó sinh ra cho bài `tree-family-overview`, nơi thật sự có nhiều
 giải pháp cạnh tranh nhau qua thời gian (bagging vs boosting, RNN vs Transformer). Ép nó vào một
 ngôn ngữ hay một hệ thống mạch lạc thì hỏng, và đã hỏng theo đúng những cách sau:
 

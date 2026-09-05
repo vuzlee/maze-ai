@@ -47,325 +47,642 @@
 </header>
 
 <section id="shard-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Nhân bản trước</h2></div>
+  <div class="sh"><b>01</b><h2>Từ một máy tới nhiều máy</h2></div>
 
-  <p>Trước khi nghĩ tới chia nhỏ dữ liệu, bước rẻ hơn và nên làm trước là <b>replication</b>: giữ nhiều bản sao giống hệt nhau trên nhiều máy.</p>
+  <p class="key">"Một máy không còn đủ" thật ra là <em>hai câu hỏi khác nhau</em>: đọc quá tải hoặc cần chịu lỗi thì nhân bản <b>toàn bộ</b> ra nhiều máy; dữ liệu lớn hơn một máy thì phải chia <b>từng phần</b>. Hai lời giải khác nhau, và chỉ cái thứ hai mới trả giá bằng join, transaction, unique.</p>
 
-  <h3>Master-slave (leader-follower)</h3>
-<figure>
-    <svg viewBox="0 0 820 250" role="img" aria-label="Một leader nhận ghi, ba follower nhận bản sao và phục vụ đọc">
-      <defs><marker id="rp1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#EDB44A"/></marker>
-      <marker id="rp2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8CA9F2"/></marker></defs>
-
-      <rect x="30" y="34" width="120" height="46" rx="6" class="sv-b"/>
-      <text x="90" y="63" class="sv-t" text-anchor="middle">Client</text>
-      <line x1="154" y1="57" x2="286" y2="57" stroke="#EDB44A" marker-end="url(#rp1)"/>
-      <text x="220" y="46" class="sv-l" fill="#EDB44A" text-anchor="middle">ghi</text>
-
-      <rect x="290" y="30" width="200" height="54" rx="6" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
-      <text x="390" y="62" class="sv-t" fill="#EDB44A" text-anchor="middle">LEADER</text>
-
-      <line x1="390" y1="88" x2="150" y2="146" stroke="#8CA9F2" marker-end="url(#rp2)"/>
-      <line x1="390" y1="88" x2="390" y2="146" stroke="#8CA9F2" marker-end="url(#rp2)"/>
-      <line x1="390" y1="88" x2="630" y2="146" stroke="#8CA9F2" marker-end="url(#rp2)"/>
-      <text x="404" y="120" class="sv-l" fill="#8CA9F2">sao chép thay đổi</text>
-
-      <g fill="rgba(140,169,242,.14)" stroke="#8CA9F2">
-        <rect x="60" y="150" width="180" height="50" rx="6"/>
-        <rect x="300" y="150" width="180" height="50" rx="6"/>
-        <rect x="540" y="150" width="180" height="50" rx="6"/>
-      </g>
-      <text x="150" y="180" class="sv-t" fill="#8CA9F2" text-anchor="middle">FOLLOWER</text>
-      <text x="390" y="180" class="sv-t" fill="#8CA9F2" text-anchor="middle">FOLLOWER</text>
-      <text x="630" y="180" class="sv-t" fill="#8CA9F2" text-anchor="middle">FOLLOWER</text>
-      <text x="390" y="228" class="sv-l" fill="#7A6F63" text-anchor="middle">client đọc từ bất kỳ follower nào · leader chết thì promote một follower lên thay</text>
+  <figure class="gist">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Bản đồ: một máy không còn đủ thì replication nhân bản toàn bộ với ba ô con leader-follower, đồng bộ hay bất đồng bộ, replication lag; sharding chia từng phần với partitioning và shard key; và ô đỏ cái mất">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--filled)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--muted)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--filled)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--filled)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--text)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--muted)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--filled)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--muted)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--probe)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--muted)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--tomb)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--muted)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--filled)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--filled)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--text)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--muted)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--filled)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--muted)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--probe)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--muted)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--tomb)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--muted)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">BỐN Ý — HẾT</text>
+    <rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="50" fill="var(--filled)">Đọc quá tải hay cần chịu lỗi → replication</text>
+    <text class="sv-s" x="388" y="68" fill="var(--dim)">nhân bản toàn bộ ra nhiều máy, mỗi máy vẫn chứa hết</text>
+    <rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="112" fill="var(--filled)">Dữ liệu lớn hơn một máy → sharding</text>
+    <text class="sv-s" x="388" y="130" fill="var(--dim)">lúc này nhân bản không giúp gì nữa, phải chia nhỏ ra</text>
+    <rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="174" fill="var(--probe)">Trước khi shard còn một nấc hay bị bỏ qua</text>
+    <text class="sv-s" x="388" y="192" fill="var(--dim)">partitioning: chia mảnh nhưng vẫn một máy, không mất gì cả</text>
+    <rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="236" fill="var(--tomb)">Đã chia ra nhiều máy là mất join, transaction, unique</text>
+    <text class="sv-s" x="388" y="254" fill="var(--dim)">nên chọn shard key sai thì sửa lại là việc tốn kém nhất</text>
     </svg>
-    <figcaption>Mọi lệnh ghi đi qua đúng một leader nên không có xung đột ghi cần giải quyết.</figcaption>
+  <figcaption>Bản đồ của cả bài. Mỗi mục sau tô sáng một ô rồi phóng to ô đó ra bên phải.</figcaption>
   </figure>
-  <p>Mọi lệnh ghi đi qua đúng một leader; follower chỉ nhận và áp lại luồng thay đổi. Phổ biến nhất vì đơn giản: không hai bên cùng ghi nên không có xung đột.</p>
 
-  <h3>Master-master (multi-leader)</h3>
   <ul class="why">
-      <li>Nhiều node cùng nhận ghi, mỗi node phát thay đổi của mình cho các node còn lại.</li>
-      <li>Giải được vấn đề "leader ở xa" cho ứng dụng nhiều vùng địa lý.</li>
-      <li>Đổi lại phải <b>tự xử lý xung đột ghi</b>: hai vùng cùng sửa một dòng thì ai thắng?</li>
-      <li>Cần một chiến lược trộn — last-write-wins theo timestamp, CRDT, hoặc merge thủ công.</li>
-    </ul>
-
-  <h3>Đồng bộ vs bất đồng bộ</h3>
-  <div class="cmp two">
-    <div>
-      <h5>Synchronous replication</h5>
-      <p>Leader chỉ báo "ghi thành công" sau khi <b>ít nhất một follower đã xác nhận</b> đã nhận bản ghi.</p>
-      <p>Đổi lấy: <b>durability cao hơn</b> — mất leader không mất dữ liệu vừa ghi — nhưng <b>latency ghi tăng</b> vì phải chờ mạng round-trip tới follower.</p>
-    </div>
-    <div>
-      <h5>Asynchronous replication</h5>
-      <p>Leader báo thành công <b>ngay khi ghi xong tại chỗ</b>, sao chép sang follower chạy nền, không chờ.</p>
-      <p>Đổi lấy: <b>latency ghi thấp</b> nhưng nếu leader chết đúng lúc đó, những bản ghi chưa kịp sao chép <b>mất luôn</b>.</p>
-    </div>
-  </div>
-  <ul class="why">
-    <li>Phần lớn hệ thống thật dùng bất đồng bộ cho tốc độ, chấp nhận cửa sổ rủi ro mất dữ liệu rất nhỏ.</li>
-    <li>Một số hệ dùng "semi-sync" để cân bằng: chờ đúng một follower xác nhận, các follower khác vẫn bất đồng bộ.</li>
+    <li>Replication không giúp gì khi <b>dữ liệu</b> đã quá lớn — mỗi bản sao vẫn phải chứa hết.</li>
+    <li>Sharding không giúp gì cho chịu lỗi — mỗi shard chết là mất đúng phần của nó, nên thực tế mỗi shard lại được replicate riêng.</li>
+    <li>Giữa hai nhánh còn một nấc hay bị bỏ qua: <b>partitioning</b> — chia mảnh nhưng vẫn một máy, nên không mất gì cả.</li>
+    <li>Ô đỏ nằm tách ra vì nó chỉ dính tới nhánh sharding: chia ra nhiều máy là lúc ba phép toán quen thuộc hết miễn phí.</li>
   </ul>
-
-  <h3>Replication lag</h3>
-  <p class="key"><b>Replication lag</b> là khoảng cách giữa lúc leader ghi xong và lúc follower áp lại xong bản ghi đó.</p>
-  <ul class="why">
-    <li>Luôn tồn tại ở chế độ bất đồng bộ, và giãn ra khi follower quá tải hoặc mạng chậm.</li>
-    <li>Đọc từ follower ngay sau khi ghi vào leader có thể <b>không thấy thay đổi vừa rồi</b>.</li>
-    <li>Người dùng cập nhật hồ sơ, bấm reload, thấy dữ liệu cũ.</li>
-  </ul>
-
-  <div class="note key">
-    <h4>Vì sao replicate</h4>
-    Ba lý do, thường đi cùng nhau: <b>đọc mở rộng</b> (chia tải đọc ra nhiều follower khi đọc nhiều hơn ghi rất nhiều — trường hợp phổ biến nhất), <b>high availability</b> (leader chết thì promote follower, hệ thống không chết theo), và <b>backup</b> (một bản sao riêng để phục hồi khi có sự cố hoặc lỗi thao tác).
-  </div>
-
-  <div class="note warn">
-    <h4>Cách né đọc dữ liệu cũ do lag</h4>
-    Ba cách hay dùng: đọc-sau-ghi thì đọc thẳng từ leader trong vài giây đầu ("read-your-writes"); gắn version/timestamp vào response và chờ follower bắt kịp version đó trước khi trả lời; hoặc đơn giản là chấp nhận độ trễ này ở những màn hình không quan trọng (đếm lượt xem, gợi ý) trong khi bắt buộc đọc từ leader ở những chỗ quan trọng (số dư, trạng thái đơn hàng).
-  </div>
 </section>
 
 <section id="shard-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Sharding khi nào</h2></div>
+  <div class="sh"><b>02</b><h2>Leader và follower</h2></div>
 
-  <p class="key">Replication nhân bản <em>toàn bộ</em> dữ liệu ra nhiều máy — mỗi máy vẫn phải chứa hết. Khi bản thân dữ liệu đã quá lớn cho một máy, nhân bản không giúp được gì nữa; đó là lúc cần <b>sharding</b> (phân mảnh): chia dữ liệu ra thành nhiều phần, mỗi phần nằm trên một máy khác nhau.</p>
+  <p class="key">Replication là giữ nhiều bản sao <em>giống hệt nhau</em> trên nhiều máy. Kiểu phổ biến nhất là <b>leader–follower</b>: mọi lệnh ghi đi qua đúng một leader, nên không có xung đột ghi nào cần giải quyết.</p>
 
-  <p>Dấu hiệu đã hết đường mở rộng theo chiều dọc (vertical scaling — mua máy mạnh hơn):</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô leader-follower sáng lên; bên phải một leader nhận ghi, ba follower nhận bản sao, và ba lý do nhân bản">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--filled)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--filled)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--text)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--muted)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--filled)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--muted)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--faint)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--faint)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--faint)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--faint)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--faint)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--faint)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — LEADER VÀ FOLLOWER</text>
+    <path d="M342 150 C 356 150, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--filled)">Mọi lệnh ghi đi qua đúng một leader</text>
+    <rect x="372" y="56" width="118" height="30" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.3"/>
+    <text class="sv-l" x="431" y="76" fill="var(--probe)" text-anchor="middle">LEADER</text>
+    <text class="sv-d" x="500" y="76" fill="var(--probe)">nhận ghi</text>
+    <line x1="431" y1="90" x2="431" y2="102" stroke="var(--filled)" stroke-width="1.2"/><polygon points="431,110 426.8,102 435.2,102" fill="var(--filled)"/>
+    <text class="sv-d" x="442" y="106" fill="var(--muted)">sao chép thay đổi</text>
+    <rect x="372.0" y="118" width="157.33333333333334" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="450.6666666666667" y="137" fill="var(--filled)" text-anchor="middle">FOLLOWER</text>
+    <rect x="537.3333333333334" y="118" width="157.33333333333334" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="616.0" y="137" fill="var(--filled)" text-anchor="middle">FOLLOWER</text>
+    <rect x="702.6666666666667" y="118" width="157.33333333333334" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="781.3333333333334" y="137" fill="var(--filled)" text-anchor="middle">FOLLOWER</text>
+    <text class="sv-s" x="372" y="160" fill="var(--dim)">client đọc từ follower bất kỳ · leader chết thì promote một cái lên thay</text>
+    <line x1="372" y1="176" x2="860" y2="176" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text class="sv-t" x="372" y="192" fill="var(--text)">Ba lý do nhân bản, thường đi cùng nhau</text>
+    <rect x="372" y="204" width="132" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="223.0" fill="var(--ok)">đọc mở rộng</text>
+    <text class="sv-d" x="518" y="223.0" fill="var(--muted)">chia tải đọc ra nhiều follower — phổ biến nhất</text>
+    <rect x="372" y="240" width="132" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="259.0" fill="var(--ok)">high availability</text>
+    <text class="sv-d" x="518" y="259.0" fill="var(--muted)">leader chết thì promote, hệ không chết theo</text>
+    <rect x="372" y="276" width="132" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="295.0" fill="var(--ok)">backup</text>
+    <text class="sv-d" x="518" y="295.0" fill="var(--muted)">một bản riêng để phục hồi khi có sự cố</text>
+    <rect x="372" y="316" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="338" fill="var(--probe)">Multi-leader — nhiều node cùng nhận ghi</text>
+    <text class="sv-s" x="388" y="356" fill="var(--dim)">giải được "leader ở xa", đổi lấy phải tự xử lý xung đột ghi</text>
+    </svg>
+  <figcaption>Một chỗ ghi duy nhất là toàn bộ lý do leader–follower đơn giản hơn multi-leader.</figcaption>
+  </figure>
+
   <ul class="why">
-    <li>Working set không còn vừa RAM/SSD của máy mạnh nhất, hoặc giá máy đó đã vượt xa lợi ích.</li>
-    <li>Thông lượng ghi đã vượt quá khả năng của một node đơn, kể cả sau khi đã tối ưu index và query.</li>
-    <li>Replication đã tách đọc/ghi nhưng lượng <b>ghi</b> vẫn quá tải cho một leader — sharding phân cả tải ghi ra nhiều node.</li>
+    <li>Follower chỉ nhận và áp lại luồng thay đổi của leader, không tự sinh thay đổi nào.</li>
+    <li>Multi-leader thì cần một chiến lược trộn khi hai vùng cùng sửa một dòng: last-write-wins theo timestamp, CRDT, hoặc merge thủ công.</li>
   </ul>
-
-  <div class="axis">
-    <div class="stop"><b>Tối ưu query &amp; index</b><span>rẻ nhất, thử trước</span></div>
-    <div class="stop"><b>Thêm cache</b><span>chặn tải đọc</span></div>
-    <div class="stop"><b>Replication</b><span>tách đọc khỏi ghi</span></div>
-    <div class="stop"><b>Partitioning</b><span>chia mảnh, vẫn một máy</span></div>
-    <div class="stop on"><b>Sharding</b><span>chia ra nhiều máy</span></div>
-  </div>
-  <p class="axiscap"><span>rẻ, đảo ngược được</span><span><em>cái giá tăng dần, khó lùi lại dần</em></span><span>đắt, khó đảo ngược</span></p>
 </section>
 
 <section id="shard-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Partitioning trong một node</h2></div>
+  <div class="sh"><b>03</b><h2>Đồng bộ hay bất đồng bộ</h2></div>
 
-  <p class="key">Có một nấc trung gian mà nhiều người bỏ qua: <em>chia bảng thành nhiều mảnh nhưng vẫn để trên cùng một máy</em>. Cùng ý tưởng chia dữ liệu, không phải trả giá của hệ phân tán.</p>
+  <p class="key">Hai chế độ khác nhau đúng một chỗ: leader báo <em>"ghi thành công"</em> vào lúc nào — sau khi follower xác nhận, hay ngay khi ghi xong tại chỗ.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô đồng bộ sáng lên; bên phải hai chế độ với cái được và cái mất của từng chế độ">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--text)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--muted)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--probe)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--muted)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--faint)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--faint)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--faint)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--faint)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--faint)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--faint)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — ĐỒNG BỘ HAY BẤT ĐỒNG BỘ</text>
+    <path d="M342 178 C 356 178, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">Leader báo "ghi xong" vào lúc nào</text>
+    <rect x="372" y="56" width="488" height="34" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
+    <text class="sv-l" x="386" y="78" fill="var(--ok)">Synchronous</text>
+    <text class="sv-d" x="496" y="78" fill="var(--muted)">sau khi ít nhất một follower xác nhận</text>
+    <text class="sv-d" x="386" y="106" fill="var(--ok)">+ mất leader không mất dữ liệu vừa ghi</text>
+    <text class="sv-d" x="386" y="124" fill="var(--tomb)">− ghi chậm hơn — phải chờ mạng</text>
+    <rect x="372" y="144" width="488" height="34" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.3"/>
+    <text class="sv-l" x="386" y="166" fill="var(--probe)">Asynchronous</text>
+    <text class="sv-d" x="496" y="166" fill="var(--muted)">ngay khi ghi xong tại chỗ</text>
+    <text class="sv-d" x="386" y="194" fill="var(--ok)">+ ghi nhanh, không chờ ai</text>
+    <text class="sv-d" x="386" y="212" fill="var(--tomb)">− leader chết thì mất phần chưa kịp sao chép</text>
+    <rect x="372" y="232" width="488" height="50" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="254" fill="var(--filled)">Phần lớn hệ thật chọn bất đồng bộ</text>
+    <text class="sv-s" x="388" y="272" fill="var(--dim)">semi-sync là mức giữa: chờ đúng một follower, số còn lại chạy nền</text>
+    </svg>
+  <figcaption>Cùng một lệnh ghi, khác nhau đúng ở chỗ leader báo xong vào lúc nào.</figcaption>
+  </figure>
+</section>
+
+<section id="shard-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Replication lag</h2></div>
+
+  <p class="key"><b>Replication lag</b> là khoảng cách giữa lúc leader ghi xong và lúc follower áp lại xong bản ghi đó. Luôn tồn tại ở chế độ bất đồng bộ, và giãn ra khi follower quá tải hoặc mạng chậm.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô replication lag sáng lên; bên phải dòng thời gian ghi vào leader rồi đọc từ follower ra dữ liệu cũ, và ba cách né">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--text)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--muted)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--tomb)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--muted)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--faint)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--faint)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--faint)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--faint)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--faint)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--faint)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — REPLICATION LAG</text>
+    <path d="M342 206 C 356 206, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--tomb)">Người dùng sửa hồ sơ rồi bấm reload</text>
+    <text class="sv-d" x="372" y="78" fill="var(--dim)">t0</text>
+    <rect x="402" y="58" width="150" height="28" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="414" y="77" fill="var(--ok)">ghi vào leader</text>
+    <text class="sv-d" x="564" y="77" fill="var(--muted)">đã lưu xong</text>
+    <text class="sv-d" x="372" y="114" fill="var(--dim)">t0</text>
+    <rect x="402" y="94" width="150" height="28" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="414" y="113" fill="var(--tomb)">đọc từ follower</text>
+    <text class="sv-d" x="564" y="113" fill="var(--muted)">chưa áp bản ghi đó → ra dữ liệu CŨ</text>
+    <text class="sv-d" x="372" y="150" fill="var(--dim)">t1</text>
+    <rect x="402" y="130" width="150" height="28" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="414" y="149" fill="var(--ok)">follower áp xong</text>
+    <text class="sv-d" x="564" y="149" fill="var(--muted)">từ đây đọc mới ra đúng</text>
+    <text class="sv-s" x="402" y="172" fill="var(--dim)">khoảng t0 → t1 chính là replication lag — giãn ra khi follower quá tải</text>
+    <text class="sv-t" x="372" y="202" fill="var(--text)">Ba cách né đọc phải dữ liệu cũ</text>
+    <rect x="372" y="214" width="140" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="233.0" fill="var(--ok)">read-your-writes</text>
+    <text class="sv-d" x="526" y="233.0" fill="var(--muted)">vài giây đầu sau khi ghi thì đọc thẳng từ leader</text>
+    <rect x="372" y="250" width="140" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="269.0" fill="var(--ok)">chờ theo version</text>
+    <text class="sv-d" x="526" y="269.0" fill="var(--muted)">gắn version vào response, chờ follower bắt kịp</text>
+    <rect x="372" y="286" width="140" height="28" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="305.0" fill="var(--filled)">chấp nhận</text>
+    <text class="sv-d" x="526" y="305.0" fill="var(--muted)">ở màn hình không quan trọng: đếm lượt xem, gợi ý</text>
+    <text class="sv-s" x="372" y="336" fill="var(--dim)">Chỗ quan trọng — số dư, trạng thái đơn hàng — thì bắt buộc đọc từ leader.</text>
+    </svg>
+  <figcaption>Cửa sổ t0 → t1 nhỏ, nhưng đủ để người vừa bấm lưu thấy dữ liệu cũ.</figcaption>
+  </figure>
+</section>
+
+<section id="shard-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Sharding khi nào</h2></div>
+
+  <p class="key">Khi bản thân dữ liệu đã lớn hơn một máy, nhân bản hết đường giúp — đó là lúc cần <b>sharding</b>: chia dữ liệu thành nhiều phần, mỗi phần nằm trên một máy khác nhau.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô một máy không còn đủ và ô partitioning cùng sáng; bên phải thang mở rộng năm nấc và ba dấu hiệu đã hết đường mua máy mạnh hơn">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--filled)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--muted)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--faint)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--faint)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--filled)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--filled)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--text)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--muted)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--filled)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--muted)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--faint)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--faint)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">HAI Ô GHÉP — KHI NÀO MỚI SHARD</text>
+    <text class="sv-t" x="372" y="40" fill="var(--text)">Thang mở rộng — đi từ trên xuống, đừng nhảy cóc</text>
+    <rect x="372" y="56" width="178" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.1"/>
+    <text class="sv-d" x="384" y="75" fill="var(--ok)">tối ưu query &amp; index</text>
+    <text class="sv-d" x="564" y="75" fill="var(--muted)">rẻ nhất, thử trước</text>
+    <rect x="372" y="90" width="178" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.1"/>
+    <text class="sv-d" x="384" y="109" fill="var(--ok)">thêm cache</text>
+    <text class="sv-d" x="564" y="109" fill="var(--muted)">chặn bớt tải đọc</text>
+    <rect x="372" y="124" width="178" height="28" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.1"/>
+    <text class="sv-d" x="384" y="143" fill="var(--filled)">replication</text>
+    <text class="sv-d" x="564" y="143" fill="var(--muted)">tách đọc khỏi ghi</text>
+    <rect x="372" y="158" width="178" height="28" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.1"/>
+    <text class="sv-d" x="384" y="177" fill="var(--probe)">partitioning</text>
+    <text class="sv-d" x="564" y="177" fill="var(--muted)">chia mảnh, vẫn một máy</text>
+    <rect x="372" y="192" width="178" height="28" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/>
+    <text class="sv-d" x="384" y="211" fill="var(--tomb)">sharding</text>
+    <text class="sv-d" x="564" y="211" fill="var(--muted)">chia ra nhiều máy</text>
+    <text class="sv-s" x="372" y="234" fill="var(--dim)">rẻ và đảo ngược được ở trên · đắt và khó lùi lại ở dưới</text>
+    <line x1="372" y1="252" x2="860" y2="252" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text class="sv-t" x="372" y="268" fill="var(--text)">Dấu hiệu đã hết đường mua máy mạnh hơn</text>
+    <rect x="372" y="280" width="142" height="28" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="299.0" fill="var(--tomb)">không vừa RAM</text>
+    <text class="sv-d" x="528" y="299.0" fill="var(--muted)">working set vượt máy mạnh nhất, hoặc giá quá đắt</text>
+    <rect x="372" y="316" width="142" height="28" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="335.0" fill="var(--tomb)">ghi quá tải</text>
+    <text class="sv-d" x="528" y="335.0" fill="var(--muted)">vượt khả năng một node dù đã tối ưu index</text>
+    <rect x="372" y="352" width="142" height="28" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="371.0" fill="var(--tomb)">replication hết giúp</text>
+    <text class="sv-d" x="528" y="371.0" fill="var(--muted)">nó chia tải đọc, không chia được tải ghi</text>
+    </svg>
+  <figcaption>Bốn nấc trên đều rẻ hơn và lùi lại được — sharding là nấc cuối, không phải nấc đầu.</figcaption>
+  </figure>
+</section>
+
+<section id="shard-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Partitioning trong một node</h2></div>
+
+  <p class="key">Có một nấc trung gian nhiều người bỏ qua: <em>chia bảng thành nhiều mảnh nhưng vẫn để trên cùng một máy</em>. Cùng ý tưởng chia dữ liệu, không phải trả giá của hệ phân tán.</p>
 
 <pre><code><span class="cm">-- PostgreSQL: chia bảng orders theo tháng</span>
 CREATE TABLE orders (id bigint, created_at date, ...) PARTITION BY RANGE (created_at);
 
 CREATE TABLE orders_2026_08 PARTITION OF orders
-  FOR VALUES FROM (<span class="st">'2026-08-01'</span>) TO (<span class="st">'2026-09-01'</span>);
-
-<span class="cm">-- truy vấn lọc theo created_at chỉ đọc đúng một mảnh (partition pruning)</span>
-SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>;</code></pre>
-
-  <p>Ba thứ nó cho mà index không cho được:</p>
-  <div class="stack">
-    <div class="s ok"><b>Partition pruning</b><span>planner loại thẳng mảnh không thể chứa kết quả, trước cả khi đụng index — bảng 5 năm mà truy vấn tháng này chỉ chạm 1/60 số dòng</span></div>
-    <div class="s ok"><b>Xoá dữ liệu cũ tức thì</b><span><code>DROP TABLE orders_2021_01</code> mất mili giây, trong khi <code>DELETE</code> vài chục triệu dòng khoá bảng hàng giờ</span></div>
-    <div class="s"><b>Bảo trì theo mảnh</b><span><code>VACUUM</code>, rebuild index, nén dữ liệu cũ làm trên từng mảnh thay vì cả bảng</span></div>
-  </div>
-
-  <div class="note key">
-    <h4>Ba nấc thang, đi theo thứ tự</h4>
-    <b>Index</b> — bảng vẫn là một, chỉ thêm đường tra cứu. <b>Partitioning</b> — chia bảng thành mảnh, vẫn một máy, vẫn một transaction, ứng dụng không cần biết. <b>Sharding</b> — chia ra nhiều máy, mất join và transaction xuyên mảnh. Đừng nhảy cóc: rất nhiều hệ tưởng cần shard thật ra chỉ cần partition theo thời gian.
-  </div>
-</section>
-
-<section id="shard-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Chọn shard key</h2></div>
-
-  <p class="key">Ba chiến lược chia dữ liệu ra nhiều mảnh (shard) — khác nhau ở việc <em>thêm/bớt node thì phải dịch chuyển bao nhiêu dữ liệu</em>.</p>
-
-  <h3>Range-based sharding</h3>
-<div class="strip">
-    <div class="c dim"><i>Shard A</i><b>1 – 1 triệu</b><u>user cũ, gần như rảnh</u></div>
-    <div class="c dim"><i>Shard B</i><b>1 – 2 triệu</b><u>user cũ, gần như rảnh</u></div>
-    <div class="c f"><i>Shard C</i><b>2 – 3 triệu</b><u>hotspot — user mới đổ hết vào đây</u></div>
-  </div>
-  <ul class="why">
-      <li>Chia theo khoảng giá trị liên tục của khoá — dễ hiểu, hợp truy vấn theo dải ("lấy user id từ X tới Y").</li>
-      <li>Nhược: dữ liệu mới thường rơi vào một đầu dải, vì id tăng dần theo thời gian.</li>
-      <li>Thành <b>hotspot</b>: một shard nhận hết ghi mới, các shard cũ gần như rảnh.</li>
-    </ul>
-
-  <h3>Hash-based sharding</h3>
-<pre><code>shard_index = hash(user_id) % N     <span class="cm">// N = số shard hiện có</span></code></pre>
-  <ul class="why">
-      <li>Băm khoá rồi chia theo modulo số shard — phân bố tải rất đều, tránh hotspot của range-based.</li>
-      <li>Nhược lớn: <b>thêm hoặc bớt một node là đổi N</b>, gần như mọi khoá đổi kết quả <code>hash % N</code>.</li>
-      <li>Phải rebalance gần hết dữ liệu — rất tốn kém khi hệ đang chạy.</li>
-    </ul>
-
-  <h3>Consistent hashing</h3>
-  <p>Giải đúng nhược điểm của hash-based thuần: đặt cả node và khoá lên cùng một <b>vòng tròn hash</b> (0 → 2³²−1), mỗi khoá thuộc node gần nhất theo chiều kim đồng hồ.</p>
-<figure>
-    <svg viewBox="0 0 700 280" role="img" aria-label="Vòng tròn hash với các node đặt trên vòng, thêm node mới chỉ dịch một cung">
-      <circle cx="350" cy="140" r="105" fill="none" stroke="#2E2822" stroke-width="2"/>
-      <circle cx="350" cy="35"  r="9" fill="#8CA9F2"/><text x="350" y="20" class="sv-t" fill="#8CA9F2" text-anchor="middle">node C</text>
-      <circle cx="441" cy="193" r="9" fill="#8CA9F2"/><text x="486" y="212" class="sv-t" fill="#8CA9F2" text-anchor="middle">node A</text>
-      <circle cx="259" cy="193" r="9" fill="#8CA9F2"/><text x="214" y="212" class="sv-t" fill="#8CA9F2" text-anchor="middle">node B</text>
-      <circle cx="441" cy="87"  r="9" fill="#5BCFA0"/><text x="492" y="80" class="sv-t" fill="#5BCFA0" text-anchor="middle">node D mới</text>
-      <circle cx="404" cy="45"  r="6" fill="#EDB44A"/><text x="378" y="62" class="sv-l" fill="#EDB44A">key</text>
-      <path d="M441 87 A105 105 0 0 0 350 35" fill="none" stroke="#5BCFA0" stroke-width="4"/>
-      <text x="350" y="266" class="sv-l" fill="#7A6F63" text-anchor="middle">chỉ cung xanh lá phải dịch — B và C không đổi gì</text>
-      <text x="350" y="145" class="sv-t" fill="#7A6F63" text-anchor="middle">mỗi khoá thuộc về node</text>
-      <text x="350" y="165" class="sv-t" fill="#7A6F63" text-anchor="middle">gần nhất theo chiều kim đồng hồ</text>
-    </svg>
-    <figcaption>Thêm hay bớt một node chỉ dịch khoảng <code>1/N</code> dữ liệu, thay vì gần như toàn bộ như <code>hash % N</code>.</figcaption>
-  </figure>
-  <ul class="why">
-      <li>Thêm hoặc bớt một node thì chỉ khoá trong đoạn cung liền kề phải dịch chuyển — trung bình <code>1/N</code> tổng dữ liệu.</li>
-      <li>Vì vậy consistent hashing là kỹ thuật nền của DynamoDB, Cassandra và phần lớn hệ phân tán hiện đại.</li>
-      <li>Triển khai thật thêm <b>virtual node</b>: mỗi node vật lý ánh xạ vào nhiều điểm ảo trên vòng, để tải chia đều hơn khi số node ít.</li>
-    </ul>
-
-  <h3>Ba tiêu chí chọn shard key</h3>
-  <ul class="why">
-    <li><b>Phân bố đều</b> — tránh giá trị lặp lại nhiều (ví dụ <code>country</code> khi phần lớn user ở một nước) gây một shard quá tải.</li>
-    <li><b>Khớp với truy vấn phổ biến nhất</b> — 90% lọc theo <code>user_id</code> thì shard theo nó. Sai trục là phải quét hết shard (scatter-gather).</li>
-    <li><b>Ổn định theo thời gian</b> — tránh khoá đổi giá trị liên tục, vì đổi shard key là phải chuyển bản ghi sang shard khác.</li>
-  </ul>
-
-  <div class="note warn">
-    <h4>Mảnh nóng (hotspot) — ví dụ kinh điển</h4>
-    Shard theo <code>country</code> cho một app có 80% người dùng ở một quốc gia: một shard gánh gần hết tải trong khi các shard còn lại gần như rảnh — mất hết lợi ích của việc chia mảnh. Cách sửa thường dùng: ghép thêm một trường có độ phân tán cao vào khoá (composite key, ví dụ <code>hash(user_id)</code> thay vì <code>country</code>), hoặc chọn hẳn một khoá khác đã đo là phân bố đều.
-  </div>
-
-  <div class="stack">
-    <div class="s"><b>Range-based — chia theo dải giá trị</b><span>tải dễ lệch (hotspot ở đầu dải mới) · rebalance chỉ cần chia lại dải liền kề · <b>range query tốt</b>: quét một dải liên tục trên ít shard</span></div>
-    <div class="s warn"><b>Hash-based (modulo N)</b><span>tải đều · nhưng thêm/bớt node là <b>gần như toàn bộ dữ liệu phải dịch chuyển</b> · range query kém: phải quét mọi shard</span></div>
-    <div class="s ok"><b>Consistent hashing</b><span>tải đều (đều hơn nữa nhờ virtual node) · thêm/bớt node chỉ dịch khoảng <code>1/N</code> dữ liệu · range query vẫn kém</span></div>
-  </div>
-</section>
-
-<section id="shard-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Cái mất khi sharding</h2></div>
-
-  <p class="key">Chia dữ liệu ra nhiều máy nghĩa là những phép toán vốn dễ trên một máy — join, transaction, unique — giờ phải <em>băng qua mạng</em> hoặc phải bỏ hẳn.</p>
-
-  <div class="stack">
-    <div class="s warn"><b>Cross-shard query &amp; join</b><span>một câu cần dữ liệu ở nhiều shard không còn JOIN sẵn — ứng dụng phải hỏi từng shard rồi tự gộp (scatter-gather)</span></div>
-    <div class="s warn"><b>Cross-shard transaction</b><span>chuyển tiền giữa hai user rơi vào hai shard không còn atomic miễn phí — phải dùng two-phase commit hoặc saga, chậm hơn và thêm chỗ hỏng</span></div>
-    <div class="s warn"><b>Khoá duy nhất toàn cục</b><span><code>UNIQUE</code> chỉ đúng trong một shard — hai user cùng email ở hai shard khác nhau không ai phát hiện</span></div>
-  </div>
-  <p class="stripnote"><span>trên một máy: miễn phí</span><span><em>ba phép toán vốn dễ, giờ phải băng qua mạng hoặc bỏ hẳn</em></span><span>trên nhiều shard: phải tự lo</span></p>
-
-  <div class="note key">
-    <h4>Nguyên tắc thiết kế bù lại</h4>
-    Thiết kế lại schema để phần lớn truy vấn <b>chỉ chạm một shard</b> — denormalize dữ liệu hay dùng cùng nhau vào cùng shard (theo cùng shard key), chấp nhận trùng lặp dữ liệu để đổi lấy việc không phải join xuyên shard. Đây là lý do vì sao chọn shard key đúng ngay từ đầu (mục 04) quan trọng hơn hẳn — sửa lại sau khi đã có dữ liệu lớn là một trong những việc tốn kém nhất trong vòng đời một hệ thống.
-  </div>
-</section>
-
-<section id="shard-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Replication nhân bản <b>toàn bộ</b> để chịu lỗi và chia tải đọc; sharding chia <b>từng phần</b> khi dữ liệu đã lớn hơn một máy — và trả giá bằng join, transaction, unique.</p>
+  FOR VALUES FROM (<span class="st">'2026-08-01'</span>) TO (<span class="st">'2026-09-01'</span>);</code></pre>
 
   <figure class="scrollx">
-  <svg viewBox="0 0 860 544" role="img" aria-label="Tổng kết sharding và replication: thang mở rộng, replication đồng bộ và bất đồng bộ, partitioning, ba chiến lược shard key, và cái mất khi sharding">
-    <text class="sv-h" x="0" y="12">&#9312; THANG MỞ RỘNG — ĐI TỪ TRÁI SANG PHẢI, ĐỪNG NHẢY CÓC</text>
-
-    <rect x="8" y="26" width="150" height="30" rx="5" fill="#5BCFA0" fill-opacity="0.14" stroke="#5BCFA0"/>
-    <text class="sv-l" x="83" y="45" text-anchor="middle" fill="#8EE0BE">query &amp; index</text>
-    <rect x="166" y="26" width="126" height="30" rx="5" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
-    <text class="sv-l" x="229" y="45" text-anchor="middle" fill="#8EE0BE">cache</text>
-    <rect x="300" y="26" width="160" height="30" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="380" y="45" text-anchor="middle" fill="#EDB44A">replication</text>
-    <rect x="468" y="26" width="170" height="30" rx="5" fill="#EDB44A" fill-opacity="0.14" stroke="#EDB44A"/>
-    <text class="sv-l" x="553" y="45" text-anchor="middle" fill="#EDB44A">partitioning</text>
-    <rect x="646" y="26" width="206" height="30" rx="5" fill="#F2718A" fill-opacity="0.12" stroke="#F2718A"/>
-    <text class="sv-l" x="749" y="45" text-anchor="middle" fill="#F79BAB">sharding</text>
-    <line x1="8" y1="68" x2="852" y2="68" stroke="#3D352C"/>
-    <text class="sv-d" x="8" y="84">rẻ, đảo ngược được</text>
-    <text class="sv-d" x="430" y="84" text-anchor="middle">cái giá tăng dần, khó lùi lại dần</text>
-    <text class="sv-d" x="852" y="84" text-anchor="end">đắt, khó đảo ngược</text>
-
-    <text class="sv-h" x="0" y="118">&#9313; REPLICATION — NHÂN BẢN TOÀN BỘ</text>
-
-    <rect x="8" y="132" width="110" height="30" rx="5" fill="#8CA9F2" fill-opacity="0.16" stroke="#8CA9F2"/>
-    <text class="sv-l" x="63" y="151" text-anchor="middle" fill="#A8BEF6">leader</text>
-    <line x1="122" y1="147" x2="150" y2="134" stroke="#3D352C" stroke-width="1.5"/>
-    <line x1="122" y1="147" x2="150" y2="160" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="154" y="120" width="110" height="26" rx="4" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
-    <text class="sv-l" x="209" y="137" text-anchor="middle">follower</text>
-    <rect x="154" y="150" width="110" height="26" rx="4" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
-    <text class="sv-l" x="209" y="167" text-anchor="middle">follower</text>
-    <text class="sv-d" x="8" y="192">đọc mở rộng &#183; high availability &#183; backup</text>
-
-    <line x1="300" y1="112" x2="300" y2="196" stroke="#2E2822"/>
-
-    <rect x="326" y="120" width="250" height="30" rx="4" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
-    <text class="sv-l" x="338" y="139" fill="#8EE0BE">Synchronous — chờ follower ack</text>
-    <text class="sv-t" x="590" y="140">mất leader không mất dữ liệu &#183; ghi chậm hơn</text>
-    <rect x="326" y="156" width="250" height="30" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="338" y="175" fill="#EDB44A">Asynchronous — báo xong ngay</text>
-    <text class="sv-t" x="590" y="176">ghi nhanh &#183; có <tspan fill="#F79BAB">replication lag</tspan>, đọc thấy dữ liệu cũ</text>
-
-    <text class="sv-h" x="0" y="220">&#9314; PARTITIONING — CHIA MẢNH, VẪN MỘT MÁY</text>
-    <rect x="8" y="232" width="276" height="26" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="20" y="249" fill="#EDB44A">partition pruning</text>
-    <rect x="292" y="232" width="276" height="26" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="304" y="249" fill="#EDB44A">DROP mảnh cũ — mili giây</text>
-    <rect x="576" y="232" width="276" height="26" rx="4" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="588" y="249" fill="#EDB44A">bảo trì trên từng mảnh</text>
-    <text class="sv-d" x="8" y="274">vẫn một transaction, ứng dụng không cần biết — rất nhiều hệ tưởng cần shard thật ra chỉ cần partition theo thời gian</text>
-
-    <text class="sv-h" x="0" y="308">&#9315; BA CHIẾN LƯỢC CHIA MẢNH — KHÁC NHAU Ở LÚC THÊM/BỚT NODE</text>
-
-    <rect x="8" y="320" width="276" height="94" rx="5" fill="#F2718A" fill-opacity="0.08" stroke="#F2718A"/>
-    <text class="sv-l" x="20" y="340" fill="#F79BAB">Range-based</text>
-    <text class="sv-d" x="20" y="358">chia theo dải giá trị liên tục</text>
-    <text class="sv-d" x="20" y="374">range query TỐT</text>
-    <text class="sv-d" x="20" y="390">nhưng dữ liệu mới dồn vào một đầu dải</text>
-    <text class="sv-d" x="20" y="406">→ <tspan fill="#F79BAB">hotspot</tspan></text>
-
-    <rect x="292" y="320" width="276" height="94" rx="5" fill="#EDB44A" fill-opacity="0.08" stroke="#EDB44A"/>
-    <text class="sv-l" x="304" y="340" fill="#EDB44A">Hash-based · hash % N</text>
-    <text class="sv-d" x="304" y="358">tải phân bố rất đều</text>
-    <text class="sv-d" x="304" y="374">range query KÉM — quét mọi shard</text>
-    <text class="sv-d" x="304" y="390">đổi N → <tspan fill="#F79BAB">gần như toàn bộ dữ liệu</tspan></text>
-    <text class="sv-d" x="304" y="406">phải dịch chuyển</text>
-
-    <rect x="576" y="320" width="276" height="94" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
-    <text class="sv-l" x="588" y="340" fill="#8EE0BE">Consistent hashing</text>
-    <text class="sv-d" x="588" y="358">node và khoá cùng trên một vòng</text>
-    <text class="sv-d" x="588" y="374">tải đều hơn nữa nhờ virtual node</text>
-    <text class="sv-d" x="588" y="390">thêm/bớt node chỉ dịch <tspan fill="#8EE0BE">~1/N</tspan></text>
-    <text class="sv-d" x="588" y="406">range query vẫn kém</text>
-
-    <text class="sv-d" x="0" y="434">chọn shard key theo ba tiêu chí: phân bố đều &#183; khớp truy vấn phổ biến nhất &#183; ổn định theo thời gian</text>
-
-    <text class="sv-h" x="0" y="466">&#9316; CÁI MẤT KHI SHARDING — TRÊN MỘT MÁY THÌ MIỄN PHÍ</text>
-    <rect x="8" y="478" width="276" height="42" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
-    <text class="sv-l" x="20" y="496" fill="#F79BAB">Cross-shard join</text>
-    <text class="sv-d" x="20" y="512">tự hỏi từng shard rồi gộp — scatter-gather</text>
-    <rect x="292" y="478" width="276" height="42" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
-    <text class="sv-l" x="304" y="496" fill="#F79BAB">Cross-shard transaction</text>
-    <text class="sv-d" x="304" y="512">two-phase commit hoặc saga</text>
-    <rect x="576" y="478" width="276" height="42" rx="4" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
-    <text class="sv-l" x="588" y="496" fill="#F79BAB">Khoá duy nhất toàn cục</text>
-    <text class="sv-d" x="588" y="512">UNIQUE chỉ đúng trong một shard</text>
-  </svg>
-  <figcaption>Đọc từ trên xuống: &#9312; thứ tự thử các cách mở rộng, &#9313; nhân bản cho ai và trả giá gì, &#9314; nấc trung gian hay bị bỏ qua, &#9315; nếu đã shard thì chia bằng cách nào, &#9316; và mất những gì.</figcaption>
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô partitioning sáng lên; bên phải bảng chia theo tháng với một mảnh được chọn, và ba thứ partitioning cho mà index không cho">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--faint)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--faint)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--filled)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--filled)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--text)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--muted)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--filled)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--muted)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--faint)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--faint)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — PARTITIONING</text>
+    <path d="M342 340 C 356 340, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--filled)">Chia bảng orders theo tháng, vẫn trên một máy</text>
+    <rect x="372.0" y="56" width="117.5" height="30" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="430.75" y="76" fill="var(--muted)" text-anchor="middle">2026_06</text>
+    <rect x="495.5" y="56" width="117.5" height="30" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="554.25" y="76" fill="var(--muted)" text-anchor="middle">2026_07</text>
+    <rect x="619.0" y="56" width="117.5" height="30" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-d" x="677.75" y="76" fill="var(--probe)" text-anchor="middle">2026_08</text>
+    <rect x="742.5" y="56" width="117.5" height="30" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="801.25" y="76" fill="var(--muted)" text-anchor="middle">2026_09</text>
+    <text class="sv-s" x="372" y="104" fill="var(--dim)">WHERE created_at &gt;= '2026-08-01' → chỉ đọc đúng một mảnh</text>
+    <text class="sv-t" x="372" y="136" fill="var(--text)">Ba thứ partitioning cho mà index không cho được</text>
+    <rect x="372" y="148" width="142" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="167.0" fill="var(--ok)">partition pruning</text>
+    <text class="sv-d" x="528" y="167.0" fill="var(--muted)">loại thẳng mảnh không thể chứa kết quả</text>
+    <rect x="372" y="184" width="142" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="203.0" fill="var(--ok)">DROP mảnh cũ</text>
+    <text class="sv-d" x="528" y="203.0" fill="var(--muted)">mili giây, thay vì DELETE khoá bảng hàng giờ</text>
+    <rect x="372" y="220" width="142" height="28" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="239.0" fill="var(--filled)">bảo trì từng mảnh</text>
+    <text class="sv-d" x="528" y="239.0" fill="var(--muted)">VACUUM, rebuild index trên mảnh chứ không cả bảng</text>
+    <rect x="372" y="260" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="282" fill="var(--probe)">Ba nấc thang: index → partitioning → sharding</text>
+    <text class="sv-s" x="388" y="300" fill="var(--dim)">rất nhiều hệ tưởng cần shard, thật ra chỉ cần partition theo thời gian</text>
+    </svg>
+  <figcaption>Cùng ý tưởng chia dữ liệu như sharding, nhưng vẫn một máy nên không mất gì cả.</figcaption>
   </figure>
-
-  <ul class="why">
-    <li><b>Replication vs sharding</b> — ở &#9312;&#9313;: nhân bản chịu lỗi và chia tải đọc, nhưng mỗi bản vẫn chứa hết dữ liệu.</li>
-    <li><b>Replication lag</b> — ở &#9313;: cái giá của bất đồng bộ; đọc-sau-ghi ở chỗ quan trọng phải đọc thẳng từ leader.</li>
-    <li><b>Ba nấc index → partitioning → sharding</b> — ở &#9312;&#9314;: đừng nhảy cóc, rất nhiều hệ chỉ cần partition theo thời gian.</li>
-    <li><b>Consistent hashing &amp; shard key</b> — ở &#9315;&#9316;: chọn khoá sai thì hotspot hoặc scatter-gather, và sửa lại sau là việc tốn kém nhất.</li>
-  </ul>
 </section>
 
 <section id="shard-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>07</b><h2>Chiến lược chia mảnh</h2></div>
+
+  <p class="key">Ba cách chia dữ liệu ra nhiều shard, khác nhau đúng ở chỗ <em>thêm hoặc bớt một node thì phải dịch chuyển bao nhiêu dữ liệu</em>.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô shard key sáng lên; bên phải ba chiến lược range-based, hash modulo N và consistent hashing với cái được và cái mất">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--faint)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--faint)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--text)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--muted)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--faint)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--faint)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--probe)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--muted)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — BA CÁCH CHIA MẢNH</text>
+    <path d="M342 368 C 356 368, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">Khác nhau đúng ở lúc thêm hoặc bớt một node</text>
+    <rect x="372" y="58" width="158" height="28" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="77" fill="var(--probe)">Range-based</text>
+    <text class="sv-d" x="544" y="77" fill="var(--muted)">chia theo dải giá trị liên tục</text>
+    <text class="sv-d" x="384" y="100" fill="var(--ok)">+ range query tốt</text>
+    <text class="sv-d" x="552" y="100" fill="var(--tomb)">− dữ liệu mới dồn một đầu dải → hotspot</text>
+    <rect x="372" y="120" width="158" height="28" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="139" fill="var(--tomb)">Hash % N</text>
+    <text class="sv-d" x="544" y="139" fill="var(--muted)">băm rồi chia dư cho số shard</text>
+    <text class="sv-d" x="384" y="162" fill="var(--ok)">+ tải rất đều</text>
+    <text class="sv-d" x="552" y="162" fill="var(--tomb)">− đổi N là gần như toàn bộ dữ liệu phải dịch</text>
+    <rect x="372" y="182" width="158" height="28" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="201" fill="var(--ok)">Consistent hashing</text>
+    <text class="sv-d" x="544" y="201" fill="var(--muted)">node và khoá cùng trên một vòng</text>
+    <text class="sv-d" x="384" y="224" fill="var(--ok)">+ thêm/bớt chỉ dịch ~1/N</text>
+    <text class="sv-d" x="552" y="224" fill="var(--tomb)">− range query vẫn kém</text>
+    <rect x="372" y="246" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="268" fill="var(--ok)">Vòng hash: mỗi khoá thuộc node gần nhất theo kim đồng hồ</text>
+    <text class="sv-s" x="388" y="286" fill="var(--dim)">thêm node chỉ cắt một cung — nền của DynamoDB, Cassandra</text>
+    </svg>
+  <figcaption>Ba chiến lược giống nhau lúc chạy bình thường; khác nhau đúng vào lúc đổi số node.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><code>shard_index = hash(user_id) % N</code> — đổi <code>N</code> là đổi kết quả của gần như mọi khoá, nên phải rebalance gần hết dữ liệu khi hệ đang chạy.</li>
+    <li>Triển khai thật của consistent hashing còn thêm <b>virtual node</b>: mỗi node vật lý ánh xạ vào nhiều điểm trên vòng, để tải chia đều hơn khi số node còn ít.</li>
+  </ul>
+</section>
+
+<section id="shard-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Chọn shard key</h2></div>
+
+  <p class="key">Đây là quyết định đắt nhất trong bài: sửa shard key khi dữ liệu đã lớn nghĩa là <em>chuyển gần như mọi bản ghi</em> sang chỗ khác.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô shard key sáng lên; bên phải ba tiêu chí chọn khoá và một ví dụ hotspot với một shard gánh 80% tải">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--faint)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--faint)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--text)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--muted)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--faint)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--faint)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--probe)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--muted)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--faint)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--faint)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — CHỌN SHARD KEY</text>
+    <path d="M342 368 C 356 368, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">Ba tiêu chí — sai một cái là trả giá rất lâu</text>
+    <rect x="372" y="54" width="166" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="74.0" fill="var(--ok)">phân bố đều</text>
+    <text class="sv-d" x="552" y="74.0" fill="var(--muted)">tránh giá trị lặp nhiều làm một shard quá tải</text>
+    <rect x="372" y="92" width="166" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="112.0" fill="var(--ok)">khớp truy vấn hay dùng</text>
+    <text class="sv-d" x="552" y="112.0" fill="var(--muted)">90% lọc theo user_id thì shard theo nó</text>
+    <rect x="372" y="130" width="166" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="150.0" fill="var(--ok)">ổn định theo thời gian</text>
+    <text class="sv-d" x="552" y="150.0" fill="var(--muted)">đổi giá trị khoá là phải chuyển cả bản ghi</text>
+    <text class="sv-t" x="372" y="176" fill="var(--tomb)">Hotspot — hỏng đúng tiêu chí đầu tiên</text>
+    <rect x="372.0" y="190" width="117.5" height="34" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="430.75" y="205" fill="var(--dim)" text-anchor="middle">shard 1</text>
+    <text class="sv-d" x="430.75" y="219" fill="var(--muted)" text-anchor="middle">5%</text>
+    <rect x="495.5" y="190" width="117.5" height="34" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="554.25" y="205" fill="var(--dim)" text-anchor="middle">shard 2</text>
+    <text class="sv-d" x="554.25" y="219" fill="var(--muted)" text-anchor="middle">5%</text>
+    <rect x="619.0" y="190" width="117.5" height="34" rx="4" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.4"/>
+    <text class="sv-d" x="677.75" y="205" fill="var(--dim)" text-anchor="middle">shard 3</text>
+    <text class="sv-d" x="677.75" y="219" fill="var(--tomb)" text-anchor="middle">80%</text>
+    <rect x="742.5" y="190" width="117.5" height="34" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-d" x="801.25" y="205" fill="var(--dim)" text-anchor="middle">shard 4</text>
+    <text class="sv-d" x="801.25" y="219" fill="var(--muted)" text-anchor="middle">10%</text>
+    <text class="sv-s" x="372" y="242" fill="var(--dim)">shard theo country khi 80% người dùng ở một nước</text>
+    <rect x="372" y="260" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="282" fill="var(--ok)">Chữa: ghép thêm trường phân tán cao vào khoá</text>
+    <text class="sv-s" x="388" y="300" fill="var(--dim)">hash(user_id) thay cho country — hoặc chọn hẳn khoá khác đã đo là đều</text>
+    </svg>
+  <figcaption>Ba tiêu chí, và cái giá khi hỏng tiêu chí đầu tiên: một shard gánh hết, phần còn lại rảnh.</figcaption>
+  </figure>
+</section>
+
+<section id="shard-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Cái mất khi sharding</h2></div>
+
+  <p class="key">Chia dữ liệu ra nhiều máy nghĩa là những phép toán vốn dễ trên một máy — join, transaction, unique — giờ phải <em>băng qua mạng</em> hoặc phải bỏ hẳn.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Ô cái mất sáng lên; bên phải ba phép toán join, transaction và unique cùng cách bù lại bằng schema">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="62" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="48" fill="var(--faint)">Một máy không còn đủ</text>
+    <text class="sv-d" x="13" y="66" fill="var(--faint)">hai câu hỏi khác nhau — hai lời giải khác nhau</text>
+    <line x1="170.0" y1="90" x2="170.0" y2="102" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,110 165.8,102 174.2,102" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="106" fill="var(--muted)">đọc quá tải, cần chịu lỗi</text>
+    <rect x="0" y="118" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="139" fill="var(--faint)">REPLICATION</text>
+    <text class="sv-d" x="118" y="139" fill="var(--faint)">nhân bản TOÀN BỘ</text>
+    <rect x="13" y="148" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="164" fill="var(--faint)">Leader ghi · follower đọc</text>
+    <text class="sv-d" x="165" y="164" fill="var(--faint)">một chỗ ghi, không xung đột</text>
+    <rect x="13" y="176" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="192" fill="var(--faint)">Đồng bộ · bất đồng bộ</text>
+    <text class="sv-d" x="165" y="192" fill="var(--faint)">chờ ack, hay báo xong ngay</text>
+    <rect x="13" y="204" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="220" fill="var(--faint)">Replication lag</text>
+    <text class="sv-d" x="165" y="220" fill="var(--faint)">chưa kịp — đọc ra dữ liệu cũ</text>
+    <line x1="170.0" y1="236" x2="170.0" y2="248" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,256 165.8,248 174.2,248" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="252" fill="var(--muted)">nhưng mỗi bản vẫn chứa hết</text>
+    <rect x="0" y="264" width="340" height="88" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="285" fill="var(--faint)">SHARDING</text>
+    <text class="sv-d" x="100" y="285" fill="var(--faint)">chia TỪNG PHẦN ra nhiều máy</text>
+    <rect x="13" y="294" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="310" fill="var(--faint)">Partitioning</text>
+    <text class="sv-d" x="120" y="310" fill="var(--faint)">nấc trước đó — vẫn một máy</text>
+    <rect x="13" y="322" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-l" x="24" y="338" fill="var(--faint)">Shard key</text>
+    <text class="sv-d" x="120" y="338" fill="var(--faint)">chọn sai thì rất khó sửa</text>
+    <line x1="0" y1="362" x2="340" y2="362" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="370" width="340" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="390" fill="var(--tomb)">Mất join · transaction · unique</text>
+    <text class="sv-d" x="13" y="407" fill="var(--muted)">nên thiết kế để mỗi truy vấn chỉ chạm một mảnh</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — CÁI MẤT KHI SHARDING</text>
+    <path d="M342 438 C 356 438, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--tomb)">Ba phép toán vốn miễn phí trên một máy</text>
+    <rect x="372" y="58" width="122" height="28" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="77" fill="var(--tomb)">JOIN</text>
+    <text class="sv-d" x="508" y="77" fill="var(--muted)">dữ liệu nằm ở hai máy, không có index chung</text>
+    <text class="sv-d" x="384" y="100" fill="var(--dim)">ứng dụng tự hỏi từng shard rồi gộp — scatter-gather</text>
+    <rect x="372" y="120" width="122" height="28" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="139" fill="var(--tomb)">Transaction</text>
+    <text class="sv-d" x="508" y="139" fill="var(--muted)">chuyển tiền giữa hai user ở hai shard</text>
+    <text class="sv-d" x="384" y="162" fill="var(--dim)">two-phase commit hoặc saga — chậm, thêm chỗ hỏng</text>
+    <rect x="372" y="182" width="122" height="28" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="201" fill="var(--tomb)">UNIQUE</text>
+    <text class="sv-d" x="508" y="201" fill="var(--muted)">chỉ đúng trong phạm vi một shard</text>
+    <text class="sv-d" x="384" y="224" fill="var(--dim)">hai user cùng email ở hai shard, không ai phát hiện</text>
+    <rect x="372" y="246" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="268" fill="var(--ok)">Bù lại bằng schema, không bằng thêm máy</text>
+    <text class="sv-s" x="388" y="286" fill="var(--dim)">gom dữ liệu hay dùng cùng nhau vào một shard, chịu trùng lặp để khỏi join</text>
+    </svg>
+  <figcaption>Ba phép toán này không mất hẳn — chúng chuyển từ database lên tầng ứng dụng, nên chi phí thật của sharding nằm ở code chứ không ở hoá đơn máy chủ.</figcaption>
+  </figure>
+</section>
+
+<section id="shard-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Sharding trước khi thử hết cách khác</h4><p>Tối ưu query, thêm index, thêm cache, replication cho đọc — thử hết trước. Sharding khó đảo ngược và mọi truy vấn xuyên shard đều đắt hơn.</p></div>
     <div class="card bad"><h4>Chọn shard key theo trường hay đổi giá trị</h4><p>Đổi giá trị shard key nghĩa là phải di chuyển cả bản ghi sang shard khác. Chọn khoá ổn định theo thời gian.</p></div>
@@ -376,8 +693,8 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
   </div>
 </section>
 
-<section id="shard-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+<section id="shard-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Hỏi đáp</h2></div>
 
   <details class="qa"><summary>Replication và sharding khác nhau ở đâu?</summary>
   <p>Replication tạo nhiều bản sao <em>giống hệt nhau</em> của toàn bộ dữ liệu trên nhiều máy — dùng để đọc mở rộng, chịu lỗi, backup, nhưng mỗi bản sao vẫn phải chứa hết dữ liệu. Sharding <em>chia</em> dữ liệu thành nhiều phần khác nhau, mỗi phần nằm trên một máy — dùng khi bản thân dữ liệu đã lớn hơn một máy có thể chứa hoặc ghi kịp. Hai kỹ thuật thường đi cùng nhau: mỗi shard thường lại được replicate riêng để chịu lỗi.</p></details>
@@ -398,7 +715,7 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
   <p>Cùng ý tưởng chia dữ liệu theo một khoá, khác ở chỗ các mảnh nằm đâu. Partitioning chia bảng thành nhiều mảnh <em>trên cùng một node</em>: ứng dụng vẫn viết SQL như cũ, join và transaction vẫn hoạt động bình thường, cái được là partition pruning và xoá dữ liệu cũ bằng <code>DROP TABLE</code> thay vì <code>DELETE</code>. Sharding chia ra <em>nhiều node</em>: được thêm khả năng mở rộng tải ghi và dung lượng, nhưng mất join xuyên mảnh, mất transaction atomic xuyên mảnh và mất ràng buộc unique toàn cục. Rất nhiều hệ tưởng cần shard thật ra chỉ cần partition theo thời gian.</p></details>
 
   <details class="qa"><summary>Sharding liên quan gì tới CAP theorem?</summary>
-  <p>Một hệ đã sharded và replicated là một hệ phân tán thật sự, nên phải đối mặt trực tiếp với đánh đổi của CAP theorem khi mạng giữa các node bị chia cắt — chọn nghiêng về nhất quán (CP) hay sẵn sàng (AP). Đây là lý thuyết nền phía sau các quyết định như đồng bộ hay bất đồng bộ replication ở mục 01; xem <a href="../../../03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html">CAP theorem &amp; consistency</a> để đào sâu phần đó.</p></details>
+  <p>Một hệ đã sharded và replicated là một hệ phân tán thật sự, nên phải đối mặt trực tiếp với đánh đổi của CAP theorem khi mạng giữa các node bị chia cắt — chọn nghiêng về nhất quán (CP) hay sẵn sàng (AP). Đây là lý thuyết nền phía sau các quyết định như đồng bộ hay bất đồng bộ replication ở mục 03; xem <a href="../../../03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html">CAP theorem &amp; consistency</a> để đào sâu phần đó.</p></details>
 </section>
 
 <footer>Deep dive · Database · SQL · Replication &amp; sharding · xem thêm <a href="../nosql-landscape/index.html">NoSQL — four families</a> để so đánh đổi consistency giữa các họ NoSQL.</footer>

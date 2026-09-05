@@ -49,85 +49,336 @@
 
 <section id="sqlindex-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Từ câu SQL tới kết quả</h2></div>
-<div class="stack">
-    <div class="s"><b>Câu truy vấn</b><span>bạn khai báo <em>muốn gì</em></span></div>
-    <div class="s"><b>Cây truy vấn</b><span>parser và rewriter dịch lại</span></div>
-    <div class="s warn"><b>Planner</b><span>sinh nhiều phương án, ước lượng chi phí, chọn cái rẻ nhất — dựa vào <strong>thống kê</strong> về dữ liệu, không phải dữ liệu thật</span></div>
-    <div class="s ok"><b>Kế hoạch thực thi</b><span>đây là thứ <code>EXPLAIN</code> cho bạn xem</span></div>
-    <div class="s"><b>Kết quả</b><span></span></div>
-  </div>
-  <div class="note key">
-    <h4>Nhớ một câu</h4>
-    Bạn <strong>không ra lệnh</strong> cho cơ sở dữ liệu cách lấy dữ liệu — bạn khai báo <em>muốn gì</em>, còn planner tự chọn cách. Nên tối ưu SQL thực chất là hai việc: <strong>cho planner thêm lựa chọn tốt</strong> (index), và <strong>cho nó thông tin đúng</strong> (thống kê).
-  </div>
+
+  <p class="key">Bạn <em>không ra lệnh</em> cho database cách lấy dữ liệu — bạn khai báo <em>muốn gì</em>, planner tự chọn cách. Nên tối ưu SQL là hai việc: cho planner <b>thêm lựa chọn tốt</b> (index), và <b>thông tin đúng</b> (thống kê).</p>
+
+  <figure class="gist">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Bản đồ sáu ô: câu SQL nói muốn gì, planner cân thống kê và các cách lấy theo chi phí, ra kế hoạch thực thi, và index phải trả giá ở mọi lệnh ghi">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--filled)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--probe)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--filled)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--probe)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--ok)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--ok)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--ok)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--ok)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--ok)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--ok)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--tomb)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">BỐN Ý — HẾT</text>
+    <rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="50" fill="var(--filled)">Bạn khai báo muốn gì — planner chọn cách lấy</text>
+    <text class="sv-s" x="388" y="68" fill="var(--dim)">nên tối ưu SQL là cho planner lựa chọn tốt và thông tin đúng</text>
+    <rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="112" fill="var(--probe)">Planner cân theo thống kê, không phải dữ liệu thật</text>
+    <text class="sv-s" x="388" y="130" fill="var(--dim)">việc đầu tiên khi đọc EXPLAIN: so rows đoán với rows thật</text>
+    <rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="174" fill="var(--probe)">Selectivity quyết định index có thắng quét cả bảng không</text>
+    <text class="sv-s" x="388" y="192" fill="var(--dim)">khớp càng nhiều dòng, index càng vô dụng — vài phần trăm là điểm giao</text>
+    <rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+    <text class="sv-t" x="388" y="236" fill="var(--tomb)">Mỗi index là một lần ghi thêm cho mọi lệnh chạm cột đó</text>
+    <text class="sv-s" x="388" y="254" fill="var(--dim)">nên "cứ index hết cho chắc" là đổi ghi chậm lấy phần lợi không có</text>
+    </svg>
+  <figcaption>Bản đồ của cả bài. Mỗi mục sau tô sáng một ô rồi phóng to ô đó ra bên phải.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Index không phải nút tăng tốc — nó là <b>một lựa chọn thêm</b> trong ô "các cách lấy", planner chỉ chọn khi thấy rẻ hơn.</li>
+    <li>Ô <b>chi phí</b> là chỗ mọi câu hỏi "có index mà sao không dùng" kết thúc: selectivity quyết định, không phải ý muốn người viết truy vấn.</li>
+    <li>Ô <b>thống kê</b> là ước lượng chứ không phải dữ liệu thật — số sai ở đây làm hỏng mọi quyết định phía sau.</li>
+    <li>Ô đỏ nằm tách ra vì nó không giúp gì cho <code>SELECT</code>: mỗi index là một lần ghi thêm cho mọi <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>.</li>
+  </ul>
 </section>
 
 <section id="sqlindex-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Index là gì</h2></div>
-  <p>Một cấu trúc dữ liệu phụ, sắp xếp theo giá trị cột, trỏ tới vị trí dòng trong bảng. Mặc định là <strong>B-tree</strong> — cây cân bằng, nút rộng, thấp.</p>
-<div class="bars">
-    <div class="b bad"><i>không index · quét cả bảng</i><u style="width:100%"></u><b>1.000.000 lần so · O(n)</b></div>
-    <div class="b hi"><i>B-tree trên email · đi từ gốc xuống lá</i><u style="width:0.5%"></u><b>≈ 3 lần đọc trang · O(log n)</b></div>
-  </div>
-  <p class="stripnote"><span>tìm <code>email = 'a@b.com'</code> trong 1 triệu dòng</span><span><em>mỗi nút chứa hàng trăm khoá nên cây rất thấp</em></span></p>
-  <h3>Vì sao B-tree mà không phải hash</h3>
-  <div class="cmp two">
-    <div><h5>B-tree — mặc định</h5>
-      <p>Làm được <code>=</code>, và cả <code>&lt;</code> <code>&gt;</code> <code>BETWEEN</code>, <code>ORDER BY</code> (đọc lá là đã sắp xếp), <code>LIKE 'abc%'</code> (tiền tố là một khoảng).</p>
-      <p>Mỗi nút là một trang đĩa nên cây rất thấp, ít lần đọc.</p></div>
-    <div><h5>Hash — hẹp hơn nhiều</h5>
-      <p>Chỉ làm được <code>=</code>, nhanh hơn B-tree một chút.</p>
-      <p>Không so sánh khoảng, không sắp xếp, không tiền tố. Chỉ đáng dùng khi chắc chắn chỉ so bằng và bảng rất lớn.</p></div>
-  </div>
-  <p>B-tree làm được gần như mọi thứ với chi phí gần bằng, nên nó là mặc định. Hash index chỉ đáng dùng khi chắc chắn chỉ so bằng và bảng rất lớn.</p>
+
+  <p class="key">Index là một cấu trúc phụ, <em>sắp theo giá trị cột</em>, trỏ tới vị trí dòng trong bảng. Mặc định là <b>B-tree</b> — cây cân bằng, nút rộng, rất thấp.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Ô các cách lấy sáng lên; bên phải quét cả bảng một triệu lần so với ba lần đọc trang của B-tree, và B-tree so với hash">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--filled)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — INDEX LÀ MỘT CÁCH LẤY</text>
+    <path d="M342 196 C 356 196, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--filled)">B-tree: cây thấp, mỗi nút là một trang đĩa</text>
+    <rect x="372" y="68" width="348" height="22" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="372" y="62" fill="var(--muted)">quét cả bảng</text>
+    <text class="sv-d" x="732" y="84" fill="var(--tomb)">1.000.000 lần so · O(n)</text>
+    <rect x="372" y="114" width="26" height="22" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="372" y="108" fill="var(--muted)">đi từ gốc xuống lá</text>
+    <text class="sv-d" x="410" y="130" fill="var(--ok)">3 lần đọc trang · O(log n)</text>
+    <text class="sv-s" x="372" y="160" fill="var(--dim)">tìm email = 'a@b.com' trong 1 triệu dòng</text>
+    <line x1="372" y1="178" x2="860" y2="178" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text class="sv-t" x="372" y="194" fill="var(--text)">Vì sao B-tree là mặc định chứ không phải hash</text>
+    <rect x="372" y="206" width="92" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="226.0" fill="var(--ok)">B-tree</text>
+    <text class="sv-d" x="478" y="226.0" fill="var(--muted)">=  ·  &lt;  &gt;  BETWEEN  ·  ORDER BY  ·  LIKE 'abc%'</text>
+    <rect x="372" y="244" width="92" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="264.0" fill="var(--probe)">hash</text>
+    <text class="sv-d" x="478" y="264.0" fill="var(--muted)">chỉ =, nhanh hơn một chút — không khoảng, không sắp</text>
+    <text class="sv-s" x="372" y="298" fill="var(--dim)">B-tree làm được gần như mọi thứ với chi phí gần bằng — nên nó thắng mặc định.</text>
+    </svg>
+  <figcaption>Cùng một câu tìm: quét cả bảng là một triệu lần so, B-tree là ba lần đọc trang. Hash nhanh hơn một chút nhưng mất khoảng và mất thứ tự.</figcaption>
+  </figure>
 </section>
 
 <section id="sqlindex-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Cái giá phải trả</h2></div>
-  <div class="stack">
-    <div class="s ok"><b><code>SELECT</code> có lọc</b><span>nhanh hơn rất nhiều — đây là lý do tạo index</span></div>
-    <div class="s warn"><b><code>INSERT</code></b><span>phải chèn khoá vào <b>mọi</b> index của bảng, có thể gây tách nút</span></div>
-    <div class="s warn"><b><code>UPDATE</code> cột được index</b><span>phải xoá khoá cũ rồi chèn khoá mới</span></div>
-    <div class="s warn"><b><code>DELETE</code></b><span>phải cập nhật mọi index</span></div>
-    <div class="s warn"><b>Dung lượng</b><span>mỗi index chiếm thêm chỗ, có khi bằng 20–50% kích thước bảng</span></div>
-  </div>
-  <div class="note warn">
-    <h4>Vì sao "cứ index hết cho chắc" là sai</h4>
-    Một bảng ghi nhiều với 10 index thì mỗi <code>INSERT</code> thành 11 lần ghi. Index không dùng tới vẫn phải bảo trì đủ, vẫn tốn chỗ, vẫn làm chậm ghi — chỉ có phần lợi là không có. Trong PostgreSQL, xem <code>pg_stat_user_indexes.idx_scan</code> để tìm index có số lần dùng bằng 0 rồi xoá đi.
-  </div>
+
+  <p class="key">Index đổi <em>ghi chậm hơn</em> lấy <em>đọc nhanh hơn</em>. Không có truy vấn nào dùng tới thì chỉ còn vế chậm.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Ô trả giá sáng lên; bên phải năm dòng chi phí ghi của index và cách tìm index không ai dùng">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--muted)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--muted)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--tomb)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — CÁI GIÁ PHẢI TRẢ</text>
+    <path d="M342 370 C 356 370, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--tomb)">Một bảng 10 index: mỗi INSERT thành 11 lần ghi</text>
+    <rect x="372" y="54" width="166" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="74.0" fill="var(--ok)">SELECT có lọc</text>
+    <text class="sv-d" x="552" y="74.0" fill="var(--muted)">nhanh hơn rất nhiều — đây là lý do tạo index</text>
+    <rect x="372" y="92" width="166" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="112.0" fill="var(--tomb)">INSERT</text>
+    <text class="sv-d" x="552" y="112.0" fill="var(--muted)">chèn khoá vào MỌI index của bảng, có thể tách nút</text>
+    <rect x="372" y="130" width="166" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="150.0" fill="var(--tomb)">UPDATE cột được index</text>
+    <text class="sv-d" x="552" y="150.0" fill="var(--muted)">xoá khoá cũ rồi chèn khoá mới</text>
+    <rect x="372" y="168" width="166" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="188.0" fill="var(--tomb)">DELETE</text>
+    <text class="sv-d" x="552" y="188.0" fill="var(--muted)">cập nhật mọi index</text>
+    <rect x="372" y="206" width="166" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="226.0" fill="var(--probe)">dung lượng</text>
+    <text class="sv-d" x="552" y="226.0" fill="var(--muted)">mỗi index có khi bằng 20–50% kích thước bảng</text>
+    <rect x="372" y="250" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="272" fill="var(--probe)">Index không dùng tới vẫn phải bảo trì đủ</text>
+    <text class="sv-s" x="388" y="290" fill="var(--dim)">pg_stat_user_indexes.idx_scan = 0 → tìm ra rồi xoá đi</text>
+    </svg>
+  <figcaption>Mặt còn lại của index: mọi lệnh ghi đều phải trả, kể cả cho index không ai dùng.</figcaption>
+  </figure>
 </section>
 
 <section id="sqlindex-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Đọc EXPLAIN</h2></div>
+
+  <p class="key"><code>EXPLAIN</code> cho xem chính cái kế hoạch planner đã chọn; thêm <code>ANALYZE</code> thì chạy thật và kèm số liệu thật.</p>
+
 <pre><code>EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 42;
 
 Index Scan using idx_orders_user on orders
   (cost=0.42..8.44 rows=1 width=64)
   (actual time=0.021..0.023 rows=3 loops=1)
   Index Cond: (user_id = 42)</code></pre>
-  <div class="stack">
-    <div class="s"><b><code>cost=0.42..8.44</code></b><span>chi phí <i>ước lượng</i>: tới dòng đầu, và tới dòng cuối. Đơn vị tương đối, không phải giây</span></div>
-    <div class="s"><b><code>rows=1</code></b><span>số dòng planner <b>đoán</b></span></div>
-    <div class="s ok"><b><code>actual … rows=3</code></b><span>số dòng <b>thực tế</b> — chỉ có khi chạy với <code>ANALYZE</code></span></div>
-    <div class="s"><b><code>loops=1</code></b><span>nút này chạy bao nhiêu lần — nhân với <code>actual time</code> mới ra tổng thời gian thật</span></div>
-  </div>
-  <div class="note key">
-    <h4>Điều đầu tiên phải nhìn</h4>
-    So <code>rows</code> ước lượng với <code>rows</code> thực tế. Lệch một bậc độ lớn trở lên nghĩa là <strong>thống kê sai</strong>, và mọi quyết định phía sau của planner đều dựa trên con số sai đó. Chạy <code>ANALYZE tablename</code> rồi xem lại — rất nhiều "plan xấu" biến mất sau bước này.
-  </div>
-  <h3>Các loại nút quét, xếp theo mức mong muốn</h3>
-  <div class="stack">
-    <div class="s ok"><b>Index Only Scan — tốt nhất</b><span>trả lời hoàn toàn từ index, không chạm bảng</span></div>
-    <div class="s ok"><b>Index Scan</b><span>dùng index tìm vị trí rồi đọc dòng trong bảng — tốt khi ít dòng</span></div>
-    <div class="s"><b>Bitmap Heap Scan</b><span>gom vị trí trước rồi đọc bảng theo thứ tự trang — tốt khi nhiều dòng nhưng chưa phải hầu hết</span></div>
-    <div class="s"><b>Seq Scan</b><span>quét toàn bảng — <b>không phải luôn xấu</b>, xem mục 05</span></div>
-    <div class="s warn"><b>Nested Loop + Seq Scan bên trong</b><span>quét lại bảng cho từng dòng bên ngoài — dấu hiệu thiếu index cho join</span></div>
-  </div>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 454" role="img" aria-label="Ô kế hoạch sáng lên; bên phải bốn con số của một nút EXPLAIN và bốn loại nút quét xếp tốt dần lên">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--muted)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--muted)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--ok)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--ok)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--ok)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--ok)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--ok)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--ok)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — KẾ HOẠCH THỰC THI</text>
+    <path d="M342 300 C 356 300, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--ok)">Bốn con số phải đọc trong một nút</text>
+    <rect x="372" y="54" width="140" height="30" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="74.0" fill="var(--filled)">cost=0.42..8.44</text>
+    <text class="sv-d" x="526" y="74.0" fill="var(--muted)">ước lượng: tới dòng đầu, và tới dòng cuối — không phải giây</text>
+    <rect x="372" y="92" width="140" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="112.0" fill="var(--probe)">rows=1</text>
+    <text class="sv-d" x="526" y="112.0" fill="var(--muted)">số dòng planner ĐOÁN</text>
+    <rect x="372" y="130" width="140" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="150.0" fill="var(--ok)">actual … rows=3</text>
+    <text class="sv-d" x="526" y="150.0" fill="var(--muted)">số dòng THẬT — chỉ có khi chạy EXPLAIN ANALYZE</text>
+    <rect x="372" y="168" width="140" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="188.0" fill="var(--tomb)">loops=1</text>
+    <text class="sv-d" x="526" y="188.0" fill="var(--muted)">nút chạy mấy lần — thời gian thật = actual time × loops</text>
+    <rect x="372" y="212" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="234" fill="var(--probe)">Điều đầu tiên phải nhìn: rows đoán so với rows thật</text>
+    <text class="sv-s" x="388" y="252" fill="var(--dim)">lệch một bậc độ lớn = thống kê sai, mọi quyết định sau đó dựa trên số sai</text>
+    <text class="sv-t" x="372" y="288" fill="var(--text)">Các loại nút quét, tốt dần lên</text>
+    <rect x="372" y="302" width="140" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="321.0" fill="var(--ok)">Index Only Scan</text>
+    <text class="sv-d" x="526" y="321.0" fill="var(--muted)">trả lời hẳn trong index, không chạm bảng</text>
+    <rect x="372" y="338" width="140" height="28" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="357.0" fill="var(--ok)">Index Scan</text>
+    <text class="sv-d" x="526" y="357.0" fill="var(--muted)">tìm vị trí rồi đọc dòng — tốt khi ít dòng</text>
+    <rect x="372" y="374" width="140" height="28" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="393.0" fill="var(--filled)">Bitmap Heap Scan</text>
+    <text class="sv-d" x="526" y="393.0" fill="var(--muted)">gom vị trí rồi đọc theo trang — khi nhiều dòng</text>
+    <rect x="372" y="410" width="140" height="28" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="429.0" fill="var(--probe)">Seq Scan</text>
+    <text class="sv-d" x="526" y="429.0" fill="var(--muted)">quét cả bảng — không phải luôn xấu, xem mục 05</text>
+    </svg>
+  <figcaption>Bốn con số trong một nút, và bốn loại nút quét xếp tốt dần lên.</figcaption>
+  </figure>
+
 </section>
 
 <section id="sqlindex-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Lab: điểm giao nhau</h2></div>
-  <p>Kéo tỉ lệ dòng khớp điều kiện và xem planner nên chọn gì. Chi phí tính theo số <strong>trang</strong> phải đọc, vì đó mới là đơn vị thật của I/O.</p>
+
+  <p class="key">Chi phí tính theo số <em>trang</em> phải đọc, vì đó mới là đơn vị thật của I/O.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Ô chi phí và ô các cách lấy cùng sáng; bên phải nói lab cho người học tự tìm điểm giao nhau giữa index scan và quét cả bảng">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--filled)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--probe)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">TỰ CHẠY — VẶN Ô CHI PHÍ</text>
+    <text class="sv-t" x="372" y="40" fill="var(--text)">Lab vặn đúng ô Chi phí của bản đồ</text>
+    <rect x="372" y="54" width="160" height="34" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="76.0" fill="var(--probe)">% dòng khớp</text>
+    <text class="sv-d" x="546" y="76.0" fill="var(--muted)">kéo lên dần để tìm chỗ hai đường cắt nhau</text>
+    <rect x="372" y="96" width="160" height="34" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="118.0" fill="var(--filled)">dòng mỗi trang</text>
+    <text class="sv-d" x="546" y="118.0" fill="var(--muted)">trang mới là đơn vị thật của I/O, không phải dòng</text>
+    <rect x="372" y="138" width="160" height="34" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="160.0" fill="var(--filled)">đọc ngẫu nhiên đắt hơn</text>
+    <text class="sv-d" x="546" y="160.0" fill="var(--muted)">index nhảy trang, seq scan đọc liền — đây là gốc</text>
+    <rect x="372" y="186" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="208" fill="var(--probe)">Quanh mức vài phần trăm, quét cả bảng bắt đầu thắng</text>
+    <text class="sv-s" x="388" y="226" fill="var(--dim)">đây là toàn bộ câu trả lời cho "vì sao có index mà nó không dùng"</text>
+    </svg>
+  <figcaption>Lab vặn đúng ô <b>chi phí</b>: kéo tỉ lệ dòng khớp lên và tìm chỗ hai đường cắt nhau.</figcaption>
+  </figure>
+
   <div class="lab">
     <div class="bar">
       <div><label>số dòng của bảng</label><input type="number" id="qrows" value="1000000" min="100"></div>
@@ -137,232 +388,517 @@ Index Scan using idx_orders_user on orders
     </div>
     <div id="qview"></div>
     <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Tăng dần tỉ lệ khớp: quanh mức <strong>vài phần trăm</strong>, quét toàn bảng bắt đầu thắng.<br>Index scan đọc <em>ngẫu nhiên</em> từng trang; seq scan đọc <em>tuần tự</em> nên rẻ hơn mỗi trang và được đọc trước.<br>Đây là toàn bộ câu trả lời cho "vì sao có index mà nó không dùng".
+      Index scan đọc <em>ngẫu nhiên</em> từng trang; seq scan đọc <em>tuần tự</em> nên rẻ hơn mỗi trang và còn được đọc trước — đó là gốc của điểm giao nhau.
     </p>
   </div>
 </section>
 
 <section id="sqlindex-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Selectivity — chỉ số quyết định</h2></div>
-<div class="eq">
-    <div class="line"><span class="t b"><span>selectivity</span><em>độ chọn lọc</em></span><span class="op">=</span><span class="t p"><span>số dòng khớp</span><em>còn lại sau lọc</em></span><span class="op">/</span><span class="t"><span>tổng số dòng</span></span></div>
-  </div>
-  <div class="axis">
-    <div class="stop on"><b>0,000001</b><span><code>email = 'a@b.com'</code> · 1 trên 1 triệu</span></div>
-    <div class="stop"><b>0,8</b><span><code>status = 'active'</code> · 800 nghìn trên 1 triệu</span></div>
-    <div class="stop"><b>0,99</b><span><code>is_deleted = false</code></span></div>
-  </div>
-  <p class="axiscap"><span>rất chọn lọc — index rất hiệu quả</span><span><em>càng khớp nhiều dòng, index càng vô dụng</em></span><span>quét thẳng cả bảng còn rẻ hơn</span></p>
-  <p><strong>Cardinality</strong> là số giá trị khác nhau của cột. Cardinality cao thì selectivity thấp, tức index tốt. Cột boolean có cardinality bằng 2 — index gần như không bao giờ được dùng.</p>
+
+  <p class="key"><b>Selectivity</b> — tỉ lệ dòng còn lại sau lọc — là con số planner dùng để quyết định. Càng khớp nhiều dòng, index càng vô dụng.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Ô chi phí sáng lên; bên phải trục selectivity từ rất chọn lọc tới gần như mọi dòng, với điểm giao nhau ở vài phần trăm">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--muted)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--probe)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — SELECTIVITY</text>
+    <path d="M342 300 C 356 300, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">Selectivity = số dòng khớp / tổng số dòng</text>
+    <line x1="386" y1="88" x2="846" y2="88" stroke="var(--rule-hi)" stroke-width="1"/>
+    <circle cx="406" cy="88" r="4" fill="var(--ok)"/>
+    <circle cx="826" cy="88" r="4" fill="var(--tomb)"/>
+    <line x1="558" y1="58" x2="558" y2="74" stroke="var(--probe)" stroke-width="1.2"/><polygon points="558,82 553.8,74 562.2,74" fill="var(--probe)"/>
+    <text class="sv-d" x="386" y="74" fill="var(--ok)">0,000001</text>
+    <text class="sv-d" x="558" y="52" fill="var(--probe)" text-anchor="middle">vài %</text>
+    <text class="sv-d" x="846" y="74" fill="var(--tomb)" text-anchor="end">0,99</text>
+    <text class="sv-d" x="386" y="106" fill="var(--muted)">email = 'a@b.com'</text>
+    <text class="sv-d" x="558" y="106" fill="var(--probe)" text-anchor="middle">điểm giao nhau</text>
+    <text class="sv-d" x="846" y="106" fill="var(--muted)" text-anchor="end">is_deleted = false</text>
+    <text class="sv-s" x="386" y="124" fill="var(--ok)">index thắng</text>
+    <text class="sv-s" x="846" y="124" fill="var(--tomb)" text-anchor="end">seq scan thắng</text>
+    <rect x="372" y="144" width="140" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="164.0" fill="var(--ok)">cardinality cao</text>
+    <text class="sv-d" x="526" y="164.0" fill="var(--muted)">nhiều giá trị khác nhau → selectivity thấp → index tốt</text>
+    <rect x="372" y="182" width="140" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="202.0" fill="var(--tomb)">cột boolean</text>
+    <text class="sv-d" x="526" y="202.0" fill="var(--muted)">cardinality bằng 2 — index gần như không bao giờ được dùng</text>
+    <rect x="372" y="226" width="488" height="50" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="248" fill="var(--filled)">Partial index — lách cả bảng chỉ để phủ nhóm nhỏ</text>
+    <text class="sv-s" x="388" y="266" fill="var(--dim)">CREATE INDEX … ON orders (created_at) WHERE status = 'pending'</text>
+    </svg>
+  <figcaption>Trục selectivity: bên trái index thắng, bên phải quét cả bảng thắng, điểm giao ở khoảng vài phần trăm.</figcaption>
+  </figure>
+
   <div class="note">
     <h4>Ngoại lệ đáng biết: partial index</h4>
-    Nếu chỉ 1% dòng có <code>status = 'pending'</code> và bạn luôn truy vấn đúng nhóm đó, hãy tạo index chỉ cho phần đó:
+    Chỉ 1% dòng có <code>status = 'pending'</code> mà bạn luôn truy vấn đúng nhóm đó — thì tạo index chỉ cho phần đó:
 <pre style="margin:8px 0 0"><code>CREATE INDEX idx_pending ON orders (created_at)
   WHERE status = <span class="st">'pending'</span>;</code></pre>
-    Index nhỏ hơn nhiều, ghi rẻ hơn, và vẫn phục vụ đúng truy vấn cần thiết. Đây là kỹ thuật nêu ra trong phỏng vấn thường gây ấn tượng tốt vì nó cho thấy bạn nghĩ theo mẫu truy vấn thật.
+    Index nhỏ hơn nhiều, ghi rẻ hơn, vẫn phục vụ đúng truy vấn cần. Nêu ra trong phỏng vấn thường gây ấn tượng vì nó cho thấy bạn nghĩ theo mẫu truy vấn thật.
   </div>
 </section>
 
 <section id="sqlindex-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Index tổ hợp và quy tắc leftmost prefix</h2></div>
-<pre><code>CREATE INDEX idx ON orders (user_id, status, created_at);</code></pre>
-  <div class="strip">
-    <div class="c t"><i>cột 1</i><b>user_id</b><u>sắp trước hết</u></div>
-    <div class="c t"><i>cột 2</i><b>status</b><u>sắp trong mỗi user_id</u></div>
-    <div class="c t"><i>cột 3</i><b>created_at</b><u>sắp trong mỗi cặp trên</u></div>
-    <div class="cut"></div>
-    <div class="c f"><i>lọc theo</i><b>status một mình</b><u>bỏ mất cột đầu → không dùng được</u></div>
-  </div>
-  <p class="stripnote"><span>giống danh bạ sắp theo họ rồi tên</span><span><em>phải bắt đầu từ cột trái nhất</em></span></p>
-  <p>Index này được sắp theo <code>user_id</code> trước, trong mỗi <code>user_id</code> thì sắp theo <code>status</code>, rồi tới <code>created_at</code>. Giống danh bạ sắp theo họ rồi tên.</p>
-  <div class="stack">
-    <div class="s warn"><b>Lọc <code>user_id</code> + <code>created_at</code> — nhảy cóc qua <code>status</code></b><span>chỉ dùng được phần <code>user_id</code>, phần sau phải lọc lại từng dòng</span></div>
-    <div class="s warn"><b><code>user_id = 5 AND status &gt; 'a'</code> — có so khoảng</b><span>dùng được tới đó; mọi cột <b>sau</b> một điều kiện khoảng không còn tìm theo index được nữa</span></div>
-  </div>
-  <div class="note key">
-    <h4>Hai quy tắc xếp thứ tự cột</h4>
-    <p><strong>1. Cột so bằng trước, cột so khoảng sau.</strong> Sau một điều kiện khoảng, các cột tiếp theo không còn sắp liên tục nên không dùng để tìm được nữa.</p>
-    <p><strong>2. Cột chọn lọc hơn đặt trước</strong> — trong các cột đều so bằng. Nó thu hẹp không gian tìm kiếm nhanh hơn.</p>
-  </div>
-  <p>Một index tổ hợp <code>(a, b)</code> thay được index đơn <code>(a)</code>, nên đừng tạo cả hai — index đơn trên <code>a</code> là dư thừa và chỉ tốn thêm chi phí ghi.</p>
+
+  <p class="key">Index tổ hợp sắp theo cột trái nhất trước, nên truy vấn phải <em>bắt đầu</em> từ cột đó mới dùng được.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 410" role="img" aria-label="Ô các cách lấy sáng lên; bên phải ba cột của index tổ hợp và bốn kiểu lọc dùng được tới đâu">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--filled)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — INDEX TỔ HỢP</text>
+    <path d="M342 228 C 356 228, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--filled)">idx ON orders (user_id, status, created_at)</text>
+    <rect x="372.0" y="60" width="157.33333333333334" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.4"/>
+    <text class="sv-l" x="450.6666666666667" y="78" fill="var(--filled)" text-anchor="middle">user_id</text>
+    <text class="sv-d" x="450.6666666666667" y="93" fill="var(--muted)" text-anchor="middle">sắp trước hết</text>
+    <rect x="537.3333333333334" y="60" width="157.33333333333334" height="40" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-l" x="616.0" y="78" fill="var(--filled)" text-anchor="middle">status</text>
+    <text class="sv-d" x="616.0" y="93" fill="var(--muted)" text-anchor="middle">sắp trong mỗi user_id</text>
+    <rect x="702.6666666666667" y="60" width="157.33333333333334" height="40" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1"/>
+    <text class="sv-l" x="781.3333333333334" y="78" fill="var(--filled)" text-anchor="middle">created_at</text>
+    <text class="sv-d" x="781.3333333333334" y="93" fill="var(--muted)" text-anchor="middle">sắp trong mỗi cặp trên</text>
+    <text class="sv-s" x="372" y="112" fill="var(--dim)">Giống danh bạ sắp theo họ rồi tên — phải bắt đầu từ cột trái nhất.</text>
+    <rect x="372" y="128" width="178" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="148.0" fill="var(--ok)">lọc user_id</text>
+    <text class="sv-d" x="564" y="148.0" fill="var(--muted)">dùng được cả cây</text>
+    <rect x="372" y="166" width="178" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="186.0" fill="var(--tomb)">lọc status một mình</text>
+    <text class="sv-d" x="564" y="186.0" fill="var(--muted)">bỏ mất cột đầu — index vô dụng</text>
+    <rect x="372" y="204" width="178" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="224.0" fill="var(--probe)">user_id + created_at</text>
+    <text class="sv-d" x="564" y="224.0" fill="var(--muted)">nhảy cóc qua status: chỉ dùng được phần đầu</text>
+    <rect x="372" y="242" width="178" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="262.0" fill="var(--probe)">user_id = 5 AND status &gt; 'a'</text>
+    <text class="sv-d" x="564" y="262.0" fill="var(--muted)">sau một điều kiện khoảng, cột sau hết tìm được</text>
+    <rect x="372" y="286" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
+    <text class="sv-t" x="388" y="308" fill="var(--ok)">Hai quy tắc xếp thứ tự cột</text>
+    <text class="sv-s" x="388" y="326" fill="var(--dim)">1. cột so bằng trước, cột so khoảng sau · 2. cột chọn lọc hơn đặt trước</text>
+    <rect x="372" y="344" width="488" height="50" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
+    <text class="sv-t" x="388" y="366" fill="var(--filled)">Index (a, b) thay được index (a)</text>
+    <text class="sv-s" x="388" y="384" fill="var(--dim)">nên đừng tạo cả hai — cái đơn là dư thừa, chỉ tốn thêm chi phí ghi</text>
+    </svg>
+  <figcaption>Index tổ hợp sắp theo cột trái nhất trước — nên phải bắt đầu từ đó, và mọi cột sau một điều kiện khoảng đều mất tác dụng tìm.</figcaption>
+  </figure>
+
 </section>
 
 <section id="sqlindex-s8" class="lesson">
   <div class="sh"><b>08</b><h2>Index bao phủ và index-only scan</h2></div>
-<pre><code><span class="cm">-- truy vấn chỉ cần user_id và total</span>
-SELECT user_id, total FROM orders WHERE user_id = <span class="st">42</span>;
 
-<span class="cm">-- index chỉ có user_id: phải quay lại bảng lấy total</span>
-CREATE INDEX i1 ON orders (user_id);              <span class="cm">→ Index Scan</span>
+  <p class="key">Khi mọi cột truy vấn cần đều nằm sẵn trong index, database <em>không phải chạm vào bảng</em> — đó là Index Only Scan.</p>
 
-<span class="cm">-- index chứa cả total: trả lời xong ngay trong index</span>
-CREATE INDEX i2 ON orders (user_id) INCLUDE (total);   <span class="cm">→ Index Only Scan</span></code></pre>
-  <p>Khi mọi cột truy vấn cần đều nằm trong index, database <strong>không phải chạm vào bảng</strong>. Đó là Index Only Scan — nhanh hơn vài lần vì bỏ hết đọc ngẫu nhiên.</p>
-  <p><code>INCLUDE</code> khác với việc thêm cột vào khoá: cột trong <code>INCLUDE</code> chỉ được <em>chở theo</em>, không tham gia sắp xếp — nên index không phình lên nhiều và không đổi thứ tự.</p>
-  <div class="note warn">
-    <h4>Trong PostgreSQL, index-only scan có điều kiện</h4>
-    Nó chỉ hoạt động khi trang dữ liệu đã được đánh dấu là "toàn bộ đều thấy được" trong visibility map — do cơ chế MVCC. Nếu bảng vừa bị ghi nhiều mà chưa <code>VACUUM</code> thì plan tụt về Index Scan thường. Đây là chi tiết đặc thù PostgreSQL, nêu ra được là điểm cộng rõ ràng.
-  </div>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Ô các cách lấy và ô kế hoạch cùng sáng; bên phải cùng một truy vấn cho Index Scan hay Index Only Scan tuỳ index có chở theo cột total không">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--filled)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--ok)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--ok)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--ok)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--ok)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--ok)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--ok)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">HAI Ô GHÉP — INDEX BAO PHỦ</text>
+    <text class="sv-t" x="372" y="40" fill="var(--ok)">SELECT user_id, total FROM orders WHERE user_id = 42</text>
+    <rect x="372" y="56" width="246" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="76" fill="var(--probe)">index (user_id)</text>
+    <line x1="624" y1="71" x2="636" y2="71" stroke="var(--probe)" stroke-width="1.1"/><polygon points="644,71 636,66.8 636,75.2" fill="var(--probe)"/>
+    <rect x="650" y="56" width="132" height="30" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.3"/>
+    <text class="sv-d" x="716" y="76" fill="var(--probe)" text-anchor="middle">Index Scan</text>
+    <text class="sv-d" x="384" y="102" fill="var(--muted)">phải quay lại bảng lấy total</text>
+    <rect x="372" y="122" width="246" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="142" fill="var(--ok)">index (user_id) INCLUDE (total)</text>
+    <line x1="624" y1="137" x2="636" y2="137" stroke="var(--ok)" stroke-width="1.1"/><polygon points="644,137 636,132.8 636,141.2" fill="var(--ok)"/>
+    <rect x="650" y="122" width="132" height="30" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.3"/>
+    <text class="sv-d" x="716" y="142" fill="var(--ok)" text-anchor="middle">Index Only Scan</text>
+    <text class="sv-d" x="384" y="168" fill="var(--muted)">trả lời xong ngay trong index</text>
+    <text class="sv-s" x="372" y="194" fill="var(--dim)">Mọi cột truy vấn cần đều nằm trong index → không phải chạm bảng.</text>
+    <rect x="372" y="214" width="150" height="30" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="234.0" fill="var(--filled)">INCLUDE (total)</text>
+    <text class="sv-d" x="536" y="234.0" fill="var(--muted)">chỉ chở theo — không tham gia sắp xếp, index không phình</text>
+    <rect x="372" y="252" width="150" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="272.0" fill="var(--probe)">thêm total vào khoá</text>
+    <text class="sv-d" x="536" y="272.0" fill="var(--muted)">đổi cả thứ tự sắp và làm index to hơn nhiều</text>
+    <rect x="372" y="296" width="488" height="50" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="318" fill="var(--tomb)">Riêng PostgreSQL — chưa VACUUM thì tụt về Index Scan</text>
+    <text class="sv-s" x="388" y="336" fill="var(--dim)">trang phải được đánh dấu "đều thấy được" trong visibility map (MVCC)</text>
+    </svg>
+  <figcaption>Cùng một truy vấn, khác nhau ở chỗ index có chở theo cột <code>total</code> hay không.</figcaption>
+  </figure>
+
 </section>
 
 <section id="sqlindex-s9" class="lesson">
   <div class="sh"><b>09</b><h2>Khi index có mà vẫn bị bỏ qua</h2></div>
-  <div class="stack">
-    <div class="s warn"><b>Hàm bọc quanh cột · <code>WHERE lower(email) = 'a@b.com'</code></b><span>chữa bằng index biểu thức: <code>CREATE INDEX ON t (lower(email))</code></span></div>
-    <div class="s warn"><b>Tính toán trên cột · <code>WHERE created_at + interval '1 day' &gt; now()</code></b><span>chuyển phép tính sang phía hằng số</span></div>
-    <div class="s warn"><b>Ký tự thay thế ở đầu · <code>LIKE '%son'</code></b><span>full-text search, trigram index, hoặc lưu thêm cột đảo ngược</span></div>
-    <div class="s warn"><b>Lệch kiểu dữ liệu · cột <code>varchar</code> so với số nguyên</b><span>ép kiểu đúng ở phía tham số</span></div>
-    <div class="s"><b>Selectivity quá thấp · <code>is_active = true</code> với 90% dòng active</b><span>không cần index, hoặc partial index cho nhóm nhỏ</span></div>
-    <div class="s"><b><code>OR</code> trên nhiều cột · <code>a = 1 OR b = 2</code></b><span>hai index riêng để planner dùng Bitmap Or, hoặc viết thành <code>UNION</code></span></div>
-    <div class="s"><b>Thống kê đã cũ · vừa nạp thêm hàng triệu dòng</b><span><code>ANALYZE tablename</code></span></div>
-    <div class="s ok"><b>Bảng quá nhỏ · vài trăm dòng</b><span>không cần chữa — seq scan đúng là rẻ hơn</span></div>
-  </div>
-  <div class="note">
-    <h4>Nguyên tắc chung phía sau bảng này</h4>
-    Index sắp theo <strong>giá trị nguyên bản của cột</strong>. Bất cứ thứ gì làm biến đổi giá trị đó trước khi so sánh đều phá thứ tự sắp xếp, và index thành vô dụng. Nên quy tắc là: <strong>giữ cột trần một bên dấu bằng</strong>, mọi phép tính đẩy sang bên kia.
-  </div>
+
+  <p class="key">Index sắp theo <em>giá trị nguyên bản của cột</em>. Thứ gì biến đổi giá trị đó trước khi so đều phá thứ tự sắp, và index thành vô dụng.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 426" role="img" aria-label="Ô các cách lấy và ô chi phí cùng sáng; bên phải tám lý do index không được dùng và cách chữa từng cái">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--filled)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--probe)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">HAI Ô GHÉP — CÓ INDEX MÀ BỊ BỎ QUA</text>
+    <text class="sv-t" x="372" y="40" fill="var(--tomb)">Giữ cột trần một bên dấu bằng</text>
+    <rect x="372" y="54" width="192" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="74.0" fill="var(--tomb)">lower(email) = 'a@b.com'</text>
+    <text class="sv-d" x="578" y="74.0" fill="var(--muted)">chữa: CREATE INDEX ON t (lower(email))</text>
+    <rect x="372" y="92" width="192" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="112.0" fill="var(--tomb)">created_at + 1 day &gt; now()</text>
+    <text class="sv-d" x="578" y="112.0" fill="var(--muted)">chuyển phép tính sang phía hằng số</text>
+    <rect x="372" y="130" width="192" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="150.0" fill="var(--tomb)">LIKE '%son'</text>
+    <text class="sv-d" x="578" y="150.0" fill="var(--muted)">full-text, trigram index, hoặc cột đảo ngược</text>
+    <rect x="372" y="168" width="192" height="30" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="188.0" fill="var(--tomb)">cột varchar so với số</text>
+    <text class="sv-d" x="578" y="188.0" fill="var(--muted)">ép kiểu đúng ở phía tham số</text>
+    <rect x="372" y="206" width="192" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="226.0" fill="var(--probe)">is_active = true · 90% active</text>
+    <text class="sv-d" x="578" y="226.0" fill="var(--muted)">selectivity quá thấp — hoặc partial index</text>
+    <rect x="372" y="244" width="192" height="30" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="264.0" fill="var(--probe)">a = 1 OR b = 2</text>
+    <text class="sv-d" x="578" y="264.0" fill="var(--muted)">hai index riêng cho Bitmap Or, hoặc viết UNION</text>
+    <rect x="372" y="282" width="192" height="30" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="302.0" fill="var(--filled)">thống kê đã cũ</text>
+    <text class="sv-d" x="578" y="302.0" fill="var(--muted)">ANALYZE tablename</text>
+    <rect x="372" y="320" width="192" height="30" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="340.0" fill="var(--ok)">bảng vài trăm dòng</text>
+    <text class="sv-d" x="578" y="340.0" fill="var(--muted)">không cần chữa — seq scan đúng là rẻ hơn</text>
+    <rect x="372" y="364" width="488" height="50" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="386" fill="var(--tomb)">Một nguyên tắc phía sau cả bảng này</text>
+    <text class="sv-s" x="388" y="404" fill="var(--dim)">index sắp theo giá trị nguyên bản — biến đổi nó là phá luôn thứ tự đó</text>
+    </svg>
+  <figcaption>Tám lý do index bị bỏ qua, và cách chữa từng cái. Bảy cái đầu là do câu truy vấn viết thế nào.</figcaption>
+  </figure>
 </section>
 
 <section id="sqlindex-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Ba thuật toán JOIN</h2></div>
-  <div class="stack">
-    <div class="s"><b>Nested Loop · O(n · chi phí tìm)</b><span>với mỗi dòng bảng ngoài, tìm dòng khớp ở bảng trong — planner chọn khi bảng ngoài nhỏ <b>và</b> bảng trong có index trên cột join</span></div>
-    <div class="s ok"><b>Hash Join · O(n + m)</b><span>dựng bảng băm từ bảng nhỏ, quét bảng lớn rồi tra — khi join so bằng, hai bảng lớn, không có index sẵn</span></div>
-    <div class="s"><b>Merge Join · O(n log n + m log m)</b><span>sắp cả hai theo cột join rồi đi song song — rẻ hẳn (O(n+m)) nếu hai bên đã sắp sẵn nhờ đọc theo index</span></div>
-  </div>
-<div class="stack">
-    <div class="s"><b>Nested Loop · rows=10000</b><span>ghép hai bảng</span></div>
-    <div class="s"><b>→ Seq Scan on users · rows=10000</b><span>bảng ngoài, quét một lần</span></div>
-    <div class="s warn"><b>→ Seq Scan on orders · rows=500 · <em>loops=10000</em></b><span>quét lại bảng <code>orders</code> mười nghìn lần → thiếu index trên <code>orders(user_id)</code></span></div>
-  </div>
-  <p>Chú ý <code>loops=10000</code>: nút bên trong chạy mười nghìn lần. Thời gian thật của một nút là <code>actual time × loops</code>, không phải chỉ <code>actual time</code>.</p>
-  <div class="note key">
-    <h4>Hash Join không xấu</h4>
-    Nhiều người thấy Hash Join là tưởng thiếu index. Với hai bảng lớn cần ghép toàn bộ, hash join <em>là</em> lựa chọn tối ưu — nó quét tuần tự cả hai bảng, không đọc ngẫu nhiên. Chỉ khi bảng ngoài nhỏ mà bảng trong lớn thì nested loop kèm index mới thắng.
-  </div>
+  <div class="sh"><b>10</b><h2>Thuật toán JOIN</h2></div>
+
+  <p class="key">Planner chọn thuật toán ghép theo <em>kích thước hai bảng</em> và <em>có index trên cột join hay không</em> — không phải theo cách bạn viết <code>JOIN</code>.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 430" role="img" aria-label="Ô kế hoạch và ô chi phí cùng sáng; bên phải ba thuật toán join với điều kiện planner chọn từng cái, và một plan thiếu index">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--probe)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--probe)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--muted)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--probe)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--ok)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--ok)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--ok)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--ok)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--ok)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--ok)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">HAI Ô GHÉP — BA THUẬT TOÁN JOIN</text>
+    <text class="sv-t" x="372" y="40" fill="var(--ok)">Ba cách ghép — planner chọn theo kích thước và index</text>
+    <rect x="372" y="54" width="122" height="30" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="74" fill="var(--filled)">Nested Loop</text>
+    <text class="sv-d" x="506" y="74" fill="var(--filled)">O(n · tìm)</text>
+    <text class="sv-d" x="384" y="98" fill="var(--muted)">bảng ngoài nhỏ VÀ bảng trong có index cột join</text>
+    <rect x="372" y="112" width="122" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="132" fill="var(--ok)">Hash Join</text>
+    <text class="sv-d" x="506" y="132" fill="var(--ok)">O(n + m)</text>
+    <text class="sv-d" x="384" y="156" fill="var(--muted)">so bằng, hai bảng lớn, không có index sẵn</text>
+    <rect x="372" y="170" width="122" height="30" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.3"/>
+    <text class="sv-l" x="384" y="190" fill="var(--probe)">Merge Join</text>
+    <text class="sv-d" x="506" y="190" fill="var(--probe)">O(n+m) nếu đã sắp</text>
+    <text class="sv-d" x="384" y="214" fill="var(--muted)">hai bên sắp sẵn nhờ đọc theo index</text>
+    <line x1="372" y1="228" x2="860" y2="228" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text class="sv-t" x="372" y="244" fill="var(--text)">Dấu hiệu thiếu index cho join, đọc thẳng trong plan</text>
+    <rect x="372" y="256" width="170" height="28" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="275.0" fill="var(--filled)">Nested Loop</text>
+    <text class="sv-d" x="556" y="275.0" fill="var(--muted)">rows=10000</text>
+    <rect x="372" y="292" width="170" height="28" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="311.0" fill="var(--filled)">→ Seq Scan on users</text>
+    <text class="sv-d" x="556" y="311.0" fill="var(--muted)">bảng ngoài, quét một lần</text>
+    <rect x="372" y="328" width="170" height="28" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="347.0" fill="var(--tomb)">→ Seq Scan on orders</text>
+    <text class="sv-d" x="556" y="347.0" fill="var(--muted)">rows=500 · loops=10000 — quét lại mười nghìn lần</text>
+    <rect x="372" y="368" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="390" fill="var(--ok)">Hash Join xuất hiện KHÔNG có nghĩa là thiếu index</text>
+    <text class="sv-s" x="388" y="408" fill="var(--dim)">hai bảng lớn ghép toàn bộ thì nó chính là tối ưu — đọc tuần tự cả hai</text>
+    </svg>
+  <figcaption>Ba thuật toán ghép, điều kiện planner chọn từng cái, và một plan lộ rõ chỗ thiếu index.</figcaption>
+  </figure>
 </section>
 
 <section id="sqlindex-s11" class="lesson">
   <div class="sh"><b>11</b><h2>Thống kê và plan xấu</h2></div>
-  <p>Planner không xem dữ liệu thật, nó xem <strong>thống kê</strong>: số dòng ước lượng, phân phối giá trị, giá trị hay gặp nhất, số giá trị khác nhau.</p>
+
+  <p class="key">Planner không xem dữ liệu thật, nó xem <b>thống kê</b>. Thống kê cũ thì plan sai, và không có lỗi nào được báo.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Ô thống kê sáng lên; bên phải ba tình huống làm thống kê sai và cách chữa từng cái">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--probe)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--muted)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">PHÓNG TO — THỐNG KÊ</text>
+    <path d="M342 196 C 356 196, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+    <text class="sv-t" x="372" y="40" fill="var(--probe)">Planner xem thống kê, không xem dữ liệu thật</text>
+    <rect x="372" y="54" width="488" height="34" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-l" x="386" y="76" fill="var(--probe)">n_distinct · most_common_vals · correlation — trong pg_stats</text>
+    <text class="sv-t" x="372" y="102" fill="var(--text)">Ba tình huống làm thống kê sai và sinh plan tệ</text>
+    <rect x="372" y="114" width="156" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="134" fill="var(--tomb)">vừa nạp dữ liệu lớn</text>
+    <text class="sv-d" x="542" y="134" fill="var(--muted)">autovacuum chưa chạy, planner tưởng bảng còn nhỏ</text>
+    <text class="sv-d" x="384" y="158" fill="var(--ok)">chữa: ANALYZE</text>
+    <rect x="372" y="172" width="156" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="192" fill="var(--tomb)">phân phối lệch</text>
+    <text class="sv-d" x="542" y="192" fill="var(--muted)">90% country là VN — ước lượng trung bình sai nặng</text>
+    <text class="sv-d" x="384" y="216" fill="var(--ok)">chữa: statistics target</text>
+    <rect x="372" y="230" width="156" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="250" fill="var(--tomb)">hai cột tương quan</text>
+    <text class="sv-d" x="542" y="250" fill="var(--muted)">city phụ thuộc country, planner giả định độc lập</text>
+    <text class="sv-d" x="384" y="274" fill="var(--ok)">chữa: CREATE STATISTICS</text>
+    <rect x="372" y="288" width="488" height="50" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/>
+    <text class="sv-t" x="388" y="310" fill="var(--filled)">Trước khi kết luận "planner bị lỗi"</text>
+    <text class="sv-s" x="388" y="328" fill="var(--dim)">so rows ước lượng với thực tế — lệch nhiều là lỗi thống kê</text>
+    </svg>
+  <figcaption>Ba tình huống làm thống kê sai, và lệnh chữa tương ứng.</figcaption>
+  </figure>
+
 <pre><code>ANALYZE orders;                    <span class="cm">-- cập nhật thống kê thủ công</span>
 
 <span class="cm">-- xem PostgreSQL đang nghĩ gì về một cột</span>
 SELECT n_distinct, most_common_vals, correlation
 FROM pg_stats WHERE tablename = <span class="st">'orders'</span> AND attname = <span class="st">'status'</span>;</code></pre>
-  <p>Ba tình huống làm thống kê sai và sinh plan tệ:</p>
-  <div class="stack">
-    <div class="s warn"><b>Vừa nạp dữ liệu lớn</b><span>autovacuum chưa chạy, planner vẫn tưởng bảng còn nhỏ và chọn nested loop cho bảng vài triệu dòng — chữa bằng <code>ANALYZE</code></span></div>
-    <div class="s warn"><b>Phân phối lệch</b><span>90% giá trị cột <code>country</code> là <code>VN</code>: ước lượng trung bình sai nặng cho cả giá trị phổ biến lẫn hiếm — chữa bằng tăng <code>statistics target</code></span></div>
-    <div class="s warn"><b>Tương quan giữa hai cột</b><span><code>city</code> phụ thuộc <code>country</code>, nhưng planner giả định độc lập nên nhân hai selectivity ra số quá nhỏ — chữa bằng <code>CREATE STATISTICS</code></span></div>
-  </div>
-  <div class="note warn">
-    <h4>Trước khi kết luận "planner bị lỗi"</h4>
-    Chạy <code>EXPLAIN ANALYZE</code> và so <code>rows</code> ước lượng với thực tế. Nếu lệch nhiều thì vấn đề là thống kê, không phải thuật toán chọn plan. Chạy <code>ANALYZE</code> trước khi nghĩ tới việc can thiệp sâu hơn.
-  </div>
 </section>
 
 <section id="sqlindex-s12" class="lesson">
   <div class="sh"><b>12</b><h2>Giới hạn của index</h2></div>
-  <p>Ba loại chậm mà index <strong>không</strong> chữa được, vì nguyên nhân không nằm trong database:</p>
-  <div class="stack">
-    <div class="s"><b>Tầng ứng dụng</b><span>gọi 101 truy vấn thay vì 1 — bài toán N+1</span></div>
-    <div class="s"><b>Tầng truyền dữ liệu</b><span><code>SELECT *</code> kéo về cột không dùng</span></div>
-    <div class="s warn"><b>Tầng kết nối</b><span>đợi mượn connection từ pool</span></div>
-  </div>
-  <ul>
-    <li><strong>Nhiều truy vấn nhỏ thay vì một.</strong> Mỗi vòng tốn 0,5–2 ms; 101 truy vấn tối ưu vẫn thua một truy vấn hơi chậm.</li>
-    <li><strong>Lấy thừa dữ liệu.</strong> <code>SELECT *</code> khi chỉ cần hai cột: index đúng cũng phải quay về bảng, mất cơ hội index-only scan.</li>
-    <li><strong>Chờ ở tầng kết nối.</strong> SQL chạy 1 ms nhưng request đợi 200 ms mới mượn được kết nối — plan không hiện gì.</li>
-  </ul>
+
+  <p class="key">Ba loại chậm mà index <em>không</em> chữa được, vì nguyên nhân không nằm trong database.</p>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 390" role="img" aria-label="Cả bản đồ mờ đi; bên phải ba tầng chậm nằm ngoài database mà index không chữa được">
+    <text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+    <rect x="0" y="26" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="47" fill="var(--muted)">Câu SQL nói MUỐN GÌ</text>
+    <text class="sv-d" x="13" y="64" fill="var(--muted)">không nói cách lấy — bạn không ra lệnh cho database</text>
+    <line x1="170.0" y1="86" x2="170.0" y2="98" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,106 165.8,98 174.2,98" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="102" fill="var(--muted)">planner tự chọn cách lấy</text>
+    <rect x="0" y="114" width="340" height="116" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+    <text class="sv-l" x="13" y="135" fill="var(--text)">PLANNER</text>
+    <text class="sv-d" x="88" y="135" fill="var(--muted)">cân rồi chọn phương án rẻ nhất</text>
+    <rect x="13" y="144" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="160" fill="var(--muted)">Thống kê</text>
+    <text class="sv-d" x="118" y="160" fill="var(--muted)">ước lượng — không phải dữ liệu thật</text>
+    <rect x="13" y="172" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="188" fill="var(--muted)">Các cách lấy</text>
+    <text class="sv-d" x="118" y="188" fill="var(--muted)">index chỉ là MỘT lựa chọn thêm</text>
+    <rect x="13" y="200" width="314" height="24" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+    <text class="sv-d" x="24" y="216" fill="var(--muted)">Chi phí</text>
+    <text class="sv-d" x="118" y="216" fill="var(--muted)">selectivity là con số quyết định</text>
+    <line x1="170.0" y1="232" x2="170.0" y2="244" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,252 165.8,244 174.2,244" fill="var(--rule-hi)"/>
+    <text class="sv-d" x="180.0" y="248" fill="var(--muted)">ra một kế hoạch cụ thể</text>
+    <rect x="0" y="260" width="340" height="58" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="279" fill="var(--muted)">Kế hoạch thực thi — EXPLAIN cho xem</text>
+    <rect x="13.0" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="62.666666666666664" y="302" fill="var(--muted)" text-anchor="middle">cost</text>
+    <rect x="120.33333333333333" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="170.0" y="302" fill="var(--muted)" text-anchor="middle">rows đoán</text>
+    <rect x="227.66666666666666" y="287" width="99.33333333333333" height="22" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+    <text class="sv-d" x="277.3333333333333" y="302" fill="var(--muted)" text-anchor="middle">loops</text>
+    <line x1="0" y1="328" x2="340" y2="328" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="0" y="336" width="340" height="46" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+    <text class="sv-t" x="13" y="356" fill="var(--muted)">Index phải trả giá ở mọi lệnh ghi</text>
+    <text class="sv-d" x="13" y="373" fill="var(--muted)">nên chỉ tạo cho truy vấn thật sự chạy nhiều</text>
+    <text class="sv-hv" x="372" y="18">CẢ BẢN ĐỒ TẮT — INDEX KHÔNG CHỮA ĐƯỢC</text>
+    <text class="sv-t" x="372" y="40" fill="var(--tomb)">Ba loại chậm không ô nào của bản đồ chữa được</text>
+    <rect x="372" y="54" width="150" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="75.0" fill="var(--tomb)">tầng ứng dụng</text>
+    <text class="sv-d" x="536" y="75.0" fill="var(--muted)">gọi 101 truy vấn thay vì 1 — bài toán N+1</text>
+    <rect x="372" y="94" width="150" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="115.0" fill="var(--tomb)">tầng truyền dữ liệu</text>
+    <text class="sv-d" x="536" y="115.0" fill="var(--muted)">SELECT * kéo về cột không dùng</text>
+    <rect x="372" y="134" width="150" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+    <text class="sv-d" x="384" y="155.0" fill="var(--tomb)">tầng kết nối</text>
+    <text class="sv-d" x="536" y="155.0" fill="var(--muted)">đợi mượn connection từ pool</text>
+    <rect x="372" y="180" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-t" x="388" y="202" fill="var(--probe)">Mỗi vòng gọi tốn 0,5–2 ms</text>
+    <text class="sv-s" x="388" y="220" fill="var(--dim)">101 truy vấn đã tối ưu vẫn thua một truy vấn hơi chậm</text>
+    <rect x="372" y="238" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-t" x="388" y="260" fill="var(--probe)">SELECT * khi chỉ cần hai cột</text>
+    <text class="sv-s" x="388" y="278" fill="var(--dim)">index đúng cũng phải quay về bảng — mất cơ hội index-only scan</text>
+    <rect x="372" y="296" width="488" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+    <text class="sv-t" x="388" y="318" fill="var(--probe)">SQL chạy 1 ms mà request đợi 200 ms</text>
+    <text class="sv-s" x="388" y="336" fill="var(--dim)">nghẽn ở pool kết nối — plan không hiện gì hết</text>
+    <text class="sv-s" x="372" y="368" fill="var(--dim)">Quy trình đầy đủ để xác định chậm ở tầng nào nằm ở bài Query tuning.</text>
+    </svg>
+  <figcaption>Cả bản đồ mờ đi: ba tầng chậm này nằm ngoài database, không ô nào chữa được.</figcaption>
+  </figure>
+
   <p>Khi có báo cáo "trang này chậm", quy trình đầy đủ để xác định vấn đề thuộc loại nào nằm ở <a href="../query-tuning/index.html">Query tuning</a>; bài này chỉ lo phần planner và index.</p>
 </section>
 
 <section id="sqlindex-s13" class="lesson">
-  <div class="sh"><b>13</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Index không phải nút tăng tốc — nó là <em>một lựa chọn thêm</em> cho planner, và planner chỉ chọn khi selectivity đủ thấp.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 390" role="img" aria-label="Bốn nhịp: planner chọn kế hoạch, selectivity quyết định index có được dùng không, thứ tự cột trong index tổ hợp, và các lý do index bị bỏ qua">
-
-      <text class="sv-h" x="8" y="16">&#9312; BẠN KHAI BÁO MUỐN GÌ — PLANNER CHỌN CÁCH LẤY</text>
-      <rect x="8" y="24" width="118" height="34" rx="5" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="20" y="45" fill="#A8BEF6">Câu SQL</text>
-      <path d="M126 41 h22" stroke="#7A6F63"/><path d="M148 41 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="150" y="24" width="150" height="34" rx="5" fill="rgba(237,180,74,.12)" stroke="#EDB44A"/>
-      <text class="sv-t" x="162" y="45" fill="#EDB44A">Planner</text>
-      <text class="sv-d" x="216" y="45" fill="#7A6F63">ước lượng chi phí</text>
-      <path d="M300 41 h22" stroke="#7A6F63"/><path d="M322 41 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="324" y="24" width="164" height="34" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="336" y="45" fill="#8EE0BE">Kế hoạch thực thi</text>
-      <text class="sv-d" x="336" y="72" fill="#7A6F63">EXPLAIN cho xem chính thứ này</text>
-      <text class="sv-l" x="8" y="92">planner dựa vào <tspan fill="#EDB44A">thống kê</tspan>, không phải dữ liệu thật —</text>
-      <text class="sv-l" x="8" y="106">nên việc đầu tiên khi đọc EXPLAIN là so rows ước lượng với rows thực tế</text>
-
-      <text class="sv-h" x="508" y="16">TỐT DẦN LÊN</text>
-      <rect x="508" y="24" width="340" height="20" rx="4" fill="rgba(91,207,160,.14)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="518" y="39" fill="#8EE0BE">Index Only Scan &#183; không chạm bảng</text>
-      <rect x="508" y="48" width="340" height="20" rx="4" fill="rgba(91,207,160,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="518" y="63" fill="#8EE0BE">Index Scan &#183; tìm rồi đọc dòng</text>
-      <rect x="508" y="72" width="340" height="20" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="518" y="87" fill="#A8BEF6">Bitmap Heap Scan &#183; gom vị trí rồi đọc theo trang</text>
-      <rect x="508" y="96" width="340" height="20" rx="4" fill="rgba(237,180,74,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="518" y="111" fill="#EDB44A">Seq Scan &#183; không phải luôn xấu</text>
-
-      <text class="sv-h" x="8" y="140">&#9313; SELECTIVITY QUYẾT ĐỊNH INDEX CÓ ĐƯỢC DÙNG KHÔNG</text>
-      <line x1="20" y1="180" x2="480" y2="180" stroke="#3D352C"/>
-      <circle cx="40" cy="180" r="4" fill="#5BCFA0"/>
-      <text class="sv-t" x="20" y="168" fill="#8EE0BE">0,000001</text>
-      <text class="sv-l" x="20" y="198">email = &#39;a@b.com&#39;</text>
-      <line x1="230" y1="164" x2="230" y2="196" stroke="#EDB44A" stroke-dasharray="3 3"/>
-      <text class="sv-t" x="196" y="158" fill="#EDB44A">vài %</text>
-      <text class="sv-l" x="182" y="212" fill="#EDB44A">điểm giao nhau</text>
-      <circle cx="460" cy="180" r="4" fill="#F2718A"/>
-      <text class="sv-t" x="432" y="168" fill="#F79BAB">0,99</text>
-      <text class="sv-l" x="376" y="198">is_deleted = false</text>
-      <text class="sv-d" x="20" y="230" fill="#7A6F63">index thắng: đọc ít trang</text>
-      <text class="sv-d" x="352" y="230" fill="#7A6F63">seq scan thắng: đọc tuần tự rẻ hơn</text>
-      <text class="sv-l" x="20" y="250">cardinality cao &#8594; selectivity thấp &#8594; index tốt · cột boolean gần như không bao giờ được dùng</text>
-
-      <text class="sv-h" x="508" y="140">&#9314; INDEX TỔ HỢP — PHẢI BẮT ĐẦU TỪ CỘT TRÁI NHẤT</text>
-      <rect x="508" y="150" width="106" height="30" rx="4" fill="rgba(140,169,242,.12)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="518" y="170" fill="#A8BEF6">user_id</text>
-      <rect x="620" y="150" width="106" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="630" y="170" fill="#A8BEF6">status</text>
-      <rect x="732" y="150" width="116" height="30" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="742" y="170" fill="#A8BEF6">created_at</text>
-      <text class="sv-l" x="508" y="198" fill="#8EE0BE">lọc user_id &#8594; dùng được cả cây</text>
-      <text class="sv-l" x="508" y="214" fill="#F79BAB">lọc status một mình &#8594; bỏ mất cột đầu, index vô dụng</text>
-      <text class="sv-l" x="508" y="230">cột so bằng trước, cột so khoảng sau —</text>
-      <text class="sv-l" x="508" y="246">sau một điều kiện khoảng, cột phía sau hết tìm theo index được</text>
-
-      <rect x="8" y="266" width="840" height="66" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-h" x="20" y="286" fill="#F79BAB">&#9315; CÓ INDEX MÀ VẪN BỊ BỎ QUA — GIỮ CỘT TRẦN MỘT BÊN DẤU BẰNG</text>
-      <text class="sv-l" x="20" y="306">lower(email) = &#39;…&#39;</text>
-      <text class="sv-l" x="184" y="306">created_at + 1 day &gt; now()</text>
-      <text class="sv-l" x="392" y="306">LIKE &#39;%son&#39;</text>
-      <text class="sv-l" x="520" y="306">lệch kiểu dữ liệu</text>
-      <text class="sv-l" x="676" y="306">thống kê đã cũ</text>
-      <text class="sv-d" x="20" y="324" fill="#7A6F63">index sắp theo giá trị nguyên bản của cột — thứ gì biến đổi giá trị trước khi so đều phá thứ tự đó</text>
-
-      <line x1="8" y1="348" x2="852" y2="348" stroke="#2E2822"/>
-      <text class="sv-l" x="8" y="366">&#9312; đọc EXPLAIN là so rows đoán với rows thật — lệch một bậc thì chạy ANALYZE trước đã</text>
-      <text class="sv-l" x="8" y="382">&#9313;&#9314;&#9315; index tốt cần đủ ba thứ: selectivity thấp, đúng thứ tự cột, và cột không bị bọc</text>
-    </svg>
-    <figcaption>Đọc theo số: planner chọn kế hoạch &#9312;, selectivity quyết định index có thắng seq scan không &#9313;, thứ tự cột quyết định index tổ hợp dùng được tới đâu &#9314;, và bốn kiểu viết truy vấn làm index thành vô dụng &#9315;.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><strong>Chi phí ghi</strong> là mặt còn lại của &#9312;: mỗi index là một lần ghi thêm cho mọi lệnh chạm cột đó.</li>
-    <li><strong>Partial index</strong> lách &#9313; khi chỉ một nhóm nhỏ dòng được truy vấn — index chỉ phủ nhóm đó nên vừa nhỏ vừa chọn lọc.</li>
-    <li><strong>Index bao phủ</strong> đẩy &#9314; lên một bậc: <code>INCLUDE</code> chở thêm cột mà không đổi thứ tự sắp, đủ để không chạm bảng.</li>
-    <li><strong>Thuật toán JOIN</strong> là chỗ &#9312; và &#9313; gặp nhau: Nested Loop chỉ rẻ khi bảng ngoài nhỏ <em>và</em> bảng trong có index.</li>
-  </ul>
-</section>
-
-<section id="sqlindex-s14" class="lesson">
-  <div class="sh"><b>14</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>13</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
     <div class="card bad"><h4>Index trên mọi cột "cho chắc"</h4><p>Ghi chậm gấp nhiều lần, tốn dung lượng, và phần lớn index không bao giờ được dùng.</p></div>
     <div class="card bad"><h4>Bọc hàm quanh cột trong WHERE</h4><p><code>lower(email) = ...</code> làm index vô hiệu. Dùng index biểu thức.</p></div>
@@ -373,8 +909,8 @@ FROM pg_stats WHERE tablename = <span class="st">'orders'</span> AND attname = <
   </div>
 </section>
 
-<section id="sqlindex-s15" class="lesson">
-  <div class="sh"><b>15</b><h2>Hỏi đáp</h2></div>
+<section id="sqlindex-s14" class="lesson">
+  <div class="sh"><b>14</b><h2>Hỏi đáp</h2></div>
 
   <details class="qa"><summary>Vì sao thêm index làm SELECT nhanh lên nhưng INSERT chậm đi?</summary>
   <p>Index là một cấu trúc B-tree phụ được sắp theo giá trị cột, nên tìm kiếm chỉ mất O(log n) thay vì quét toàn bảng O(n). Nhưng nó phải luôn đồng bộ với bảng: mỗi <code>INSERT</code> phải chèn khoá vào <b>mọi</b> index của bảng, có thể gây tách nút; <code>UPDATE</code> cột được index thì phải xoá khoá cũ và chèn khoá mới. Bảng có 10 index thì một lần insert thành 11 lần ghi. Cộng thêm dung lượng, có khi bằng 20–50% kích thước bảng.</p></details>
@@ -389,7 +925,7 @@ FROM pg_stats WHERE tablename = <span class="st">'orders'</span> AND attname = <
   <p>Khi tỉ lệ dòng khớp điều kiện đủ lớn — thực tế khoảng vài phần trăm trở lên. Lý do là index scan đọc <em>ngẫu nhiên</em> từng trang chứa dòng cần lấy, còn seq scan đọc <em>tuần tự</em> nên mỗi trang rẻ hơn và hệ thống đọc trước được. Khi phải chạm hầu hết các trang thì đọc tuần tự cả bảng rẻ hơn nhảy ngẫu nhiên. Bảng rất nhỏ cũng vậy: cả bảng chỉ vài trang thì index chỉ thêm việc.</p></details>
 
   <details class="qa"><summary>Hash join, merge join, nested loop — planner chọn thế nào?</summary>
-  <p>Nested loop khi bảng ngoài nhỏ <b>và</b> bảng trong có index trên cột join — mỗi dòng ngoài chỉ mất một lần tra. Hash join khi join so bằng và hai bảng đều lớn không có index: dựng bảng băm từ bên nhỏ rồi quét bên lớn, tất cả đọc tuần tự. Merge join khi hai bên đã sắp theo cột join, thường vì đọc theo index. Hash join xuất hiện <b>không</b> có nghĩa là thiếu index — với hai bảng lớn cần ghép toàn bộ thì nó chính là lựa chọn tối ưu.</p></details>
+  <p>Nested loop khi bảng ngoài nhỏ <b>và</b> bảng trong có index trên cột join — mỗi dòng ngoài chỉ mất một lần tra. Hash join khi join so bằng và hai bảng đều lớn không có index: dựng hash table từ bên nhỏ rồi quét bên lớn, tất cả đọc tuần tự. Merge join khi hai bên đã sắp theo cột join, thường vì đọc theo index. Hash join xuất hiện <b>không</b> có nghĩa là thiếu index — với hai bảng lớn cần ghép toàn bộ thì nó chính là lựa chọn tối ưu.</p></details>
 
 </section>
 
