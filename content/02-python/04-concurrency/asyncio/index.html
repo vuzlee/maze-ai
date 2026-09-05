@@ -104,7 +104,7 @@ asyncio.run(main(urls))                <span class="cm"># 1000 request đồng t
     <span class="kw">await</span> asyncio.sleep(<span class="st">2</span>)
     data = <span class="kw">await</span> client.get(url)                     <span class="cm"># thư viện async</span>
     row = <span class="kw">await</span> asyncio.to_thread(cursor.execute, sql) <span class="cm"># đẩy hàm chặn sang thread</span></code></pre>
-  <p>Đây là lỗi nghiêm trọng nhất vì hậu quả không nằm ở một request — nó làm <em>mọi</em> request đang chờ bị treo theo. Triệu chứng: server chậm bất thường dưới tải mà CPU vẫn thấp.</p>
+  <p>Lỗi nặng nhất: hậu quả không nằm ở một request, nó treo <em>mọi</em> request đang chờ. Triệu chứng là server chậm bất thường dưới tải mà CPU vẫn thấp.</p>
   <h3>2. Quên await</h3>
 <pre><code>result = fetch(url)          <span class="cm">← không chạy gì, result là một coroutine object</span>
 result = <span class="kw">await</span> fetch(url)    <span class="cm"># đúng</span></code></pre>
@@ -148,7 +148,7 @@ results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="k
     <div class="c on"><i>Thread</i><b>~8 MB ngăn xếp</b><u>tạo dưới 1 ms · chuyển qua kernel · hàng trăm là hết</u></div>
     <div class="c t"><i>Async task</i><b>vài KB</b><u>tạo mất micro giây · chuyển là gọi hàm · hàng chục nghìn</u></div>
   </div>
-  <p>Bảng này giải thích tại sao câu hỏi "tại sao async chứ không thread" có câu trả lời định lượng: cùng phục vụ 10.000 kết nối đồng thời, thread cần khoảng 80 GB RAM, async cần vài chục MB.</p>
+  <p>Câu "tại sao async chứ không thread" có câu trả lời bằng số: cùng 10.000 kết nối đồng thời, thread cần khoảng <b>80 GB RAM</b>, async cần <b>vài chục MB</b>.</p>
 </section>
 
 <section id="async-s5">
@@ -173,7 +173,13 @@ results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="k
     <div class="s"><b>async</b><span>nhận request, gọi vector DB, gọi LLM API, stream về client</span></div>
     <div class="s warn"><b>to_thread</b><span>driver DB đồng bộ, đọc file, xử lý ảnh — những thư viện chưa có bản async</span></div>
   </div>
-  <p>Đây là kiến trúc gặp ở gần như mọi service Python hiện đại, và nó dùng <em>cả ba</em> mô hình đúng chỗ: process để dùng nhiều lõi, async để chồng lấn hàng nghìn lần chờ, thread để chứa những thư viện chưa có bản async.</p>
+  <p>Gần như mọi service Python hiện đại dựng theo kiến trúc này — dùng <em>cả ba</em> mô hình, mỗi cái đúng chỗ:</p>
+
+  <ul class="why">
+    <li><b>Process</b> — dùng hết số lõi.</li>
+    <li><b>Async</b> — chồng lấn hàng nghìn lần chờ.</li>
+    <li><b>Thread</b> — chứa những thư viện chưa có bản async.</li>
+  </ul>
   <div class="note">
     <h4>Câu hỏi hay gặp ở vòng system design</h4>
     <em>Service của em xử lý được bao nhiêu request đồng thời?</em> Câu trả lời tốt bắt đầu bằng việc phân loại: nếu chủ yếu là chờ, giới hạn nằm ở kết nối và bộ nhớ nên async cho phép hàng nghìn; nếu chủ yếu là tính, giới hạn nằm ở số lõi và không mô hình nào vượt qua được — phải scale ngang.
@@ -232,7 +238,7 @@ results = <span class="kw">await</span> asyncio.gather(*[fetch(u) <span class="k
       <text class="sv-d" x="306" y="296" fill="#7A6F63">cảnh báo hiện muộn, ở chỗ khác</text>
       <rect x="572" y="250" width="264" height="48" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
       <text class="sv-t" x="582" y="268" fill="#F79BAB">3 &#183; tuần tự hoá vô tình</text>
-      <text class="sv-l" x="582" y="284">await trong vòng lặp &#8594; nối đuôi</text>
+      <text class="sv-s" x="582" y="284">await trong vòng lặp &#8594; nối đuôi</text>
       <text class="sv-d" x="582" y="296" fill="#7A6F63">300 ms thay vì 100 ms</text>
 
       <text class="sv-h" x="8" y="330">&#9315; CHỌN MÔ HÌNH NÀO</text>

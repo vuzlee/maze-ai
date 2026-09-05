@@ -48,8 +48,14 @@
 
 <section id="osproc-s1">
   <div class="sh"><b>01</b><h2>Process so với thread</h2></div>
-  <p>Một <strong>process</strong> là một chương trình đang chạy, cấp phát cho nó một không gian địa chỉ (address space) riêng — bộ nhớ của process này process khác không nhìn thấy, trừ khi đi qua cơ chế liên lạc rõ ràng (IPC). Đó là ranh giới cô lập mạnh nhất hệ điều hành cung cấp: một process crash không kéo process khác chết theo.</p>
-  <p>Một <strong>thread</strong> là một luồng thực thi <em>bên trong</em> một process. Nhiều thread trong cùng process <strong>chia sẻ</strong> cùng một không gian địa chỉ — cùng heap, cùng biến global, cùng file descriptor đang mở — nhưng mỗi thread vẫn giữ <strong>riêng</strong> stack, tập thanh ghi (register) và program counter của nó, vì mỗi thread cần biết nó đang thực thi dòng lệnh nào, độc lập với các thread khác.</p>
+  <p class="key">Một <strong>process</strong> là một chương trình đang chạy, có <em>không gian địa chỉ riêng</em>. Một <strong>thread</strong> là một luồng thực thi <em>bên trong</em> một process.</p>
+
+  <ul class="why">
+    <li>Bộ nhớ của process này process khác không nhìn thấy, trừ khi đi qua IPC — ranh giới cô lập mạnh nhất hệ điều hành có.</li>
+    <li>Một process crash không kéo process khác chết theo.</li>
+    <li>Thread cùng process <strong>chia sẻ</strong> heap, biến global, file descriptor đang mở.</li>
+    <li>Nhưng mỗi thread giữ <strong>riêng</strong> stack, register và program counter — để biết mình đang chạy dòng lệnh nào.</li>
+  </ul>
   <div class="cmp two">
     <div><h5>Process</h5>
       <p><b>Không gian địa chỉ</b> riêng, cô lập</p>
@@ -68,8 +74,13 @@
 
 <section id="osproc-s2">
   <div class="sh"><b>02</b><h2>Context switch</h2></div>
-  <p>Context switch là lúc CPU dừng thực thi một luồng để chạy luồng khác. Chi phí không chỉ là "chuyển sự chú ý" — CPU phải <strong>lưu lại toàn bộ trạng thái register</strong> của luồng đang chạy (để lát nữa khôi phục đúng chỗ đã dừng), rồi nạp trạng thái register của luồng sắp chạy.</p>
-  <p>Chuyển giữa hai <strong>thread cùng process</strong> tương đối rẻ vì không gian địa chỉ giữ nguyên. Chuyển giữa hai <strong>process khác nhau</strong> đắt hơn hẳn vì phải đổi cả không gian địa chỉ — CPU có thể phải <strong>flush TLB</strong> (bảng dịch địa chỉ ảo → vật lý đang cache), và những lần truy cập bộ nhớ ngay sau đó chậm lại vì phải dịch địa chỉ lại từ đầu.</p>
+  <p class="key">Context switch là lúc CPU dừng một luồng để chạy luồng khác — phải <em>lưu toàn bộ register</em> của luồng cũ rồi nạp register của luồng mới.</p>
+
+  <ul class="why">
+    <li><strong>Hai thread cùng process</strong> — rẻ, vì không gian địa chỉ giữ nguyên.</li>
+    <li><strong>Hai process khác nhau</strong> — đắt hơn hẳn: phải đổi cả không gian địa chỉ, CPU có thể phải <strong>flush TLB</strong>.</li>
+    <li>Sau khi flush, mọi truy cập bộ nhớ chậm lại vì phải dịch địa chỉ lại từ đầu.</li>
+  </ul>
   <div class="bars">
     <div class="b"><i>gọi hàm thường</i><u style="width:2%"></u><b>~vài ns</b></div>
     <div class="b hi"><i>thread switch (cùng process)</i><u style="width:15%"></u><b>~1–4 µs</b></div>
@@ -83,13 +94,19 @@
 
 <section id="osproc-s3">
   <div class="sh"><b>03</b><h2>Lập lịch</h2></div>
-  <p>Hai triết lý cho bộ lập lịch (scheduler): <strong>preemptive</strong> — hệ điều hành có quyền ngắt ngang một tiến trình đang chạy để nhường CPU cho tiến trình khác, không cần tiến trình đó đồng ý; và <strong>cooperative</strong> — tiến trình phải tự chủ động nhường lại quyền chạy, hệ điều hành không ép được. Hầu hết hệ điều hành hiện đại (Linux, Windows) dùng preemptive cho tiến trình ở tầng OS, vì cooperative có rủi ro rõ: một tiến trình treo hoặc cố tình không nhường thì cả hệ thống bị khoá.</p>
+  <p class="key">Hai triết lý lập lịch, khác nhau ở chỗ <em>ai có quyền cắt ngang</em>.</p>
+
+  <ul class="why">
+    <li><strong>Preemptive</strong> — hệ điều hành ngắt ngang tiến trình đang chạy, không cần nó đồng ý.</li>
+    <li><strong>Cooperative</strong> — tiến trình phải tự nhường quyền chạy, hệ điều hành không ép được.</li>
+    <li>Linux và Windows dùng preemptive ở tầng OS: cooperative thì một tiến trình treo là khoá cả hệ thống.</li>
+  </ul>
   <div class="flow">
-    <div class="n"><h5>1 · Chạy</h5><p>tiến trình được cấp một <b>time slice</b> (quantum) — một khoảng CPU cố định</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>2 · Hết giờ</h5><p>hệ điều hành <b>ngắt ngang</b> (preempt) dù tiến trình chưa xong việc</p></div>
-    <div class="a">→</div>
-    <div class="n ok"><h5>3 · Xếp lại hàng</h5><p>chọn tiến trình kế tiếp theo <b>độ ưu tiên</b>, quay lại bước 1</p></div>
+    <div class="n"><h5>Đang chạy</h5><p>tiến trình được cấp một <b>time slice</b> (quantum) &#8212; một khoảng CPU cố định</p></div>
+    <div class="a act"><i>hết quantum</i>&#8594;</div>
+    <div class="n"><h5>Bị ngắt ngang</h5><p>hệ điều hành <b>preempt</b> dù tiến trình chưa xong việc</p></div>
+    <div class="a act"><i>chọn theo độ ưu tiên</i>&#8594;</div>
+    <div class="n ok"><h5>Tiến trình kế tiếp</h5><p>lên chạy, quay lại bước 1</p></div>
   </div>
   <div class="note">
     <h4>Priority scheduling và priority inversion</h4>
@@ -99,17 +116,23 @@
 
 <section id="osproc-s4">
   <div class="sh"><b>04</b><h2>Trạng thái tiến trình</h2></div>
-  <p>Một tiến trình đi qua vài trạng thái cố định trong vòng đời của nó, và bộ lập lịch chỉ là thứ quyết định khi nào nó chuyển từ trạng thái này sang trạng thái khác.</p>
+  <p class="key">Một tiến trình đi qua vài trạng thái cố định; bộ lập lịch chỉ quyết định <em>khi nào</em> nó chuyển trạng thái.</p>
   <div class="flow">
     <div class="n"><h5>New</h5><p>vừa được tạo</p></div>
-    <div class="a">→</div>
+    <div class="a act"><i>xếp vào hàng chờ</i>&#8594;</div>
     <div class="n"><h5>Ready</h5><p>chờ tới lượt, sẵn sàng chạy</p></div>
-    <div class="a">→</div>
+    <div class="a act"><i>scheduler chọn</i>&#8594;</div>
     <div class="n ok"><h5>Running</h5><p>đang chiếm CPU</p></div>
-    <div class="a">→</div>
-    <div class="n no"><h5>Terminated</h5><p>chạy xong hoặc bị kết thúc</p></div>
+    <div class="a act"><i>xong việc hoặc bị kill</i>&#8594;</div>
+    <div class="n no"><h5>Terminated</h5><p>giải phóng tài nguyên</p></div>
   </div>
-  <p>Hai đường rẽ đáng nhớ ngoài dòng chính: từ <strong>Running</strong> có thể quay lại <strong>Ready</strong> khi hết time slice mà chưa xong việc — bị preempt chứ không phải lỗi; và từ <strong>Running</strong> có thể rẽ sang <strong>Waiting/Blocked</strong> khi tiến trình phải chờ một sự kiện bên ngoài (thường là I/O — đọc file, chờ mạng), rồi quay lại <strong>Ready</strong> khi sự kiện đó xong chứ không được chạy ngay lập tức.</p>
+  <p>Hai đường rẽ ngoài dòng chính, đều xuất phát từ <strong>Running</strong>:</p>
+
+  <ul class="why">
+    <li>Về lại <strong>Ready</strong> khi hết time slice mà chưa xong — bị preempt, không phải lỗi.</li>
+    <li>Sang <strong>Waiting/Blocked</strong> khi phải chờ I/O — đọc file, chờ mạng.</li>
+    <li>Chờ xong thì về <strong>Ready</strong>, không được chạy ngay.</li>
+  </ul>
 </section>
 
 <section id="osproc-s5" class="lesson">
@@ -123,12 +146,12 @@
       <text class="sv-h" x="8" y="16">&#9312; RANH GIỚI CÔ LẬP &#8212; CHIA SẺ BỘ NHỚ HAY KHÔNG</text>
       <rect x="8" y="26" width="404" height="80" rx="6" fill="rgba(140,169,242,.06)" stroke="#8CA9F2"/>
       <text class="sv-t" x="20" y="44" fill="#A8BEF6">Process &#8212; không gian địa chỉ riêng</text>
-      <text class="sv-l" x="20" y="62">không chia sẻ gì &#183; muốn trao đổi phải qua IPC</text>
+      <text class="sv-s" x="20" y="62">không chia sẻ gì &#183; muốn trao đổi phải qua IPC</text>
       <text class="sv-l" x="20" y="78">tạo mới đắt: nhân bản bộ nhớ, bảng trang</text>
       <text class="sv-d" x="20" y="96" fill="#7A6F63">crash một process không kéo process khác chết theo</text>
       <rect x="424" y="26" width="424" height="80" rx="6" fill="rgba(237,180,74,.06)" stroke="#EDB44A"/>
       <text class="sv-t" x="436" y="44" fill="#EDB44A">Thread &#8212; nằm trong một process</text>
-      <text class="sv-l" x="436" y="62">CHUNG: heap, biến global, file descriptor</text>
+      <text class="sv-s" x="436" y="62">CHUNG: heap, biến global, file descriptor</text>
       <text class="sv-l" x="436" y="78">RIÊNG: stack, register, program counter</text>
       <text class="sv-d" x="436" y="96" fill="#7A6F63">chính phần dùng chung là nguồn của race condition &#8594; cần lock</text>
 

@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Python dict &amp; hash table — MazeAI</title>
-<meta name="description" content="Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.">
+<meta name="description" content="Hash function, hashable, collision, probe sequence, tombstone, load factor, resize, insertion order — đủ để trả lời mọi câu dict trong phỏng vấn.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/03-builtin-structures/dict-hash-table/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Python dict &amp; hash table">
-<meta property="og:description" content="Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.">
+<meta property="og:description" content="Hash function, hashable, collision, probe sequence, tombstone, load factor, resize, insertion order — đủ để trả lời mọi câu dict trong phỏng vấn.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,715 +39,966 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-dict" data-title="Python dict &amp; hash table" data-tag="Python internals" data-blurb="Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.">
+      <article class="doc" id="art-dict" data-title="Python dict &amp; hash table" data-tag="Python internals" data-blurb="Hash function, hashable, collision, probe sequence, tombstone, load factor, resize, insertion order &#8212; đủ để trả lời mọi câu dict trong phỏng vấn.">
         <header class="hero">
-  <p class="eyebrow">Cheat sheet · CPython 3.12 · hash table internals</p>
+  <p class="eyebrow">Cheat sheet &#183; CPython 3.12 &#183; hash table internals</p>
   <h1>Python <em>dict</em><br>từ trong ra ngoài</h1>
-  <p class="lede">Toàn bộ kiến thức về <b>dict</b>: hash function, hashable, collision, <b>probe sequence</b>, <b>clustering</b>, tombstone, resize, insertion order và độ phức tạp. Mọi công thức trong tài liệu này lấy đúng theo mã nguồn CPython, có ví dụ chạy được.</p>
+  <p class="lede">Dict nhanh không phải vì nó tìm giỏi, mà vì nó <b>không tìm</b>: từ chính key, nó <b>tính</b> thẳng ra slot cần đọc rồi chỉ đọc đúng slot đó. Phần còn lại của bài là hai thứ giữ cho phép tính ấy luôn đúng:</p>
+  <ul class="ledelist">
+    <li><b>Collision</b> — <em>hai key tính ra cùng một slot thì xử lý thế nào</em></li>
+    <li><b>Resize</b> — <em>bảng chật thì cơi nới ra sao mà không mất key</em></li>
+  </ul>
 </header>
 
 
 <section id="dict-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Dict là một hash table</h2></div>
-  <p>Một lần <code>d[key]</code> đi qua sáu chặng. Nhớ được sơ đồ này là nhớ được 80% phần còn lại của tài liệu.</p>
-  <figure>
-    <svg viewBox="0 0 860 300" role="img" aria-label="Sơ đồ luồng từ key tới value trong dict">
-      <defs>
-        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,0 L10,5 L0,10 z" fill="#9A8F81"/>
-        </marker>
-      </defs>
-      <g class="sv-b" stroke-width="1">
-        <rect x="4" y="30" width="112" height="48" rx="6"/>
-        <rect x="156" y="30" width="112" height="48" rx="6"/>
-        <rect x="308" y="30" width="140" height="48" rx="6"/>
-      </g>
-      <text class="sv-t" x="60" y="52" text-anchor="middle">key</text>
-      <text class="sv-l" x="60" y="68" text-anchor="middle">"apple"</text>
-      <text class="sv-t" x="212" y="52" text-anchor="middle">hash(key)</text>
-      <text class="sv-l" x="212" y="68" text-anchor="middle">int 64-bit</text>
-      <text class="sv-t" x="378" y="52" text-anchor="middle">hash &amp; mask</text>
-      <text class="sv-l" x="378" y="68" text-anchor="middle">mask = size − 1</text>
-      <path d="M120,54 L152,54" stroke="#9A8F81" marker-end="url(#ar)"/>
-      <path d="M272,54 L304,54" stroke="#9A8F81" marker-end="url(#ar)"/>
-      <path d="M378,82 L378,110" stroke="#9A8F81" marker-end="url(#ar)"/>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-      <rect x="248" y="116" width="260" height="52" rx="6" class="sv-b" stroke-width="1"/>
-      <text class="sv-t" x="378" y="138" text-anchor="middle">dk_indices[i]</text>
-      <text class="sv-l" x="378" y="156" text-anchor="middle">bảng thưa: chỉ chứa số thứ tự entry</text>
+  <p class="key">Dict không đi tìm key — nó <em>tính</em> ra chỗ key phải nằm rồi kiểm đúng slot đó; mọi phần còn lại của bài chỉ là chống đỡ cho những lần phép tính ra trùng slot.</p>
 
-      <path d="M508,142 L560,142" stroke="#9A8F81" marker-end="url(#ar)"/>
-      <rect x="566" y="116" width="140" height="52" rx="6" class="sv-b" stroke-width="1"/>
-      <text class="sv-t" x="636" y="138" text-anchor="middle">dk_entries[ix]</text>
-      <text class="sv-l" x="636" y="156" text-anchor="middle">hash | key | value</text>
+<figure class="gist">
+<svg viewBox="0 0 860 344" role="img" aria-label="Bản đồ dict: một phép tính ra chỗ và ba thứ chống đỡ nó">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--probe)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--probe)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="85" fill="var(--probe)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--dim)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--filled)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--filled)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="12" y="141" fill="var(--filled)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--dim)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--dim)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--filled)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--filled)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="188" y="141" fill="var(--filled)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--dim)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--dim)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="223" fill="var(--tomb)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--dim)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="269" fill="var(--tomb)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--dim)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="315" fill="var(--ok)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--dim)">thì nhân đôi bảng &#8212; resize</text>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">CẢ BÀI TRONG NĂM DÒNG</text>
+<rect x="360" y="26" width="500" height="50" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="47" fill="var(--probe)">Dict không đi tìm key, nó tính ra chỗ</text>
+<text class="sv-t" x="376" y="65" fill="var(--dim)">từ key tính thẳng ra slot index, rồi đọc đúng slot đó</text>
+<rect x="360" y="84" width="500" height="50" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="376" y="105" fill="var(--filled)">Chỗ lưu là hai mảng, không phải một</text>
+<text class="sv-t" x="376" y="123" fill="var(--dim)">bảng thưa chỉ chứa số thứ tự, trỏ vào vùng đặc chứa entry</text>
+<rect x="360" y="142" width="500" height="50" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="163" fill="var(--tomb)">Hai key trùng slot thì probe sang slot khác</text>
+<text class="sv-t" x="376" y="181" fill="var(--dim)">theo một đường cố định &#8212; insert và lookup đi lại y hệt nhau</text>
+<rect x="360" y="200" width="500" height="50" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="221" fill="var(--tomb)">Xoá phải để lại vết, không xoá trắng</text>
+<text class="sv-t" x="376" y="239" fill="var(--dim)">ghi trắng là cắt đường probe, mọi key phía sau biến mất</text>
+<rect x="360" y="258" width="500" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="376" y="279" fill="var(--ok)">Chật tới 2/3 thì nhân đôi bảng</text>
+<text class="sv-t" x="376" y="297" fill="var(--dim)">tính lại mọi slot index và dọn sạch vết xoá trong một lượt</text>
+<text class="sv-d" x="360" y="326" fill="var(--muted)">Năm dòng này là năm mục tiếp theo &#8212; mỗi mục phóng to đúng một ô của bản đồ.</text>
+</svg>
+<figcaption>Dict không đi tìm key &#8212; nó tính ra chỗ key phải nằm; cả bài chỉ là bốn thứ giữ cho phép tính đó luôn ra cùng một slot.</figcaption>
+</figure>
 
-      <path d="M636,172 L636,204" stroke="#9A8F81" marker-end="url(#ar)"/>
-      <rect x="546" y="210" width="180" height="52" rx="6" fill="#1C1815" stroke="#5BCFA0"/>
-      <text class="sv-t" x="636" y="232" text-anchor="middle">key khớp?</text>
-      <text class="sv-l" x="636" y="250" text-anchor="middle">so hash rồi so ==</text>
+  <ul class="why">
+    <li><strong>Tính ra slot</strong> là lõi: từ key ra thẳng slot index, không duyệt &#8212; mục 02.</li>
+    <li><strong>Chỗ lưu</strong> tách làm hai mảng để vừa gọn vừa giữ thứ tự chèn &#8212; mục 03.</li>
+    <li><strong>Hai key trùng slot</strong> thì dò sang slot khác theo một đường cố định &#8212; mục 04 và 05.</li>
+    <li><strong>Vết xoá</strong> và <strong>nhân đôi bảng</strong> giữ cho đường dò không dài ra &#8212; mục 06 và 07.</li>
+  </ul>
 
-      <path d="M546,236 L470,236" stroke="#EDB44A" marker-end="url(#ar)"/>
-      <rect x="248" y="210" width="216" height="52" rx="6" fill="#1C1815" stroke="#EDB44A"/>
-      <text class="sv-t" x="356" y="232" text-anchor="middle">không khớp → probe tiếp</text>
-      <text class="sv-l" x="356" y="250" text-anchor="middle">i = (i*5 + perturb + 1) &amp; mask</text>
-      <path d="M356,210 L356,180 L280,180 L280,168" stroke="#EDB44A" fill="none" marker-end="url(#ar)"/>
-
-      <text class="sv-l" x="740" y="240" fill="#5BCFA0">khớp → trả value</text>
-    </svg>
-    <figcaption>Hai bảng, không phải một: <code>dk_indices</code> là bảng hash thưa dùng để tìm; <code>dk_entries</code> là vùng dữ liệu đặc, xếp theo thứ tự chèn.</figcaption>
-  </figure>
+  <details class="deep"><summary>Nói &quot;O(1)&quot; thì đã đủ để trả lời câu &quot;vì sao dict nhanh&quot; chưa?</summary>
+    <div class="body">
+      <p>Chưa, vì O(1) mới là kết quả chứ không phải lý do. Lý do là chi phí một lần tra <b>không đọc phần tử nào khác ngoài slot được tính ra</b>: một lần băm, một phép chia dư, một lần đọc mảng. Số phần tử trong dict không xuất hiện ở bất kỳ đâu trong ba bước đó.</p>
+      <p>Nói được câu đó thì ba câu hỏi tiếp theo tự trả lời: vì sao key phải hashable (phép tính phải luôn ra cùng kết quả), vì sao dict tốn bộ nhớ hơn list (bảng phải để trống một phần), và vì sao worst case vẫn là O(n) (khi phép tính ra cùng một slot cho mọi key).</p>
+    </div></details>
 </section>
 
 <section id="dict-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Dict là gì</h2></div>
-  <ul>
-    <li>Cấu trúc lưu cặp <strong>key → value</strong>, cài đặt bằng <strong>hash table</strong>.</li>
-    <li>Lookup / insert / delete trung bình <strong>O(1)</strong>, không phụ thuộc số phần tử.</li>
-    <li>Ý chính: <strong>không tìm tuần tự</strong>. Từ chính bản thân key tính ra được vị trí cần đọc.</li>
-    <li>Đánh đổi: tốn bộ nhớ hơn list (phải để trống ~1/3 bảng), và cần key hashable.</li>
+  <div class="sh"><b>02</b><h2>Tính ra chỗ, không duyệt tìm</h2></div>
+
+  <p class="key">Ô trên cùng của bản đồ. Ba kết quả nối bằng hai phép tính, không bước nào là duyệt: key thành <em>hash value</em>, hash value thành <em>slot index</em>, slot index thành dữ liệu.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Key qua hash rồi qua chia dư thành slot index, và vì sao hai key có thể ra cùng slot">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--probe)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--probe)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="85" fill="var(--probe)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--dim)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--rule)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="12" y="141" fill="var(--muted)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--muted)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--muted)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--rule)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="188" y="141" fill="var(--muted)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--muted)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--muted)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="223" fill="var(--muted)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--muted)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 88 H 328 V 46 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,46 348,41.8 348,50.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">TỪ KEY RA SLOT INDEX &#8212; HAI PHÉP TÍNH, KHÔNG DUYỆT</text>
+<rect x="360" y="32" width="124" height="46" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="373" y="52" fill="var(--filled)">key</text>
+<text class="sv-s" x="373" y="69" fill="var(--dim)">&quot;user&quot;</text>
+<rect x="548" y="32" width="124" height="46" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="561" y="52" fill="var(--filled)">hash value</text>
+<text class="sv-s" x="561" y="69" fill="var(--dim)">một số nguyên</text>
+<rect x="736" y="32" width="124" height="46" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="749" y="52" fill="var(--probe)">slot index</text>
+<text class="sv-s" x="749" y="69" fill="var(--dim)">số thứ tự slot</text>
+<line x1="484" y1="58" x2="540" y2="58" stroke="var(--probe)" stroke-width="1.2"/><polygon points="548,58 540,53.8 540,62.2" fill="var(--probe)"/>
+<text class="sv-l" x="516.0" y="50" fill="var(--probe)" text-anchor="middle">hash(key)</text>
+<line x1="672" y1="58" x2="728" y2="58" stroke="var(--probe)" stroke-width="1.2"/><polygon points="736,58 728,53.8 728,62.2" fill="var(--probe)"/>
+<text class="sv-l" x="704.0" y="50" fill="var(--probe)" text-anchor="middle">% size</text>
+<text class="sv-d" x="360" y="100" fill="var(--muted)">CPython viết phép chia dư đó thành hash &amp; (size &#8722; 1) &#8212; cùng nghĩa, nhanh hơn</text>
+<text class="sv-hv" x="360" y="130" fill="var(--muted)">HAI KEY KHÁC NHAU VẪN CÓ THỂ RA CÙNG MỘT SLOT</text>
+<rect x="360" y="140" width="500" height="26" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="157" fill="var(--filled)">Ít slot, hash vô số</text>
+<text class="sv-s" x="536" y="157" fill="var(--dim)">nén một dải rất lớn xuống 8 chỗ &#8212; trùng là tất yếu</text>
+<rect x="360" y="170" width="500" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="187" fill="var(--probe)">Trùng slot &#8800; trùng key</text>
+<text class="sv-s" x="536" y="187" fill="var(--dim)">dict vẫn phải so key mới dám kết luận</text>
+<rect x="360" y="200" width="500" height="26" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="217" fill="var(--tomb)">Nên cần đường đi tiếp</text>
+<text class="sv-s" x="536" y="217" fill="var(--dim)">đó là probe sequence &#8212; mục 04</text>
+<text class="sv-hv" x="360" y="252" fill="var(--muted)">ĐIỀU KIỆN ĐỂ BƯỚC ĐẦU CÓ NGHĨA</text>
+<rect x="360" y="262" width="500" height="60" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="374" y="282" fill="var(--text)">hash phải bất biến suốt đời key</text>
+<text class="sv-s" x="374" y="300" fill="var(--dim)">đổi hash sau khi lưu &#8594; tìm ở slot mới, dữ liệu nằm slot cũ</text>
+<text class="sv-s" x="374" y="316" fill="var(--dim)">list &#183; dict &#183; set không làm key được &#8212; tuple, str, int thì được</text>
+</svg>
+<figcaption>Slot cần đọc được <em>tính</em> ra chứ không tìm ra &#8212; nhưng phép nén ấy có thể trả cùng một slot cho hai key khác nhau, và đó là toàn bộ nội dung mục sau.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong><code>hash(key)</code></strong> biến object thành một số nguyên.</li>
+    <li><strong>Số đó chia dư cho size</strong> ra thẳng slot index &#8212; không đọc slot nào khác.</li>
+    <li><strong>Nén thì phải trùng</strong>: bảng có 8 slot mà hash có vô số giá trị, nên hai key khác nhau vẫn có thể ra cùng một slot &#8212; xử lý ở mục 04.</li>
+    <li><strong>Hashable</strong> là điều kiện để bước đầu có nghĩa: hash phải bất biến và nhất quán với <code>==</code>.</li>
   </ul>
-  <div class="note key">
-    <h4>Nhớ một câu</h4>
-    List trả lời câu "phần tử thứ 5 ở đâu". Dict trả lời câu "key này ở đâu". Cả hai đều là truy cập mảng theo index — khác nhau ở chỗ index từ đâu ra.
-  </div>
+
+  <details class="deep"><summary>Mutable có làm key được không?</summary>
+    <div class="body">
+      <p>Được, miễn hash của nó không đổi. Điều Python đòi là <b>hash bất biến và nhất quán với <code>==</code></b>, chứ không phải object immutable &#8212; một class tự viết mặc định hash theo <code>id()</code> nên sửa thuộc tính thoải mái vẫn làm key được. Cái giá là chính chỗ đó: hễ bạn tự viết <code>__hash__</code> đọc một field sửa được, sửa field là mất luôn key trong dict.</p>
+      <p>Ranh giới immutable / mutable nằm ở bài <a href="../../02-language-core/memory-model-mutability/index.html">Memory model &amp; mutability</a>; ở đây chỉ cần nhớ immutable là <em>cách dễ nhất</em> để đạt hash bất biến, không phải điều kiện bắt buộc.</p>
+    </div></details>
+
+  <details class="deep"><summary>Vì sao <code>{1: &quot;int&quot;, 1.0: &quot;float&quot;, True: &quot;bool&quot;}</code> chỉ còn một phần tử?</summary>
+    <div class="body">
+      <p>Vì <code>1 == 1.0 == True</code>, mà hợp đồng bắt bằng nhau thì hash phải bằng nhau. Ba lần gán là ba lần ghi vào <b>cùng một slot</b>, key giữ nguyên từ lần đầu và value bị ghi đè dần &#8212; kết quả là <code>{1: 'bool'}</code>.</p>
+      <p>Cùng họ với nó: hash của <code>str</code> trộn một seed riêng mỗi tiến trình, nên <code>hash(&quot;a&quot;)</code> đổi giá trị sau mỗi lần chạy &#8212; đừng đem đi lưu file hay làm shard key.</p>
+    </div></details>
 </section>
 
 <section id="dict-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Hash function</h2></div>
-  <p>Biến một object thành số nguyên có dấu 64-bit (trên nền tảng 64-bit). Số đó dùng để suy ra vị trí trong bảng.</p>
-<pre><code>&gt;&gt;&gt; hash("apple")     <span class="cm"># đổi mỗi lần chạy interpreter</span>
--1795402529437124651
-&gt;&gt;&gt; hash(123)
-123                    <span class="cm"># int nhỏ: hash chính là nó</span>
-&gt;&gt;&gt; hash(2**61 - 1)
-0                      <span class="cm"># hash int lấy modulo 2**61-1</span>
-&gt;&gt;&gt; hash(-1), hash(-2)
-(-2, -2)               <span class="cm"># -1 bị đổi thành -2 vì -1 là mã lỗi trong C</span></code></pre>
-  <h3>Bốn tính chất phải nhớ</h3>
-  <ul>
-    <li><strong>Không cần duy nhất.</strong> Hai key khác nhau được phép trùng hash — đó là collision, xử lý sau.</li>
-    <li><strong>Bắt buộc nhất quán:</strong> <code>a == b</code> thì <code>hash(a) == hash(b)</code>. Ngược lại không đúng.</li>
-    <li><strong>Bằng nhau xuyên kiểu:</strong> <code>1 == 1.0 == True</code> nên cùng hash → trong dict chúng là <em>một</em> key duy nhất.</li>
-    <li><strong>Ngẫu nhiên hoá:</strong> hash của <code>str</code> trộn seed riêng mỗi tiến trình — <em>đừng</em> đem đi lưu file hay làm shard key.</li>
+  <div class="sh"><b>03</b><h2>Compact dict &#8212; hai mảng thay vì một</h2></div>
+
+  <p class="key">Ô chỗ lưu. Bảng hash chỉ giữ <em>số thứ tự</em>, còn dữ liệu nằm trong một vùng đặc ghi nối tiếp theo thứ tự chèn.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Compact dict: bảng thưa dk_indices trỏ vào vùng đặc dk_entries">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--rule)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="85" fill="var(--muted)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--muted)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--filled)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--filled)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="12" y="141" fill="var(--filled)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--dim)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--dim)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--filled)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--filled)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="188" y="141" fill="var(--filled)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--dim)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--dim)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="223" fill="var(--muted)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--muted)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 149 H 328 V 40 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,40 348,35.8 348,44.2" fill="var(--probe)"/>
+<text class="sv-h" x="360" y="16" fill="var(--muted)">d = {}; d[&quot;c&quot;]=1; d[&quot;a&quot;]=2; d[&quot;b&quot;]=3</text>
+<rect x="360" y="26" width="40" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="380" y="46" fill="var(--muted)" text-anchor="middle">&#8722;1</text>
+<text class="sv-l" x="380" y="68" fill="var(--muted)" text-anchor="middle">0</text>
+<rect x="404" y="26" width="40" height="30" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="424" y="46" fill="var(--filled)" text-anchor="middle">2</text>
+<text class="sv-l" x="424" y="68" fill="var(--muted)" text-anchor="middle">1</text>
+<rect x="448" y="26" width="40" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="468" y="46" fill="var(--muted)" text-anchor="middle">&#8722;1</text>
+<text class="sv-l" x="468" y="68" fill="var(--muted)" text-anchor="middle">2</text>
+<rect x="492" y="26" width="40" height="30" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="512" y="46" fill="var(--filled)" text-anchor="middle">0</text>
+<text class="sv-l" x="512" y="68" fill="var(--muted)" text-anchor="middle">3</text>
+<rect x="536" y="26" width="40" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="556" y="46" fill="var(--muted)" text-anchor="middle">&#8722;1</text>
+<text class="sv-l" x="556" y="68" fill="var(--muted)" text-anchor="middle">4</text>
+<rect x="580" y="26" width="40" height="30" rx="3" fill="var(--panel)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="600" y="46" fill="var(--tomb)" text-anchor="middle">&#8722;2</text>
+<text class="sv-l" x="600" y="68" fill="var(--muted)" text-anchor="middle">5</text>
+<rect x="624" y="26" width="40" height="30" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="644" y="46" fill="var(--filled)" text-anchor="middle">1</text>
+<text class="sv-l" x="644" y="68" fill="var(--muted)" text-anchor="middle">6</text>
+<rect x="668" y="26" width="40" height="30" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="688" y="46" fill="var(--muted)" text-anchor="middle">&#8722;1</text>
+<text class="sv-l" x="688" y="68" fill="var(--muted)" text-anchor="middle">7</text>
+<text class="sv-d" x="360" y="88" fill="var(--muted)">dk_indices &#183; thưa &#183; mỗi slot chỉ là một số nhỏ</text>
+<rect x="360" y="104" width="300" height="22" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="372" y="119" fill="var(--filled)">0 &#183; hash &#183; &quot;c&quot; &#183; 1</text>
+<rect x="360" y="130" width="300" height="22" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="372" y="145" fill="var(--filled)">1 &#183; hash &#183; &quot;a&quot; &#183; 2</text>
+<rect x="360" y="156" width="300" height="22" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="372" y="171" fill="var(--filled)">2 &#183; hash &#183; &quot;b&quot; &#183; 3</text>
+<text class="sv-d" x="360" y="200" fill="var(--muted)">dk_entries &#183; đặc &#183; ghi nối tiếp theo thứ tự chèn</text>
+<text class="sv-d" x="680" y="119" fill="var(--muted)">&#8722;1 = slot trống</text>
+<text class="sv-d" x="680" y="145" fill="var(--tomb)">&#8722;2 = vết xoá</text>
+<text class="sv-d" x="680" y="171" fill="var(--filled)">&#8805;0 = số thứ tự entry</text>
+<text class="sv-hv" x="360" y="226" fill="var(--muted)">MỘT THIẾT KẾ, HAI THỨ ĐƯỢC CÙNG LÚC</text>
+<rect x="360" y="236" width="500" height="26" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="253" fill="var(--ok)">Tiết kiệm 20&#8211;25% bộ nhớ</text>
+<text class="sv-s" x="536" y="253" fill="var(--dim)">slot để trống chỉ tốn 1 byte</text>
+<rect x="360" y="266" width="500" height="26" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="283" fill="var(--ok)">Thứ tự chèn miễn phí</text>
+<text class="sv-s" x="536" y="283" fill="var(--dim)">duyệt dict = quét vùng đặc từ đầu tới cuối</text>
+<text class="sv-d" x="360" y="312" fill="var(--muted)">Từ 3.7 thứ tự chèn là cam kết của ngôn ngữ, không còn là chi tiết cài đặt.</text>
+</svg>
+<figcaption>Tách làm hai mảng để bảng hash được phép rỗng mà vẫn rẻ &#8212; và thứ tự chèn rơi ra như một món quà kèm.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong><code>dk_indices</code></strong> thưa, mỗi slot chỉ 1 byte khi bảng &#8804; 128 slot &#8212; nên phần để trống rất rẻ.</li>
+    <li><strong><code>dk_entries</code></strong> đặc, mỗi entry là bộ ba <code>hash</code> &#183; <code>key</code> &#183; <code>value</code>.</li>
+    <li><strong>Tiết kiệm 20&#8211;25% bộ nhớ</strong> so với thiết kế một mảng của Python 3.5 trở về trước.</li>
+    <li><strong>Thứ tự chèn</strong> là hệ quả miễn phí: duyệt dict chính là quét tuần tự vùng đặc.</li>
   </ul>
-<pre><code>&gt;&gt;&gt; d = {1: "int", 1.0: "float", True: "bool"}
-&gt;&gt;&gt; d
-{1: 'bool'}            <span class="cm"># 3 lần ghi vào cùng một ô</span></code></pre>
+
+  <details class="deep"><summary>Insertion order là cam kết hay chỉ là chi tiết cài đặt?</summary>
+    <div class="body">
+      <p>Từ 3.6 nó là chi tiết cài đặt của CPython; từ <b>3.7 nó là cam kết trong ngôn ngữ</b>. Nhưng nhớ đúng nghĩa: thứ tự <em>chèn</em>, không phải thứ tự sắp xếp. Ghi đè value trên key đã có <b>không</b> đẩy nó xuống cuối &#8212; muốn thế phải <code>del</code> rồi gán lại. Và <code>d1 == d2</code> không xét thứ tự.</p>
+    </div></details>
 </section>
 
 <section id="dict-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Hashable</h2></div>
-  <p>Object đủ điều kiện làm key. Ba điều kiện, thiếu một là sai:</p>
-  <ol>
-    <li>Có <code>__hash__()</code> trả về int.</li>
-    <li>Giá trị hash <strong>không đổi</strong> suốt đời object.</li>
-    <li>Tương thích với <code>__eq__()</code>: bằng nhau thì hash phải bằng nhau.</li>
-  </ol>
-  <div class="grid2">
-    <div class="card ok"><h4>Hashable</h4><p><code>int</code> <code>float</code> <code>str</code> <code>bytes</code> <code>bool</code> <code>None</code> <code>tuple</code> (nếu mọi phần tử hashable) <code>frozenset</code> <code>type</code>, object tự định nghĩa (mặc định hash theo địa chỉ)</p></div>
-    <div class="card bad"><h4>Không hashable</h4><p><code>list</code> <code>dict</code> <code>set</code> <code>bytearray</code>, và <code>tuple</code> có chứa list bên trong</p></div>
-  </div>
-<pre><code>&gt;&gt;&gt; hash((1, 2, 3))
-529344067295497451
-&gt;&gt;&gt; hash((1, [2]))
-TypeError: unhashable type: 'list'   <span class="cm"># tuple chỉ hashable nếu bên trong hashable</span></code></pre>
-  <div class="note warn">
-    <h4>Vì sao key buộc phải hashable</h4>
-    Vị trí lưu được tính từ hash. Nếu hash của key thay đổi sau khi đã lưu, dict sẽ đi tìm ở ô mới trong khi dữ liệu nằm ở ô cũ — không bao giờ tìm lại được. Chi tiết ở mục 19.
-  </div>
+  <div class="sh"><b>04</b><h2>Collision &amp; probe sequence</h2></div>
+
+  <p class="key">Ô hai key trùng slot. Bảng có 8 slot mà hash có vô số giá trị, nên trùng là chuyện thường &#8212; vấn đề chỉ là đi tiếp theo đường nào.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Hai mức va chạm, hai cách xử lý, và hai điều kiện của một probe sequence">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--rule)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="85" fill="var(--muted)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--muted)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--rule)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="12" y="141" fill="var(--muted)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--muted)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--muted)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--rule)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="188" y="141" fill="var(--muted)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--muted)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--muted)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="223" fill="var(--tomb)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--dim)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 225 H 328 V 40 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,40 348,35.8 348,44.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">TRÙNG SLOT VÀ TRÙNG HASH LÀ HAI CHUYỆN KHÁC NHAU</text>
+<rect x="360" y="26" width="500" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="43" fill="var(--probe)">Trùng slot, khác hash</text>
+<text class="sv-s" x="536" y="43" fill="var(--dim)">thường xuyên &#183; probe tách hai key ra ngay</text>
+<rect x="360" y="56" width="500" height="26" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="73" fill="var(--tomb)">Trùng cả hash</text>
+<text class="sv-s" x="536" y="73" fill="var(--dim)">hiếm &#183; đường đi y hệt nhau &#8212; gốc của O(n)</text>
+<text class="sv-hv" x="360" y="106" fill="var(--muted)">HAI CÁCH XỬ LÝ &#8212; PYTHON CHỌN CÁI THỨ HAI</text>
+<rect x="360" y="116" width="244" height="76" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="374" y="136" fill="var(--text)">Chaining &#8212; Java</text>
+<text class="sv-s" x="374" y="154" fill="var(--muted)">mỗi slot treo một danh sách</text>
+<text class="sv-d" x="374" y="172" fill="var(--muted)">xoá dễ, nhưng con trỏ nhảy loạn</text>
+<rect x="616" y="116" width="244" height="76" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="630" y="136" fill="var(--ok)">Open addressing &#8212; Python</text>
+<text class="sv-s" x="630" y="154" fill="var(--dim)">đi tìm slot khác trong chính mảng</text>
+<text class="sv-d" x="630" y="172" fill="var(--dim)">cache tốt, nhưng xoá thành khó</text>
+<text class="sv-hv" x="360" y="216" fill="var(--muted)">ĐƯỜNG ĐI ĐÓ PHẢI THOẢ HAI ĐIỀU</text>
+<rect x="360" y="226" width="500" height="26" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="243" fill="var(--filled)">Xác định</text>
+<text class="sv-s" x="536" y="243" fill="var(--dim)">cùng key luôn ra cùng dãy slot &#8212; sai thì lookup lạc</text>
+<rect x="360" y="256" width="500" height="26" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="273" fill="var(--filled)">Đi hết được bảng</text>
+<text class="sv-s" x="536" y="273" fill="var(--dim)">không sót slot nào, không thì bảng kêu đầy sớm</text>
+<rect x="360" y="292" width="500" height="30" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="312" fill="var(--probe)">CPython trộn thêm bit cao của hash vào bước nhảy</text>
+</svg>
+<figcaption>Probe sequence là hợp đồng giữa insert và lookup: lookup chỉ tìm ra key nếu nó đi lại đúng con đường insert đã đi.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong>Trùng slot</strong> phổ biến và vô hại: hash khác nhau, chỉ tình cờ chia dư ra cùng số.</li>
+    <li><strong>Trùng hash</strong> mới tệ: hai key có probe sequence y hệt nhau, không tách ra được.</li>
+    <li><strong>Đường dò phải xác định</strong> &#8212; lookup chỉ tìm ra key nếu nó đi lại đúng đường insert đã đi.</li>
+    <li><strong>Và phải đi hết bảng</strong>, nếu không dict sẽ kêu đầy khi vẫn còn slot trống.</li>
+  </ul>
+
+  <details class="deep"><summary>CPython dò slot tiếp theo bằng cách nào?</summary>
+    <div class="body">
+      <p>Hiểu ý là đủ, không cần thuộc công thức. Bước nhảy được trộn thêm <b>phần cao của hash value</b> &#8212; phần mà phép chia dư đã vứt đi. Nhờ vậy hai key trùng slot đầu nhưng khác hash sẽ <b>rẽ khác nhau ngay bước thứ hai</b>, thay vì đi chung một đường.</p>
+      <p>Kèm theo là một phần bảo hiểm để dãy vẫn <b>đi hết được bảng</b> khi phần hash kia đã dùng cạn. Hai vai trò đó chính là hai điều kiện ở trên &#8212; phân tán và phủ hết; nhớ hai điều kiện thì tự suy ra được công thức phải làm gì.</p>
+    </div></details>
+
+  <details class="deep"><summary>Vì sao Python không treo linked list ngoài slot như Java?</summary>
+    <div class="body">
+      <p>Chaining cho load factor vượt 1 và xoá đơn giản, nhưng mỗi node là một lần cấp phát riêng và một lần nhảy con trỏ &#8212; cache miss liên tục. Open addressing giữ toàn bộ dữ liệu liền khối nên đọc rất nhanh, đổi lại phải giữ bảng rỗng một phần và phải để tombstone khi xoá.</p>
+      <p>Trong họ open addressing, Python cũng không chọn cách đơn giản nhất là <code>i + 1</code>: nó dồn các key va chạm thành một dải slot liền kề, dải càng dài càng hút thêm key rơi vào nó, và đường dò dài ra rất nhanh. Dãy giả ngẫu nhiên rải chúng ra khắp bảng nên không có dải nào tự lớn lên.</p>
+    </div></details>
 </section>
 
 <section id="dict-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Immutable vs Mutable</h2></div>
-<div class="cmp two">
-    <div><h5>Immutable — không sửa được nội dung</h5><p><code>int</code> <code>float</code> <code>complex</code> <code>bool</code> <code>str</code> <code>bytes</code> <code>tuple</code> <code>frozenset</code> <code>None</code></p></div>
-    <div><h5>Mutable — sửa được nội dung</h5><p><code>list</code> <code>dict</code> <code>set</code> <code>bytearray</code>, phần lớn class tự viết</p></div>
-  </div>
-  <p>Quan hệ giữa hai khái niệm hay bị nhầm — nhớ theo ba gạch đầu dòng này:</p>
-  <ul>
-    <li>Immutable thì <strong>hầu hết</strong> hashable. Không phải tất cả: <code>tuple</code> chứa <code>list</code> là immutable ở tầng ngoài nhưng vẫn unhashable.</li>
-    <li>Mutable <strong>có thể</strong> hashable: object tự viết mặc định vẫn hashable (hash theo <code>id()</code>) dù bạn sửa thuộc tính nó thoải mái.</li>
-    <li>Python cần <strong>hash không đổi và nhất quán với ==</strong>. Immutable chỉ là cách dễ nhất để đạt điều đó.</li>
-  </ul>
-</section>
+  <div class="sh"><b>05</b><h2>Lab &#8212; đường đi của probe</h2></div>
 
-<section id="dict-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Từ hash sang index</h2></div>
-  <p>Kích thước bảng của CPython <strong>luôn là lũy thừa của 2</strong> (nhỏ nhất là 8). Nhờ đó phép chia lấy dư được thay bằng phép AND bit, nhanh hơn nhiều:</p>
-<pre><code><span class="cm">// mask = size - 1, ví dụ size=8 → mask=0b111</span>
-i = hash &amp; mask;      <span class="cm">// tương đương hash % size, nhưng chỉ 1 chu kỳ CPU</span></code></pre>
-  <p>Hệ quả quan trọng: chỉ <strong>các bit thấp</strong> của hash quyết định ô đầu tiên. Với <code>size = 8</code> thì các key <code>0, 8, 16, 24, 32</code> đều bắt đầu ở ô 0, dù hash của chúng khác nhau hoàn toàn. Đây chính là lý do CPython phải trộn thêm bit cao vào lúc probe (mục 10).</p>
-  <div class="rail" id="rail-mask"></div>
-  <p class="legend"><span><b style="background:var(--filled)"></b>các key 0 · 8 · 16 · 24 đều đáp xuống ô 0 khi size = 8</span></p>
-</section>
+  <p class="key">Một key sinh ra không phải một slot mà một <em>dãy slot</em>, luôn theo đúng thứ tự đó &#8212; insert đi tới slot trống đầu tiên trên dãy, lookup đi lại y hệt.</p>
 
-<section id="dict-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Compact dict — cấu trúc thật</h2></div>
-  <p>Từ Python 3.6, dict không còn là một mảng entry duy nhất. Nó tách làm hai vùng:</p>
-  <ul>
-    <li><code>dk_indices</code> — <strong>bảng hash thưa</strong>, mỗi ô chỉ chứa một số nhỏ: thứ tự entry, <code>EMPTY (-1)</code> hoặc <code>DUMMY (-2)</code>.</li>
-    <li><code>dk_entries</code> — <strong>vùng dữ liệu đặc</strong>, mỗi entry <code>{hash, key, value}</code>, ghi nối tiếp <strong>theo thứ tự chèn</strong>.</li>
-  </ul>
-  <figure>
-    <svg viewBox="0 0 860 240" role="img" aria-label="Cấu trúc compact dict gồm dk_indices và dk_entries">
-      <text class="sv-l" x="0" y="16">dk_indices (8 ô, thưa)</text>
-      <g stroke="#2E2822" fill="#241F1A">
-        <rect x="0" y="26" width="66" height="34" rx="4"/><rect x="70" y="26" width="66" height="34" rx="4"/>
-        <rect x="140" y="26" width="66" height="34" rx="4"/><rect x="210" y="26" width="66" height="34" rx="4"/>
-        <rect x="280" y="26" width="66" height="34" rx="4"/><rect x="350" y="26" width="66" height="34" rx="4"/>
-        <rect x="420" y="26" width="66" height="34" rx="4"/><rect x="490" y="26" width="66" height="34" rx="4"/>
-      </g>
-      <g class="sv-l" text-anchor="middle" font-size="11">
-        <text x="33" y="74">0</text><text x="103" y="74">1</text><text x="173" y="74">2</text><text x="243" y="74">3</text>
-        <text x="313" y="74">4</text><text x="383" y="74">5</text><text x="453" y="74">6</text><text x="523" y="74">7</text>
-      </g>
-      <g class="sv-t" text-anchor="middle" font-family="JetBrains Mono" font-size="12">
-        <text x="33" y="48" fill="#9A8F81">−1</text><text x="103" y="48" fill="#8CA9F2">2</text>
-        <text x="173" y="48" fill="#9A8F81">−1</text><text x="243" y="48" fill="#8CA9F2">0</text>
-        <text x="313" y="48" fill="#9A8F81">−1</text><text x="383" y="48" fill="#F2718A">−2</text>
-        <text x="453" y="48" fill="#8CA9F2">1</text><text x="523" y="48" fill="#9A8F81">−1</text>
-      </g>
-      <text class="sv-l" x="0" y="118">dk_entries (đặc, theo thứ tự chèn)</text>
-      <g stroke="#2E2822" fill="#1C1815">
-        <rect x="0" y="128" width="176" height="34" rx="4"/><rect x="180" y="128" width="176" height="34" rx="4"/>
-        <rect x="360" y="128" width="176" height="34" rx="4"/>
-      </g>
-      <g class="sv-t" font-family="JetBrains Mono" font-size="11.5" text-anchor="middle">
-        <text x="88" y="149">h · "c" · 1</text><text x="268" y="149">h · "a" · 2</text><text x="448" y="149">h · "b" · 3</text>
-      </g>
-      <g class="sv-l" text-anchor="middle"><text x="88" y="176">ix=0</text><text x="268" y="176">ix=1</text><text x="448" y="176">ix=2</text></g>
-      <path d="M243,60 L243,100 L88,100 L88,126" stroke="#8CA9F2" fill="none" stroke-dasharray="3 3"/>
-      <path d="M453,60 L453,110 L268,110 L268,126" stroke="#8CA9F2" fill="none" stroke-dasharray="3 3"/>
-      <path d="M103,60 L103,92 L448,92 L448,126" stroke="#8CA9F2" fill="none" stroke-dasharray="3 3"/>
-      <text class="sv-l" x="600" y="40">−1 = EMPTY</text>
-      <text class="sv-l" x="600" y="58" fill="#F2718A">−2 = DUMMY (tombstone)</text>
-      <text class="sv-l" x="600" y="76" fill="#8CA9F2">≥0 = chỉ số trong dk_entries</text>
-      <text class="sv-l" x="600" y="140">Duyệt dict = đọc dk_entries</text>
-      <text class="sv-l" x="600" y="158">tuần tự → ra đúng thứ tự chèn.</text>
-    </svg>
-    <figcaption>Với <code>d = {}; d["c"]=1; d["a"]=2; d["b"]=3</code>. Bảng thưa chỉ tốn 1 byte/ô khi size ≤ 128 (2 byte tới 2¹⁵, 4 byte tới 2³¹), nên phần "để trống" của bảng hash rất rẻ.</figcaption>
-  </figure>
-  <p>Thiết kế này giải quyết hai việc cùng lúc: <strong>tiết kiệm 20–25% bộ nhớ</strong> so với dict cũ, và <strong>giữ được thứ tự chèn miễn phí</strong> (mục 18).</p>
-</section>
-
-<section id="dict-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Collision</h2></div>
-  <p>Hai key khác nhau nhưng cùng ra một ô. Có hai mức độ, phải phân biệt:</p>
-  <ul>
-    <li><strong>Trùng index</strong> — phổ biến, không tránh được: hash khác nhau nhưng cùng ô, vì bảng 8 ô mà hash là 2⁶⁴.</li>
-    <li><strong>Trùng hash</strong> — hiếm, tệ hơn: hai key có probe sequence <em>giống hệt nhau</em>, không tách ra được. Đây là gốc của O(n).</li>
-  </ul>
-<pre><code>&gt;&gt;&gt; hash(-1) == hash(-2)          <span class="cm"># trùng hash thật sự</span>
-True
-&gt;&gt;&gt; 4 &amp; 7, 12 &amp; 7                 <span class="cm"># trùng index, hash vẫn khác</span>
-(4, 4)</code></pre>
-  <div class="note">
-    <h4>Nhận diện đúng khi so hai key</h4>
-    CPython so <code>hash</code> đã lưu trong entry <em>trước</em>, chỉ khi hash bằng nhau mới gọi <code>==</code>. Nhờ vậy va chạm index không kéo theo chi phí so sánh object đắt đỏ.
-  </div>
-</section>
-
-<section id="dict-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Chaining vs Open Addressing</h2></div>
-  <div class="grid2">
-    <div class="card">
-      <h4>Separate Chaining</h4>
-      <p>Mỗi ô giữ một danh sách liên kết. Va chạm thì nối thêm vào cuối danh sách.</p>
-      <p class="legend" style="margin-top:10px"><span>Dùng bởi Java <code>HashMap</code> (đủ dài thì đổi sang cây đỏ-đen)</span></p>
-      <ul style="font-size:14px">
-        <li>+ Load factor có thể vượt 1</li>
-        <li>+ Xoá đơn giản, không cần tombstone</li>
-        <li>− Mỗi node một lần cấp phát, con trỏ nhảy lung tung → cache miss</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h4>Open Addressing</h4>
-      <p>Toàn bộ dữ liệu nằm trong chính mảng. Ô bị chiếm thì đi tìm ô khác theo một trật tự xác định.</p>
-      <p class="legend" style="margin-top:10px"><span>Dùng bởi Python <code>dict</code> và <code>set</code></span></p>
-      <ul style="font-size:14px">
-        <li>+ Không cấp phát thêm, dữ liệu liền khối → cache tốt</li>
-        <li>+ Ít bộ nhớ hơn</li>
-        <li>− Load factor phải &lt; 1, cần resize sớm</li>
-        <li>− Xoá phức tạp: phải đánh dấu tombstone</li>
-      </ul>
-    </div>
-  </div>
-  <figure>
-    <svg viewBox="0 0 860 170" role="img" aria-label="So sánh chaining và open addressing">
-      <text class="sv-l" x="0" y="14">CHAINING</text>
-      <g stroke="#2E2822" fill="#241F1A">
-        <rect x="0" y="24" width="40" height="28" rx="3"/><rect x="0" y="56" width="40" height="28" rx="3"/><rect x="0" y="88" width="40" height="28" rx="3"/>
-      </g>
-      <g stroke="#2E2822" fill="#1C1815">
-        <rect x="66" y="56" width="52" height="28" rx="3"/><rect x="132" y="56" width="52" height="28" rx="3"/><rect x="198" y="56" width="52" height="28" rx="3"/>
-      </g>
-      <g class="sv-l" text-anchor="middle"><text x="92" y="75">A</text><text x="158" y="75">B</text><text x="224" y="75">C</text></g>
-      <g stroke="#9A8F81"><path d="M40,70 L64,70"/><path d="M118,70 L130,70"/><path d="M184,70 L196,70"/></g>
-      <text class="sv-l" x="0" y="140">ba key cùng ô 1 → nối thành chuỗi ngoài bảng</text>
-
-      <text class="sv-l" x="430" y="14">OPEN ADDRESSING</text>
-      <g stroke="#2E2822" fill="#241F1A">
-        <rect x="430" y="46" width="46" height="30" rx="3"/><rect x="480" y="46" width="46" height="30" rx="3" fill="#8CA9F2"/>
-        <rect x="530" y="46" width="46" height="30" rx="3"/><rect x="580" y="46" width="46" height="30" rx="3" fill="#8CA9F2"/>
-        <rect x="630" y="46" width="46" height="30" rx="3"/><rect x="680" y="46" width="46" height="30" rx="3"/>
-        <rect x="730" y="46" width="46" height="30" rx="3" fill="#8CA9F2"/><rect x="780" y="46" width="46" height="30" rx="3"/>
-      </g>
-      <g font-family="JetBrains Mono" font-size="12" text-anchor="middle" fill="#14110E">
-        <text x="503" y="66">A</text><text x="603" y="66">B</text><text x="753" y="66">C</text>
-      </g>
-      <path d="M503,80 Q550,110 603,80" stroke="#EDB44A" fill="none"/>
-      <path d="M603,80 Q680,120 753,80" stroke="#EDB44A" fill="none"/>
-      <text class="sv-l" x="430" y="140">ba key cùng ô 1 → B, C bị đẩy tới ô khác trong cùng bảng</text>
-    </svg>
-  </figure>
-</section>
-<section id="dict-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Probe Sequence</h2></div>
-  <p><strong>Probe sequence</strong> là trật tự các ô được kiểm tra khi ô đầu tiên đã bị chiếm. Nó không phải chi tiết phụ — nó là <em>hợp đồng</em> giữa insert và lookup: lookup chỉ tìm ra key nếu nó đi lại đúng con đường mà insert đã đi.</p>
-  <h3>Một probe sequence tốt cần ba thứ</h3>
-  <ol>
-    <li><strong>Xác định</strong> — cùng một key luôn cho cùng một đường đi.</li>
-    <li><strong>Phủ hết bảng</strong> — nếu bảng còn ô trống thì phải tìm được, không được lặp vòng sớm.</li>
-    <li><strong>Phân tán</strong> — hai key khác nhau nên có đường đi khác nhau, tránh clustering (mục 11).</li>
-  </ol>
-  <div class="stack">
-    <div class="s warn"><b>Linear probing — <code>(i + k) &amp; mask</code></b><span>primary clustering nặng: các dải ô liền nhau tự lớn lên</span></div>
-    <div class="s warn"><b>Quadratic probing — <code>(i + k²) &amp; mask</code></b><span>secondary clustering, và không chắc phủ hết bảng</span></div>
-    <div class="s"><b>Double hashing — <code>(i + k·h₂(key)) &amp; mask</code></b><span>phân tán tốt, nhưng tốn thêm một lần băm</span></div>
-    <div class="s ok"><b>Pseudo-random — <code>(i·5 + perturb + 1) &amp; mask</code> ← Python</b><span>phân tán tốt, phủ hết bảng; cái giá là cache locality kém hơn</span></div>
-  </div>
-  <h3>Công thức của CPython</h3>
-<pre><code><span class="cm">// Objects/dictobject.c — PERTURB_SHIFT = 5</span>
-perturb = hash;
-i = (size_t)hash &amp; mask;
-<span class="kw">for</span> (;;) {
-    ix = dk_indices[i];
-    <span class="kw">if</span> (ix == EMPTY) <span class="kw">return</span> NOT_FOUND;      <span class="cm">// gặp ô trống là hết đường</span>
-    <span class="kw">if</span> (ix &gt;= 0 &amp;&amp; match(entries[ix])) <span class="kw">return</span> ix;
-    perturb &gt;&gt;= PERTURB_SHIFT;                <span class="cm">// bơm bit cao của hash vào</span>
-    i = (i*5 + perturb + 1) &amp; mask;
-}</code></pre>
-  <p>Hai thành phần, mỗi thành phần một nhiệm vụ:</p>
-  <ul>
-    <li><code>perturb</code> giữ <strong>cả 64 bit hash</strong>, mỗi bước tiêm thêm <strong>bit cao</strong> mà <code>hash &amp; mask</code> đã bỏ đi.</li>
-    <li><code>i*5 + 1</code> lo bảo hiểm: khi <code>perturb</code> cạn, dãy vẫn <strong>đi qua đủ mọi ô</strong> — còn ô trống là còn chỗ.</li>
-  </ul>
-  <div class="note key">
-    <h4>Vì sao là 5 và +1</h4>
-    <code>5i + 1 (mod 2ᵏ)</code> là một linear congruential generator có chu kỳ đầy đủ: hệ số 5 ≡ 1 (mod 4) và hằng số 1 lẻ. Đổi 5 thành 4 hoặc bỏ <code>+1</code> là mất tính chất này và dict sẽ có ô không bao giờ chạm tới được.
-  </div>
-
-  <h3>Thử trực tiếp</h3>
   <div class="lab">
     <div class="bar">
-      <div><label for="ph">hash (thập phân hoặc 0x…)</label><input id="ph" value="0xA3"></div>
+      <div><label for="ph">hash (thập phân hoặc 0x&#8230;)</label><input id="ph" value="0xA3"></div>
       <div><label for="ps">size của bảng</label>
-        <select id="ps"><option>8</option><option selected>32</option><option>64</option><option>128</option></select>
+        <select id="ps"><option>8</option><option selected>32</option><option>64</option></select>
       </div>
       <button id="pgo">Chạy probe</button>
       <button id="prnd" class="ghost">hash ngẫu nhiên</button>
     </div>
     <div class="rail" id="prail"></div>
     <div class="steps" id="psteps"></div>
-    <p class="legend"><span><b style="background:var(--probe)"></b>ô được thăm, số trong ô là bước probe</span></p>
+    <p class="legend"><span><b style="background:var(--probe)"></b>slot được thăm, số trong slot là bước probe</span></p>
   </div>
 
-  <h3>Ba key cùng ô đầu, ba đường đi khác nhau</h3>
-  <p>Cả ba hash dưới đây có 5 bit thấp giống nhau nên cùng đáp xuống ô 3 của bảng 32 ô. Bit cao khác nhau lập tức đẩy chúng đi ba hướng:</p>
-  <div id="pdiv"></div>
-  <div class="note">
-    <h4>Chi tiết ít ai để ý</h4>
-    Đường đi <em>không</em> đảm bảo không lặp trong giai đoạn <code>perturb</code> còn khác 0 — <code>0x2A3</code> ở trên quay lại ô 3 ở bước 3. Đó chỉ là một lần probe lãng phí, không gây sai, vì giai đoạn <code>5i+1</code> phía sau vẫn bảo đảm phủ hết bảng.
-  </div>
-</section>
-
-<section id="dict-s11" class="lesson">
-  <div class="sh"><b>11</b><h2>Clustering</h2></div>
-  <p><strong>Clustering</strong> là hiện tượng các ô bị chiếm dồn lại thành cụm, khiến probe sequence dài ra và O(1) trượt dần về O(n). Đây là lý do tồn tại của cách probe kỳ dị ở mục 10.</p>
-
-  <h3>Primary clustering — bệnh của linear probing</h3>
-  <p>Với <code>i+1</code>, mọi va chạm đều lấp vào ô kế tiếp, tạo ra một <strong>dải liền kề</strong>. Dải này có hai tính chất chết người:</p>
-  <ul>
-    <li><strong>Tự lớn lên.</strong> Dải dài L hút mọi key rơi vào L ô đó — càng dài càng dễ bị va thêm.</li>
-    <li><strong>Dính vào nhau.</strong> Hai dải chỉ cách nhau một ô trống, khi ô đó bị lấp thì chúng nhập thành một dải dài gấp đôi.</li>
-  </ul>
-  <div class="bars">
-    <div class="b"><i>linear · α=0.66</i><u style="width:10%"></u><b>4.8</b></div>
-    <div class="b bad"><i>linear · α=0.9</i><u style="width:100%"></u><b>50</b></div>
-    <div class="b hi"><i>Python · α=0.66</i><u style="width:6%"></u><b>2.9</b></div>
-    <div class="b"><i>Python · α=0.9</i><u style="width:20%"></u><b>10</b></div>
-  </div>
-  <p class="stripnote"><span>số ô phải dò cho một lần tìm hụt</span><span><em>bảng càng đầy, linear probing càng sụp nhanh</em></span></p>
-  <div id="clust"></div>
-
-  <h3>Secondary clustering — bệnh của quadratic probing</h3>
-  <p>Quadratic probing (<code>i + k²</code>) phá được dải liền kề, nhưng vẫn còn một lỗ: <strong>đường đi chỉ phụ thuộc ô đầu tiên</strong>. Mọi key có cùng <code>hash &amp; mask</code> sẽ thăm đúng cùng một chuỗi ô theo đúng thứ tự đó — chúng chen nhau trên một hành lang chung, chỉ là hành lang này không nằm liền nhau trong bộ nhớ.</p>
-  <p>Chính điểm này là điều <code>perturb</code> của Python xử lý. Đường đi phụ thuộc <em>toàn bộ</em> 64 bit hash, không chỉ phần bị mask giữ lại, nên hai key khác hash thì khác đường ngay từ bước một — như demo ở mục 10.</p>
-
-  <h3>Cái giá phải trả: cache locality</h3>
-  <p>Linear probing có một ưu điểm thật: ô kế tiếp gần như chắc chắn đã nằm trong cache line vừa nạp, nên probe thứ hai gần như miễn phí. Pseudo-random probing nhảy lung tung, mỗi probe là một lần có thể cache miss.</p>
-  <p>CPython bù lại bằng chính <strong>compact dict</strong>: <code>dk_indices</code> chỉ tốn <strong>1 byte mỗi ô</strong> khi bảng ≤ 128 ô, nên toàn bộ bảng hash của một dict cỡ vừa nằm gọn trong một hai cache line — nhảy đi đâu thì cũng vẫn ở trong cache. Đây là ví dụ đẹp về hai quyết định thiết kế bù trừ cho nhau.</p>
-  <div class="note warn">
-    <h4>Clustering giả do tombstone</h4>
-    Ô <code>DUMMY</code> không chứa dữ liệu nhưng vẫn buộc probe đi tiếp (mục 14). Một dict bị thêm–xoá liên tục mà không resize sẽ đầy tombstone và probe sequence dài ra y như bị clustering thật, dù số phần tử thực tế rất ít.
-  </div>
-</section>
-
-<section id="dict-s12" class="lesson">
-  <div class="sh"><b>12</b><h2>Lookup</h2></div>
-<pre><code>tính hash(key)
-i = hash &amp; mask
-lặp:
-    ix = dk_indices[i]
-    ix == EMPTY   → KeyError            <span class="cm"># điều kiện dừng duy nhất</span>
-    ix == DUMMY   → probe tiếp
-    ix &gt;= 0       → e = dk_entries[ix]
-                    e.hash != hash        → probe tiếp   <span class="cm"># so int, rất rẻ</span>
-                    e.key is key          → trả e.value  <span class="cm"># so địa chỉ trước</span>
-                    e.key == key          → trả e.value  <span class="cm"># mới gọi __eq__</span>
-                    ngược lại             → probe tiếp</code></pre>
-  <ul>
-    <li>Gặp <strong>EMPTY</strong> mới được kết luận "không có". Đây là lý do không thể xoá thẳng một ô.</li>
-    <li>Thứ tự so sánh <strong>hash → <code>is</code> → <code>==</code></strong>, ba lớp lọc từ rẻ tới đắt. Với <code>str</code> đã interned, <code>is</code> thường ăn ngay.</li>
-    <li><code>d[k]</code>, <code>k in d</code>, <code>d.get(k)</code> dùng chung đúng đường này; khác nhau chỉ ở cách xử lý khi không tìm thấy.</li>
+  <ul class="why">
+    <li><strong>Chạy lại cùng một hash</strong> cho đúng dãy slot cũ &#8212; tính xác định là thứ khiến lookup hoạt động.</li>
+    <li><strong>Đổi một chút ở hash</strong> mà slot đầu tiên vẫn thế thì bước thứ hai đã rẽ hướng khác.</li>
+    <li><strong>Đổi size</strong> là cả dãy khác hẳn &#8212; đó chính là chuyện xảy ra khi dict resize ở mục 07.</li>
   </ul>
 </section>
 
-<section id="dict-s13" class="lesson">
-  <div class="sh"><b>13</b><h2>Insert</h2></div>
-<pre><code>tính hash(key)
-probe như lookup:
-    tìm thấy key    → ghi đè value, GIỮ NGUYÊN vị trí và thứ tự
-    gặp EMPTY       → đây là chỗ để ghi
-ghi:
-    dk_entries[nentries] = {hash, key, value}   <span class="cm"># nối vào cuối vùng đặc</span>
-    dk_indices[i] = nentries                    <span class="cm"># bảng thưa trỏ tới</span>
-    nentries += 1
-nếu bảng đã quá 2/3 → resize (mục 15)</code></pre>
-  <div class="note">
-    <h4>Ghi đè không đổi thứ tự</h4>
-    <code>d["a"] = 99</code> trên key đã tồn tại chỉ sửa <code>value</code> tại entry cũ. Vị trí trong <code>dk_entries</code> không đổi → <code>"a"</code> vẫn ở đúng chỗ cũ khi duyệt. Muốn đẩy nó xuống cuối thì phải <code>del</code> rồi gán lại.
-  </div>
-  <div class="note">
-    <h4>Tombstone được tái sử dụng có điều kiện</h4>
-    Trong quá trình probe, nếu gặp <code>DUMMY</code> trước <code>EMPTY</code>, CPython ghi nhớ ô đó và dùng lại nếu cuối cùng xác định key chưa tồn tại. Việc này thu hồi ô nhưng <em>không</em> làm ngắn probe sequence của các key khác.
-  </div>
-</section>
+<section id="dict-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lookup, insert, delete &amp; tombstone</h2></div>
 
-<section id="dict-s14" class="lesson">
-  <div class="sh"><b>14</b><h2>Delete &amp; Tombstone</h2></div>
-  <p>Xoá đi qua đúng lộ trình lookup, nhưng <strong>không dọn ô</strong>. Nó ghi <code>DUMMY (−2)</code> vào <code>dk_indices[i]</code> và set <code>key</code>, <code>value</code> trong entry về NULL.</p>
-  <p>Nếu ghi <code>EMPTY</code> thay vì <code>DUMMY</code>, ô vừa xoá trở thành một điều kiện dừng giả và mọi key nằm phía sau nó trên probe sequence sẽ biến mất khỏi dict — dù dữ liệu vẫn còn trong bảng.</p>
+  <p class="key">Ô vết xoá. Ba thao tác đi chung một đường dò, chỉ khác ở đích &#8212; và vì cả ba dừng khi gặp slot trống, xoá không được phép tạo ra slot trống.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Lookup, insert, delete đi chung một đường; xoá phải để lại tombstone">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--rule)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="85" fill="var(--muted)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--muted)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--rule)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="12" y="141" fill="var(--muted)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--muted)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--muted)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--rule)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="188" y="141" fill="var(--muted)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--muted)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--muted)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="223" fill="var(--muted)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--muted)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="269" fill="var(--tomb)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--dim)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 271 H 328 V 40 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,40 348,35.8 348,44.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">LOOKUP, INSERT, DELETE ĐI CHUNG MỘT ĐƯỜNG DÒ</text>
+<rect x="360" y="26" width="500" height="24" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="43" fill="var(--filled)">Lookup</text>
+<text class="sv-s" x="536" y="43" fill="var(--dim)">gặp EMPTY &#8594; KeyError. Đó là điều kiện dừng duy nhất</text>
+<rect x="360" y="54" width="500" height="24" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="71" fill="var(--filled)">Insert</text>
+<text class="sv-s" x="536" y="71" fill="var(--dim)">gặp EMPTY &#8594; đây là chỗ ghi. Thấy key thì đè value</text>
+<rect x="360" y="82" width="500" height="24" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="99" fill="var(--tomb)">Delete</text>
+<text class="sv-s" x="536" y="99" fill="var(--dim)">ghi DUMMY vào slot, KHÔNG ghi EMPTY</text>
+<text class="sv-hv" x="360" y="130" fill="var(--muted)">VÌ SAO XOÁ KHÔNG ĐƯỢC XOÁ TRẮNG</text>
+<rect x="360" y="140" width="244" height="78" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="160" fill="var(--tomb)">Nếu ghi EMPTY</text>
+<text class="sv-s" x="374" y="178" fill="var(--dim)">probe dừng ngay tại slot vừa xoá</text>
+<text class="sv-d" x="374" y="196" fill="var(--dim)">mọi key phía sau biến mất khỏi dict</text>
+<text class="sv-d" x="374" y="212" fill="var(--dim)">dữ liệu vẫn còn, chỉ là không tìm ra</text>
+<rect x="616" y="140" width="244" height="78" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="630" y="160" fill="var(--ok)">Ghi DUMMY</text>
+<text class="sv-d" x="630" y="178" fill="var(--dim)">probe biết đi tiếp</text>
+<text class="sv-d" x="630" y="196" fill="var(--dim)">slot được dùng lại khi insert key mới</text>
+<text class="sv-d" x="630" y="212" fill="var(--dim)">nhưng đường đi vẫn dài như cũ</text>
+<text class="sv-hv" x="360" y="242" fill="var(--muted)">LỌC BA LỚP KHI SO KEY &#8212; RẺ TRƯỚC, ĐẮT SAU</text>
+<rect x="360" y="252" width="500" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="269" fill="var(--ok)">so hash đã lưu</text>
+<text class="sv-s" x="536" y="269" fill="var(--dim)">một phép so int &#8212; loại hết va chạm slot</text>
+<rect x="360" y="276" width="500" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="293" fill="var(--ok)">so is</text>
+<text class="sv-s" x="536" y="293" fill="var(--dim)">str đã intern thường ăn ngay tại đây</text>
+<rect x="360" y="300" width="500" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="317" fill="var(--probe)">mới gọi ==</text>
+<text class="sv-s" x="536" y="317" fill="var(--dim)">chỉ tới đây mới chạm vào __eq__ của bạn</text>
+</svg>
+<figcaption>Cả ba thao tác chỉ khác nhau ở việc làm gì khi gặp slot trống &#8212; và chính điều đó khiến xoá không được phép dọn slot.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong>EMPTY là điều kiện dừng duy nhất</strong> &#8212; gặp nó mới được kết luận &quot;không có&quot;.</li>
+    <li><strong>Xoá ghi <code>DUMMY</code></strong>, giữ đường đi cho các key nằm phía sau trên probe sequence.</li>
+    <li><strong>So key ba lớp</strong>: hash trước, rồi <code>is</code>, cuối cùng mới <code>==</code> &#8212; rẻ trước, đắt sau.</li>
+    <li><strong>Tombstone chỉ được dọn lúc resize</strong>, nên dict thêm&#8211;xoá liên tục sẽ dò ngày một dài.</li>
+  </ul>
+
   <div id="tomb"></div>
-  <ul>
-    <li>Tombstone <strong>không được thu hồi ngay</strong>; chúng chỉ biến mất khi resize/rehash.</li>
-    <li>Dict chỉ dọn tombstone <strong>lúc insert kích hoạt resize</strong>. <code>del</code> hết phần tử không trả lại bộ nhớ, <code>d.clear()</code> mới cấp bảng rỗng.</li>
-    <li>Dict dùng làm cache/queue là chỗ tích tombstone nhanh nhất — <code>d = dict(d)</code> định kỳ để rehash.</li>
+
+  <details class="deep"><summary>Ghi đè, tái dùng slot đã xoá &#8212; hai chi tiết hay bị hỏi</summary>
+    <div class="body">
+      <p><b>Ghi đè không đổi thứ tự.</b> <code>d[&quot;a&quot;] = 99</code> trên key đã có chỉ sửa <code>value</code> ngay tại entry cũ, vị trí trong vùng đặc giữ nguyên, nên <code>&quot;a&quot;</code> vẫn ở đúng chỗ cũ khi duyệt.</p>
+      <p><b>Slot <code>DUMMY</code> được tái dùng có điều kiện.</b> Đang dò mà gặp <code>DUMMY</code> trước <code>EMPTY</code> thì dict ghi nhớ slot đó và dùng lại nếu cuối cùng xác định key chưa tồn tại. Việc này thu hồi được slot, nhưng <em>không</em> làm ngắn probe sequence của các key khác &#8212; chỉ resize mới làm được.</p>
+      <p>Hệ quả thực dụng: <code>del</code> hết phần tử không trả lại bộ nhớ. Dict dùng làm cache hay hàng đợi là chỗ tích tombstone nhanh nhất &#8212; <code>d = dict(d)</code> định kỳ là cách rehash rẻ nhất.</p>
+    </div></details>
+</section>
+
+<section id="dict-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Load factor &amp; resize</h2></div>
+
+  <p class="key">Ô nhân đôi bảng. Open addressing sụp đổ khi bảng gần đầy, nên Python giữ trần ở <em>2/3</em> và trả cái giá đó bằng bộ nhớ.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Ngưỡng 2/3, ba việc resize làm, và vì sao chi phí chia đều thành O(1)">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--rule)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="85" fill="var(--muted)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--muted)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--rule)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="12" y="141" fill="var(--muted)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--muted)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--muted)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--rule)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="188" y="141" fill="var(--muted)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--muted)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--muted)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="223" fill="var(--muted)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--muted)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="315" fill="var(--ok)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--dim)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 317 H 328 V 40 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,40 348,35.8 348,44.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">BẢNG ĐẦY 2/3 THÌ NHÂN ĐÔI</text>
+<rect x="360" y="26" width="114" height="44" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="372" y="46" fill="var(--muted)">size 8</text>
+<text class="sv-d" x="372" y="62" fill="var(--muted)">5 key</text>
+<line x1="474" y1="48" x2="476" y2="48" stroke="var(--faint)" stroke-width="1.2"/><polygon points="484,48 476,43.8 476,52.2" fill="var(--faint)"/>
+<rect x="486" y="26" width="114" height="44" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="498" y="46" fill="var(--muted)">size 16</text>
+<text class="sv-d" x="498" y="62" fill="var(--muted)">10 key</text>
+<line x1="600" y1="48" x2="602" y2="48" stroke="var(--faint)" stroke-width="1.2"/><polygon points="610,48 602,43.8 602,52.2" fill="var(--faint)"/>
+<rect x="612" y="26" width="114" height="44" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="624" y="46" fill="var(--ok)">size 32</text>
+<text class="sv-d" x="624" y="62" fill="var(--ok)">21 key</text>
+<line x1="726" y1="48" x2="728" y2="48" stroke="var(--faint)" stroke-width="1.2"/><polygon points="736,48 728,43.8 728,52.2" fill="var(--faint)"/>
+<rect x="738" y="26" width="114" height="44" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="750" y="46" fill="var(--muted)">size 64</text>
+<text class="sv-d" x="750" y="62" fill="var(--muted)">42 key</text>
+<text class="sv-d" x="360" y="88" fill="var(--muted)">bảng nhỏ nhất là 8 &#183; mỗi lần resize là O(n) thật</text>
+<text class="sv-hv" x="360" y="118" fill="var(--muted)">RESIZE LÀM BA VIỆC CÙNG LÚC</text>
+<rect x="360" y="128" width="500" height="24" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="145" fill="var(--filled)">Tính lại mọi slot index</text>
+<text class="sv-s" x="536" y="145" fill="var(--dim)">từ hash đã lưu trong entry, không gọi lại __hash__</text>
+<rect x="360" y="156" width="500" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="173" fill="var(--ok)">Dọn sạch mọi vết xoá</text>
+<text class="sv-s" x="536" y="173" fill="var(--dim)">reset luôn các đường probe đã bị kéo dài</text>
+<rect x="360" y="184" width="500" height="24" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="201" fill="var(--probe)">Có thể co lại</text>
+<text class="sv-s" x="536" y="201" fill="var(--dim)">theo số key còn sống, không theo số slot đã chạm</text>
+<text class="sv-hv" x="360" y="236" fill="var(--muted)">VÌ SAO VẪN GỌI LÀ O(1)</text>
+<rect x="360" y="246" width="500" height="46" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="266" fill="var(--ok)">n/2 + n/4 + n/8 + &#8230; &lt; n</text>
+<text class="sv-s" x="374" y="283" fill="var(--dim)">tổng công của mọi lần resize vẫn nhỏ hơn n &#8594; chia đều ra là O(1)</text>
+<text class="sv-d" x="360" y="310" fill="var(--muted)">Nhưng một lần d[k] = v đơn lẻ vẫn có thể mất O(n) &#8212; p99 cảm nhận được điều đó.</text>
+</svg>
+<figcaption>Bảng luôn phải rỗng ít nhất một phần ba &#8212; đó là cái giá bằng bộ nhớ trả cho việc probe không bao giờ dài ra.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong>Bảng nhỏ nhất là 8</strong>, chứa được 2/3 size &#8212; key thứ 6, 11, 22 là các mốc nhân đôi.</li>
+    <li><strong>Resize tính lại index từ hash đã lưu</strong> trong entry, không gọi lại <code>__hash__</code>.</li>
+    <li><strong>Nó dọn sạch tombstone</strong>, tức reset luôn mọi đường dò đã bị kéo dài.</li>
+    <li><strong>Cỡ mới tính theo số key còn sống</strong>, nên một dict xoá gần hết sẽ <em>co lại</em>.</li>
   </ul>
+
+  <details class="deep"><summary>Amortized O(1) nghĩa là gì, và khi nào nó không đủ?</summary>
+    <div class="body">
+      <p>Insert thứ 22 phải rehash 21 phần tử &#8212; một lần O(n) thật. Nhưng để tới lần resize kế tiếp cần thêm chừng ấy lần insert rẻ, và tổng công của mọi lần resize là <code>n/2 + n/4 + n/8 + &#8230; &lt; n</code>. Chia đều ra thì n lần insert vẫn tốn O(n), tức <b>O(1) mỗi lần</b>.</p>
+      <p>Chỗ nó không đủ: amortized nói về trung bình, không bảo đảm cho từng lần riêng lẻ. Một <code>d[k] = v</code> đơn lẻ vẫn có thể mất O(n), và hệ thống có SLA theo p99 sẽ nhìn thấy đúng cái gai đó. Biết trước số key thì dựng một lần bằng <code>dict.fromkeys(keys)</code> hoặc <code>{k: f(k) for k in keys}</code> để tránh resize dây chuyền.</p>
+    </div></details>
 </section>
 
-<section id="dict-s15" class="lesson">
-  <div class="sh"><b>15</b><h2>Load factor &amp; Resize</h2></div>
-  <p><strong>Load factor</strong> α = số ô đã dùng / size. Open addressing sụp đổ khi α tiến tới 1, nên CPython giữ trần ở <strong>2/3</strong>: vùng <code>dk_entries</code> chỉ được cấp <code>2/3 × size</code> chỗ, đầy là resize.</p>
-  <div class="strip">
-    <div class="c"><i>size 8</i><b>5 key</b><u>key thứ 6 → 16</u></div>
-    <div class="c"><i>size 16</i><b>10 key</b><u>key thứ 11 → 32</u></div>
-    <div class="c on"><i>size 32</i><b>21 key</b><u>key thứ 22 → 64</u></div>
-    <div class="c"><i>size 64</i><b>42 key</b><u>key thứ 43 → 128</u></div>
-  </div>
-  <p class="stripnote"><span>bảng nhỏ nhất là 8</span><span><em>chứa được 2/3 size, đầy là nhân đôi</em></span><span>mỗi lần resize là O(n)</span></p>
-<pre><code>&gt;&gt;&gt; import sys
-&gt;&gt;&gt; [sys.getsizeof(dict.fromkeys(range(n))) for n in (5, 6, 10, 11, 21, 22)]
-[224, 352, 352, 632, 632, 1168]        <span class="cm"># nhảy đúng tại 6, 11, 22</span></code></pre>
-  <h3>Resize làm gì</h3>
-  <ol>
-    <li>Cấp bảng mới, <strong>tính lại index cho toàn bộ key</strong> từ hash đã lưu sẵn trong entry — không gọi lại <code>__hash__</code>.</li>
-    <li><strong>Dọn sạch tombstone</strong> và nén <code>dk_entries</code> lại thành khối liền, tức reset luôn mọi probe sequence đã bị kéo dài.</li>
-    <li>Chi phí <strong>O(n)</strong> nhưng chỉ xảy ra khi size nhân đôi → chia đều ra là <strong>O(1)</strong> mỗi lần insert (mục 16).</li>
-  </ol>
-  <div class="note key">
-    <h4>Resize không đồng nghĩa với phình to</h4>
-    Kích thước mới tính theo <code>used</code> — số phần tử <em>còn sống</em>, không phải số ô đã chạm. Một dict 1000 key bị xoá còn 10 key, khi insert kích hoạt resize sẽ <strong>co lại</strong> về size 32. Đây là lối duy nhất để dict nhả bộ nhớ.
-  </div>
-  <p>Biết trước số lượng key thì tránh được resize dây chuyền bằng cách dựng một lần:</p>
-<pre><code>d = dict.fromkeys(keys)          <span class="cm"># cấp bảng đúng cỡ ngay từ đầu</span>
-d = {k: f(k) for k in keys}      <span class="cm"># cũng tốt hơn vòng lặp d[k] = ...</span></code></pre>
-</section>
+<section id="dict-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Complexity</h2></div>
 
-<section id="dict-s16" class="lesson">
-  <div class="sh"><b>16</b><h2>Complexity</h2></div>
-  <table>
-    <tr><th>Thao tác</th><th>Trung bình</th><th>Tệ nhất</th><th>Ghi chú</th></tr>
-    <tr><td><code>d[k]</code> / <code>k in d</code></td><td>O(1)</td><td>O(n)</td><td>tệ nhất khi mọi key trùng hash</td></tr>
-    <tr><td><code>d[k] = v</code></td><td>O(1)*</td><td>O(n)</td><td>* amortized, có resize</td></tr>
-    <tr><td><code>del d[k]</code></td><td>O(1)</td><td>O(n)</td><td>không giải phóng bộ nhớ</td></tr>
-    <tr><td><code>len(d)</code></td><td>O(1)</td><td>O(1)</td><td>đọc <code>ma_used</code></td></tr>
-    <tr><td>duyệt <code>for k in d</code></td><td>O(size vùng entries)</td><td>—</td><td>tính cả ô đã xoá</td></tr>
-    <tr><td><code>d.copy()</code></td><td>O(n)</td><td>O(n)</td><td>shallow</td></tr>
-    <tr><td><code>d1 == d2</code></td><td>O(n)</td><td>O(n)</td><td>không quan tâm thứ tự</td></tr>
-  </table>
-  <h3>Amortized O(1) nghĩa là gì</h3>
-  <p>Insert thứ 22 phải rehash 21 phần tử: một lần O(n) thật. Nhưng để tới được lần resize kế tiếp cần thêm ~21 lần insert rẻ. Tổng chi phí của n lần insert là O(n) vì tổng công resize là <code>n/2 + n/4 + n/8 + … &lt; n</code>. Chia đều: <strong>O(1) mỗi lần</strong>.</p>
-  <div class="note warn">
-    <h4>Amortized không phải worst-case</h4>
-    Một lần <code>d[k] = v</code> đơn lẻ vẫn có thể mất O(n). Với hệ thống realtime hay có SLA theo p99, đây là nguồn latency spike có thật — nên cấp sẵn dung lượng nếu biết trước số key.
-  </div>
-</section>
+  <p class="key">Cột trung bình đọc thẳng từ bản đồ; cột tệ nhất là chuyện gì xảy ra khi bước tính slot hỏng.</p>
 
-<section id="dict-s17" class="lesson">
-  <div class="sh"><b>17</b><h2>Khi nào dict rơi xuống O(n)</h2></div>
-  <div class="stack">
-    <div class="s warn"><b><code>__hash__</code> tự viết trả về hằng số</b><span>mọi key cùng hash → cùng probe sequence → hash table thành linked list. Lỗi phổ biến nhất và tự gây ra</span></div>
-    <div class="s warn"><b>Key trùng hash do thiết kế</b><span>hash lấy theo field ít giá trị phân biệt, ví dụ <code>hash(self.status)</code></span></div>
-    <div class="s"><b>Tombstone tích tụ</b><span>thêm–xoá liên tục mà không insert đủ để kích hoạt resize: probe sequence dài dần vì phải bước qua ô <code>DUMMY</code> (mục 14)</span></div>
-    <div class="s"><b>Va chạm ở bit thấp trên bảng nhỏ</b><span>nhẹ — <code>perturb</code> tách ra nhanh, chỉ lãng phí vài bước probe đầu</span></div>
-    <div class="s"><b>Tấn công hash-collision</b><span>Python đã chặn bằng hash randomization cho <code>str</code>/<code>bytes</code>. Nhưng <code>int</code> <em>không</em> randomize (<code>hash(n) == n</code>)</span></div>
-  </div>
-<pre><code><span class="kw">class</span> Bad:
-    <span class="kw">def</span> __hash__(self): <span class="kw">return</span> 1        <span class="cm"># dict trở thành O(n)</span></code></pre>
-  <p>Về mặt thực tế: với key là <code>str</code>, <code>int</code> hay <code>tuple</code> chuẩn, xác suất gặp worst-case là con số bỏ qua được. Gần như mọi trường hợp O(n) thật trong sản phẩm đều đến từ <code>__hash__</code> tự viết.</p>
-</section>
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Bảng chi phí từng thao tác và bốn nguồn khiến dict tuột xuống O(n)">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--rule)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="85" fill="var(--muted)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--muted)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--rule)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="12" y="141" fill="var(--muted)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--muted)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--muted)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--rule)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="188" y="141" fill="var(--muted)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--muted)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--muted)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="223" fill="var(--tomb)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--dim)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 225 H 328 V 40 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,40 348,35.8 348,44.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">CHI PHÍ TỪNG THAO TÁC</text>
+<rect x="360" y="26" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="41" fill="var(--text)">d[k] &#183; k in d</text>
+<text class="sv-d" x="510" y="41" fill="var(--ok)">O(1)</text>
+<text class="sv-d" x="596" y="41" fill="var(--tomb)">O(n)</text>
+<text class="sv-d" x="660" y="41" fill="var(--muted)">tệ nhất khi mọi key trùng hash</text>
+<rect x="360" y="52" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="67" fill="var(--text)">d[k] = v</text>
+<text class="sv-d" x="510" y="67" fill="var(--ok)">O(1)*</text>
+<text class="sv-d" x="596" y="67" fill="var(--tomb)">O(n)</text>
+<text class="sv-d" x="660" y="67" fill="var(--muted)">* chia đều, đã tính cả resize</text>
+<rect x="360" y="78" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="93" fill="var(--text)">del d[k]</text>
+<text class="sv-d" x="510" y="93" fill="var(--ok)">O(1)</text>
+<text class="sv-d" x="596" y="93" fill="var(--tomb)">O(n)</text>
+<text class="sv-d" x="660" y="93" fill="var(--muted)">không trả lại bộ nhớ</text>
+<rect x="360" y="104" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="119" fill="var(--text)">len(d)</text>
+<text class="sv-d" x="510" y="119" fill="var(--ok)">O(1)</text>
+<text class="sv-d" x="596" y="119" fill="var(--tomb)">O(1)</text>
+<text class="sv-d" x="660" y="119" fill="var(--muted)">đọc một biến đếm sẵn</text>
+<rect x="360" y="130" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="145" fill="var(--text)">for k in d</text>
+<text class="sv-d" x="510" y="145" fill="var(--ok)">O(vùng entries)</text>
+<text class="sv-d" x="596" y="145" fill="var(--tomb)">&#8212;</text>
+<text class="sv-d" x="660" y="145" fill="var(--muted)">tính cả entry đã xoá</text>
+<text class="sv-hv" x="360" y="178" fill="var(--muted)">CỘT O(n) ĐẾN TỪ ĐÂU TRÊN BẢN ĐỒ</text>
+<rect x="360" y="188" width="500" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="205" fill="var(--tomb)">hash trả hằng số</text>
+<text class="sv-s" x="536" y="205" fill="var(--dim)">bước tính slot hỏng &#8212; bảng thành danh sách nối</text>
+<rect x="360" y="214" width="500" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="231" fill="var(--tomb)">hash theo field nghèo</text>
+<text class="sv-s" x="536" y="231" fill="var(--dim)">ví dụ hash(self.status) &#8212; chỉ vài giá trị</text>
+<rect x="360" y="240" width="500" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="257" fill="var(--probe)">vết xoá tích lại</text>
+<text class="sv-s" x="536" y="257" fill="var(--dim)">thêm rồi xoá mãi mà không insert đủ để resize</text>
+<rect x="360" y="266" width="500" height="22" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="374" y="283" fill="var(--rule)">trùng slot ngẫu nhiên</text>
+<text class="sv-s" x="536" y="283" fill="var(--dim)">nhẹ &#8212; probe tách hai key ra sau một hai bước</text>
+<text class="sv-d" x="360" y="312" fill="var(--muted)">Với key là str, int hay tuple chuẩn, worst-case gần như không xảy ra trong thực tế.</text>
+</svg>
+<figcaption>Gần như mọi trường hợp O(n) thật trong sản phẩm đều đến từ một hàm <code>__hash__</code> tự viết, không phải từ bản thân dict.</figcaption>
+</figure>
 
-<section id="dict-s18" class="lesson">
-  <div class="sh"><b>18</b><h2>Insertion order</h2></div>
-  <p>Từ <strong>3.6</strong> dict giữ thứ tự chèn như một chi tiết cài đặt; từ <strong>3.7</strong> đây là <strong>cam kết trong ngôn ngữ</strong>, mọi implementation phải tuân theo.</p>
-<pre><code>&gt;&gt;&gt; d = {}; d["c"]=1; d["a"]=2; d["b"]=3
-&gt;&gt;&gt; list(d)
-['c', 'a', 'b']            <span class="cm"># thứ tự chèn, không phải thứ tự hash</span></code></pre>
-  <p><strong>Vì sao có được:</strong> duyệt dict là quét tuần tự <code>dk_entries</code> — vùng đặc được ghi nối tiếp theo đúng thứ tự chèn (mục 07). Thứ tự không phải tính năng bổ sung mà là <em>hệ quả miễn phí</em> của thiết kế tiết kiệm bộ nhớ.</p>
-  <ul>
-    <li><code>del</code> để lại lỗ NULL trong <code>dk_entries</code>: vòng duyệt vẫn phải bước qua, nên dict xoá nhiều thì duyệt chậm.</li>
-    <li>Ghi đè value <strong>không</strong> đổi thứ tự. Muốn đưa key về cuối phải <code>del</code> rồi gán lại.</li>
-    <li><code>d1 == d2</code> <strong>không</strong> xét thứ tự, <code>OrderedDict</code> thì có — cùng với <code>move_to_end()</code>, đó là khác biệt còn lại của nó.</li>
-    <li>Sửa dict trong lúc đang duyệt → <code>RuntimeError: dictionary changed size during iteration</code>. Duyệt trên <code>list(d)</code> nếu cần xoá.</li>
+  <ul class="why">
+    <li><strong>Tra, ghi, xoá đều O(1)</strong> trung bình &#8212; số phần tử không xuất hiện trong công thức.</li>
+    <li><strong>Duyệt tốn theo cỡ vùng entries</strong>, tính cả các entry đã xoá còn để lỗ.</li>
+    <li><strong>Worst case O(n)</strong> gần như luôn đến từ <code>__hash__</code> tự viết, không phải từ dict.</li>
+    <li><strong>Với key là <code>str</code>, <code>int</code>, <code>tuple</code> chuẩn</strong>, worst case là con số bỏ qua được.</li>
   </ul>
+
+  <details class="deep"><summary>Tấn công hash-collision còn là mối lo không?</summary>
+    <div class="body">
+      <p>Với <code>str</code> và <code>bytes</code> thì không: từ 3.3 Python bật <b>hash randomization</b> mặc định, mỗi tiến trình trộn một seed riêng nên kẻ tấn công không dựng sẵn được tập key trùng hash. Đó cũng là lý do <code>hash(&quot;a&quot;)</code> đổi giá trị mỗi lần chạy lại interpreter.</p>
+      <p>Nhưng <code>int</code> <em>không</em> được randomize &#8212; <code>hash(n) == n</code> với int nhỏ. Nhận dữ liệu ngoài rồi lấy thẳng số nguyên do người dùng gửi làm key thì vẫn dựng được worst case, dù đây là tình huống hiếm hơn nhiều so với việc tự viết một <code>__hash__</code> hỏng.</p>
+    </div></details>
 </section>
 
-<section id="dict-s19" class="lesson">
-  <div class="sh"><b>19</b><h2>__hash__ &amp; __eq__</h2></div>
-  <p>Hai method này là một cặp. Hợp đồng: <strong><code>a == b</code> ⟹ <code>hash(a) == hash(b)</code></strong>. Vi phạm là dict trả về kết quả sai chứ không phải chậm.</p>
-  <p>Python bảo vệ bạn một nửa: định nghĩa <code>__eq__</code> mà không định nghĩa <code>__hash__</code> thì class <strong>tự động thành unhashable</strong> (<code>__hash__ = None</code>).</p>
-<pre><code><span class="kw">class</span> User:
-    <span class="kw">def</span> __init__(self, uid, name):
-        self.uid, self.name = uid, name
-    <span class="kw">def</span> __eq__(self, other):
-        <span class="kw">return</span> isinstance(other, User) <span class="kw">and</span> self.uid == other.uid
-    <span class="kw">def</span> __hash__(self):
-        <span class="kw">return</span> hash(self.uid)      <span class="cm"># cùng field với __eq__, không thêm không bớt</span></code></pre>
-  <p>Quy tắc: <strong>hash và eq phải đọc đúng cùng một tập field, và tập field đó không được thay đổi.</strong> Cách gọn nhất là để dataclass làm:</p>
-<pre><code><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass
+<section id="dict-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>__hash__ &amp; __eq__</h2></div>
 
-@dataclass(frozen=<span class="kw">True</span>)      <span class="cm"># sinh cả __eq__ và __hash__, chặn gán lại field</span>
-<span class="kw">class</span> Point:
-    x: int
-    y: int
+  <p class="key">Hai hàm chia nhau hai đầu của phép tính: một hàm chọn slot, một hàm xác nhận key &#8212; sửa một mà quên cái kia là dict trả về kết quả sai, không phải chạy chậm.</p>
 
-@dataclass                     <span class="cm"># eq=True, __hash__ = None → unhashable</span>
-<span class="kw">class</span> Mutable:
-    x: int</code></pre>
-  <h3>Vì sao key phải immutable — sự cố minh hoạ</h3>
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Tra d[k] đi qua hai cửa: __hash__ chọn slot, __eq__ xác nhận key">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--probe)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--probe)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="85" fill="var(--probe)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--dim)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--rule)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="12" y="141" fill="var(--muted)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--muted)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--muted)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--rule)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="188" y="141" fill="var(--muted)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--muted)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--muted)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="223" fill="var(--muted)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--muted)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 88 H 328 V 55 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,55 348,50.8 348,59.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">MỖI LẦN TRA d[k] PHẢI QUA HAI CỬA</text>
+<rect x="360" y="32" width="124" height="46" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="373" y="52" fill="var(--filled)">key k</text>
+<text class="sv-s" x="373" y="69" fill="var(--dim)">object bạn viết</text>
+<rect x="548" y="32" width="124" height="46" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="561" y="52" fill="var(--probe)">slot index</text>
+<text class="sv-s" x="561" y="69" fill="var(--dim)">chỗ cần đọc</text>
+<rect x="736" y="32" width="124" height="46" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="749" y="52" fill="var(--ok)">đúng entry</text>
+<text class="sv-s" x="749" y="69" fill="var(--dim)">value trả về</text>
+<line x1="484" y1="58" x2="540" y2="58" stroke="var(--probe)" stroke-width="1.2"/><polygon points="548,58 540,53.8 540,62.2" fill="var(--probe)"/>
+<text class="sv-l" x="516.0" y="50" fill="var(--probe)" text-anchor="middle">__hash__</text>
+<line x1="672" y1="58" x2="728" y2="58" stroke="var(--ok)" stroke-width="1.2"/><polygon points="736,58 728,53.8 728,62.2" fill="var(--ok)"/>
+<text class="sv-l" x="704.0" y="50" fill="var(--ok)" text-anchor="middle">__eq__</text>
+<text class="sv-s" x="360" y="98" fill="var(--dim)">__hash__ chọn chỗ để tìm &#183; __eq__ xác nhận đã tìm đúng key</text>
+<text class="sv-hv" x="360" y="124" fill="var(--muted)">VIẾT SAI HÀM NÀO THÌ HỎNG CỬA ĐÓ</text>
+<rect x="360" y="134" width="244" height="62" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="154" fill="var(--tomb)">Bằng nhau mà khác hash</text>
+<text class="sv-s" x="374" y="172" fill="var(--dim)">tìm sang slot khác &#8594; KeyError</text>
+<text class="sv-d" x="374" y="188" fill="var(--muted)">entry vẫn nằm nguyên trong bảng</text>
+<rect x="616" y="134" width="244" height="62" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="630" y="154" fill="var(--tomb)">Khác nhau mà eq nói bằng</text>
+<text class="sv-s" x="630" y="172" fill="var(--dim)">nhận nhầm entry của key kia</text>
+<text class="sv-d" x="630" y="188" fill="var(--muted)">d[a] trả về value của b</text>
+<text class="sv-hv" x="360" y="216" fill="var(--muted)">CÁCH VIẾT ĐÚNG MÀ KHÔNG PHẢI NHỚ LUẬT</text>
+<rect x="360" y="226" width="500" height="50" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="246" fill="var(--ok)">@dataclass(frozen=True)</text>
+<text class="sv-s" x="374" y="265" fill="var(--dim)">sinh cả hai hàm trên cùng một tập field, và chặn luôn việc gán lại field</text>
+<rect x="360" y="288" width="500" height="44" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="374" y="308" fill="var(--text)">Tự viết __eq__ mà quên __hash__</text>
+<text class="sv-s" x="374" y="326" fill="var(--dim)">class thành unhashable &#8212; lỗi ngay, còn hơn sai âm thầm</text>
+</svg>
+<figcaption>Tự viết class làm key là tự viết hai cửa đó &#8212; lệch một cửa thì dict không báo lỗi, nó chỉ trả về sai.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong>Hợp đồng một chiều</strong>: <code>a == b</code> thì <code>hash(a) == hash(b)</code>; chiều ngược lại không bắt buộc.</li>
+    <li><strong>Cùng một tập field</strong> cho cả hai hàm, không thêm không bớt.</li>
+    <li><strong>Tập field đó phải bất biến</strong> &#8212; sửa nó sau khi đã làm key là mất key.</li>
+    <li><strong><code>@dataclass(frozen=True)</code></strong> sinh sẵn cả hai và chặn luôn việc gán lại field.</li>
+  </ul>
+
+  <details class="deep"><summary>Mất key trông như thế nào trong code thật?</summary>
+    <div class="body">
 <pre><code><span class="kw">class</span> Box:
     <span class="kw">def</span> __init__(self, v): self.v = v
     <span class="kw">def</span> __eq__(self, o):    <span class="kw">return</span> self.v == o.v
-    <span class="kw">def</span> __hash__(self):     <span class="kw">return</span> hash(self.v)   <span class="cm"># hash phụ thuộc field sửa được</span>
+    <span class="kw">def</span> __hash__(self):     <span class="kw">return</span> hash(self.v)   <span class="cm"># hash đọc field sửa được</span>
 
 b = Box(1)
-d = {b: "xin chào"}
-b.v = 2                        <span class="cm"># hash đổi, nhưng dữ liệu vẫn nằm ở ô cũ</span>
+d = {b: <span class="st">"xin chào"</span>}
+b.v = 2                        <span class="cm"># hash đổi, dữ liệu vẫn nằm ở slot cũ</span>
 
-d[b]        <span class="cm"># KeyError — tìm ở ô mới, không có gì ở đó</span>
-list(d)     <span class="cm"># [Box(2)] — key vẫn còn nguyên trong bảng</span>
-b <span class="kw">in</span> d      <span class="cm"># False — object tự tìm chính nó không ra</span></code></pre>
-  <p>Dict không hỏng, nó chỉ đang tìm ở địa chỉ mà bạn khai. Entry đó thành rác không thể truy cập cho tới khi rehash.</p>
+d[b]        <span class="cm"># KeyError &#8212; tìm ở slot mới, không có gì ở đó</span>
+list(d)     <span class="cm"># [Box(2)] &#8212; key vẫn còn nguyên trong bảng</span>
+b <span class="kw">in</span> d      <span class="cm"># False &#8212; object tự tìm chính nó không ra</span></code></pre>
+      <p>Dict không hỏng, nó chỉ đang tìm ở đúng địa chỉ mà bạn khai. Entry đó thành rác không truy cập được cho tới lần rehash sau. Không exception nào cảnh báo lúc bạn gán <code>b.v = 2</code> &#8212; đó là lý do lỗi này im lặng và khó truy.</p>
+    </div></details>
 </section>
 
-<section id="dict-s20" class="lesson">
-  <div class="sh"><b>20</b><h2>Dict vs List vs Set</h2></div>
-<div class="stack">
-    <div class="s"><b>list — index là vị trí bạn đưa</b><span>truy cập theo thứ tự · <code>x in c</code> là O(n) · lưu value · phần tử bất kỳ · tốn bộ nhớ ít nhất · giữ thứ tự</span></div>
-    <div class="s ok"><b>dict — index là <code>hash(key) &amp; mask</code></b><span>truy cập theo key · <code>x in c</code> là O(1) · lưu key + value · key phải hashable · tốn bộ nhớ nhiều nhất · giữ thứ tự chèn</span></div>
-    <div class="s ok"><b>set — index là <code>hash(el) &amp; mask</code></b><span>chỉ kiểm tra tồn tại · <code>x in c</code> là O(1) · chỉ lưu key · phần tử phải hashable · bộ nhớ trung bình · <b>không</b> đảm bảo thứ tự</span></div>
-  </div>
-  <p><code>set</code> cũng là open addressing với cùng công thức probe, nhưng <strong>không</strong> dùng thiết kế compact — nên nó không giữ thứ tự chèn, và giữ load factor thấp hơn (~3/5) để đổi tốc độ.</p>
-  <div class="note key">
-    <h4>Phản xạ khi tối ưu</h4>
-    Thấy <code>if x in some_list</code> nằm trong vòng lặp là đổi ngay sang <code>set</code>/<code>dict</code>: O(n·m) thành O(n). Đây là tối ưu Python phổ biến nhất và cũng đáng giá nhất.
-  </div>
-</section>
+<section id="dict-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Dict, list hay set</h2></div>
 
-<section id="dict-s21" class="lesson">
-  <div class="sh"><b>21</b><h2>API thực dụng</h2></div>
-  <table>
-    <tr><th>Việc cần làm</th><th>Cách viết</th></tr>
-    <tr><td>Đọc, không muốn KeyError</td><td><code>d.get(k)</code> · <code>d.get(k, default)</code></td></tr>
-    <tr><td>Đọc, chưa có thì tạo</td><td><code>d.setdefault(k, [])</code> — trả về giá trị đang có hoặc vừa tạo</td></tr>
-    <tr><td>Lấy ra và xoá</td><td><code>d.pop(k, default)</code></td></tr>
-    <tr><td>Lấy ra phần tử cuối</td><td><code>d.popitem()</code> — LIFO từ 3.7</td></tr>
-    <tr><td>Gộp dict</td><td><code>d1 | d2</code> (3.9+) · <code>d1 |= d2</code> · <code>{**d1, **d2}</code> · <code>d1.update(d2)</code></td></tr>
-    <tr><td>Đảo key-value</td><td><code>{v: k for k, v in d.items()}</code></td></tr>
-    <tr><td>Nhóm dữ liệu</td><td><code>defaultdict(list)</code> — không cần kiểm tra key tồn tại</td></tr>
-    <tr><td>Đếm tần suất</td><td><code>Counter(items)</code> · <code>.most_common(n)</code></td></tr>
-    <tr><td>Chặn ghi</td><td><code>types.MappingProxyType(d)</code> — view chỉ đọc</td></tr>
-    <tr><td>Rehash / dọn tombstone</td><td><code>d = dict(d)</code></td></tr>
-  </table>
-  <h3>View — không phải bản copy</h3>
-<pre><code>&gt;&gt;&gt; d = {"a": 1}
-&gt;&gt;&gt; ks = d.keys()
-&gt;&gt;&gt; d["b"] = 2
-&gt;&gt;&gt; ks
-dict_keys(['a', 'b'])            <span class="cm"># view sống, tự thấy thay đổi</span>
-&gt;&gt;&gt; d.keys() &amp; {"a", "z"}
-{'a'}                            <span class="cm"># keys() và items() hỗ trợ phép toán tập hợp</span></code></pre>
-  <div class="note warn">
-    <h4>Hai cái bẫy hay gặp</h4>
-    <code>dict.fromkeys(keys, [])</code> — mọi key <strong>dùng chung một list</strong>. Dùng <code>{k: [] for k in keys}</code>.<br>
-    <code>d.copy()</code> là shallow: value là list/dict thì vẫn chia sẻ. Dùng <code>copy.deepcopy</code> nếu cần cắt hẳn.
-  </div>
-</section>
+  <p class="key">Cả ba đều là truy cập mảng theo index. Khác nhau đúng một chỗ: index đó từ đâu ra.</p>
 
-<section id="dict-s22" class="lesson">
-  <div class="sh"><b>22</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Dict nhanh vì nó không đi tìm — nó <em>tính</em> ra chỗ; mọi thứ còn lại trong bài chỉ là chống đỡ cho những lần phép tính đó ra cùng một ô.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 404" role="img" aria-label="Đường đi từ key tới ô nhớ, cấu trúc hai mảng của compact dict, va chạm và tombstone, ngưỡng resize 2/3">
-
-      <text class="sv-h" x="8" y="16">&#9312; TỪ KEY TỚI Ô — TÍNH RA CHỖ, KHÔNG DUYỆT TÌM</text>
-      <rect x="8" y="26" width="150" height="34" rx="4" fill="rgba(140,169,242,.12)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="18" y="48" fill="#A8BEF6">key "user"</text>
-      <text class="sv-d" x="8" y="76" fill="#7A6F63">phải hashable</text>
-      <path d="M158 43 h20" stroke="#7A6F63"/><path d="M178 43 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="178" y="26" width="150" height="34" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="188" y="48" fill="#A8BEF6">hash(key)</text>
-      <text class="sv-d" x="178" y="76" fill="#7A6F63">một số 64 bit</text>
-      <path d="M328 43 h20" stroke="#7A6F63"/><path d="M348 43 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="348" y="26" width="150" height="34" rx="4" fill="rgba(237,180,74,.14)" stroke="#EDB44A"/>
-      <text class="sv-t" x="358" y="48" fill="#EDB44A">hash &amp; mask</text>
-      <text class="sv-d" x="348" y="76" fill="#7A6F63">cắt lấy bit thấp &#8594; i</text>
-      <path d="M498 43 h20" stroke="#7A6F63"/><path d="M518 43 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="518" y="26" width="150" height="34" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="528" y="48" fill="#A8BEF6">dk_indices[i]</text>
-      <text class="sv-d" x="518" y="76" fill="#7A6F63">ra số thứ tự ix</text>
-      <path d="M668 43 h20" stroke="#7A6F63"/><path d="M688 43 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="688" y="26" width="160" height="34" rx="4" fill="rgba(91,207,160,.12)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="698" y="48" fill="#8EE0BE">dk_entries[ix]</text>
-      <text class="sv-d" x="688" y="76" fill="#7A6F63">so key rồi trả value</text>
-      <text class="sv-l" x="8" y="96">chỉ các bit thấp quyết định ô đầu tiên &#8212; hai key hash khác hẳn nhau vẫn có thể bắt đầu ở cùng một chỗ</text>
-
-      <text class="sv-h" x="8" y="126">&#9313; HAI MẢNG THAY VÌ MỘT &#8212; ĐÓ LÀ COMPACT DICT</text>
-      <rect x="8" y="136" width="28" height="22" rx="2" fill="rgba(140,169,242,.06)" stroke="#2E2822"/>
-      <text class="sv-l" x="17" y="151" fill="#7A6F63">-1</text>
-      <rect x="40" y="136" width="28" height="22" rx="2" fill="rgba(140,169,242,.06)" stroke="#2E2822"/>
-      <text class="sv-l" x="49" y="151" fill="#7A6F63">-1</text>
-      <rect x="72" y="136" width="28" height="22" rx="2" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
-      <text class="sv-l" x="84" y="151" fill="#EDB44A">0</text>
-      <rect x="104" y="136" width="28" height="22" rx="2" fill="rgba(140,169,242,.06)" stroke="#2E2822"/>
-      <text class="sv-l" x="113" y="151" fill="#7A6F63">-1</text>
-      <rect x="136" y="136" width="28" height="22" rx="2" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
-      <text class="sv-l" x="148" y="151" fill="#EDB44A">2</text>
-      <rect x="168" y="136" width="28" height="22" rx="2" fill="rgba(237,180,74,.16)" stroke="#EDB44A"/>
-      <text class="sv-l" x="180" y="151" fill="#EDB44A">1</text>
-      <rect x="200" y="136" width="28" height="22" rx="2" fill="rgba(140,169,242,.06)" stroke="#2E2822"/>
-      <text class="sv-l" x="209" y="151" fill="#7A6F63">-1</text>
-      <rect x="232" y="136" width="28" height="22" rx="2" fill="rgba(140,169,242,.06)" stroke="#2E2822"/>
-      <text class="sv-l" x="241" y="151" fill="#7A6F63">-1</text>
-      <text class="sv-d" x="8" y="174" fill="#7A6F63">dk_indices &#183; thưa &#183; mỗi ô chỉ là một số nhỏ</text>
-      <path d="M264 147 h26" stroke="#EDB44A"/><path d="M290 147 l-7 -4 v8 z" fill="#EDB44A"/>
-      <rect x="300" y="136" width="300" height="20" rx="3" fill="rgba(91,207,160,.10)" stroke="#3D352C"/>
-      <text class="sv-l" x="310" y="150" fill="#8EE0BE">0 &#183; hash "user" &#183; key &#183; value</text>
-      <rect x="300" y="158" width="300" height="20" rx="3" fill="rgba(91,207,160,.10)" stroke="#3D352C"/>
-      <text class="sv-l" x="310" y="172" fill="#8EE0BE">1 &#183; hash "id" &#183; key &#183; value</text>
-      <rect x="300" y="180" width="300" height="20" rx="3" fill="rgba(91,207,160,.10)" stroke="#3D352C"/>
-      <text class="sv-l" x="310" y="194" fill="#8EE0BE">2 &#183; hash "age" &#183; key &#183; value</text>
-      <text class="sv-d" x="300" y="212" fill="#7A6F63">dk_entries &#183; đặc &#183; ghi nối tiếp theo thứ tự chèn</text>
-      <text class="sv-l" x="620" y="150" fill="#8EE0BE">tiết kiệm 20&#8211;25% bộ nhớ</text>
-      <text class="sv-l" x="620" y="172" fill="#8EE0BE">thứ tự chèn là hệ quả miễn phí</text>
-      <text class="sv-l" x="620" y="194">hash lưu sẵn trong entry</text>
-
-      <rect x="8" y="228" width="840" height="88" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-h" x="20" y="248" fill="#F79BAB">&#9314; HAI KEY CÙNG Ô &#8212; VÀ VẾT ĐỂ LẠI KHI XOÁ</text>
-      <rect x="20" y="256" width="404" height="50" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="30" y="274" fill="#F79BAB">Collision &#8594; open addressing</text>
-      <text class="sv-l" x="30" y="290">i = (i*5 + perturb + 1) &amp; mask</text>
-      <text class="sv-d" x="30" y="303" fill="#7A6F63">perturb trộn bit cao vào, nên hai key khác hash tách nhau ngay bước đầu</text>
-      <rect x="436" y="256" width="400" height="50" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="446" y="274" fill="#F79BAB">Xoá phải ghi DUMMY, không phải EMPTY</text>
-      <text class="sv-l" x="446" y="290">EMPTY &#8594; probe dừng sớm &#8594; key phía sau biến mất</text>
-      <text class="sv-d" x="446" y="303" fill="#7A6F63">tombstone chỉ được dọn lúc resize, tích lại thì probe dài dần</text>
-
-      <text class="sv-h" x="8" y="338">&#9315; ĐẦY 2/3 THÌ NHÂN ĐÔI</text>
-      <rect x="8" y="348" width="100" height="22" rx="3" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-l" x="18" y="363" fill="#A8BEF6">size 8 &#183; 5 key</text>
-      <path d="M112 359 h16" stroke="#7A6F63"/><path d="M128 359 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="132" y="348" width="110" height="22" rx="3" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-l" x="142" y="363" fill="#A8BEF6">size 16 &#183; 10 key</text>
-      <path d="M246 359 h16" stroke="#7A6F63"/><path d="M262 359 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="266" y="348" width="110" height="22" rx="3" fill="rgba(237,180,74,.14)" stroke="#EDB44A"/>
-      <text class="sv-l" x="276" y="363" fill="#EDB44A">size 32 &#183; 21 key</text>
-      <text class="sv-l" x="392" y="363">resize tính lại index từ hash đã lưu &#8212; không gọi lại __hash__</text>
-      <line x1="8" y1="378" x2="852" y2="378" stroke="#2E2822"/>
-      <text class="sv-l" x="8" y="396" fill="#8EE0BE">O(1) trung bình: resize O(n) nhưng chia đều cho n lần insert</text>
-      <text class="sv-l" x="440" y="396" fill="#F79BAB">O(n) thật sự chỉ đến từ __hash__ tự viết trả về hằng số</text>
-    </svg>
-    <figcaption>Đọc theo số: tra một key là bốn phép tính chứ không phải một vòng duyệt &#9312;, chỗ lưu tách làm hai mảng để vừa gọn vừa giữ thứ tự &#9313;, hai key trùng ô và ô vừa xoá là hai thứ phải chống đỡ &#9314;, và bảng tự nhân đôi ở ngưỡng 2/3 &#9315;.</figcaption>
-  </figure>
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="So sánh list, dict và set theo bộ nhớ, thứ tự và điều kiện phần tử">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--rule)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="85" fill="var(--muted)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--muted)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--filled)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--filled)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="12" y="141" fill="var(--filled)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--dim)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--dim)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--filled)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--filled)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="188" y="141" fill="var(--filled)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--dim)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--dim)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="223" fill="var(--muted)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--muted)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="269" fill="var(--muted)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--muted)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="315" fill="var(--muted)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--muted)">thì nhân đôi bảng &#8212; resize</text>
+<path d="M304 149 H 328 V 40 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,40 348,35.8 348,44.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">CẢ BA ĐỀU LÀ TRUY CẬP MẢNG &#8212; KHÁC Ở CÁCH TÍNH RA INDEX</text>
+<rect x="360" y="26" width="500" height="24" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="374" y="43" fill="var(--rule)">list</text>
+<text class="sv-s" x="536" y="43" fill="var(--dim)">index là số bạn đưa &#183; tìm một phần tử mất O(n)</text>
+<rect x="360" y="54" width="500" height="24" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="71" fill="var(--filled)">dict</text>
+<text class="sv-s" x="536" y="71" fill="var(--dim)">index = hash(key) % size &#183; tìm một key là O(1)</text>
+<rect x="360" y="82" width="500" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="99" fill="var(--ok)">set</text>
+<text class="sv-s" x="536" y="99" fill="var(--dim)">index = hash(el) % size &#183; chỉ lưu key</text>
+<text class="sv-hv" x="360" y="130" fill="var(--muted)">BA CỘT ĐỂ CHỌN</text>
+<text class="sv-d" x="550" y="154" fill="var(--muted)">bộ nhớ</text>
+<text class="sv-d" x="648" y="154" fill="var(--muted)">thứ tự</text>
+<text class="sv-d" x="752" y="154" fill="var(--muted)">điều kiện phần tử</text>
+<rect x="360" y="162" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="177" fill="var(--muted)">list</text>
+<text class="sv-d" x="550" y="177" fill="var(--muted)">ít nhất</text>
+<text class="sv-d" x="648" y="177" fill="var(--muted)">giữ nguyên</text>
+<text class="sv-d" x="752" y="177" fill="var(--muted)">bất kỳ</text>
+<rect x="360" y="188" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="203" fill="var(--filled)">dict</text>
+<text class="sv-d" x="550" y="203" fill="var(--muted)">nhiều nhất</text>
+<text class="sv-d" x="648" y="203" fill="var(--muted)">thứ tự chèn</text>
+<text class="sv-d" x="752" y="203" fill="var(--muted)">key hashable</text>
+<rect x="360" y="214" width="500" height="22" rx="3" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="372" y="229" fill="var(--ok)">set</text>
+<text class="sv-d" x="550" y="229" fill="var(--muted)">ở giữa</text>
+<text class="sv-d" x="648" y="229" fill="var(--muted)">KHÔNG đảm bảo</text>
+<text class="sv-d" x="752" y="229" fill="var(--muted)">phần tử hashable</text>
+<text class="sv-hv" x="360" y="258" fill="var(--muted)">PHẢN XẠ ĐÁNG GIÁ NHẤT KHI TỐI ƯU PYTHON</text>
+<rect x="360" y="268" width="500" height="54" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="288" fill="var(--ok)">thấy if x in some_list nằm trong vòng lặp</text>
+<text class="sv-s" x="374" y="306" fill="var(--dim)">đổi some_list thành set: O(n&#183;m) tụt xuống O(n), sửa đúng một dòng</text>
+</svg>
+<figcaption>set dùng đúng cơ chế của dict nhưng bỏ phần value và không dùng thiết kế hai mảng &#8212; nên nó nhanh tương đương mà không giữ thứ tự.</figcaption>
+</figure>
 
   <ul class="why">
-    <li><strong>Hashable</strong> là điều kiện để bước đầu của &#9312; có nghĩa: hash phải bất biến suốt đời key, nên list không làm key được.</li>
-    <li><strong><code>__hash__</code> &amp; <code>__eq__</code></strong> chia nhau hai đầu của &#9312; — hash chọn ô, eq xác nhận key; sửa một mà quên cái kia là hỏng.</li>
-    <li><strong>Load factor</strong> là con số đứng sau &#9315;: giữ trần ở 2/3 để probe ở &#9314; không dài ra, đổi bộ nhớ lấy tốc độ.</li>
-    <li><strong>Set</strong> dùng đúng cơ chế &#9312;&#8211;&#9314; nhưng bỏ phần value, nên mọi giới hạn về key áp dụng y nguyên cho phần tử set.</li>
+    <li><strong>list</strong> nhận index từ bạn, nên tìm một phần tử vẫn phải duyệt.</li>
+    <li><strong>dict</strong> tính index từ key, nên tìm là O(1) &#8212; đổi lại tốn bộ nhớ nhất.</li>
+    <li><strong>set</strong> dùng đúng cơ chế đó nhưng bỏ phần value và bỏ thiết kế hai mảng.</li>
+    <li><strong>set không giữ thứ tự</strong>, và giữ load factor thấp hơn (~3/5) để đổi lấy tốc độ.</li>
   </ul>
+
+  <details class="deep"><summary>Vài API dict đáng thuộc</summary>
+    <div class="body">
+      <p><b>Đọc an toàn</b>: <code>d.get(k, default)</code>; <b>chưa có thì tạo</b>: <code>d.setdefault(k, [])</code>; <b>lấy ra và xoá</b>: <code>d.pop(k, default)</code>; <b>lấy phần tử cuối</b>: <code>d.popitem()</code> (LIFO từ 3.7). <b>Gộp</b>: <code>d1 | d2</code> từ 3.9. <b>Nhóm</b>: <code>defaultdict(list)</code>. <b>Đếm</b>: <code>Counter(items).most_common(n)</code>. <b>Chặn ghi</b>: <code>types.MappingProxyType(d)</code>. <b>Rehash</b>: <code>d = dict(d)</code>.</p>
+      <p><b><code>keys()</code> và <code>items()</code> là view, không phải bản copy</b> &#8212; dict đổi thì view thấy ngay, và cả hai hỗ trợ phép toán tập hợp: <code>d.keys() &amp; {&quot;a&quot;, &quot;z&quot;}</code>.</p>
+      <p>Hai cái bẫy: <code>dict.fromkeys(keys, [])</code> cho mọi key <b>dùng chung một list</b> &#8212; viết <code>{k: [] for k in keys}</code>; và <code>d.copy()</code> là shallow, value dạng list hay dict vẫn dùng chung.</p>
+    </div></details>
 </section>
 
-<section id="dict-s23" class="lesson">
-  <div class="sh"><b>23</b><h2>Hỏi đáp</h2></div>
+<section id="dict-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Lỗi hay gặp</h2></div>
 
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
+  <p class="key">Năm lỗi dưới đây đều là một cách đọc sai đúng một ô của bản đồ &#8212; và cả năm đều im lặng.</p>
 
-  <details class="qa"><summary>Hash table là gì?</summary>
-  <p>Mảng các ô, vị trí của mỗi phần tử được tính từ chính key qua hàm hash — nên truy cập trực tiếp bằng index thay vì tìm tuần tự.</p></details>
+<figure class="scrollx">
+<svg viewBox="0 0 860 344" role="img" aria-label="Năm lỗi thường gặp, mỗi lỗi gắn với một ô của bản đồ">
+<text class="sv-hv" x="0" y="16">BẢN ĐỒ</text>
+<rect x="0" y="24" width="300" height="28" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="150" y="43" fill="var(--text)" text-anchor="middle">d[key] &#8212; câu bạn viết</text>
+<line x1="62" y1="52" x2="62" y2="56" stroke="var(--probe)" stroke-width="1.2"/><polygon points="62,64 57.8,56 66.2,56" fill="var(--probe)"/>
+<rect x="0" y="66" width="300" height="44" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="85" fill="var(--probe)">Tính ra slot, không đi tìm</text>
+<text class="sv-s" x="14" y="102" fill="var(--dim)">hash(key) % size &#8594; slot index</text>
+<line x1="62" y1="110" x2="62" y2="114" stroke="var(--filled)" stroke-width="1.2"/><polygon points="62,122 57.8,114 66.2,114" fill="var(--filled)"/>
+<rect x="0" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="12" y="141" fill="var(--filled)">dk_indices</text>
+<text class="sv-s" x="12" y="157" fill="var(--dim)">bảng thưa</text>
+<text class="sv-s" x="12" y="171" fill="var(--dim)">chỉ là số thứ tự</text>
+<line x1="126" y1="149" x2="166" y2="149" stroke="var(--filled)" stroke-width="1.2"/><polygon points="174,149 166,144.8 166,153.2" fill="var(--filled)"/>
+<rect x="176" y="124" width="124" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="188" y="141" fill="var(--filled)">dk_entries</text>
+<text class="sv-s" x="188" y="157" fill="var(--dim)">vùng đặc</text>
+<text class="sv-s" x="188" y="171" fill="var(--dim)">chứa key và value</text>
+<text class="sv-hv" x="0" y="194" fill="var(--muted)">BA CHUYỆN LÀM HỎNG PHÉP TÍNH ĐÓ</text>
+<line x1="0" y1="200" x2="300" y2="200" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="206" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="223" fill="var(--tomb)">Hai key ra cùng một slot</text>
+<text class="sv-s" x="14" y="240" fill="var(--dim)">thì dò sang slot khác &#8212; probe sequence</text>
+<rect x="0" y="252" width="300" height="38" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="269" fill="var(--tomb)">Xoá làm đứt đường dò</text>
+<text class="sv-s" x="14" y="286" fill="var(--dim)">thì để lại vết xoá &#8212; tombstone</text>
+<rect x="0" y="298" width="300" height="38" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="315" fill="var(--ok)">Bảng chật thì đường dò dài ra</text>
+<text class="sv-s" x="14" y="332" fill="var(--dim)">thì nhân đôi bảng &#8212; resize</text>
+<text class="sv-hv" x="360" y="16" fill="var(--muted)">NĂM LỖI, MỖI LỖI LÀ ĐỌC SAI MỘT Ô CỦA BẢN ĐỒ</text>
+<rect x="360" y="26" width="500" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="46" fill="var(--tomb)">hash(key) đem đi lưu file</text>
+<text class="sv-d" x="596" y="46" fill="var(--dim)">str đổi hash mỗi lần chạy</text>
+<rect x="360" y="60" width="500" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="80" fill="var(--tomb)">sửa field sau khi làm key</text>
+<text class="sv-d" x="596" y="80" fill="var(--dim)">tìm ở slot mới, dữ liệu ở slot cũ</text>
+<rect x="360" y="94" width="500" height="30" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="114" fill="var(--probe)">del hết mà mong nhẹ đi</text>
+<text class="sv-d" x="596" y="114" fill="var(--dim)">vết xoá chỉ dọn lúc resize</text>
+<rect x="360" y="128" width="500" height="30" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="148" fill="var(--probe)">dict.fromkeys(keys, [])</text>
+<text class="sv-d" x="596" y="148" fill="var(--dim)">mọi key dùng chung một list</text>
+<rect x="360" y="162" width="500" height="30" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="182" fill="var(--probe)">sửa dict trong lúc duyệt</text>
+<text class="sv-d" x="596" y="182" fill="var(--dim)">RuntimeError giữa chừng</text>
+<text class="sv-hv" x="360" y="214" fill="var(--muted)">CÁCH SỬA, THEO ĐÚNG THỨ TỰ TRÊN</text>
+<rect x="360" y="220" width="500" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="237" fill="var(--ok)">dùng hash ổn định riêng</text>
+<text class="sv-s" x="536" y="237" fill="var(--dim)">sha256 hay md5 nếu cần lưu ra ngoài</text>
+<rect x="360" y="244" width="500" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="261" fill="var(--ok)">dùng frozen dataclass</text>
+<text class="sv-s" x="536" y="261" fill="var(--dim)">chặn luôn việc gán lại field</text>
+<rect x="360" y="268" width="500" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="285" fill="var(--ok)">d = dict(d) định kỳ</text>
+<text class="sv-s" x="536" y="285" fill="var(--dim)">ép rehash, dọn sạch vết xoá</text>
+<rect x="360" y="292" width="500" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="309" fill="var(--ok)">{k: [] for k in keys}</text>
+<text class="sv-s" x="536" y="309" fill="var(--dim)">mỗi key một list riêng</text>
+<text class="sv-d" x="360" y="331" fill="var(--muted)">Lỗi cuối: duyệt trên list(d) nếu trong vòng lặp có xoá key.</text>
+</svg>
+<figcaption>Không lỗi nào trong số này làm dict báo sai ngay &#8212; chúng đều trả về kết quả trông có vẻ đúng, nên phải nhận ra bằng bản đồ.</figcaption>
+</figure>
 
-  <details class="qa"><summary>Vì sao dict nhanh?</summary>
-  <p>Từ key tính ra index chỉ bằng một lần hash và một phép AND, rồi đọc mảng một lần. Chi phí không phụ thuộc số phần tử.</p></details>
+  <ul class="why">
+    <li><strong>Đọc sai bước tính slot</strong>: <code>__hash__</code> trả hằng số &#8212; bảng thành danh sách nối.</li>
+    <li><strong>Đọc sai ô chỗ lưu</strong>: tưởng ghi đè thì key nhảy xuống cuối khi duyệt.</li>
+    <li><strong>Đọc sai ô vết xoá</strong>: tưởng <code>del</code> trả lại bộ nhớ và làm ngắn đường dò.</li>
+    <li><strong>Đọc sai ô nhân đôi bảng</strong>: chèn hàng triệu key từng cái một rồi ngạc nhiên vì gai latency.</li>
+  </ul>
 
-  <details class="qa"><summary>Hashable là gì? Vì sao key phải hashable?</summary>
-  <p>Có <code>__hash__</code>, hash bất biến, nhất quán với <code>==</code>. Vị trí lưu suy ra từ hash — hash đổi thì không tìm lại được key.</p></details>
+  <details class="deep"><summary>Sửa dict trong lúc đang duyệt thì sao?</summary>
+    <div class="body">
+      <p><code>RuntimeError: dictionary changed size during iteration</code>. Đây là một trong số ít lỗi dict chịu báo ra, vì vòng duyệt đang quét vùng đặc mà vùng đó vừa bị chèn thêm hoặc nén lại thì nó không còn biết mình đang ở đâu.</p>
+      <p>Cách chữa: duyệt trên một bản chụp &#8212; <code>for k in list(d)</code> &#8212; rồi mới xoá. Đổi <em>value</em> trong lúc duyệt thì không sao, vì kích thước không đổi.</p>
+    </div></details>
+</section>
 
-  <details class="qa"><summary>Mutable có thể làm key không?</summary>
-  <p>Được, nếu hash không phụ thuộc phần bị sửa. Điều Python cần là hash bất biến, không phải object immutable.</p></details>
+<section id="dict-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Hỏi đáp</h2></div>
 
-  <details class="qa"><summary>Collision là gì?</summary>
-  <p>Hai key khác nhau ra cùng index. Phân biệt trùng index (thường, xử lý được) với trùng hash (probe sequence y hệt nhau, không tách được).</p></details>
+  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở &#8212; cốt là hiểu ý, không phải thuộc chữ.</p>
 
-  <details class="qa"><summary>Chaining vs Open Addressing?</summary>
-  <p>Chaining treo linked list ngoài ô (Java). Open addressing tìm ô khác trong chính mảng (Python) — cache tốt hơn, ít bộ nhớ hơn, nhưng cần load factor thấp và tombstone khi xoá.</p></details>
+  <details class="qa"><summary>Hash table là gì, và vì sao dict nhanh?</summary>
+  <p>Một mảng mà vị trí của mỗi phần tử được <b>tính ra từ chính key</b> qua hàm hash, nên đọc trực tiếp bằng index thay vì duyệt tuần tự. Dict nhanh vì một lần tra chỉ gồm một lần băm, một phép chia dư và một lần đọc mảng &#8212; số phần tử không xuất hiện ở bước nào, nên chi phí không phụ thuộc kích thước.</p></details>
 
-  <details class="qa"><summary>Probe sequence của Python?</summary>
-  <p><code>i = (i*5 + perturb + 1) &amp; mask</code>, <code>perturb</code> khởi tạo bằng cả hash rồi dịch phải 5 bit mỗi bước. Bit cao được tiêm dần để tách các key trùng bit thấp; khi perturb hết, <code>5i+1</code> đảm bảo phủ toàn bảng.</p></details>
+  <details class="qa"><summary>Hashable là gì, và mutable có làm key được không?</summary>
+  <p>Hashable là có <code>__hash__</code>, hash bất biến suốt đời object, và nhất quán với <code>==</code>. Mutable <b>vẫn làm key được</b> nếu hash không phụ thuộc phần bị sửa &#8212; class tự viết mặc định hash theo <code>id()</code> là ví dụ. Điều Python đòi là hash bất biến, không phải object immutable; immutable chỉ là cách dễ nhất để đạt điều đó.</p></details>
 
-  <details class="qa"><summary>Clustering là gì?</summary>
-  <p>Primary: linear probing tạo dải liền kề tự lớn lên. Secondary: quadratic probing khiến mọi key cùng ô đầu đi chung một đường. Pseudo-random probing của Python tránh cả hai, đổi lại kém cache locality — được compact dict bù lại.</p></details>
+  <details class="qa"><summary>Collision là gì, xử lý thế nào?</summary>
+  <p>Hai key khác nhau ra cùng một slot &#8212; tất yếu, vì bảng có ít slot mà hash có vô số giá trị. Phải phân biệt hai mức: <b>trùng slot</b> là chuyện thường và tách ra được ngay, còn <b>trùng hash</b> mới tệ vì hai key có probe sequence y hệt nhau. Python xử lý bằng <b>open addressing</b>: đi tìm slot khác trong chính mảng theo một dãy xác định, chứ không treo linked list ra ngoài slot như Java.</p></details>
 
-  <details class="qa"><summary>Tại sao xoá phải để tombstone?</summary>
-  <p>Vì probe dừng khi gặp ô EMPTY. Xoá thẳng sẽ cắt đường đi và làm mất các key phía sau.</p></details>
+  <details class="qa"><summary>Một probe sequence tốt cần thoả điều gì?</summary>
+  <p>Hai điều, và cả hai đều bắt buộc. <b>Xác định</b>: cùng một key phải luôn sinh ra đúng dãy slot cũ, vì lookup chỉ tìm được key nếu nó đi lại đúng con đường insert đã đi. <b>Phủ hết bảng</b>: dãy phải đi qua được mọi slot, nếu không dict sẽ báo đầy trong khi vẫn còn chỗ trống. CPython đạt cả hai bằng cách trộn phần cao của hash vào bước nhảy &#8212; phần phân tán &#8212; kèm một phần bảo hiểm để dãy vẫn phủ hết bảng.</p></details>
 
-  <details class="qa"><summary>Resize khi nào, ra sao?</summary>
-  <p>Khi vượt 2/3 size. Kích thước mới = lũy thừa 2 nhỏ nhất ≥ <code>used*3</code>; rehash toàn bộ từ hash đã lưu, dọn sạch tombstone, và có thể co lại nếu đã xoá nhiều.</p></details>
+  <details class="qa"><summary>Tại sao xoá phải để lại tombstone?</summary>
+  <p>Vì probe chỉ dừng khi gặp slot <code>EMPTY</code>. Ghi <code>EMPTY</code> vào slot vừa xoá là tạo ra một điều kiện dừng giả, và mọi key nằm phía sau nó trên probe sequence sẽ biến mất khỏi dict &#8212; dù dữ liệu vẫn còn nguyên trong bảng. Nên xoá ghi <code>DUMMY</code>: không có dữ liệu, nhưng vẫn buộc probe đi tiếp.</p></details>
 
-  <details class="qa"><summary>Amortized O(1) là gì?</summary>
-  <p>Resize tốn O(n) nhưng khoảng cách giữa hai lần resize tăng gấp đôi, nên tổng chi phí n lần insert vẫn là O(n) → trung bình O(1) mỗi lần. Không phải bảo đảm cho từng lần riêng lẻ.</p></details>
+  <details class="qa"><summary>Resize xảy ra khi nào và làm những gì?</summary>
+  <p>Khi phần đã dùng vượt <b>2/3</b> size. Cỡ mới là cỡ nhỏ nhất đủ chứa số key <em>còn sống</em>, nên một dict xoá gần hết sẽ co lại chứ không chỉ phình ra. Resize tính lại index cho toàn bộ key từ hash đã lưu sẵn trong entry (không gọi lại <code>__hash__</code>) và dọn sạch tombstone &#8212; đây là lối duy nhất để đường dò ngắn lại.</p></details>
+
+  <details class="qa"><summary>Amortized O(1) khác gì O(1)?</summary>
+  <p>Resize tốn O(n) thật, nhưng khoảng cách giữa hai lần resize tăng gấp đôi nên tổng công là <code>n/2 + n/4 + &#8230; &lt; n</code> &#8212; chia đều cho n lần insert vẫn ra O(1). Đó là <b>trung bình, không phải bảo đảm cho từng lần</b>: một <code>d[k] = v</code> đơn lẻ vẫn có thể mất O(n), và hệ thống đo p99 sẽ nhìn thấy cái gai đó.</p></details>
 
   <details class="qa"><summary>Vì sao dict giữ được insertion order?</summary>
-  <p>Compact dict tách bảng hash thưa (chỉ chứa chỉ số) khỏi vùng entries đặc ghi nối tiếp theo thứ tự chèn. Duyệt dict là quét vùng đặc đó.</p></details>
+  <p>Vì compact dict tách bảng hash <b>thưa</b> (chỉ chứa số thứ tự) khỏi vùng entries <b>đặc</b> được ghi nối tiếp theo thứ tự chèn. Duyệt dict chính là quét tuần tự vùng đặc đó. Thứ tự không phải tính năng thêm vào mà là hệ quả miễn phí của một thiết kế vốn để tiết kiệm bộ nhớ &#8212; cam kết trong ngôn ngữ từ 3.7.</p></details>
 
   <details class="qa"><summary>Khi nào dict rơi xuống O(n)?</summary>
-  <p>Chủ yếu do <code>__hash__</code> tự viết cho hash trùng nhau; ngoài ra do tombstone tích tụ, hoặc tấn công hash-collision (đã được hash randomization chặn với str).</p></details>
+  <p>Chủ yếu do <code>__hash__</code> tự viết cho hash trùng nhau &#8212; hằng số, hoặc lấy theo field quá ít giá trị phân biệt như <code>hash(self.status)</code>. Ngoài ra: tombstone tích tụ do thêm&#8211;xoá liên tục mà không insert đủ để kích hoạt resize, và tấn công hash-collision (đã chặn với <code>str</code> bằng hash randomization, nhưng <code>int</code> thì không randomize).</p></details>
 
-  <details class="qa"><summary>Override <code>__eq__</code> thì sao?</summary>
-  <p><code>__hash__</code> bị set None, class thành unhashable. Phải tự định nghĩa <code>__hash__</code> trên đúng tập field mà <code>__eq__</code> dùng, hoặc dùng <code>@dataclass(frozen=True)</code>.</p></details>
+  <details class="qa"><summary>Override <code>__eq__</code> rồi thì phải làm gì nữa?</summary>
+  <p>Phải định nghĩa luôn <code>__hash__</code>, vì Python tự set <code>__hash__ = None</code> và class thành unhashable &#8212; đây là chỗ Python chặn giúp, lỗi hiện ra ngay còn hơn sai âm thầm. Hai hàm phải đọc <b>đúng cùng một tập field</b>, và tập field đó không được đổi sau khi object đã làm key. Gọn nhất là <code>@dataclass(frozen=True)</code>: sinh sẵn cả hai và chặn luôn việc gán lại field.</p></details>
 </section>
+
+<footer>Cheat sheet &#183; Python dict &amp; hash table &#183; phần immutable, mutable và cách Python quản object nằm ở bài <a href="../../02-language-core/memory-model-mutability/index.html">Memory model &amp; mutability</a>.</footer>
 
 
       </article>

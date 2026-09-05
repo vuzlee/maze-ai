@@ -41,128 +41,365 @@
     <main class="reader" id="stage">
       <article class="doc" id="art-iter" data-title="Iterator & generator" data-tag="Python" data-blurb="Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.">
         <header class="hero">
-  <p class="eyebrow">Deep dive · Python internals</p>
+  <p class="eyebrow">Deep dive &#183; Python internals</p>
   <h1>Iterator <em>&amp; generator</em></h1>
-  <p class="lede">Vòng <code>for</code> của Python không hề đơn giản như nó trông. Bài này mở nó ra: <b>iterable khác iterator ở đâu</b>, generator tiết kiệm bộ nhớ tới mức nào bằng con số cụ thể, và vì sao duyệt một generator lần thứ hai lại ra rỗng mà không báo lỗi.</p>
+  <p class="lede">Vòng <code>for</code> của Python không đọc thẳng từ list. Nó xin một <b>iterator</b> — thứ chỉ nhớ hai điều:</p>
+  <ul class="ledelist">
+    <li><b>Đang đứng ở đâu</b> — <em>không giữ dữ liệu, chỉ giữ vị trí</em></li>
+    <li><b>Cách lấy phần tử kế tiếp</b> — <em>tính ra khi được hỏi, không tính sẵn</em></li>
+  </ul>
+  <p class="lede"><code>yield</code> là cách viết iterator ngắn nhất, và cái giá của nó là bạn chỉ được đi qua một lần.</p>
 </header>
 
-<section id="iter-s1">
-  <div class="sh"><b>01</b><h2>Iterator &amp; generator là gì</h2></div>
-<p class="key">Ba khái niệm xếp chồng lên nhau: <em>iterable sinh ra iterator, generator là iterator viết gọn bằng <code>yield</code></em>.</p>
-  <div class="stack">
-    <div class="s"><b>iterable · có <code>__iter__</code></b><span>"tôi có thể tạo ra một iterator" — <code>list</code>, <code>dict</code>, <code>str</code></span></div>
-    <div class="s"><b>iterator · có <code>__next__</code></b><span>"tôi giữ vị trí hiện tại" — file object, <code>enumerate</code></span></div>
-    <div class="s ok"><b>generator · viết bằng <code>yield</code></b><span>tự động có cả hai — không phải tự cài phương thức nào</span></div>
-  </div>
-  <p>Hai khái niệm hay bị gộp nhầm vào đây — <strong>closure</strong> (hàm nhớ được biến của phạm vi bao ngoài) và <strong>decorator</strong> (hàm nhận hàm, trả về hàm, bọc thêm hành vi) — nằm ở bài <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</p>
-  <div class="note key">
-    <h4>Nhớ một câu</h4>
-    Iterator là <strong>lười</strong>: nó không giữ dữ liệu, nó giữ <em>cách tính ra phần tử tiếp theo</em>. Decorator là <strong>bọc</strong>: nó không sửa hàm gốc, nó lồng hàm gốc vào trong một hàm mới.
-  </div>
-</section>
+<section id="iter-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-<section id="iter-s2">
-  <div class="sh"><b>02</b><h2>Iterable vs iterator</h2></div>
-<div class="cmp two">
-    <div><h5>Iterable — chỉ có <code>__iter__()</code></h5>
-      <p><b>Không</b> giữ trạng thái.</p>
-      <p>Duyệt được <b>nhiều lần</b>, mỗi lần tạo một iterator mới.</p>
-      <p><code>list</code> · <code>dict</code> · <code>str</code> · <code>range</code></p></div>
-    <div><h5>Iterator — có <code>__next__()</code> và <code>__iter__()</code></h5>
-      <p><b>Có</b> giữ trạng thái: vị trí hiện tại.</p>
-      <p>Duyệt được <b>đúng một lần</b>, cạn là hết.</p>
-      <p>Kết quả của <code>iter()</code> · generator · file object</p></div>
-  </div>
-<pre><code>a = [<span class="st">1</span>, <span class="st">2</span>, <span class="st">3</span>]
-<span class="kw">for</span> x <span class="kw">in</span> a: <span class="kw">pass</span>
-<span class="kw">for</span> x <span class="kw">in</span> a: <span class="kw">pass</span>        <span class="cm"># chạy lại được — a là iterable</span>
+  <p class="key">Iterator không giữ dữ liệu, nó giữ <em>cách tính ra phần tử tiếp theo</em> — mọi ưu điểm và mọi bẫy của cả bài đều rơi ra từ câu đó.</p>
 
-it = <span class="kw">iter</span>(a)
-<span class="kw">list</span>(it)                  <span class="cm"># [1, 2, 3]</span>
-<span class="kw">list</span>(it)                  <span class="cm"># []  ← đã cạn, it là iterator</span></code></pre>
-  <div class="note warn">
-    <h4>Vì sao phân biệt lại quan trọng</h4>
-    Nhận một tham số rồi duyệt nó <strong>hai lần</strong> là bug im lặng: nếu người gọi truyền list thì chạy đúng, truyền generator thì lượt hai rỗng và hàm trả về kết quả sai mà không có exception nào. Nếu hàm cần duyệt nhiều lần, hãy vật chất hoá ở đầu: <code>items = list(items)</code>, và ghi rõ điều đó trong docstring.
-  </div>
-<pre><code><span class="cm"># tự viết một iterator</span>
-<span class="kw">class</span> Countdown:
-    <span class="kw">def</span> __init__(self, n): self.n = n
-    <span class="kw">def</span> __iter__(self): <span class="kw">return</span> self        <span class="cm"># chính nó là iterator</span>
-    <span class="kw">def</span> __next__(self):
-        <span class="kw">if</span> self.n &lt;= <span class="st">0</span>: <span class="kw">raise</span> StopIteration  <span class="cm">← cách báo "hết rồi"</span>
-        self.n -= <span class="st">1</span>
-        <span class="kw">return</span> self.n + <span class="st">1</span></code></pre>
-</section>
+<figure class="gist">
+<svg viewBox="0 0 860 274" role="img" aria-label="Bản đồ bốn ô: dòng for bạn viết, iterable, iterator, yield và cái giá của lười; bên phải là bốn ý cốt lõi">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--filled)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--probe)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--ok)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="233" fill="var(--tomb)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--dim)">đổi bộ nhớ lấy khả năng quay lại</text>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">BỐN Ý &#8212; HẾT</text>
+<rect x="360" y="32" width="500" height="52" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="376" y="53" fill="var(--filled)">Iterable giữ dữ liệu, duyệt lại được</text>
+<text class="sv-t" x="376" y="71" fill="var(--dim)">list &#183; dict &#183; str &#8212; mỗi vòng for tạo một iterator mới</text>
+<rect x="360" y="92" width="500" height="52" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="113" fill="var(--probe)">Iterator giữ vị trí, cạn là hết</text>
+<text class="sv-t" x="376" y="131" fill="var(--dim)">duyệt lần hai ra rỗng, và không có exception nào báo cho bạn</text>
+<rect x="360" y="152" width="500" height="52" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="376" y="173" fill="var(--ok)">yield đóng băng hàm giữa chừng</text>
+<text class="sv-t" x="376" y="191" fill="var(--dim)">biến cục bộ còn nguyên, lần next sau chạy tiếp từ đúng chỗ đó</text>
+<rect x="360" y="212" width="500" height="52" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="233" fill="var(--tomb)">Lười đổi bộ nhớ lấy khả năng quay lại</text>
+<text class="sv-t" x="376" y="251" fill="var(--dim)">không có len(), không chỉ số, không duyệt được lần thứ hai</text>
+</svg>
+<figcaption>Bản đồ bên trái lặp lại ở <b>mọi mục</b> của bài — mỗi lần chỉ sáng đúng ô đang học, phần còn lại xám đi. Học cách đọc nó một lần là đọc được cả bài.</figcaption>
+</figure>
 
-<section id="iter-s3">
-  <div class="sh"><b>03</b><h2>Vòng for thực chất làm gì</h2></div>
-<div class="cmp two">
-    <div><h5>Bạn viết</h5>
-      <p><code>for x in obj:</code><br><code>&nbsp;&nbsp;&nbsp;&nbsp;body(x)</code></p></div>
-    <div><h5>Python thực thi</h5>
-      <p><code>it = iter(obj)</code> — gọi <code>obj.__iter__()</code><br>
-      <code>while True:</code><br>
-      <code>&nbsp;&nbsp;try: x = next(it)</code> — gọi <code>it.__next__()</code><br>
-      <code>&nbsp;&nbsp;except StopIteration: break</code><br>
-      <code>&nbsp;&nbsp;body(x)</code></p></div>
-  </div>
-  <p>Ba hệ quả rút ra từ bốn dòng này:</p>
-  <ul>
-    <li><strong><code>StopIteration</code> là cơ chế điều khiển luồng</strong>, không phải lỗi. Để nó lọt ra ngoài thì vòng <code>for</code> hiểu nhầm là "hết dữ liệu".</li>
-    <li><strong>Bất cứ object nào cài đúng hai phương thức đó đều dùng được trong <code>for</code></strong> — không cần kế thừa gì, đây là duck typing.</li>
-    <li><strong>Vòng <code>for</code> không biết độ dài</strong> — chỉ hỏi phần tử tiếp cho tới khi bị từ chối, nên duyệt được chuỗi vô hạn.</li>
+  <ul class="why">
+    <li><strong>Ô ITERABLE</strong> giữ dữ liệu thật, nên duyệt lại bao nhiêu lần cũng được — mục 02.</li>
+    <li><strong>Ô ITERATOR</strong> chỉ giữ vị trí, nên cạn là hết — mục 02 và mục 03.</li>
+    <li><strong>Ô YIELD</strong> là cách viết một iterator mà không phải tự cài phương thức nào — mục 04 và 06.</li>
+    <li><strong>Ô CÁI GIÁ</strong> nói vì sao lười không phải lúc nào cũng thắng — mục 05.</li>
   </ul>
+
+  <details class="deep"><summary>Vì sao Python không cho <code>for</code> đọc thẳng dữ liệu cho xong?</summary>
+    <div class="body">
+      <p>Vì như vậy thì <code>for</code> chỉ chạy được trên thứ đã nằm sẵn trong bộ nhớ. Tách ra làm hai vai — một bên giữ dữ liệu, một bên giữ vị trí — thì <code>for</code> chỉ cần biết cách hỏi &quot;phần tử tiếp là gì&quot;, còn phần tử đó ở đâu ra là việc của phía kia.</p>
+      <p>Đổi lại, một dòng đọc từ file, một luồng số vô hạn, hay kết quả của một truy vấn đều dùng chung được cú pháp <code>for</code>. Đó là toàn bộ lý do bản đồ này có hai ô riêng thay vì một.</p>
+    </div></details>
 </section>
 
-<section id="iter-s4">
+<section id="iter-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Iterable vs iterator</h2></div>
+
+  <p class="key">Hai ô giữa của bản đồ. <em>Iterable</em> giữ dữ liệu và tạo ra iterator mới mỗi lần được duyệt; <em>iterator</em> chỉ giữ vị trí, và vị trí thì chỉ đi tới được một lượt.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng hai ô iterable và iterator; bên phải so sánh duyệt lại được với cạn là hết, và cái bug im lặng sinh ra từ đó">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--filled)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--probe)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">đổi bộ nhớ lấy khả năng quay lại</text>
+<path d="M304 112 H 328 V 100 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,100 348,95.8 348,104.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">CÙNG MỘT DỮ LIỆU &#183; HAI CÁCH CẦM</text>
+<rect x="360" y="30" width="240" height="128" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="52" fill="var(--filled)">ITERABLE &#8212; có __iter__</text>
+<rect x="374" y="62" width="212" height="24" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="386" y="79" fill="var(--dim)">a = [1, 2, 3]</text>
+<text class="sv-d" x="374" y="106" fill="var(--muted)">for x in a:  &#8594; 1 2 3</text>
+<text class="sv-d" x="374" y="124" fill="var(--muted)">for x in a:  &#8594; 1 2 3  chạy lại được</text>
+<text class="sv-d" x="374" y="146" fill="var(--ok)">mỗi vòng for tạo một iterator MỚI</text>
+<rect x="620" y="30" width="240" height="128" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="634" y="52" fill="var(--probe)">ITERATOR &#8212; có thêm __next__</text>
+<rect x="634" y="62" width="212" height="24" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="646" y="79" fill="var(--dim)">it = iter(a)</text>
+<text class="sv-d" x="634" y="106" fill="var(--muted)">list(it)  &#8594; [1, 2, 3]</text>
+<text class="sv-d" x="634" y="124" fill="var(--tomb)">list(it)  &#8594; []   đã cạn, im lặng</text>
+<text class="sv-d" x="634" y="146" fill="var(--tomb)">nó giữ VỊ TRÍ, không giữ dữ liệu</text>
+<text class="sv-hv" x="360" y="190" fill="var(--muted)">VÌ SAO PHÂN BIỆT NÀY ĐÁNG TIỀN</text>
+<rect x="360" y="198" width="500" height="62" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="220" fill="var(--tomb)">Hàm nhận tham số rồi duyệt HAI LẦN</text>
+<text class="sv-s" x="374" y="238" fill="var(--muted)">người gọi truyền list &#8594; đúng &#183; truyền generator &#8594; lượt hai rỗng</text>
+<text class="sv-d" x="374" y="254" fill="var(--ok)">cần duyệt nhiều lần thì items = list(items) ngay đầu hàm</text>
+</svg>
+<figcaption>Cùng một dãy số, hai cách cầm. <code>list</code> duyệt lại được vì mỗi vòng <code>for</code> tạo iterator mới; iterator thì chỉ có một lượt, và lượt hai trả về rỗng mà không báo gì.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong>Phân biệt bằng phương thức</strong>: có <code>__iter__</code> là iterable, có thêm <code>__next__</code> là iterator.</li>
+    <li><strong>Generator và file object là iterator</strong>, còn <code>list</code>, <code>dict</code>, <code>str</code>, <code>range</code> là iterable.</li>
+    <li><strong>Iterator cũng có <code>__iter__</code></strong> — nó trả về chính nó, nên bỏ thẳng vào <code>for</code> vẫn chạy.</li>
+  </ul>
+
+  <details class="deep"><summary>Bug im lặng đó trông như thế nào trong code thật?</summary>
+    <div class="body">
+      <p>Một hàm nhận <code>items</code> rồi vừa tính <code>total</code> vừa lọc ra danh sách con. Nó duyệt hai lượt. Người viết test truyền list vào — xanh hết. Sáu tháng sau ai đó truyền <code>(x for x in rows)</code> vào cho tiết kiệm bộ nhớ, và danh sách con trả về rỗng.</p>
+      <p>Không exception nào được ném, không dòng log nào bất thường. Cách chữa duy nhất đáng tin: hàm nào cần duyệt nhiều lần thì <code>items = list(items)</code> ngay dòng đầu và ghi rõ trong docstring.</p>
+    </div></details>
+</section>
+
+<section id="iter-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Vòng for thực chất làm gì</h2></div>
+
+  <p class="key">Ô trên cùng của bản đồ. Dòng <code>for</code> bạn viết chỉ là <em>đường tắt cú pháp</em> cho bốn dòng gọi <code>iter</code> rồi <code>next</code> lặp lại.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 306" role="img" aria-label="Bản đồ sáng ô dòng for; bên phải là bốn dòng Python thực thi và ba hệ quả rút ra">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">đổi bộ nhớ lấy khả năng quay lại</text>
+<path d="M304 41 H 328 V 46 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,46 348,41.8 348,50.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">PYTHON DỊCH DÒNG ĐÓ RA BỐN DÒNG NÀY</text>
+<rect x="360" y="30" width="500" height="108" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="376" y="54" fill="var(--probe)">it = iter(obj)</text>
+<text class="sv-d" x="566" y="54" fill="var(--muted)">gọi obj.__iter__()</text>
+<text class="sv-l" x="376" y="76" fill="var(--probe)">while True:</text>
+<text class="sv-l" x="376" y="96" fill="var(--probe)">    x = next(it)</text>
+<text class="sv-d" x="566" y="96" fill="var(--muted)">gọi it.__next__()</text>
+<text class="sv-l" x="376" y="118" fill="var(--tomb)">    except StopIteration: break</text>
+<text class="sv-d" x="566" y="130" fill="var(--muted)">không phải lỗi &#8212; là cách báo hết</text>
+<text class="sv-hv" x="360" y="168" fill="var(--muted)">BA HỆ QUẢ RƠI THẲNG RA TỪ BỐN DÒNG TRÊN</text>
+<rect x="360" y="176" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="376" y="193" fill="var(--probe)">StopIteration là điều khiển luồng</text>
+<text class="sv-s" x="376" y="207" fill="var(--muted)">để nó lọt ra ngoài &#8594; vòng for hiểu nhầm là hết dữ liệu</text>
+<rect x="360" y="218" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="376" y="235" fill="var(--ok)">Object nào cài đủ hai phương thức đều chạy</text>
+<text class="sv-s" x="376" y="249" fill="var(--muted)">duck typing &#8212; không cần kế thừa lớp nào</text>
+<rect x="360" y="260" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="376" y="277" fill="var(--filled)">Vòng for không hề biết độ dài</text>
+<text class="sv-s" x="376" y="291" fill="var(--muted)">chỉ hỏi phần tử tiếp cho tới khi bị từ chối &#8594; duyệt được chuỗi vô hạn</text>
+</svg>
+<figcaption>Vòng <code>for</code> chỉ là <code>iter</code> rồi <code>next</code> lặp lại tới khi bị từ chối. Ba hệ quả bên dưới đều là cách đọc lại đúng bốn dòng đó.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong><code>StopIteration</code> là tín hiệu, không phải lỗi</strong> — cách duy nhất để iterator nói &quot;hết rồi&quot;.</li>
+    <li><strong>Duck typing</strong>: cài đủ hai phương thức là chạy được trong <code>for</code>, không cần kế thừa gì.</li>
+    <li><strong>Không có bước hỏi độ dài</strong> nào trong bốn dòng đó — nên chuỗi vô hạn vẫn duyệt được.</li>
+  </ul>
+
+  <details class="deep"><summary>Tự viết một iterator thì cần đúng những gì?</summary>
+    <div class="body">
+      <p>Một lớp <code>Countdown(n)</code> cần hai phương thức: <code>__iter__</code> trả về <code>self</code> vì chính nó giữ vị trí, và <code>__next__</code> giảm bộ đếm rồi trả về giá trị, hoặc <code>raise StopIteration</code> khi <code>n</code> về 0.</p>
+      <p>Đúng hai phương thức đó, không kế thừa lớp nào, là <code>for x in Countdown(3)</code> chạy. Nhưng viết bằng <code>yield</code> thì chỉ tốn ba dòng và không phải tự giữ biến trạng thái — đó là toàn bộ lý do ô YIELD tồn tại trong bản đồ.</p>
+    </div></details>
+</section>
+
+<section id="iter-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Generator</h2></div>
-  <p>Hàm có <code>yield</code> thì không còn là hàm thường. Gọi nó <strong>không chạy dòng nào</strong> — chỉ trả về một generator object.</p>
-<pre><code><span class="kw">def</span> gen():
-    <span class="kw">print</span>(<span class="st">"bắt đầu"</span>)
-    <span class="kw">yield</span> <span class="st">1</span>
-    <span class="kw">print</span>(<span class="st">"giữa"</span>)
-    <span class="kw">yield</span> <span class="st">2</span>
-    <span class="kw">print</span>(<span class="st">"kết thúc"</span>)
 
-g = gen()          <span class="cm"># không in gì cả</span>
-<span class="kw">next</span>(g)            <span class="cm"># in "bắt đầu", trả về 1, rồi ĐÓNG BĂNG tại đây</span>
-<span class="kw">next</span>(g)            <span class="cm"># in "giữa", trả về 2</span>
-<span class="kw">next</span>(g)            <span class="cm"># in "kết thúc", ném StopIteration</span></code></pre>
-  <p><code>yield</code> <strong>tạm dừng</strong> hàm và giữ nguyên toàn bộ trạng thái: biến cục bộ, vị trí trong vòng lặp, cả ngăn xếp. Lần <code>next</code> sau, hàm tiếp tục đúng từ chỗ đó. Đây là một máy trạng thái mà bạn không phải tự viết.</p>
-<pre><code><span class="cm"># đọc file khổng lồ, bộ nhớ không đổi theo kích thước file</span>
-<span class="kw">def</span> read_lines(path):
-    <span class="kw">with</span> <span class="kw">open</span>(path) <span class="kw">as</span> f:
-        <span class="kw">for</span> line <span class="kw">in</span> f:            <span class="cm"># bản thân file object cũng là iterator</span>
-            <span class="kw">yield</span> line.strip()
+  <p class="key">Ô YIELD. Hàm có <code>yield</code> khi gọi <em>không chạy dòng nào</em> — mỗi <code>next()</code> mới cho nó chạy tới <code>yield</code> kế tiếp rồi đóng băng lại.</p>
 
-<span class="cm"># chuỗi vô hạn — chỉ khả thi với generator</span>
-<span class="kw">def</span> naturals():
-    n = <span class="st">0</span>
-    <span class="kw">while</span> <span class="kw">True</span>:
-        <span class="kw">yield</span> n; n += <span class="st">1</span>
+<figure class="scrollx">
+<svg viewBox="0 0 860 348" role="img" aria-label="Bản đồ sáng ô yield; bên phải là dòng thời gian bốn bước của một generator và hai chỗ dùng đặc trưng">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--ok)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">đổi bộ nhớ lấy khả năng quay lại</text>
+<path d="M304 184 H 328 V 60 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,60 348,55.8 348,64.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">GỌI HÀM CÓ YIELD &#8212; KHÔNG CHẠY DÒNG NÀO</text>
+<rect x="360" y="30" width="500" height="26" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="48" fill="var(--muted)">g = gen()</text>
+<text class="sv-t" x="500" y="48" fill="var(--muted)">không in gì cả</text>
+<text class="sv-d" x="640" y="48" fill="var(--muted)">mới chỉ tạo ra generator object</text>
+<rect x="360" y="60" width="500" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="374" y="78" fill="var(--probe)">next(g)</text>
+<text class="sv-t" x="500" y="78" fill="var(--probe)">in &quot;bắt đầu&quot; &#8594; 1</text>
+<text class="sv-d" x="640" y="78" fill="var(--muted)">ĐÓNG BĂNG ngay tại yield đó</text>
+<rect x="360" y="90" width="500" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="374" y="108" fill="var(--probe)">next(g)</text>
+<text class="sv-t" x="500" y="108" fill="var(--probe)">in &quot;giữa&quot; &#8594; 2</text>
+<text class="sv-d" x="640" y="108" fill="var(--muted)">chạy tiếp đúng từ chỗ vừa dừng</text>
+<rect x="360" y="120" width="500" height="26" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="374" y="138" fill="var(--tomb)">next(g)</text>
+<text class="sv-t" x="500" y="138" fill="var(--tomb)">StopIteration</text>
+<text class="sv-d" x="640" y="138" fill="var(--muted)">hết &#8212; không lùi lại được nữa</text>
+<text class="sv-hv" x="360" y="172" fill="var(--muted)">CÁI ĐƯỢC GIỮ LẠI KHI ĐÓNG BĂNG</text>
+<rect x="360" y="180" width="500" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="376" y="202" fill="var(--ok)">biến cục bộ &#183; vị trí trong vòng lặp &#183; cả ngăn xếp</text>
+<text class="sv-s" x="376" y="222" fill="var(--muted)">tức là một máy trạng thái mà bạn không phải tự viết dòng nào</text>
+<text class="sv-hv" x="360" y="264" fill="var(--muted)">HAI CHỖ DÙNG MÀ LIST LÀM KHÔNG NỔI</text>
+<rect x="360" y="272" width="244" height="62" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="292" fill="var(--filled)">File 10 GB</text>
+<text class="sv-s" x="374" y="309" fill="var(--muted)">yield từng dòng &#8212; bộ nhớ không</text>
+<text class="sv-d" x="374" y="325" fill="var(--muted)">đổi theo kích thước file</text>
+<rect x="616" y="272" width="244" height="62" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="630" y="292" fill="var(--filled)">Chuỗi vô hạn</text>
+<text class="sv-s" x="630" y="309" fill="var(--muted)">while True: yield n &#8212; chỉ khả thi</text>
+<text class="sv-d" x="630" y="325" fill="var(--muted)">khi không phải dựng sẵn cả dãy</text>
+</svg>
+<figcaption><code>yield</code> không trả về rồi kết thúc như <code>return</code> — nó <b>tạm dừng</b> và giữ nguyên mọi thứ, nên lần <code>next</code> sau hàm chạy tiếp đúng từ chỗ đã dừng.</figcaption>
+</figure>
 
-<span class="cm"># generator expression: như comprehension nhưng lười</span>
-squares = (x*x <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">10</span>**<span class="st">9</span>))   <span class="cm"># tức thì, không cấp phát gì</span>
-squares_list = [x*x <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">10</span>**<span class="st">9</span>)]  <span class="cm"># treo máy, hết RAM</span></code></pre>
+  <ul class="why">
+    <li><strong>Trạng thái được giữ hộ</strong>: biến cục bộ, vị trí trong vòng lặp, cả ngăn xếp — không phải tự lưu.</li>
+    <li><strong>Generator expression</strong> <code>(x*x for x in it)</code> là cách viết một dòng, lười y hệt.</li>
+    <li><strong>File object cũng là iterator</strong>, nên <code>for line in f</code> đọc từng dòng chứ không nạp cả file.</li>
+  </ul>
+
+  <details class="deep"><summary><code>yield</code> khác <code>return</code> ở chỗ nào là quan trọng nhất?</summary>
+    <div class="body">
+      <p><code>return</code> kết thúc hàm: khung stack bị xoá, biến cục bộ biến mất, lần gọi sau bắt đầu lại từ dòng đầu. <code>yield</code> chỉ <b>tạm dừng</b>: khung stack được giữ nguyên trên heap, nên lần <code>next</code> sau hàm chạy tiếp đúng từ dòng dưới <code>yield</code>.</p>
+      <p>Vì cái khung đó sống trên heap chứ không nằm trên stack, nó chịu đúng luật của bài <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>: generator chưa chạy hết mà mất tham chiếu cuối thì cả khung được giải phóng, và <code>finally</code> trong thân hàm được chạy lúc đóng.</p>
+    </div></details>
 </section>
 
-<section id="iter-s5">
-  <div class="sh"><b>05</b><h2>Bộ nhớ — con số cụ thể</h2></div>
+<section id="iter-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Cái giá của lười</h2></div>
 
-  <div class="bars">
-    <div class="b bad"><i><code>sum([x*x for x in range(10**7)])</code></i><u style="width:100%"></u><b>≈ 400 MB</b></div>
-    <div class="b hi"><i><code>sum(x*x for x in range(10**7))</code></i><u style="width:0.3%"></u><b>vài trăm byte</b></div>
-  </div>
-  <p class="stripnote"><span>khác nhau đúng <em>hai dấu ngoặc vuông</em></span><span>với <code>sum</code>, <code>max</code>, <code>any</code>, <code>all</code>, <code>join</code> thì luôn bỏ ngoặc vuông đi</span></p>
-  <div class="note">
-    <h4>Đánh đổi thật của lười</h4>
-    Generator tiết kiệm bộ nhớ nhưng: không có <code>len()</code>, không truy cập theo chỉ số, không duyệt lại được, và khó gỡ lỗi hơn vì stack trace chỉ hiện ra khi phần tử được lấy. Nếu dữ liệu vừa RAM và sẽ dùng nhiều lần thì list đơn giản hơn và nhanh hơn.
-  </div>
+  <p class="key">Ô dưới cùng của bản đồ. Lười <em>đổi bộ nhớ lấy khả năng quay lại</em> — được cái này thì mất cái kia, không có bữa trưa miễn phí.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 294" role="img" aria-label="Bản đồ sáng ô cái giá của lười; bên phải so sánh bộ nhớ giữa list comprehension và generator expression, rồi liệt kê được và mất">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="233" fill="var(--tomb)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--dim)">đổi bộ nhớ lấy khả năng quay lại</text>
+<path d="M304 232 H 328 V 46 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,46 348,41.8 348,50.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">KHÁC NHAU ĐÚNG HAI DẤU NGOẶC VUÔNG</text>
+<rect x="360" y="30" width="500" height="40" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="374" y="48" fill="var(--dim)">sum([x*x for x in range(10**7)])</text>
+<text class="sv-t" x="700" y="49" fill="var(--tomb)">&#8776; 400 MB</text>
+<text class="sv-d" x="374" y="63" fill="var(--muted)">dựng đủ 10 triệu phần tử rồi mới cộng</text>
+<rect x="360" y="76" width="500" height="40" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="374" y="94" fill="var(--dim)">sum(x*x for x in range(10**7))</text>
+<text class="sv-t" x="700" y="95" fill="var(--ok)">vài trăm byte</text>
+<text class="sv-d" x="374" y="109" fill="var(--muted)">cộng xong phần tử nào thì bỏ phần tử đó</text>
+<text class="sv-d" x="360" y="136" fill="var(--probe)">Với sum, max, any, all, join &#8212; luôn bỏ hai dấu ngoặc vuông đi.</text>
+<text class="sv-hv" x="360" y="172" fill="var(--muted)">ĐỔI ĐƯỢC GÌ, MẤT GÌ</text>
+<rect x="360" y="180" width="244" height="96" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="200" fill="var(--ok)">ĐƯỢC</text>
+<text class="sv-d" x="374" y="219" fill="var(--muted)">bộ nhớ là hằng số, không</text>
+<text class="sv-d" x="374" y="235" fill="var(--muted)">đổi theo lượng dữ liệu</text>
+<text class="sv-d" x="374" y="255" fill="var(--muted)">dựng được đường ống nhiều</text>
+<text class="sv-d" x="374" y="271" fill="var(--muted)">tầng, dừng ngay khi đủ hàng</text>
+<rect x="616" y="180" width="244" height="96" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="630" y="200" fill="var(--tomb)">MẤT</text>
+<text class="sv-s" x="630" y="219" fill="var(--muted)">không len(), không truy cập</text>
+<text class="sv-d" x="630" y="235" fill="var(--muted)">theo chỉ số, không duyệt lại</text>
+<text class="sv-d" x="630" y="255" fill="var(--muted)">stack trace chỉ hiện khi phần</text>
+<text class="sv-d" x="630" y="271" fill="var(--muted)">tử được lấy &#8594; khó gỡ lỗi hơn</text>
+</svg>
+<figcaption>Dữ liệu vừa RAM mà còn dùng nhiều lần thì <code>list</code> vẫn đơn giản hơn và nhanh hơn — lười chỉ thắng khi nguồn lớn, vô hạn, hoặc chỉ cần duyệt một lượt.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong>Bỏ hai dấu ngoặc vuông</strong> khi truyền vào <code>sum</code>, <code>max</code>, <code>any</code>, <code>all</code>, <code>join</code>.</li>
+    <li><strong>Dữ liệu vừa RAM và dùng nhiều lần</strong> thì <code>list</code> đơn giản hơn, nhanh hơn, dễ gỡ lỗi hơn.</li>
+    <li><strong>Đường ống nhiều tầng</strong> chỉ chạm tới phần tử thật sự cần — dừng ngay khi đủ hàng.</li>
+  </ul>
+
+  <details class="deep"><summary>Vì sao generator lại khó gỡ lỗi hơn?</summary>
+    <div class="body">
+      <p>Vì thân hàm không chạy lúc bạn gọi nó. Dòng <code>g = gen(bad_input)</code> luôn thành công; lỗi chỉ nổ ra ở nơi nào đó phía sau, lúc có người gọi <code>next</code> — thường là bên trong <code>sum()</code> hay một vòng <code>for</code> cách đó vài chục dòng.</p>
+      <p>Stack trace vì thế trỏ vào chỗ <b>tiêu thụ</b> chứ không phải chỗ <b>tạo ra</b>. Với đường ống nhiều tầng lồng nhau, tìm đúng tầng gây lỗi là việc mất thời gian thật.</p>
+    </div></details>
 </section>
 
-<section id="iter-s6">
+<section id="iter-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Lab: đường ống lười</h2></div>
-  <p>Đường ống bốn tầng, lấy 3 phần tử. Bấm từng bước để thấy dữ liệu bị <strong>kéo</strong> từ cuối lên chứ không phải đẩy từ đầu xuống — và đường ống dừng ngay khi đủ hàng.</p>
+
+  <p class="key">Đường ống bốn tầng, lấy 3 phần tử. Bấm từng bước để thấy dữ liệu bị <em>kéo từ cuối lên</em> chứ không phải đẩy từ đầu xuống.</p>
+
   <div class="lab">
     <div class="bar">
       <div><label>chế độ</label>
@@ -184,174 +421,236 @@ squares_list = [x*x <span class="kw">for</span> x <span class="kw">in</span> <sp
     </div>
     <div class="steps" id="plog"></div>
     <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Chạy hết cả hai chế độ rồi so <strong>tổng số phép tính</strong>. Bản list xử lý cả 12 phần tử ở mọi tầng rồi mới cắt lấy 3. Bản generator chỉ chạm tới đúng những phần tử cần thiết — đó là lý do đường ống lười thắng khi nguồn dữ liệu lớn hoặc vô hạn.
+      Chạy hết cả hai chế độ rồi so <strong>tổng số phép tính</strong>. Bản list xử lý cả 12 phần tử ở mọi tầng rồi mới cắt lấy 3. Bản generator chỉ chạm tới đúng những phần tử cần thiết.
     </p>
   </div>
 </section>
 
-<section id="iter-s7">
-  <div class="sh"><b>07</b><h2>yield from và giao tiếp hai chiều</h2></div>
-<pre><code><span class="cm"># yield from: giao quyền cho một iterable khác</span>
-<span class="kw">def</span> flatten(nested):
-    <span class="kw">for</span> item <span class="kw">in</span> nested:
-        <span class="kw">if</span> <span class="kw">isinstance</span>(item, <span class="kw">list</span>):
-            <span class="kw">yield from</span> flatten(item)    <span class="cm"># đệ quy gọn gàng</span>
-        <span class="kw">else</span>:
-            <span class="kw">yield</span> item
+<section id="iter-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>yield from và send</h2></div>
 
-<span class="kw">list</span>(flatten([<span class="st">1</span>, [<span class="st">2</span>, [<span class="st">3</span>, <span class="st">4</span>]], <span class="st">5</span>]))    <span class="cm"># [1, 2, 3, 4, 5]</span></code></pre>
-  <p><code>yield from x</code> tương đương <code>for i in x: yield i</code>, nhưng ngoài việc ngắn hơn, nó còn <em>chuyển tiếp</em> cả <code>send</code>, <code>throw</code>, <code>close</code> và giá trị trả về xuống generator con.</p>
-<pre><code><span class="cm"># generator cũng NHẬN được dữ liệu — nền tảng của coroutine trước async/await</span>
-<span class="kw">def</span> accumulator():
-    total = <span class="st">0</span>
-    <span class="kw">while</span> <span class="kw">True</span>:
-        x = <span class="kw">yield</span> total       <span class="cm"># yield vừa trả ra vừa nhận vào</span>
-        total += x
+  <p class="key">Vẫn ô YIELD, nhìn kỹ hơn: <code>yield</code> không chỉ <em>trả ra</em> — nó còn <em>nhận vào</em>, và đó là nền của coroutine.</p>
 
-acc = accumulator()
-<span class="kw">next</span>(acc)                  <span class="cm"># khởi động, chạy tới yield đầu tiên → 0</span>
-acc.send(<span class="st">10</span>)              <span class="cm"># 10</span>
-acc.send(<span class="st">5</span>)               <span class="cm"># 15</span>
-acc.close()                <span class="cm"># dọn dẹp</span></code></pre>
-  <div class="note">
-    <h4>Vì sao đáng biết dù ít dùng</h4>
-    Đây chính là cơ chế mà <code>asyncio</code> được xây trên trước khi có cú pháp <code>async</code>/<code>await</code>: một coroutine tạm dừng, nhường quyền, rồi nhận kết quả gửi vào. Hiểu <code>send</code> làm cho async bớt bí ẩn — <code>await</code> về bản chất là "yield rồi chờ được send lại".
-  </div>
+<figure class="scrollx">
+<svg viewBox="0 0 860 288" role="img" aria-label="Bản đồ sáng ô yield; bên phải là yield from giao quyền và ba bước send đẩy dữ liệu ngược vào generator">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--ok)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">đổi bộ nhớ lấy khả năng quay lại</text>
+<path d="M304 184 H 328 V 46 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,46 348,41.8 348,50.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">YIELD FROM &#8212; GIAO QUYỀN CHO ITERABLE KHÁC</text>
+<rect x="360" y="30" width="500" height="74" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="374" y="52" fill="var(--dim)">yield from flatten(item)</text>
+<text class="sv-d" x="374" y="70" fill="var(--muted)">viết gọn của: for i in x: yield i</text>
+<text class="sv-d" x="374" y="90" fill="var(--probe)">nhưng còn chuyển tiếp send, throw, close xuống generator con</text>
+<text class="sv-hv" x="360" y="134" fill="var(--muted)">YIELD VỪA TRẢ RA VỪA NHẬN VÀO</text>
+<rect x="360" y="142" width="156" height="66" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="372" y="162" fill="var(--dim)">next(acc)</text>
+<text class="sv-t" x="372" y="182" fill="var(--probe)">&#8594; 0</text>
+<text class="sv-d" x="372" y="198" fill="var(--muted)">chạy tới yield đầu tiên</text>
+<rect x="528" y="142" width="156" height="66" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="540" y="162" fill="var(--dim)">acc.send(10)</text>
+<text class="sv-t" x="540" y="182" fill="var(--probe)">&#8594; 10</text>
+<text class="sv-d" x="540" y="198" fill="var(--muted)">giá trị đi NGƯỢC vào hàm</text>
+<rect x="696" y="142" width="156" height="66" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="708" y="162" fill="var(--dim)">acc.send(5)</text>
+<text class="sv-t" x="708" y="182" fill="var(--probe)">&#8594; 15</text>
+<text class="sv-d" x="708" y="198" fill="var(--muted)">total còn nguyên</text>
+<line x1="512" y1="175" x2="512" y2="175" stroke="var(--faint)" stroke-width="1"/><polygon points="520,175 512,170.8 512,179.2" fill="var(--faint)"/>
+<line x1="680" y1="175" x2="680" y2="175" stroke="var(--faint)" stroke-width="1"/><polygon points="688,175 680,170.8 680,179.2" fill="var(--faint)"/>
+<rect x="360" y="224" width="500" height="46" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="244" fill="var(--filled)">Đây chính là nền của asyncio trước khi có async/await</text>
+<text class="sv-s" x="374" y="262" fill="var(--muted)">await về bản chất là &quot;yield rồi chờ được send lại&quot;</text>
+</svg>
+<figcaption>Generator không chỉ đẩy dữ liệu ra — <code>send()</code> đẩy được dữ liệu <b>ngược vào</b>, và đó là cơ chế mà coroutine được xây trên.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong><code>yield from x</code></strong> gọn hơn <code>for i in x: yield i</code>, và chuyển tiếp cả <code>send</code>, <code>throw</code>, <code>close</code>.</li>
+    <li><strong>Đệ quy sạch</strong>: <code>flatten</code> một cấu trúc lồng nhau chỉ cần một dòng <code>yield from</code>.</li>
+    <li><strong><code>send()</code> đẩy giá trị ngược vào</strong> đúng chỗ <code>yield</code> đang dừng, trạng thái vẫn còn nguyên.</li>
+  </ul>
+
+  <details class="deep"><summary>Biết <code>send</code> thì hiểu <code>async</code>/<code>await</code> dễ hơn ở chỗ nào?</summary>
+    <div class="body">
+      <p>Trước Python 3.5, coroutine <b>chính là</b> generator: hàm chạy tới <code>yield</code>, nhường quyền cho vòng lặp sự kiện, và được đánh thức bằng <code>send(kết_quả)</code>. Cú pháp <code>async</code>/<code>await</code> ra đời sau chỉ đặt tên mới cho đúng cơ chế đó.</p>
+      <p>Nên câu &quot;<code>await</code> là yield rồi chờ được send lại&quot; không phải phép so sánh cho vui — nó là mô tả đúng cách chạy. Chi tiết ở bài <a href="../../04-concurrency/asyncio/index.html">Asyncio</a>.</p>
+    </div></details>
 </section>
 
-<section id="iter-s8">
-  <div class="sh"><b>08</b><h2>itertools thực dụng</h2></div>
-<div class="stack">
-    <div class="s"><b><code>islice(it, n)</code> — lấy n phần tử đầu, vẫn lười</b><span>xem thử dữ liệu lớn mà không tải hết</span></div>
-    <div class="s"><b><code>chain(a, b)</code> — nối nhiều iterable</b><span>duyệt nhiều file như một dòng</span></div>
-    <div class="s warn"><b><code>groupby(it, key)</code> — gom nhóm liên tiếp</b><span><b>phải sắp xếp trước</b>, nó chỉ gom các phần tử kề nhau</span></div>
-    <div class="s warn"><b><code>tee(it, 2)</code> — nhân bản một iterator</b><span>cần duyệt hai lần, nhưng đệm ngầm nên tốn bộ nhớ</span></div>
-    <div class="s"><b><code>count()</code> · <code>cycle()</code> · <code>repeat()</code> — chuỗi vô hạn</b><span>sinh id, luân phiên, làm đối số cho <code>zip</code></span></div>
-    <div class="s"><b><code>product</code> · <code>permutations</code> · <code>combinations</code> — tổ hợp</b><span>thay vòng lặp lồng nhau, hoặc thay backtracking đơn giản</span></div>
-    <div class="s"><b><code>batched(it, n)</code> — chia thành khối n phần tử (3.12+)</b><span>gửi request theo lô</span></div>
-  </div>
-<pre><code><span class="kw">from</span> itertools <span class="kw">import</span> islice, groupby, chain
+<section id="iter-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>itertools</h2></div>
 
-<span class="cm"># xem 5 dòng đầu của file 10GB — không tải gì thêm</span>
-<span class="kw">for</span> line <span class="kw">in</span> islice(read_lines(<span class="st">"huge.log"</span>), <span class="st">5</span>): <span class="kw">print</span>(line)
+  <p class="key">Thư viện chuẩn đã dựng sẵn hàng chục iterator trên đúng giao thức ở mục 03 — ghép vào đường ống mà <em>không phá tính lười</em>.</p>
 
-<span class="cm"># BẪY: groupby chỉ gom các phần tử KỀ NHAU</span>
-data = [(<span class="st">"a"</span>,<span class="st">1</span>), (<span class="st">"b"</span>,<span class="st">2</span>), (<span class="st">"a"</span>,<span class="st">3</span>)]
-{k: <span class="kw">list</span>(v) <span class="kw">for</span> k, v <span class="kw">in</span> groupby(data, key=<span class="kw">lambda</span> t: t[<span class="st">0</span>])}
-<span class="cm"># → 'a' xuất hiện HAI lần trong kết quả, nhóm sau ghi đè nhóm trước</span>
-<span class="cm"># phải sort theo key trước, hoặc dùng defaultdict cho chắc</span></code></pre>
+<figure class="scrollx">
+<svg viewBox="0 0 860 348" role="img" aria-label="Bản đồ sáng ô iterator; bên phải là bảng tra itertools, đánh dấu hai hàm có bẫy">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--probe)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">đổi bộ nhớ lấy khả năng quay lại</text>
+<path d="M304 112 H 328 V 46 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,46 348,41.8 348,50.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">DỰNG SẴN TRÊN ĐÚNG GIAO THỨC ITERATOR &#8212; VẪN LƯỜI</text>
+<rect x="360" y="30" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="52" fill="var(--ok)">islice(it, n)</text>
+<text class="sv-d" x="580" y="52" fill="var(--muted)">lấy n phần tử đầu, không tải hết phần sau</text>
+<rect x="360" y="72" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="94" fill="var(--ok)">chain(a, b)</text>
+<text class="sv-d" x="580" y="94" fill="var(--muted)">duyệt nhiều nguồn như một dòng liền</text>
+<rect x="360" y="114" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="136" fill="var(--ok)">count() &#183; cycle() &#183; repeat()</text>
+<text class="sv-d" x="580" y="136" fill="var(--muted)">chuỗi vô hạn &#8212; sinh id, luân phiên, ghép với zip</text>
+<rect x="360" y="156" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="178" fill="var(--ok)">batched(it, n)  (3.12+)</text>
+<text class="sv-d" x="580" y="178" fill="var(--muted)">chia thành khối n phần tử &#8212; gửi request theo lô</text>
+<rect x="360" y="198" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="220" fill="var(--probe)">groupby(it, key)</text>
+<text class="sv-d" x="580" y="220" fill="var(--muted)">CHỈ gom phần tử kề nhau &#8212; phải sắp xếp trước</text>
+<rect x="360" y="240" width="500" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="374" y="262" fill="var(--tomb)">tee(it, 2)</text>
+<text class="sv-d" x="580" y="262" fill="var(--muted)">cho duyệt hai lần, nhưng đệm ngầm nên tốn bộ nhớ</text>
+<rect x="360" y="288" width="500" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="308" fill="var(--probe)">product &#183; permutations &#183; combinations</text>
+<text class="sv-s" x="374" y="325" fill="var(--muted)">thay vòng lặp lồng nhau, hoặc thay backtracking đơn giản</text>
+</svg>
+<figcaption>Ghép được vào đường ống mà không phá tính lười — trừ <code>tee</code>, thứ đệm ngầm và trả lại đúng phần bộ nhớ vừa tiết kiệm.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><strong><code>islice</code> và <code>chain</code></strong> dùng nhiều nhất: xem thử dữ liệu lớn, nối nhiều nguồn thành một dòng.</li>
+    <li><strong><code>groupby</code> có bẫy</strong> — nó gom phần tử kề nhau, nên phải sắp xếp theo đúng khoá trước.</li>
+    <li><strong><code>tee</code> là ngoại lệ duy nhất</strong>: nó đệm ngầm, trả lại phần bộ nhớ vừa tiết kiệm được.</li>
+  </ul>
+
+  <details class="deep"><summary>Khi nào nên bỏ <code>groupby</code> mà dùng <code>defaultdict</code>?</summary>
+    <div class="body">
+      <p><code>groupby</code> chỉ đáng dùng khi dữ liệu <b>đã</b> sắp xếp sẵn theo khoá — đọc từ file đã sort, hay kết quả một truy vấn có <code>ORDER BY</code>. Khi đó nó gom theo kiểu lười, bộ nhớ không đổi.</p>
+      <p>Còn phải tự sort trước thì đằng nào cũng đã nạp hết vào bộ nhớ, và <code>defaultdict(list)</code> gọn hơn, không có bẫy kề-nhau, lại chạy đúng dù dữ liệu xáo trộn. Chi tiết cách dict gom nhóm ở bài <a href="../../03-builtin-structures/dict-hash-table/index.html">Python dict &amp; hash table</a>.</p>
+    </div></details>
 </section>
 
 <section id="iter-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Tổng kết một hình</h2></div>
+  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
 
-  <p class="key">Iterator không giữ dữ liệu, nó giữ <em>cách tính ra phần tử tiếp theo</em> — mọi ưu điểm và mọi bẫy của cả bài đều rơi ra từ câu đó.</p>
+  <p class="key">Bốn lỗi này đều <em>im lặng</em> — không exception nào, chỉ ra kết quả thiếu. Mỗi lỗi là hệ quả của việc đọc sai một ô trong bản đồ.</p>
 
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 394" role="img" aria-label="Ba khái niệm xếp chồng, vòng for gọi iter rồi next, generator đóng băng tại yield, và cái giá của lười">
-
-      <text class="sv-h" x="8" y="16">&#9312; BA KHÁI NIỆM XẾP CHỒNG</text>
-      <rect x="8" y="24" width="272" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="18" y="44" fill="#A8BEF6">iterable</text>
-      <text class="sv-d" x="88" y="44" fill="#7A6F63">có __iter__ &#183; tạo ra iterator</text>
-      <rect x="8" y="58" width="272" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="18" y="78" fill="#A8BEF6">iterator</text>
-      <text class="sv-d" x="88" y="78" fill="#7A6F63">có __next__ &#183; giữ vị trí hiện tại</text>
-      <rect x="8" y="92" width="272" height="30" rx="4" fill="rgba(91,207,160,.12)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="18" y="112" fill="#8EE0BE">generator</text>
-      <text class="sv-d" x="88" y="112" fill="#7A6F63">viết bằng yield &#183; tự có cả hai</text>
-      <text class="sv-l" x="8" y="140" fill="#8EE0BE">list duyệt lại được</text>
-      <text class="sv-l" x="152" y="140" fill="#F79BAB">generator cạn là hết</text>
-
-      <text class="sv-h" x="300" y="16">&#9313; VÒNG FOR THỰC CHẤT LÀ BỐN DÒNG NÀY</text>
-      <rect x="300" y="24" width="548" height="98" rx="6" fill="rgba(140,169,242,.06)" stroke="#3D352C"/>
-      <text class="sv-t" x="314" y="46" fill="#A8BEF6">it = iter(obj)</text>
-      <text class="sv-d" x="470" y="46" fill="#7A6F63">gọi __iter__</text>
-      <text class="sv-t" x="314" y="66" fill="#A8BEF6">x = next(it)</text>
-      <text class="sv-d" x="470" y="66" fill="#7A6F63">gọi __next__, lặp lại mãi</text>
-      <text class="sv-t" x="314" y="86" fill="#EDB44A">except StopIteration: break</text>
-      <text class="sv-d" x="560" y="86" fill="#7A6F63">điều khiển luồng, không phải lỗi</text>
-      <text class="sv-d" x="314" y="110" fill="#7A6F63">vòng for không biết độ dài — nên duyệt được cả chuỗi vô hạn</text>
-
-      <text class="sv-h" x="8" y="172">&#9314; YIELD ĐÓNG BĂNG HÀM, GIỮ NGUYÊN MỌI TRẠNG THÁI</text>
-      <rect x="8" y="182" width="132" height="34" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="18" y="198" fill="#A8BEF6">g = gen()</text>
-      <text class="sv-d" x="18" y="211" fill="#7A6F63">không chạy dòng nào</text>
-      <path d="M140 199 h20" stroke="#7A6F63"/><path d="M160 199 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="162" y="182" width="150" height="34" rx="4" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="172" y="198" fill="#EDB44A">next(g) &#8594; yield 1</text>
-      <text class="sv-d" x="172" y="211" fill="#7A6F63">dừng ngay tại đó</text>
-      <path d="M312 199 h20" stroke="#7A6F63"/><path d="M332 199 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="334" y="182" width="182" height="34" rx="4" fill="rgba(237,180,74,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="344" y="198" fill="#EDB44A">next(g) &#8594; chạy tiếp từ đó</text>
-      <text class="sv-d" x="344" y="211" fill="#7A6F63">biến cục bộ còn nguyên</text>
-      <path d="M516 199 h20" stroke="#7A6F63"/><path d="M536 199 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="538" y="182" width="164" height="34" rx="4" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="548" y="198" fill="#F79BAB">StopIteration</text>
-      <text class="sv-d" x="548" y="211" fill="#7A6F63">hết, không quay lại được</text>
-      <text class="sv-l" x="8" y="238">yield vừa trả ra vừa nhận vào — send() là nền của coroutine trước khi có async/await</text>
-
-      <text class="sv-h" x="8" y="268">&#9315; CÁI ĐƯỢC VÀ CÁI MẤT CỦA LƯỜI</text>
-      <rect x="8" y="278" width="416" height="56" rx="5" fill="rgba(91,207,160,.08)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="20" y="298" fill="#8EE0BE">được: bộ nhớ không đổi theo kích thước dữ liệu</text>
-      <text class="sv-l" x="20" y="316">sum([x*x for x in range(10**7)]) &#8594; 400 MB</text>
-      <text class="sv-l" x="20" y="330" fill="#8EE0BE">sum(x*x for x in range(10**7)) &#8594; vài trăm byte</text>
-      <rect x="432" y="278" width="416" height="56" rx="5" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-t" x="444" y="298" fill="#F79BAB">mất: không len(), không chỉ số, không duyệt lại</text>
-      <text class="sv-l" x="444" y="316">nhận tham số rồi duyệt hai lần &#8594; lượt hai rỗng, không exception nào</text>
-      <text class="sv-d" x="444" y="330" fill="#7A6F63">cần duyệt nhiều lần thì items = list(items) ngay đầu hàm</text>
-
-      <line x1="8" y1="352" x2="852" y2="352" stroke="#2E2822"/>
-      <text class="sv-l" x="8" y="370">&#9312;&#9313; bất cứ object nào cài __iter__ và __next__ đều chạy được trong for — duck typing, không cần kế thừa</text>
-      <text class="sv-l" x="8" y="386">&#9314;&#9315; lười đổi bộ nhớ lấy khả năng quay lại — dữ liệu vừa RAM mà dùng nhiều lần thì list vẫn hơn</text>
-    </svg>
-    <figcaption>Đọc theo số: ba khái niệm chồng lên nhau &#9312;, vòng <code>for</code> chỉ là <code>iter</code> rồi <code>next</code> &#9313;, <code>yield</code> đóng băng hàm giữa chừng &#9314;, và cái giá phải trả cho tính lười &#9315;.</figcaption>
-  </figure>
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng toàn bộ; bên phải là bốn lỗi im lặng, mỗi lỗi ghi rõ nó đọc sai ô nào của bản đồ">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--filled)">ITERABLE</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">giữ dữ liệu</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">duyệt lại được</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">sinh ra</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--probe)">ITERATOR</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giữ vị trí</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">cạn là hết</text>
+<path d="M238 140 V 152" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--ok)">YIELD &#8212; cách viết gọn</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="233" fill="var(--tomb)">CÁI GIÁ CỦA LƯỜI</text>
+<text class="sv-s" x="14" y="249" fill="var(--dim)">đổi bộ nhớ lấy khả năng quay lại</text>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">BỐN LỖI IM LẶNG &#183; MỖI LỖI ĐỌC SAI MỘT Ô</text>
+<rect x="360" y="30" width="500" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="52" fill="var(--probe)">Duyệt generator lần thứ hai</text>
+<text class="sv-hv" x="846" y="51" fill="var(--muted)" text-anchor="end">đọc sai ô ITERATOR</text>
+<text class="sv-s" x="376" y="71" fill="var(--muted)">sum(g) &#8594; 3, rồi sum(g) &#8594; 0. Cạn là hết, không cảnh báo.</text>
+<rect x="360" y="92" width="500" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="114" fill="var(--probe)">groupby khi chưa sắp xếp</text>
+<text class="sv-hv" x="846" y="113" fill="var(--muted)" text-anchor="end">đọc sai ô ITERATOR</text>
+<text class="sv-s" x="376" y="133" fill="var(--muted)">nó chỉ gom phần tử KỀ NHAU &#8594; một khoá hiện ra nhiều lần.</text>
+<rect x="360" y="154" width="500" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="176" fill="var(--tomb)">Để StopIteration lọt ra ngoài</text>
+<text class="sv-hv" x="846" y="175" fill="var(--muted)" text-anchor="end">đọc sai ô for</text>
+<text class="sv-s" x="376" y="195" fill="var(--muted)">vòng for bao ngoài hiểu nhầm là hết dữ liệu rồi dừng im lặng.</text>
+<rect x="360" y="216" width="500" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="238" fill="var(--tomb)">tee để duyệt hai lần dữ liệu lớn</text>
+<text class="sv-hv" x="846" y="237" fill="var(--muted)" text-anchor="end">đọc sai ô CÁI GIÁ</text>
+<text class="sv-s" x="376" y="257" fill="var(--muted)">đệm ngầm mọi phần tử nhánh kia chưa lấy &#8212; tốn bằng cả một list.</text>
+</svg>
+<figcaption>Không lỗi nào ném exception — chúng chỉ trả về kết quả thiếu. Mỗi dòng ghi kèm ô nào của bản đồ đang bị đọc sai.</figcaption>
+</figure>
 
   <ul class="why">
-    <li><strong>Generator expression</strong> là &#9314; viết gọn một dòng — khác list comprehension đúng hai dấu ngoặc, và đó là toàn bộ &#9315;.</li>
-    <li><strong><code>yield from</code></strong> giao quyền cho một iterable khác trong &#9314;, chuyển tiếp cả <code>send</code>, <code>throw</code> và <code>close</code> xuống generator con.</li>
-    <li><strong><code>itertools</code></strong> dựng sẵn theo đúng luật &#9313; — <code>islice</code>, <code>chain</code>, <code>groupby</code> đều lười, ghép vào đường ống không phá &#9315;.</li>
-    <li><strong><code>tee</code></strong> là ngoại lệ: cho duyệt hai lần như &#9312; mong muốn, nhưng đệm ngầm nên trả lại phần bộ nhớ vừa tiết kiệm.</li>
+    <li><strong>Nguy hiểm nhất là lỗi đầu</strong>: hàm chạy đúng với <code>list</code> nên test không bắt được.</li>
+    <li><strong>Chữa bằng <code>list(items)</code></strong> ngay đầu hàm, mỗi khi hàm cần duyệt nhiều hơn một lượt.</li>
+    <li><strong>Trong generator</strong>, đừng để <code>StopIteration</code> lọt ra — dùng <code>next(it, default)</code>.</li>
   </ul>
+
+  <p class="stripnote"><span>ba bẫy hay bị gộp nhầm vào đây</span><span>biến vòng lặp trong closure ở <a href="../decorator-context-manager/index.html"><em>decorator</em></a> &#183; đối số mặc định khả biến và <code>lru_cache</code> giữ <code>self</code> ở <a href="../memory-model-mutability/index.html"><em>memory model</em></a></span></p>
 </section>
 
 <section id="iter-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
-
-  <p class="key">Bốn lỗi này đều <em>im lặng</em> — không exception, chỉ ra kết quả sai hoặc thiếu.</p>
-
-  <h3>Generator chỉ chạy một lần</h3>
-<pre><code>g = (x <span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>))
-<span class="kw">sum</span>(g)    <span class="cm"># 3</span>
-<span class="kw">sum</span>(g)    <span class="cm"># 0  ← đã cạn, không có cảnh báo nào</span></code></pre>
-  <p>Lỗi nguy hiểm nhất trong nhóm này vì nó không hỏng ngay: hàm nhận tham số rồi duyệt hai lần vẫn chạy đúng với <code>list</code>, chỉ sai khi có người truyền vào một generator. Hàm nào cần duyệt nhiều lần thì <code>list()</code> ngay ở đầu.</p>
-
-  <div class="grid2">
-    <div class="card bad"><h4>Dùng <code>groupby</code> mà chưa sắp xếp</h4><p>Nó chỉ gom các phần tử <b>kề nhau</b> nên cùng một khoá xuất hiện nhiều lần. Sắp xếp theo đúng khoá đó trước.</p></div>
-    <div class="card bad"><h4>Để <code>StopIteration</code> lọt ra</h4><p>Vòng <code>for</code> bên ngoài hiểu nhầm là hết dữ liệu và dừng im lặng. Trong generator, bắt nó lại hoặc dùng <code>next(it, default)</code>.</p></div>
-    <div class="card bad"><h4><code>tee</code> để duyệt hai lần trên dữ liệu lớn</h4><p><code>tee</code> đệm ngầm mọi phần tử chưa được nhánh kia lấy — có thể tốn bằng cả một list, tức mất đúng cái lợi của generator.</p></div>
-  </div>
-
-  <p class="stripnote"><span>ba bẫy hay bị gộp nhầm vào đây</span><span>biến vòng lặp trong closure ở <a href="../decorator-context-manager/index.html"><em>decorator</em></a> · đối số mặc định khả biến và <code>lru_cache</code> giữ <code>self</code> ở <a href="../memory-model-mutability/index.html"><em>memory model</em></a></span></p>
-</section>
-
-<section id="iter-s11" class="lesson">
-  <div class="sh"><b>11</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>10</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
   <details class="qa"><summary>Iterable và iterator khác nhau thế nào?</summary>
   <p>Iterable có <code>__iter__</code> và tạo ra iterator mới mỗi lần được duyệt, nên duyệt lại được nhiều lần — list, dict, str. Iterator có thêm <code>__next__</code>, giữ vị trí hiện tại, và <b>chỉ duyệt được một lần</b>. Điều này quan trọng thực tế: một hàm nhận tham số rồi duyệt hai lần sẽ chạy đúng với list nhưng trả kết quả sai với generator, mà không có exception nào — bug im lặng.</p></details>
 
+  <details class="qa"><summary>Vòng <code>for</code> thực chất chạy những gì?</summary>
+  <p>Bốn dòng: gọi <code>iter(obj)</code> lấy iterator, rồi lặp <code>next(it)</code> cho tới khi bắt được <code>StopIteration</code> thì <code>break</code>. Ba hệ quả rơi ra từ đó: <code>StopIteration</code> là cơ chế điều khiển luồng chứ không phải lỗi; object nào cài đủ hai phương thức đều dùng được trong <code>for</code> mà không cần kế thừa gì; và vòng <code>for</code> không bao giờ hỏi độ dài, nên duyệt được cả chuỗi vô hạn.</p></details>
+
   <details class="qa"><summary>Generator hoạt động thế nào, khi nào bạn dùng?</summary>
   <p>Hàm có <code>yield</code> khi gọi không chạy dòng nào, chỉ trả về generator object. Mỗi lần <code>next()</code> thì thân hàm chạy tới <code>yield</code> tiếp theo rồi đóng băng, giữ nguyên biến cục bộ và vị trí — thực chất là một máy trạng thái viết sẵn. Tôi dùng khi dữ liệu lớn hoặc vô hạn, khi chỉ cần duyệt một lần, và khi dựng đường ống xử lý theo tầng. Đổi lại thì mất <code>len()</code>, mất truy cập theo chỉ số và không duyệt lại được.</p></details>
 
   <details class="qa"><summary>Khi nào dùng list comprehension và khi nào generator expression?</summary>
   <p>Generator khi chỉ duyệt một lần, khi đưa thẳng vào hàm gộp như <code>sum</code>, <code>max</code>, <code>any</code>, hoặc khi dữ liệu lớn tới mức không nên giữ trong RAM — bộ nhớ là hằng số thay vì O(n). List khi cần <code>len()</code>, cần truy cập theo chỉ số, hoặc cần duyệt nhiều lần. Chi tiết đáng nhớ: <code>sum([...])</code> và <code>sum(...)</code> chỉ khác hai dấu ngoặc vuông nhưng có thể lệch nhau hàng trăm MB.</p></details>
+
+  <details class="qa"><summary><code>yield from</code> làm gì mà <code>for ... yield</code> không làm được?</summary>
+  <p>Về mặt sinh ra giá trị thì hai cách như nhau. Khác biệt là <code>yield from</code> <b>chuyển tiếp cả kênh ngược</b>: <code>send()</code>, <code>throw()</code>, <code>close()</code> và giá trị <code>return</code> của generator con đều đi xuyên qua. Viết tay bằng vòng <code>for</code> thì mất hết những thứ đó, nên với generator lồng nhau — nhất là coroutine — <code>yield from</code> là cách đúng.</p></details>
+
+  <details class="qa"><summary>Vì sao duyệt một generator lần thứ hai lại ra rỗng mà không báo lỗi?</summary>
+  <p>Vì generator là iterator, mà iterator chỉ giữ <b>vị trí</b> chứ không giữ dữ liệu. Duyệt hết lượt đầu thì vị trí đã ở cuối; lượt hai gọi <code>next</code> là nhận ngay <code>StopIteration</code>, và <code>for</code> hiểu đúng tín hiệu đó là &quot;không còn gì&quot; nên kết thúc bình thường. Đứng từ chỗ đó thì không có gì sai để mà báo — cái sai nằm ở kỳ vọng của người viết, và đó là lý do nó im lặng.</p></details>
 </section>
 
-<footer>Deep dive · iterator &amp; generator · phần closure, decorator và context manager nằm ở bài <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</footer>
+<footer>Deep dive &#183; iterator &amp; generator &#183; phần closure, decorator và context manager nằm ở bài <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

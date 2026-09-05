@@ -43,191 +43,561 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · Python internals · bộ nhớ</p>
   <h1>Memory model &amp; <em>mutability</em></h1>
-  <p class="lede">Trong Python, biến <b>không chứa</b> giá trị — nó là một cái tên dán lên object. Hiểu đúng một câu đó xoá sạch cả một họ bug: gán tưởng là sao chép, sửa list trong hàm làm bẩn dữ liệu ngoài, đối số mặc định sống dai, và <code>[[0]*3]*3</code> chỉ có một dòng thật. Object bị dọn đi lúc nào thì ở bài tiếp theo, <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>.</p>
+  <p class="lede">Trong Python, <b>tên</b> và <b>object</b> là hai thứ khác nhau: tên chỉ là cái nhãn dán lên object. Nên mỗi dòng code bạn viết chỉ làm một trong hai việc:</p>
+  <ul class="ledelist">
+    <li><b>Dán nhãn sang object khác</b> — <em>object cũ không đổi gì</em></li>
+    <li><b>Sửa ruột object đang có</b> — <em>mọi tên đang trỏ vào nó đều thấy</em></li>
+  </ul>
+  <p class="lede"><b>Mutability</b> là tính sửa được: object nào cho phép việc thứ hai.</p>
 </header>
 
 <section id="memory-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Tên và object — hai thứ khác nhau</h2></div>
-<figure class="scrollx">
-    <svg viewBox="0 0 860 470" role="img" aria-label="Bản đồ bộ nhớ: RAM chia thành code, globals, heap và stack; tên nằm trên stack và chỉ chứa địa chỉ, object nằm trên heap">
-      <defs>
-        <marker id="mem-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,0 L10,5 L0,10 z" fill="var(--probe)"/>
-        </marker>
-      </defs>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-      <text class="sv-h" x="1" y="12">RAM · VÙNG ĐỊA CHỈ CỦA MỘT TIẾN TRÌNH PYTHON</text>
+  <p class="key">Nhớ đúng <em>một hình</em> này là trả lời được gần hết câu hỏi về bộ nhớ Python. Mọi mục sau chỉ là phóng to một ô của nó.</p>
 
-      <rect x="0"   y="22" width="148" height="56" rx="6" fill="var(--panel)" stroke="var(--rule)"/>
-      <text class="sv-t" x="74"  y="47" text-anchor="middle">Code</text>
-      <text class="sv-d" x="74"  y="65" text-anchor="middle">bytecode, hằng</text>
+<figure class="gist">
+<svg viewBox="0 0 860 274" role="img" aria-label="Bản đồ bốn ô: một dòng code, tên, object và ranh giới mutable; bên phải là bốn ý cốt lõi">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--probe)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--filled)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--tomb)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="233" fill="var(--ok)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--dim)">cách duy nhất tách hai tên ra hai object</text>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">BỐN Ý &#8212; HẾT</text>
+<rect x="360" y="32" width="500" height="52" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="376" y="53" fill="var(--probe)">Gán chỉ dán thêm một cái tên</text>
+<text class="sv-t" x="376" y="71" fill="var(--dim)">b = a &#8594; hai cái tên, vẫn một object &#8212; không có bản sao nào</text>
+<rect x="360" y="92" width="500" height="52" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="376" y="113" fill="var(--tomb)">Một dòng code làm một trong hai việc</text>
+<text class="sv-t" x="376" y="131" fill="var(--dim)">gán lại tên sang object khác, hoặc sửa ruột object đang có</text>
+<rect x="360" y="152" width="500" height="52" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="376" y="173" fill="var(--ok)">Mutable quyết định việc thứ hai</text>
+<text class="sv-t" x="376" y="191" fill="var(--dim)">immutable thì nhánh sửa bị khoá, chỉ còn cách tạo object mới</text>
+<rect x="360" y="212" width="500" height="52" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="376" y="233" fill="var(--filled)">Muốn hai bản rời nhau phải sao chép</text>
+<text class="sv-t" x="376" y="251" fill="var(--dim)">chép tới tầng nào thì hai bên độc lập tới tầng đó</text>
+</svg>
+<figcaption>Bản đồ bên trái lặp lại ở <b>mọi mục</b> của bài — mỗi lần chỉ sáng đúng ô đang học, phần còn lại xám đi. Học cách đọc nó một lần là đọc được cả bài.</figcaption>
+</figure>
 
-      <rect x="154" y="22" width="148" height="56" rx="6" fill="var(--panel)" stroke="var(--rule)"/>
-      <text class="sv-t" x="228" y="47" text-anchor="middle">Globals</text>
-      <text class="sv-d" x="228" y="65" text-anchor="middle">module, built-in</text>
+  <ul class="why">
+    <li><b>Tên</b> và <b>object</b> là hai thứ tách rời — tên chỉ giữ địa chỉ.</li>
+    <li>Một dòng code làm <b>một trong hai</b>: gán lại tên, hoặc sửa object.</li>
+    <li><b>Mutable</b> quyết định nhánh thứ hai có mở hay không.</li>
+    <li>Muốn hai tên rời hẳn nhau thì phải <b>sao chép</b> — gán không bao giờ chép.</li>
+  </ul>
 
-      <rect x="308" y="22" width="326" height="56" rx="6" fill="rgba(var(--blue-a),.10)" stroke="rgba(var(--blue-a),.42)"/>
-      <text class="sv-t" x="471" y="47" text-anchor="middle" fill="var(--filled)">HEAP</text>
-      <text class="sv-d" x="471" y="65" text-anchor="middle">mọi object nằm ở đây · cấp phát dần →</text>
-
-      <rect x="640" y="22" width="220" height="56" rx="6" fill="rgba(var(--amber-a),.12)" stroke="rgba(var(--amber-a),.42)"/>
-      <text class="sv-t" x="750" y="47" text-anchor="middle" fill="var(--probe)">STACK</text>
-      <text class="sv-d" x="750" y="65" text-anchor="middle">← khung hàm đang chạy</text>
-
-      <rect x="0" y="105" width="9" height="9" rx="2" fill="var(--probe)"/>
-      <text class="sv-h" x="17" y="114">STACK · KHUNG HÀM</text>
-      <rect x="0" y="126" width="360" height="232" rx="8" fill="var(--panel)" stroke="rgba(var(--amber-a),.28)"/>
-      <text class="sv-d" x="20"  y="151">tên</text>
-      <text class="sv-d" x="340" y="151" text-anchor="end">ô 8 byte · chỉ chứa địa chỉ</text>
-
-      <g fill="var(--raise)" stroke="var(--rule)">
-        <rect x="20" y="162" width="320" height="46" rx="5"/>
-        <rect x="20" y="216" width="320" height="46" rx="5"/>
-        <rect x="20" y="270" width="320" height="46" rx="5"/>
-      </g>
-      <g stroke="var(--rule)">
-        <path d="M96,162 V208"/><path d="M96,216 V262"/><path d="M96,270 V316"/>
-      </g>
-      <text class="sv-n" x="58" y="190" text-anchor="middle">nums</text>
-      <text class="sv-n" x="58" y="244" text-anchor="middle">same</text>
-      <text class="sv-n" x="58" y="298" text-anchor="middle">n</text>
-      <g class="sv-l" text-anchor="end" fill="var(--probe)">
-        <text x="322" y="190">0x7f3c…a0</text>
-        <text x="322" y="244">0x7f3c…a0</text>
-        <text x="322" y="298">0x7f3c…08</text>
-      </g>
-      <text class="sv-d" x="20" y="342">hàm return → cả khung này biến mất, object thì không</text>
-
-      <rect x="430" y="105" width="9" height="9" rx="2" fill="var(--filled)"/>
-      <text class="sv-h" x="447" y="114">HEAP · OBJECT THẬT</text>
-      <rect x="430" y="126" width="430" height="232" rx="8" fill="var(--panel)" stroke="rgba(var(--blue-a),.28)"/>
-
-      <text class="sv-d" x="452" y="148">object @0x7f3c…a0</text>
-      <rect x="452" y="156" width="386" height="76" rx="6" fill="var(--sunk)" stroke="rgba(var(--blue-a),.45)"/>
-      <g stroke="var(--rule)"><path d="M576,156 V232"/><path d="M700,156 V232"/></g>
-      <text class="sv-d" x="514" y="184" text-anchor="middle">refcount</text>
-      <text class="sv-n" x="514" y="211" text-anchor="middle" fill="var(--probe)">2</text>
-      <text class="sv-d" x="638" y="184" text-anchor="middle">type</text>
-      <text class="sv-n" x="638" y="211" text-anchor="middle">list</text>
-      <text class="sv-d" x="769" y="184" text-anchor="middle">items</text>
-      <text class="sv-n" x="769" y="211" text-anchor="middle">[→, →]</text>
-
-      <text class="sv-d" x="452" y="256">object @0x7f3c…08</text>
-      <rect x="452" y="264" width="386" height="76" rx="6" fill="var(--sunk)" stroke="rgba(var(--blue-a),.45)"/>
-      <g stroke="var(--rule)"><path d="M576,264 V340"/><path d="M700,264 V340"/></g>
-      <text class="sv-d" x="514" y="292" text-anchor="middle">refcount</text>
-      <text class="sv-n" x="514" y="319" text-anchor="middle">1</text>
-      <text class="sv-d" x="638" y="292" text-anchor="middle">type</text>
-      <text class="sv-n" x="638" y="319" text-anchor="middle">int</text>
-      <text class="sv-d" x="769" y="292" text-anchor="middle">value</text>
-      <text class="sv-n" x="769" y="319" text-anchor="middle">1000</text>
-
-      <g fill="none" stroke="var(--probe)" marker-end="url(#mem-ar)">
-        <path d="M344,185 C388,185 404,179 446,179"/>
-        <path d="M344,239 C392,239 406,212 446,209"/>
-        <path d="M344,293 C392,293 406,302 446,302"/>
-      </g>
-
-      <path d="M0,388 H860" stroke="var(--rule)"/>
-      <text class="sv-h" x="1"   y="412">TRONG C — BIẾN LÀ Ô NHỚ</text>
-      <rect x="0" y="422" width="200" height="38" rx="5" fill="var(--raise)" stroke="var(--rule)"/>
-      <path d="M64,422 V460" stroke="var(--rule)"/>
-      <text class="sv-n" x="32"  y="446" text-anchor="middle">n</text>
-      <text class="sv-n" x="132" y="446" text-anchor="middle">1000</text>
-
-      <text class="sv-h" x="470" y="412">TRONG PYTHON — TÊN TRỎ TỚI OBJECT</text>
-      <rect x="470" y="422" width="200" height="38" rx="5" fill="var(--raise)" stroke="var(--rule)"/>
-      <path d="M534,422 V460" stroke="var(--rule)"/>
-      <text class="sv-n" x="502" y="446" text-anchor="middle">n</text>
-      <text class="sv-l" x="602" y="446" text-anchor="middle" fill="var(--probe)">0x7f3c…08</text>
-      <path d="M678,441 H710" stroke="var(--probe)" marker-end="url(#mem-ar)"/>
-      <rect x="718" y="422" width="142" height="38" rx="5" fill="var(--sunk)" stroke="rgba(var(--blue-a),.45)"/>
-      <text class="sv-n" x="789" y="446" text-anchor="middle">int 1000</text>
-    </svg>
-    <figcaption>Với <code>nums = [1, 2]; same = nums; n = 1000</code>. Ô nhớ của một biến trong C chứa thẳng giá trị; ô của một tên trong Python chỉ chứa <b>địa chỉ</b> — nên <code>same = nums</code> chép địa chỉ chứ không chép list, và refcount của object đó lên 2.</figcaption>
-  </figure>
-  <div class="note key">
-    <h4>Nhớ một câu</h4>
-    <strong>Gán không sao chép object, nó chỉ dán thêm một cái tên.</strong> Từ câu này suy ra được toàn bộ hành vi trong bài: vì sao <code>b = a</code> rồi sửa <code>b</code> lại đổi cả <code>a</code>, vì sao hàm sửa được list của người gọi, và vì sao <code>x = 5</code> không bao giờ gây ra vấn đề đó.
-  </div>
+  <p class="stripnote"><span>object hết được trỏ tới thì biến mất lúc nào?</span><span>ở bài sau: <a href="../memory-management-gc/index.html"><em>Memory management &amp; GC</em></a></span></p>
 </section>
 
 <section id="memory-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Tên và object</h2></div>
-<pre><code>a = [<span class="st">1</span>, <span class="st">2</span>]
-b = a              <span class="cm"># KHÔNG sao chép — hai tên, một list</span>
-b.append(<span class="st">3</span>)
-a                  <span class="cm"># [1, 2, 3]  ← a cũng đổi</span>
 
-<span class="kw">id</span>(a) == <span class="kw">id</span>(b)      <span class="cm"># True — cùng một object</span></code></pre>
-  <p>Có <strong>hai loại thao tác</strong> hoàn toàn khác nhau, và phân biệt được chúng là chìa khoá:</p>
-<div class="cmp two">
-    <div><h5>Gán lại tên — <code>b = [9]</code></h5>
-      <p>Chỉ dán cái tên <code>b</code> sang object khác.</p>
-      <p>Các tên khác <b>không</b> đổi gì.</p></div>
-    <div><h5>Sửa object — <code>b.append(9)</code> · <code>b[0] = 9</code></h5>
-      <p>Đổi nội dung chính object đó.</p>
-      <p><b>Mọi</b> tên trỏ tới nó đều thấy thay đổi.</p></div>
-  </div>
-<pre><code>a = [<span class="st">1</span>, <span class="st">2</span>]; b = a
-b = [<span class="st">9</span>]           <span class="cm"># gán lại tên b → a vẫn là [1, 2]</span>
+  <p class="key">Biến trong Python <em>không chứa</em> giá trị. Nó là một cái nhãn dán lên object — nên <code>b = a</code> chép <em>địa chỉ</em>, không chép dữ liệu.</p>
 
-a = [<span class="st">1</span>, <span class="st">2</span>]; b = a
-b[<span class="st">0</span>] = <span class="st">9</span>          <span class="cm"># sửa object   → a thành [9, 2]</span></code></pre>
-  <div class="note warn">
-    <h4>Chỗ tinh vi nhất: <code>+=</code></h4>
-    Với list, <code>b += [9]</code> gọi <code>__iadd__</code> và <strong>sửa tại chỗ</strong> — giống <code>extend</code>. Với tuple hay số, <code>b += x</code> tạo object mới rồi gán lại tên. Cùng một toán tử, hai hành vi khác nhau tuỳ kiểu dữ liệu. Đây là nguồn bug rất khó thấy khi tái cấu trúc code.
-  </div>
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng hai ô tên và object; bên phải ba dòng code cho thấy id không đổi, gán chỉ thêm một cái tên">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--probe)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--filled)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">cách duy nhất tách hai tên ra hai object</text>
+<path d="M304 112 H 328 V 100 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,100 348,95.8 348,104.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">BA DÒNG CODE &#183; TÊN ĐỔI, OBJECT VẪN LÀ MỘT</text>
+<rect x="360" y="30" width="156" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="438.0" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2]</text>
+<rect x="418.0" y="66" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="438.0" y="81" fill="var(--probe)" text-anchor="middle">a</text>
+<line x1="438.0" y1="88" x2="438.0" y2="92" stroke="var(--probe)" stroke-width="1.2"/><polygon points="438.0,100 433.8,92 442.2,92" fill="var(--probe)"/>
+<rect x="360" y="104" width="156" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="125" fill="var(--filled)">[1, 2]</text>
+<text class="sv-d" x="374" y="141" fill="var(--muted)">id 0x7f2c40</text>
+<text class="sv-d" x="360" y="168" fill="var(--filled)">object sinh ra</text>
+<text class="sv-d" x="360" y="183" fill="var(--filled)">một tên trỏ vào</text>
+<rect x="528" y="30" width="156" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="606.0" y="47" fill="var(--dim)" text-anchor="middle">b = a</text>
+<rect x="562.0" y="66" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="582.0" y="81" fill="var(--probe)" text-anchor="middle">a</text>
+<line x1="582.0" y1="88" x2="582.0" y2="92" stroke="var(--probe)" stroke-width="1.2"/><polygon points="582.0,100 577.8,92 586.2,92" fill="var(--probe)"/>
+<rect x="610.0" y="66" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="630.0" y="81" fill="var(--probe)" text-anchor="middle">b</text>
+<line x1="630.0" y1="88" x2="630.0" y2="92" stroke="var(--probe)" stroke-width="1.2"/><polygon points="630.0,100 625.8,92 634.2,92" fill="var(--probe)"/>
+<rect x="528" y="104" width="156" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="542" y="125" fill="var(--filled)">[1, 2]</text>
+<text class="sv-d" x="542" y="141" fill="var(--muted)">id 0x7f2c40</text>
+<text class="sv-d" x="528" y="168" fill="var(--filled)">chép ĐỊA CHỈ,</text>
+<text class="sv-d" x="528" y="183" fill="var(--filled)">không chép list</text>
+<rect x="696" y="30" width="156" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="774.0" y="47" fill="var(--dim)" text-anchor="middle">b.append(3)</text>
+<rect x="730.0" y="66" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="750.0" y="81" fill="var(--probe)" text-anchor="middle">a</text>
+<line x1="750.0" y1="88" x2="750.0" y2="92" stroke="var(--probe)" stroke-width="1.2"/><polygon points="750.0,100 745.8,92 754.2,92" fill="var(--probe)"/>
+<rect x="778.0" y="66" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="798.0" y="81" fill="var(--probe)" text-anchor="middle">b</text>
+<line x1="798.0" y1="88" x2="798.0" y2="92" stroke="var(--probe)" stroke-width="1.2"/><polygon points="798.0,100 793.8,92 802.2,92" fill="var(--probe)"/>
+<rect x="696" y="104" width="156" height="46" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="710" y="125" fill="var(--probe)">[1, 2, 3]</text>
+<text class="sv-d" x="710" y="141" fill="var(--muted)">id 0x7f2c40</text>
+<text class="sv-d" x="696" y="168" fill="var(--probe)">sửa object &#8594;</text>
+<text class="sv-d" x="696" y="183" fill="var(--probe)">a cũng thấy</text>
+<text class="sv-d" x="360" y="212" fill="var(--ok)">Cùng một id ở cả ba cột &#8212; không có object thứ hai nào được tạo ra.</text>
+<text class="sv-d" x="360" y="232" fill="var(--muted)">Tên sống trong namespace, object sống trên heap; tên chỉ giữ địa chỉ.</text>
+<text class="sv-d" x="360" y="258" fill="var(--tomb)">Vậy một dòng code động tới TÊN hay động tới OBJECT? &#8212; mục sau.</text>
+</svg>
+<figcaption>Ba cột, cùng một <code>id</code>. <code>b = a</code> không tạo list mới — nó chép <b>địa chỉ</b>, nên <code>b.append(3)</code> sửa đúng cái list mà <code>a</code> đang trỏ tới.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><code>id(a) == id(b)</code> trả về <code>True</code> — đúng một object, hai cái tên.</li>
+    <li>Tên sống trong <b>namespace</b>, object sống trên <b>heap</b>; hai vùng khác nhau.</li>
+    <li>Nên gán <b>không tốn</b> bộ nhớ theo kích thước dữ liệu, dù list dài triệu phần tử.</li>
+  </ul>
+
+  <details class="deep"><summary>Vì sao <code>x = 5</code> không bao giờ gây ra chuyện này?</summary>
+  <div class="body">
+    <p>Vẫn đúng cơ chế đó: <code>x</code> là tên dán lên object <code>5</code>, và <code>y = x</code> cho hai tên cùng trỏ vào nó. Khác biệt nằm ở chỗ <code>int</code> là immutable — <b>không có thao tác nào sửa được ruột nó</b>, nên hai tên không thể ảnh hưởng nhau.</p>
+    <p>Cái người ta hay gọi là "kiểu giá trị và kiểu tham chiếu" trong ngôn ngữ khác, ở Python chỉ là hệ quả của ranh giới mutable ở mục 05. Cơ chế thì đồng nhất cho mọi kiểu.</p>
+  </div></details>
 </section>
 
 <section id="memory-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>is và ==</h2></div>
-<div class="cmp two">
-    <div><h5><code>==</code> — so giá trị</h5>
-      <p>Gọi <code>__eq__</code>, hỏi "nội dung có giống nhau không".</p>
-      <p>Dùng cho gần như mọi so sánh.</p></div>
-    <div><h5><code>is</code> — so danh tính</h5>
-      <p>Hỏi "có phải <b>cùng một object</b> trong bộ nhớ không".</p>
-      <p>Chỉ dùng với <code>None</code>, <code>True</code>, <code>False</code>, sentinel.</p></div>
-  </div>
-<pre><code>a = [<span class="st">1</span>, <span class="st">2</span>]; b = [<span class="st">1</span>, <span class="st">2</span>]
-a == b             <span class="cm"># True  — cùng giá trị</span>
-a <span class="kw">is</span> b             <span class="cm"># False — hai object khác nhau</span>
+  <div class="sh"><b>03</b><h2>Gán lại tên hay sửa object</h2></div>
 
-x = <span class="kw">None</span>
-x <span class="kw">is</span> <span class="kw">None</span>          <span class="cm"># ĐÚNG cách kiểm None</span>
-x == <span class="kw">None</span>          <span class="cm"># chạy được nhưng sai chuẩn: __eq__ có thể bị ghi đè</span></code></pre>
-  <p><strong>Vì sao <code>None</code> phải dùng <code>is</code>:</strong> <code>None</code> là một object duy nhất trong cả interpreter, nên so danh tính là chính xác và nhanh nhất. Còn <code>==</code> gọi <code>__eq__</code>, mà một class có thể định nghĩa <code>__eq__</code> trả về <code>True</code> với mọi thứ — NumPy array thì <code>arr == None</code> còn trả về một mảng boolean, làm <code>if</code> ném lỗi.</p>
+  <p class="key">Đây là <em>ngã ba</em> của cả bài. Đọc một dòng code, luôn hỏi đúng một câu: nó động tới <em>cái tên</em>, hay động tới <em>cái object</em>?</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng ô một dòng code; bên phải so sánh gán lại tên chỉ đổi chỗ tên b với sửa object làm mọi tên cùng thấy">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">cách duy nhất tách hai tên ra hai object</text>
+<path d="M304 41 H 328 V 46 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,46 348,41.8 348,50.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">CÙNG MỘT CHỮ b &#8212; HAI VIỆC KHÁC HẲN NHAU</text>
+<rect x="360" y="30" width="240" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="480" y="47" fill="var(--probe)" text-anchor="middle">b = [9]</text>
+<text class="sv-d" x="360" y="74" fill="var(--probe)">GÁN LẠI TÊN &#8212; động tới tên</text>
+<rect x="372" y="84" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="392" y="99" fill="var(--probe)" text-anchor="middle">a</text>
+<rect x="372" y="118" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="392" y="133" fill="var(--probe)" text-anchor="middle">b</text>
+<line x1="414" y1="95" x2="450" y2="95" stroke="var(--filled)" stroke-width="1.2"/><polygon points="458,95 450,90.8 450,99.2" fill="var(--filled)"/>
+<line x1="414" y1="129" x2="450" y2="129" stroke="var(--probe)" stroke-width="1.2"/><polygon points="458,129 450,124.8 450,133.2" fill="var(--probe)"/>
+<rect x="462" y="82" width="128" height="26" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="526" y="99" fill="var(--filled)" text-anchor="middle">[1, 2]</text>
+<rect x="462" y="116" width="128" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="526" y="133" fill="var(--probe)" text-anchor="middle">[9]</text>
+<text class="sv-d" x="360" y="164" fill="var(--muted)">chỉ b đổi chỗ &#183; object cũ nguyên vẹn</text>
+<text class="sv-d" x="360" y="180" fill="var(--ok)">a vẫn là [1, 2]</text>
+<rect x="616" y="30" width="244" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="738" y="47" fill="var(--tomb)" text-anchor="middle">b[0] = 9</text>
+<text class="sv-d" x="616" y="74" fill="var(--tomb)">SỬA OBJECT &#8212; động tới object</text>
+<rect x="628" y="84" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="648" y="99" fill="var(--probe)" text-anchor="middle">a</text>
+<rect x="628" y="118" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="648" y="133" fill="var(--probe)" text-anchor="middle">b</text>
+<path d="M670 95 H 700 V 112" stroke="var(--tomb)" stroke-width="1.2" fill="none"/>
+<path d="M670 129 H 700 V 112" stroke="var(--tomb)" stroke-width="1.2" fill="none"/>
+<line x1="700" y1="112" x2="728" y2="112" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="736,112 728,107.8 728,116.2" fill="var(--tomb)"/>
+<rect x="740" y="99" width="116" height="26" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="798" y="116" fill="var(--tomb)" text-anchor="middle">[9, 2]</text>
+<text class="sv-d" x="616" y="164" fill="var(--muted)">một object, hai tên cùng nhìn vào</text>
+<text class="sv-d" x="616" y="180" fill="var(--tomb)">a cũng thành [9, 2]</text>
+<line x1="360" y1="200" x2="860" y2="200" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-d" x="360" y="222" fill="var(--probe)">Toán tử += đứng đúng giữa hai cột, và đổi cột theo kiểu dữ liệu:</text>
+<text class="sv-d" x="360" y="242" fill="var(--muted)">list &#8594; sửa tại chỗ &#183; tuple, số, chuỗi &#8594; tạo object mới rồi gán lại tên.</text>
+<text class="sv-d" x="360" y="268" fill="var(--ok)">Đọc một dòng code, luôn hỏi: nó động tới TÊN hay động tới OBJECT?</text>
+</svg>
+<figcaption>Cùng một chữ <code>b</code> đứng bên trái dấu bằng. <code>b = [9]</code> đổi chỗ <b>cái tên</b>; <code>b[0] = 9</code> đổi ruột <b>cái object</b> — và mọi tên trỏ vào nó đều thấy.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><b>Gán lại tên</b> — <code>b = [9]</code> — chỉ tên <code>b</code> đổi chỗ, tên khác không hay biết.</li>
+    <li><b>Sửa object</b> — <code>b[0] = 9</code>, <code>b.append(9)</code> — mọi tên trỏ vào đều thấy.</li>
+    <li><code>+=</code> đổi nhánh theo kiểu: list thì sửa tại chỗ, tuple và số thì tạo object mới.</li>
+  </ul>
+
+  <details class="deep"><summary>Vì sao <code>+=</code> là chỗ tinh vi nhất</summary>
+  <div class="body">
+    <p>Với list, <code>b += [9]</code> gọi <code>__iadd__</code> và <b>sửa tại chỗ</b> — giống hệt <code>extend</code>, nên mọi tên trỏ vào cái list đó đều thấy. Với tuple, số hay chuỗi thì không có <code>__iadd__</code>, Python quay về <code>__add__</code>: tạo object mới rồi gán lại tên.</p>
+    <p>Cùng một toán tử, hai nhánh khác nhau của bản đồ, chọn theo kiểu dữ liệu. Đây là nguồn bug rất khó thấy khi tái cấu trúc code — đổi một list thành tuple là hành vi đổi theo mà không có lỗi nào báo.</p>
+  </div></details>
 </section>
 
 <section id="memory-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Mutable hay không</h2></div>
-  <div class="grid2">
-    <div class="card ok"><h4>Immutable — không sửa được nội dung</h4><p><code>int</code> <code>float</code> <code>bool</code> <code>str</code> <code>bytes</code> <code>tuple</code> <code>frozenset</code> <code>None</code> <code>complex</code></p></div>
-    <div class="card bad"><h4>Mutable — sửa được</h4><p><code>list</code> <code>dict</code> <code>set</code> <code>bytearray</code>, và phần lớn class tự viết</p></div>
-  </div>
-<pre><code>s = <span class="st">"abc"</span>
-s[<span class="st">0</span>] = <span class="st">"x"</span>         <span class="cm"># TypeError — str là immutable</span>
-s = s.replace(<span class="st">"a"</span>, <span class="st">"x"</span>)  <span class="cm"># tạo chuỗi MỚI rồi gán lại tên</span></code></pre>
-  <div class="strip">
-    <div class="c dim"><i>vòng 1</i><b>"a"</b><u>cấp chuỗi mới, chép 1 ký tự</u></div>
-    <div class="c dim"><i>vòng 2</i><b>"ab"</b><u>cấp chuỗi mới, chép 2</u></div>
-    <div class="c on"><i>vòng 3</i><b>"abc"</b><u>cấp chuỗi mới, chép 3</u></div>
-    <div class="c f"><i>vòng n</i><b>…</b><u>chép n → tổng là O(n²)</u></div>
-  </div>
-  <p class="stripnote"><span>mỗi lần <code>s += ch</code> là một chuỗi hoàn toàn mới</span><span><em>dùng <code>"".join(parts)</code> để chép đúng một lần</em></span></p>
-  <h3>Immutable không đồng nghĩa với "đóng băng hoàn toàn"</h3>
-<pre><code>t = (<span class="st">1</span>, [<span class="st">2</span>, <span class="st">3</span>])       <span class="cm"># tuple immutable...</span>
-t[<span class="st">1</span>].append(<span class="st">4</span>)      <span class="cm"># ...nhưng list BÊN TRONG thì không</span>
-t                     <span class="cm"># (1, [2, 3, 4])</span>
+  <div class="sh"><b>04</b><h2>is và ==</h2></div>
 
-<span class="kw">hash</span>(t)               <span class="cm"># TypeError: unhashable — vì có list bên trong</span></code></pre>
-  <p>Tuple đảm bảo <em>danh sách các tham chiếu</em> không đổi, không đảm bảo các object được trỏ tới cũng không đổi. Nói cách khác, immutable ở đây là <strong>nông</strong>.</p>
+  <p class="key">Hai toán tử này hỏi hai câu khác nhau về <em>đúng ô TÊN</em> của bản đồ: <code>==</code> hỏi về nội dung, <code>is</code> hỏi về địa chỉ.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 306" role="img" aria-label="Bản đồ sáng ô tên; bên phải hai object nội dung giống nhau nhưng địa chỉ khác nhau, nên bằng bằng trả về True còn is trả về False">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--probe)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">cách duy nhất tách hai tên ra hai object</text>
+<path d="M304 107 H 328 V 92 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,92 348,87.8 348,96.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">HAI CÂU HỎI KHÁC NHAU VỀ CÙNG HAI CÁI TÊN</text>
+<rect x="360" y="30" width="300" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="510" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2]  ;  b = [1, 2]</text>
+<rect x="372" y="68" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="392" y="83" fill="var(--probe)" text-anchor="middle">a</text>
+<line x1="392" y1="90" x2="392" y2="94" stroke="var(--probe)" stroke-width="1.2"/><polygon points="392,102 387.8,94 396.2,94" fill="var(--probe)"/>
+<rect x="360" y="106" width="128" height="40" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="374" y="126" fill="var(--filled)">[1, 2]</text>
+<text class="sv-d" x="374" y="141" fill="var(--muted)">id 0x7f2c40</text>
+<rect x="544" y="68" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="564" y="83" fill="var(--probe)" text-anchor="middle">b</text>
+<line x1="564" y1="90" x2="564" y2="94" stroke="var(--probe)" stroke-width="1.2"/><polygon points="564,102 559.8,94 568.2,94" fill="var(--probe)"/>
+<rect x="532" y="106" width="128" height="40" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="546" y="126" fill="var(--filled)">[1, 2]</text>
+<text class="sv-d" x="546" y="141" fill="var(--muted)">id 0x7f9e18</text>
+<text class="sv-d" x="360" y="172" fill="var(--muted)">hai object khác nhau, nội dung tình cờ giống nhau</text>
+<rect x="688" y="62" width="172" height="44" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="702" y="82" fill="var(--ok)">a == b  &#8594;  True</text>
+<text class="sv-d" x="702" y="98" fill="var(--muted)">so NỘI DUNG, gọi __eq__</text>
+<rect x="688" y="116" width="172" height="44" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="702" y="136" fill="var(--tomb)">a is b  &#8594;  False</text>
+<text class="sv-s" x="702" y="152" fill="var(--muted)">so ĐỊA CHỈ, hai ô khác nhau</text>
+<line x1="360" y1="192" x2="860" y2="192" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-hv" x="360" y="214" fill="var(--muted)">CHỖ DUY NHẤT NÊN DÙNG is</text>
+<rect x="360" y="224" width="500" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="374" y="244" fill="var(--probe)">x is None  &#183;  x is True  &#183;  x is SENTINEL</text>
+<text class="sv-s" x="374" y="260" fill="var(--muted)">None chỉ có đúng một object trong cả interpreter &#8212; so địa chỉ là chính xác nhất</text>
+<text class="sv-d" x="360" y="290" fill="var(--tomb)">Đừng dùng is để so số hay chuỗi: có lúc đúng nhờ interning, đó là bẫy.</text>
+</svg>
+<figcaption>Hai list nội dung giống hệt vẫn là <b>hai object</b>. <code>==</code> hỏi về nội dung, <code>is</code> hỏi về địa chỉ — nên chỉ <code>None</code> và sentinel mới hợp với <code>is</code>.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><code>==</code> gọi <code>__eq__</code> — dùng cho gần như mọi so sánh.</li>
+    <li><code>is</code> so địa chỉ — chỉ dùng với <code>None</code>, <code>True</code>, <code>False</code>, sentinel.</li>
+    <li><code>None</code> là object <b>duy nhất</b> trong cả interpreter, nên so địa chỉ là chính xác nhất.</li>
+    <li><code>arr == None</code> với NumPy trả về một mảng boolean, làm <code>if</code> ném lỗi.</li>
+  </ul>
+
+  <details class="deep"><summary>Interning — vì sao <code>a is b</code> có lúc trả về True với số và chuỗi</summary>
+  <div class="body">
+    <p>CPython cache sẵn các số nguyên từ &#8722;5 tới 256 và intern những chuỗi trông giống tên biến, để tiết kiệm bộ nhớ và tăng tốc so sánh. Nên <code>a = 256; b = 256</code> cho <code>a is b</code> là <code>True</code>, còn <code>257</code> thì thường <code>False</code>; <code>"hello"</code> thì <code>True</code>, <code>"hello world"</code> có dấu cách nên thường không.</p>
+    <p>Đây là <b>chi tiết cài đặt</b>, không phải đặc tả ngôn ngữ: nó đổi theo phiên bản, và đổi theo việc code nằm trong một hàm hay ở cấp module. Bài học duy nhất cần rút ra là <b>đừng bao giờ dùng <code>is</code> để so giá trị</b> — nó có thể đúng lúc test rồi sai trên production.</p>
+  </div></details>
 </section>
 
 <section id="memory-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Lab: theo dõi tham chiếu</h2></div>
-  <p>Chạy từng dòng và xem tên nào trỏ tới object nào. Hai tên cùng màu là cùng một object.</p>
+  <div class="sh"><b>05</b><h2>Mutable hay không</h2></div>
+
+  <p class="key">Ranh giới này quyết định nhánh <em>sửa object</em> ở mục 03 có mở hay không. Đóng nhánh đó là đóng luôn cả một họ bug.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 288" role="img" aria-label="Bản đồ sáng ô mutable; bên phải hai hàng immutable và mutable, và ví dụ tuple chứa list cho thấy immutable chỉ nông">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="190" y="95" fill="var(--muted)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--muted)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--muted)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--tomb)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">cách duy nhất tách hai tên ra hai object</text>
+<path d="M304 184 H 328 V 96 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,96 348,91.8 348,100.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">RANH GIỚI NÀY QUYẾT ĐỊNH NHÁNH &quot;SỬA OBJECT&quot; CÓ MỞ KHÔNG</text>
+<rect x="360" y="32" width="500" height="60" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="374" y="52" fill="var(--ok)">IMMUTABLE</text>
+<text class="sv-l" x="470" y="52" fill="var(--muted)">int  float  bool  str  bytes  tuple  frozenset  None</text>
+<text class="sv-s" x="374" y="72" fill="var(--muted)">nhánh sửa object ĐÓNG &#8212; s[0] = &quot;x&quot; ném TypeError</text>
+<text class="sv-d" x="374" y="86" fill="var(--ok)">chỉ còn một cách: tạo object MỚI rồi gán lại tên</text>
+<rect x="360" y="100" width="500" height="60" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="374" y="120" fill="var(--tomb)">MUTABLE</text>
+<text class="sv-l" x="460" y="120" fill="var(--muted)">list  dict  set  bytearray, và phần lớn class tự viết</text>
+<text class="sv-s" x="374" y="140" fill="var(--muted)">nhánh sửa object MỞ &#8212; append, [i] =, update sửa tại chỗ</text>
+<text class="sv-d" x="374" y="154" fill="var(--tomb)">nên mọi tên trỏ vào đều thấy thay đổi</text>
+<line x1="360" y1="178" x2="860" y2="178" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-hv" x="360" y="200" fill="var(--muted)">IMMUTABLE LÀ NÔNG, KHÔNG PHẢI ĐÓNG BĂNG</text>
+<rect x="360" y="210" width="500" height="62" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="374" y="230" fill="var(--probe)">t = (1, [2, 3])</text>
+<text class="sv-d" x="500" y="230" fill="var(--muted)">tuple khoá DANH SÁCH tham chiếu&#8230;</text>
+<text class="sv-l" x="374" y="250" fill="var(--probe)">t[1].append(4)</text>
+<text class="sv-d" x="500" y="250" fill="var(--muted)">&#8230;không khoá object được trỏ tới</text>
+<text class="sv-d" x="374" y="266" fill="var(--tomb)">nên hash(t) ném TypeError: unhashable &#8212; có list bên trong</text>
+</svg>
+<figcaption>Immutable không phải &quot;an toàn tuyệt đối&quot; — <code>tuple</code> chỉ khoá <b>danh sách địa chỉ</b> nó giữ, còn cái list nằm bên trong thì vẫn sửa được như thường.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><b>Immutable</b> — <code>int</code> <code>float</code> <code>bool</code> <code>str</code> <code>bytes</code> <code>tuple</code> <code>frozenset</code> <code>None</code>.</li>
+    <li><b>Mutable</b> — <code>list</code> <code>dict</code> <code>set</code> <code>bytearray</code>, và phần lớn class tự viết.</li>
+    <li>Immutable là <b>nông</b>: <code>tuple</code> khoá danh sách địa chỉ, không khoá object bên trong.</li>
+    <li>Nên <code>hash((1, [2, 3]))</code> vẫn ném <code>TypeError</code> — có list bên trong.</li>
+  </ul>
+
+  <details class="deep"><summary>Vì sao nối chuỗi trong vòng lặp là <code>O(n²)</code></summary>
+  <div class="body">
+    <p><code>str</code> immutable nên <code>s += ch</code> <b>không</b> nối thêm vào chỗ cũ được: mỗi vòng cấp một chuỗi hoàn toàn mới rồi chép toàn bộ ký tự cũ sang. Vòng thứ <em>k</em> chép <em>k</em> ký tự, cộng lại thành <code>1 + 2 + &#8230; + n</code>, tức <code>O(n²)</code>.</p>
+    <p>Cách đúng là gom vào list rồi <code>"".join(parts)</code> — <code>join</code> đo tổng độ dài trước, cấp một lần, chép một lần: <code>O(n)</code>. Đây là ví dụ rõ nhất cho thấy ranh giới mutable không chỉ là chuyện đúng sai, mà còn là chuyện tốc độ.</p>
+  </div></details>
+</section>
+
+<section id="memory-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Gán, shallow copy, deep copy</h2></div>
+
+  <p class="key">Gán không bao giờ chép, nên muốn hai tên rời hẳn nhau chỉ có một đường: <em>sao chép</em>. Chép tới tầng nào thì độc lập tới tầng đó.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 278" role="img" aria-label="Bản đồ sáng ô object; bên phải ba mức sao chép với list lồng nhau, cho thấy shallow copy vẫn dùng chung tầng trong">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="95" fill="var(--muted)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--muted)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--muted)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--rule)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--rule)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--rule)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--filled)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">cách duy nhất tách hai tên ra hai object</text>
+<path d="M304 107 H 328 V 100 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,100 348,95.8 348,104.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">a = [[1,2],[3,4]] &#8212; CHÉP TỚI TẦNG NÀO ĐỘC LẬP TỚI TẦNG ĐÓ</text>
+<text class="sv-hv" x="360" y="84" fill="var(--muted)">VỎ</text>
+<text class="sv-hv" x="360" y="132" fill="var(--muted)">RUỘT</text>
+<rect x="392" y="30" width="156" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="470.0" y="47" fill="var(--dim)" text-anchor="middle">b = a</text>
+<rect x="426" y="68" width="88" height="24" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="470" y="84" fill="var(--tomb)" text-anchor="middle">a  b</text>
+<line x1="470" y1="92" x2="470" y2="100" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="470,108 465.8,100 474.2,100" fill="var(--tomb)"/>
+<rect x="392" y="112" width="156" height="30" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="470.0" y="132" fill="var(--filled)" text-anchor="middle">[1, 2]   [3, 4]</text>
+<text class="sv-d" x="470.0" y="160" fill="var(--tomb)" text-anchor="middle">MỘT BẢN, DÙNG CHUNG</text>
+<text class="sv-d" x="392" y="184" fill="var(--tomb)">chép 0 tầng</text>
+<text class="sv-d" x="392" y="199" fill="var(--muted)">chỉ thêm một cái tên</text>
+<rect x="548" y="30" width="156" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="626.0" y="47" fill="var(--dim)" text-anchor="middle">b = a[:]</text>
+<rect x="556" y="68" width="62" height="24" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="587" y="84" fill="var(--probe)" text-anchor="middle">a</text>
+<rect x="634" y="68" width="62" height="24" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="665" y="84" fill="var(--probe)" text-anchor="middle">b</text>
+<path d="M587 92 V 100 H 626 V 104" stroke="var(--probe)" stroke-width="1.2" fill="none"/>
+<path d="M665 92 V 100 H 626 V 104" stroke="var(--probe)" stroke-width="1.2" fill="none"/>
+<line x1="626" y1="104" x2="626" y2="104" stroke="var(--probe)" stroke-width="1.2"/><polygon points="626,112 621.8,104 630.2,104" fill="var(--probe)"/>
+<rect x="548" y="112" width="156" height="30" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="626.0" y="132" fill="var(--filled)" text-anchor="middle">[1, 2]   [3, 4]</text>
+<text class="sv-d" x="626.0" y="160" fill="var(--tomb)" text-anchor="middle">MỘT BẢN, DÙNG CHUNG</text>
+<text class="sv-d" x="548" y="184" fill="var(--probe)">chép 1 tầng</text>
+<text class="sv-d" x="548" y="199" fill="var(--muted)">list(a) &#183; copy.copy(a)</text>
+<rect x="704" y="30" width="156" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="782.0" y="47" fill="var(--dim)" text-anchor="middle">copy.deepcopy(a)</text>
+<rect x="712" y="68" width="62" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="743" y="84" fill="var(--ok)" text-anchor="middle">a</text>
+<rect x="790" y="68" width="62" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="821" y="84" fill="var(--ok)" text-anchor="middle">b</text>
+<line x1="743" y1="92" x2="743" y2="100" stroke="var(--ok)" stroke-width="1.2"/><polygon points="743,108 738.8,100 747.2,100" fill="var(--ok)"/>
+<line x1="821" y1="92" x2="821" y2="100" stroke="var(--ok)" stroke-width="1.2"/><polygon points="821,108 816.8,100 825.2,100" fill="var(--ok)"/>
+<rect x="704" y="112" width="72" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="740" y="132" fill="var(--ok)" text-anchor="middle">[1, 2]</text>
+<rect x="788" y="112" width="72" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="824" y="132" fill="var(--ok)" text-anchor="middle">[1, 2]</text>
+<text class="sv-d" x="782.0" y="160" fill="var(--ok)" text-anchor="middle">HAI BẢN RIÊNG</text>
+<text class="sv-d" x="704" y="184" fill="var(--ok)">chép mọi tầng</text>
+<text class="sv-d" x="704" y="199" fill="var(--muted)">đệ quy xuống tận đáy</text>
+<line x1="360" y1="218" x2="860" y2="218" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-d" x="360" y="240" fill="var(--probe)">Cột giữa là chỗ sập bẫy: b[0].append(99) vẫn đổi cả a, vì tầng trong chưa được chép.</text>
+<text class="sv-d" x="360" y="260" fill="var(--muted)">Cái giá của cột phải: chậm, tốn bộ nhớ, và ném lỗi với socket, khoá, kết nối đang mở.</text>
+</svg>
+<figcaption>Ba mức chép, cùng một dữ liệu lồng nhau. Chỗ hay sập là cột giữa: vỏ ngoài đã là hai, nhưng <b>ruột vẫn dùng chung</b>.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li><b>Gán</b> — <code>b = a</code> — chép 0 tầng, chỉ thêm một cái tên.</li>
+    <li><b>Shallow copy</b> — <code>a[:]</code>, <code>list(a)</code>, <code>copy.copy(a)</code> — chép đúng một tầng.</li>
+    <li><b>Deep copy</b> — <code>copy.deepcopy(a)</code> — chép đệ quy xuống tận đáy.</li>
+    <li>Dữ liệu <b>phẳng</b> thì shallow copy là đủ; lồng nhau mới cần cân nhắc.</li>
+  </ul>
+
+  <details class="deep"><summary>Khi nào <code>deepcopy</code> là lựa chọn sai</summary>
+  <div class="body">
+    <p>Nó chậm và tốn bộ nhớ, ném lỗi với object không sao chép được — kết nối đang mở, khoá, socket — và nó chép cả những thứ bạn <em>muốn</em> dùng chung, chẳng hạn một config toàn cục hay một model đã nạp.</p>
+    <p>Với dữ liệu lồng nhau, thường tốt hơn là thiết kế bất biến: dùng <code>tuple</code>, dataclass đóng băng, hoặc trả về object mới thay vì sửa tại chỗ. Khi ô MUTABLE của bản đồ đã đóng thì không còn ai cần chép để tự vệ nữa.</p>
+  </div></details>
+</section>
+
+<section id="memory-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Truyền tham số</h2></div>
+
+  <p class="key">Không phải <em>by value</em>, cũng không phải <em>by reference</em>. Tham số chỉ là một cái tên mới dán lên object cũ — nên mục 03 lặp lại nguyên vẹn bên trong thân hàm.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 252" role="img" aria-label="Bản đồ sáng hai ô tên và object; bên phải f1 sửa object nên người gọi thấy, f2 gán lại tên cục bộ nên người gọi không thấy">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="150" y="47" fill="var(--muted)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--rule)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--rule)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--probe)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--filled)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="185" fill="var(--muted)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--muted)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="14" y="233" fill="var(--muted)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--muted)">cách duy nhất tách hai tên ra hai object</text>
+<path d="M304 112 H 328 V 100 H 348" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+<polygon points="356,100 348,95.8 348,104.2" fill="var(--probe)"/>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">THAM SỐ CHỈ LÀ MỘT CÁI TÊN MỚI DÁN LÊN OBJECT CŨ</text>
+<rect x="360" y="30" width="500" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-l" x="610" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2, 3]</text>
+<rect x="360" y="68" width="240" height="118" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="374" y="88" fill="var(--tomb)">def f1(lst): lst.append(4)</text>
+<text class="sv-d" x="374" y="108" fill="var(--muted)">SỬA object</text>
+<rect x="374" y="118" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="394" y="133" fill="var(--probe)" text-anchor="middle">a</text>
+<rect x="430" y="118" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="450" y="133" fill="var(--probe)" text-anchor="middle">lst</text>
+<line x1="472" y1="129" x2="500" y2="129" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="508,129 500,124.8 500,133.2" fill="var(--tomb)"/>
+<rect x="512" y="118" width="76" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="550" y="133" fill="var(--tomb)" text-anchor="middle">[1,2,3,4]</text>
+<text class="sv-d" x="374" y="160" fill="var(--tomb)">người gọi THẤY thay đổi</text>
+<text class="sv-d" x="374" y="176" fill="var(--muted)">by value thì việc này không xảy ra được</text>
+<rect x="620" y="68" width="240" height="118" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="634" y="88" fill="var(--ok)">def f2(lst): lst = [9, 9]</text>
+<text class="sv-d" x="634" y="108" fill="var(--muted)">GÁN LẠI tên cục bộ</text>
+<rect x="634" y="118" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="654" y="133" fill="var(--probe)" text-anchor="middle">a</text>
+<rect x="690" y="118" width="40" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="710" y="133" fill="var(--probe)" text-anchor="middle">lst</text>
+<line x1="732" y1="129" x2="756" y2="129" stroke="var(--ok)" stroke-width="1.2"/><polygon points="764,129 756,124.8 756,133.2" fill="var(--ok)"/>
+<rect x="768" y="118" width="76" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="806" y="133" fill="var(--ok)" text-anchor="middle">[9, 9]</text>
+<text class="sv-d" x="634" y="160" fill="var(--ok)">người gọi KHÔNG thấy gì</text>
+<text class="sv-d" x="634" y="176" fill="var(--muted)">by reference thật thì phải đổi được a</text>
+<text class="sv-d" x="360" y="214" fill="var(--probe)">Không phải by value, cũng không phải by reference &#8212; tên gọi đúng là PASS BY ASSIGNMENT.</text>
+<text class="sv-d" x="360" y="234" fill="var(--muted)">Đúng hai thao tác ở mục 03, lặp lại nguyên vẹn bên trong thân hàm.</text>
+</svg>
+<figcaption>Hai hàm, cùng một đối số. <code>f1</code> đi theo nhánh <b>sửa object</b> nên người gọi thấy; <code>f2</code> đi theo nhánh <b>gán lại tên</b> nên không.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li>Hàm <b>sửa object</b> thì người gọi thấy — <code>lst.append(4)</code>.</li>
+    <li>Hàm <b>gán lại tên</b> thì người gọi không thấy — <code>lst = [9, 9]</code>.</li>
+    <li>Tên đúng của cơ chế này là <b>pass by assignment</b>.</li>
+  </ul>
+
+  <details class="deep"><summary>Quy tắc thực dụng khi viết hàm</summary>
+  <div class="body">
+    <p>Chọn <b>một</b> trong hai nhánh và ghi rõ vào tên hàm: hoặc trả về object mới — <code>sorted(x)</code>, <code>x.upper()</code> — hoặc sửa tại chỗ rồi trả <code>None</code> — <code>x.sort()</code>, <code>x.append()</code>. Đừng làm cả hai trong một hàm.</p>
+    <p>Thư viện chuẩn tuân theo quy ước này rất nhất quán, và đó là chủ ý: hàm sửa tại chỗ không trả về gì để bạn <b>không viết được</b> <code>y = x.sort()</code> rồi tưởng mình có bản mới. Lỗi bị chặn ngay lúc viết thay vì lúc chạy.</p>
+  </div></details>
+</section>
+
+<section id="memory-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Lab: theo dõi tham chiếu</h2></div>
+
+  <p class="key">Chạy từng dòng và xem tên nào trỏ tới object nào. Hai tên <em>cùng màu</em> là cùng một object.</p>
+
   <div class="lab">
     <div class="bar">
       <div><label>kịch bản</label>
@@ -244,214 +614,107 @@ t                     <span class="cm"># (1, [2, 3, 4])</span>
     </div>
     <div id="mview2"></div>
     <div class="steps" id="mlog2"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Kịch bản <strong>nhân bản list</strong> là cái đáng chạy nhất: <code>[[0]*3]*3</code> trông như ma trận 3×3 nhưng thực chất chỉ có <strong>một</strong> dòng, được trỏ tới ba lần. Sửa một ô là ba dòng cùng đổi.
-    </p>
   </div>
-</section>
 
-<section id="memory-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Gán, shallow copy, deep copy</h2></div>
-<div class="stack">
-    <div class="s"><b>Gán — <code>b = a</code></b><span>không sao chép gì cả, chỉ thêm một cái tên</span></div>
-    <div class="s warn"><b>Shallow copy — <code>a[:]</code> · <code>list(a)</code> · <code>copy.copy(a)</code></b><span>chép lớp ngoài; các object bên trong vẫn <b>dùng chung</b></span></div>
-    <div class="s ok"><b>Deep copy — <code>copy.deepcopy(a)</code></b><span>chép đệ quy toàn bộ, không dùng chung gì</span></div>
-  </div>
-<pre><code><span class="kw">import</span> copy
-a = [[<span class="st">1</span>, <span class="st">2</span>], [<span class="st">3</span>, <span class="st">4</span>]]
-
-b = a[:]                    <span class="cm"># shallow</span>
-b[<span class="st">0</span>].append(<span class="st">99</span>)            <span class="cm"># sửa list BÊN TRONG</span>
-a                           <span class="cm"># [[1, 2, 99], [3, 4]]  ← a bị ảnh hưởng!</span>
-
-c = copy.deepcopy(a)
-c[<span class="st">0</span>].append(<span class="st">88</span>)
-a                           <span class="cm"># không đổi — c hoàn toàn độc lập</span></code></pre>
-  <div class="note">
-    <h4>Khi nào deepcopy là sai lựa chọn</h4>
-    Nó chậm và tốn bộ nhớ, có thể lỗi với object không sao chép được (kết nối mở, khoá, socket), và nó sao chép cả những thứ bạn <em>muốn</em> dùng chung. Với dữ liệu lồng nhau, thường tốt hơn là thiết kế bất biến — dùng tuple, dataclass đóng băng, hoặc tạo object mới thay vì sửa tại chỗ.
-  </div>
-</section>
-
-<section id="memory-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Truyền tham số — không phải by value cũng không phải by reference</h2></div>
-  <p>Python truyền theo cách gọi là <em>pass by assignment</em>: tham số trong hàm là một cái tên mới, được dán lên cùng object mà người gọi truyền vào.</p>
-<pre><code><span class="kw">def</span> f1(lst):
-    lst.append(<span class="st">4</span>)       <span class="cm"># SỬA object → người gọi thấy</span>
-
-<span class="kw">def</span> f2(lst):
-    lst = [<span class="st">9</span>, <span class="st">9</span>]        <span class="cm"># GÁN LẠI tên cục bộ → người gọi KHÔNG thấy</span>
-
-a = [<span class="st">1</span>, <span class="st">2</span>, <span class="st">3</span>]
-f1(a); a              <span class="cm"># [1, 2, 3, 4]</span>
-f2(a); a              <span class="cm"># [1, 2, 3, 4] — không đổi thêm</span></code></pre>
-  <div class="cmp two">
-    <div><h5><code>f1</code> — sửa object</h5>
-      <p>Tên trong hàm và tên người gọi trỏ <b>cùng một object</b></p>
-      <p>Sửa object đó → người gọi thấy</p>
-      <p>Nếu là <em>by value</em> thì việc này không xảy ra</p></div>
-    <div><h5><code>f2</code> — gán lại tên</h5>
-      <p>Gán chỉ dán <b>tên cục bộ</b> lên một object khác</p>
-      <p>Object của người gọi không hề đụng tới</p>
-      <p>Nếu là <em>by reference</em> đúng nghĩa thì việc này phải đổi được biến người gọi</p></div>
-  </div>
-  <div class="note key">
-    <h4>Quy tắc thực dụng khi viết hàm</h4>
-    Chọn một trong hai và ghi rõ vào tên hàm: <strong>trả về object mới</strong> (<code>sorted(x)</code>, <code>x.upper()</code>) hoặc <strong>sửa tại chỗ và trả về <code>None</code></strong> (<code>x.sort()</code>, <code>x.append()</code>). Thư viện chuẩn của Python tuân theo quy ước này rất nhất quán — hàm sửa tại chỗ không trả về gì, để bạn không viết được <code>y = x.sort()</code> rồi tưởng có bản mới.
-  </div>
-</section>
-
-<section id="memory-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Lỗi hay gặp</h2></div>
-  <p class="key">Bốn bẫy dưới đây <em>đều mọc ra từ đúng một câu</em> ở mục 01: gán chỉ dán tên, không sao chép.</p>
-  <h3>1. Đối số mặc định khả biến</h3>
-<pre><code><span class="kw">def</span> add(x, out=[]):       <span class="cm">← list này tạo MỘT LẦN, lúc định nghĩa hàm</span>
-    out.append(x)
-    <span class="kw">return</span> out
-
-add(<span class="st">1</span>)                    <span class="cm"># [1]</span>
-add(<span class="st">2</span>)                    <span class="cm"># [1, 2]  ← không phải [2]</span>
-
-<span class="kw">def</span> add(x, out=<span class="kw">None</span>):     <span class="cm"># cách đúng</span>
-    <span class="kw">if</span> out <span class="kw">is</span> <span class="kw">None</span>: out = []
-    out.append(x); <span class="kw">return</span> out</code></pre>
-  <p>Giá trị mặc định được lượng giá <strong>một lần duy nhất khi hàm được định nghĩa</strong>, không phải mỗi lần gọi. Cùng nguyên nhân với bẫy <code>lambda i=i</code> ở bài decorator.</p>
-  <h3>2. Nhân bản list lồng nhau</h3>
-<pre><code>grid = [[<span class="st">0</span>] * <span class="st">3</span>] * <span class="st">3</span>       <span class="cm"># 3 tham chiếu tới CÙNG một dòng</span>
-grid[<span class="st">0</span>][<span class="st">0</span>] = <span class="st">1</span>
-grid                      <span class="cm"># [[1,0,0], [1,0,0], [1,0,0]]  ← cả ba đổi</span>
-
-grid = [[<span class="st">0</span>] * <span class="st">3</span> <span class="kw">for</span> _ <span class="kw">in</span> <span class="kw">range</span>(<span class="st">3</span>)]   <span class="cm"># đúng: mỗi dòng một list riêng</span></code></pre>
-  <h3>3. Sửa list trong lúc đang duyệt nó</h3>
-<pre><code>a = [<span class="st">1</span>, <span class="st">2</span>, <span class="st">3</span>, <span class="st">4</span>]
-<span class="kw">for</span> x <span class="kw">in</span> a:
-    <span class="kw">if</span> x % <span class="st">2</span> == <span class="st">0</span>: a.remove(x)
-a                         <span class="cm"># [1, 3] có vẻ đúng, nhưng với [1,2,4,5] thì sai</span>
-
-a = [x <span class="kw">for</span> x <span class="kw">in</span> a <span class="kw">if</span> x % <span class="st">2</span>]     <span class="cm"># tạo list mới — luôn an toàn</span></code></pre>
-  <p>Xoá phần tử làm các chỉ số phía sau dịch lên, nên iterator nhảy qua một phần tử. Với <code>dict</code> và <code>set</code> thì Python thẳng thắn ném <code>RuntimeError</code>; với <code>list</code> thì nó âm thầm cho ra kết quả sai — nguy hiểm hơn.</p>
-  <h3>4. Dùng object khả biến làm khoá</h3>
-<pre><code>d = {}
-k = [<span class="st">1</span>, <span class="st">2</span>]
-d[k] = <span class="st">"x"</span>               <span class="cm"># TypeError: unhashable type: 'list'</span>
-d[<span class="kw">tuple</span>(k)] = <span class="st">"x"</span>        <span class="cm"># được — tuple hashable</span></code></pre>
-  <p>Python chặn từ đầu vì nếu khoá đổi giá trị sau khi lưu thì hash đổi theo, và dict sẽ đi tìm ở ô mới trong khi dữ liệu nằm ở ô cũ. Chi tiết đầy đủ nằm ở bài <em>Python dict &amp; hash table</em>.</p>
-  <div class="grid2">
-    <div class="card bad"><h4>Tưởng <code>b = a</code> là sao chép</h4><p>Sửa <code>b</code> làm đổi cả <code>a</code>. Bug thường xuất hiện xa chỗ gán nên rất khó truy.</p></div>
-    <div class="card bad"><h4>Shallow copy cho dữ liệu lồng nhau</h4><p><code>a[:]</code> chỉ chép lớp ngoài, không bảo vệ được các list bên trong.</p></div>
-    <div class="card bad"><h4>Dùng <code>is</code> để so số hoặc chuỗi</h4><p>Đúng trong test nhờ interning, sai trên production. Xem mục 09.</p></div>
-  </div>
+  <ul class="why">
+    <li>Bốn kịch bản là bốn ô của bản đồ, chạy thật thay vì đọc.</li>
+    <li>Đáng chạy nhất là <b>nhân bản list</b>: <code>[[0]*3]*3</code> trông như ma trận 3&#215;3.</li>
+    <li>Thật ra chỉ có <b>một</b> dòng, được trỏ tới ba lần — sửa một ô là ba dòng cùng đổi.</li>
+  </ul>
 </section>
 
 <section id="memory-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Interning — vì sao <code>a is b</code> có lúc True</h2></div>
-<pre><code>a = <span class="st">256</span>; b = <span class="st">256</span>
-a <span class="kw">is</span> b            <span class="cm"># True  — int nhỏ được cache sẵn</span>
+  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
 
-a = <span class="st">257</span>; b = <span class="st">257</span>
-a <span class="kw">is</span> b            <span class="cm"># False trong REPL — hai object khác nhau</span>
+  <p class="key">Bốn bẫy dưới đây <em>đều mọc ra từ đúng một câu</em> ở mục 01: gán chỉ dán tên, không sao chép.</p>
 
-a = <span class="st">"hello"</span>; b = <span class="st">"hello"</span>
-a <span class="kw">is</span> b            <span class="cm"># True  — chuỗi giống định danh được intern</span>
+<figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="Bản đồ sáng cả bốn ô; bên phải bốn bẫy quen thuộc, mỗi bẫy gắn với một ô của bản đồ và một cách sửa">
+<text class="sv-hv" x="0" y="18">BẢN ĐỒ</text>
+<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
+<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
+<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="95" fill="var(--probe)">TÊN</text>
+<text class="sv-d" x="14" y="112" fill="var(--dim)">a &#183; b &#183; đối số</text>
+<text class="sv-d" x="14" y="129" fill="var(--dim)">gán lại tên</text>
+<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">trỏ tới</text>
+<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
+<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="190" y="95" fill="var(--filled)">OBJECT</text>
+<text class="sv-d" x="190" y="112" fill="var(--dim)">giá trị thật</text>
+<text class="sv-d" x="190" y="129" fill="var(--dim)">sửa nội dung</text>
+<path d="M238 140 V 152" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="185" fill="var(--tomb)">MUTABLE hay không</text>
+<text class="sv-s" x="14" y="201" fill="var(--dim)">immutable &#8594; khoá nhánh sửa object</text>
+<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="233" fill="var(--ok)">SAO CHÉP</text>
+<text class="sv-s" x="14" y="249" fill="var(--dim)">cách duy nhất tách hai tên ra hai object</text>
+<text class="sv-hv" x="360" y="22" fill="var(--muted)">BỐN BẪY &#8212; MỖI BẪY LÀ MỘT Ô CỦA BẢN ĐỒ BỊ ĐỌC SAI</text>
+<rect x="360" y="34" width="500" height="52" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="376" y="55" fill="var(--tomb)">def add(x, out=[])</text>
+<text class="sv-hv" x="700" y="55" fill="var(--muted)">ô MỘT DÒNG CODE</text>
+<text class="sv-d" x="376" y="73" fill="var(--muted)">list mặc định tạo MỘT LẦN lúc định nghĩa hàm &#8594; dùng out=None</text>
+<rect x="360" y="94" width="500" height="52" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-l" x="376" y="115" fill="var(--filled)">grid = [[0] * 3] * 3</text>
+<text class="sv-hv" x="700" y="115" fill="var(--muted)">ô OBJECT</text>
+<text class="sv-d" x="376" y="133" fill="var(--muted)">ba tham chiếu tới CÙNG một dòng &#8594; dùng [[0]*3 for _ in range(3)]</text>
+<rect x="360" y="154" width="500" height="52" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-l" x="376" y="175" fill="var(--probe)">for x in a: a.remove(x)</text>
+<text class="sv-hv" x="700" y="175" fill="var(--muted)">ô TÊN</text>
+<text class="sv-d" x="376" y="193" fill="var(--muted)">xoá làm chỉ số dịch, iterator nhảy cóc &#8594; tạo list mới bằng comprehension</text>
+<rect x="360" y="214" width="500" height="52" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-l" x="376" y="235" fill="var(--ok)">d[[1, 2]] = &quot;x&quot;</text>
+<text class="sv-hv" x="700" y="235" fill="var(--muted)">ô MUTABLE</text>
+<text class="sv-d" x="376" y="253" fill="var(--muted)">khoá đổi thì hash đổi theo &#8594; dict chỉ nhận khoá immutable, dùng tuple</text>
+<text class="sv-d" x="360" y="288" fill="var(--ok)">Cả bốn mọc ra từ đúng một câu: gán dán tên, không sao chép.</text>
+</svg>
+<figcaption>Bốn bẫy kinh điển, mỗi cái là một ô của bản đồ bị đọc sai. Cột phải là cách sửa — ngắn tới mức thuộc được.</figcaption>
+</figure>
 
-a = <span class="st">"hello world"</span>; b = <span class="st">"hello world"</span>
-a <span class="kw">is</span> b            <span class="cm"># thường False — có dấu cách nên không intern</span></code></pre>
-  <p>CPython cache sẵn các số nguyên nhỏ từ −5 tới 256 và intern những chuỗi trông giống tên biến, để tiết kiệm bộ nhớ và tăng tốc so sánh. Đây là <strong>chi tiết cài đặt</strong>, không phải đặc tả ngôn ngữ.</p>
-  <div class="note warn">
-    <h4>Bài học duy nhất cần rút ra</h4>
-    <strong>Không bao giờ dùng <code>is</code> để so sánh giá trị.</strong> Nó có thể đúng trong lúc test rồi sai trên production, vì hành vi intern phụ thuộc phiên bản, phụ thuộc việc code nằm trong một hàm hay ở cấp module. Chỉ dùng <code>is</code> cho <code>None</code>, <code>True</code>, <code>False</code> và các sentinel do bạn tự tạo.
-  </div>
+  <ul class="why">
+    <li>Đối số mặc định lượng giá <b>một lần</b> lúc định nghĩa hàm, không phải mỗi lần gọi.</li>
+    <li><code>[[0]*3]*3</code> nhân <b>tham chiếu</b>, không nhân dữ liệu.</li>
+    <li>Xoá trong lúc duyệt: <code>dict</code> ném <code>RuntimeError</code>, <code>list</code> âm thầm sai — nguy hơn.</li>
+    <li>Khoá phải immutable, vì khoá đổi thì hash đổi và dict đi tìm nhầm ô.</li>
+  </ul>
+
+  <p class="stripnote"><span>vì sao dict bắt khoá phải hashable</span><span>đọc <a href="../../03-builtin-structures/dict-hash-table/index.html"><em>Python dict &amp; hash table</em></a></span></p>
 </section>
 
 <section id="memory-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Tổng kết một hình</h2></div>
+  <div class="sh"><b>10</b><h2>Hỏi đáp</h2></div>
 
-  <p class="key">Cả bài chỉ là một câu nhìn từ bốn phía: <em>tên và object là hai thứ khác nhau</em> — gán động tới tên, sửa động tới object.</p>
+  <p class="key">Tám câu hay gặp nhất. Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 396" role="img" aria-label="Gán lại tên so với sửa object, ba mức sao chép, truyền tham số, và ranh giới mutable">
-
-      <text class="sv-h" x="8" y="16">&#9312; HAI THAO TÁC KHÁC HẲN NHAU TRÊN CÙNG MỘT DÒNG CODE</text>
-      <text class="sv-l" x="8" y="36" fill="#A8BEF6">a</text>
-      <text class="sv-l" x="8" y="54" fill="#A8BEF6">b</text>
-      <path d="M26 32 L96 42" stroke="#8CA9F2"/><path d="M96 42 l-8 -2 v6 z" fill="#8CA9F2"/>
-      <path d="M26 50 L96 46" stroke="#8CA9F2"/><path d="M96 46 l-8 -3 v6 z" fill="#8CA9F2"/>
-      <rect x="100" y="30" width="120" height="28" rx="4" fill="rgba(140,169,242,.12)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="112" y="49" fill="#A8BEF6">[1, 2]</text>
-      <text class="sv-d" x="100" y="74" fill="#7A6F63">một object, hai cái tên</text>
-
-      <rect x="266" y="24" width="270" height="52" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="278" y="43" fill="#EDB44A">b = [9] &#8212; gán lại tên</text>
-      <text class="sv-l" x="278" y="60">chỉ b đổi chỗ &#183; a vẫn là [1, 2]</text>
-      <rect x="552" y="24" width="296" height="52" rx="5" fill="rgba(242,113,138,.10)" stroke="#F2718A"/>
-      <text class="sv-t" x="564" y="43" fill="#F79BAB">b[0] = 9 &#183; b.append(9) &#8212; sửa object</text>
-      <text class="sv-l" x="564" y="60">mọi tên trỏ tới nó đều thấy &#183; a thành [9, 2]</text>
-      <text class="sv-l" x="8" y="94">toán tử += đứng giữa hai cột: với list là sửa tại chỗ, với tuple và số là tạo object mới rồi gán lại tên</text>
-
-      <text class="sv-h" x="8" y="124">&#9313; BA MỨC SAO CHÉP &#8212; CHÉP TỚI ĐÂU THÌ ĐỘC LẬP TỚI ĐÓ</text>
-      <rect x="8" y="134" width="270" height="46" rx="5" fill="rgba(242,113,138,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="20" y="152" fill="#F79BAB">b = a</text>
-      <text class="sv-l" x="20" y="170">không chép gì &#183; thêm một cái tên</text>
-      <rect x="290" y="134" width="270" height="46" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="302" y="152" fill="#EDB44A">list(a) &#183; a[:] &#183; copy.copy(a)</text>
-      <text class="sv-l" x="302" y="170">chép lớp ngoài &#183; bên trong vẫn dùng chung</text>
-      <rect x="572" y="134" width="276" height="46" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="584" y="152" fill="#8EE0BE">copy.deepcopy(a)</text>
-      <text class="sv-l" x="584" y="170">chép đệ quy &#183; chậm, có thứ không chép được</text>
-
-      <text class="sv-h" x="8" y="212">&#9314; TRUYỀN THAM SỐ &#8212; PASS BY ASSIGNMENT</text>
-      <rect x="8" y="222" width="418" height="58" rx="5" fill="rgba(140,169,242,.06)" stroke="#3D352C"/>
-      <text class="sv-t" x="20" y="240" fill="#F79BAB">def f1(lst): lst.append(4)</text>
-      <text class="sv-l" x="20" y="257">sửa object &#8594; người gọi thấy</text>
-      <text class="sv-d" x="20" y="271" fill="#7A6F63">nếu là by value thì việc này không xảy ra được</text>
-      <rect x="438" y="222" width="410" height="58" rx="5" fill="rgba(140,169,242,.06)" stroke="#3D352C"/>
-      <text class="sv-t" x="450" y="240" fill="#EDB44A">def f2(lst): lst = [9, 9]</text>
-      <text class="sv-l" x="450" y="257">gán lại tên cục bộ &#8594; người gọi không thấy</text>
-      <text class="sv-d" x="450" y="271" fill="#7A6F63">nếu là by reference thì việc này phải đổi được biến người gọi</text>
-
-      <text class="sv-h" x="8" y="312">&#9315; RANH GIỚI MUTABLE</text>
-      <rect x="8" y="322" width="404" height="42" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="20" y="340" fill="#8EE0BE">Immutable</text>
-      <text class="sv-l" x="106" y="340">int float bool str bytes tuple frozenset None</text>
-      <text class="sv-d" x="20" y="357" fill="#7A6F63">tuple chỉ khoá danh sách tham chiếu &#8212; list bên trong vẫn sửa được</text>
-      <rect x="424" y="322" width="424" height="42" rx="5" fill="rgba(242,113,138,.10)" stroke="#F2718A"/>
-      <text class="sv-t" x="436" y="340" fill="#F79BAB">Mutable</text>
-      <text class="sv-l" x="512" y="340">list dict set bytearray, và phần lớn class tự viết</text>
-      <text class="sv-d" x="436" y="357" fill="#7A6F63">chỉ những kiểu này mới làm &#9312; cột phải và &#9314; cột trái xảy ra</text>
-      <line x1="8" y1="374" x2="852" y2="374" stroke="#2E2822"/>
-      <text class="sv-l" x="8" y="388">is hỏi &#8220;cùng object không&#8221; &#8212; đúng câu hỏi của cột trái &#9312;, nên chỉ dùng cho None và sentinel</text>
-    </svg>
-    <figcaption>Đọc theo số: một dòng code có thể động tới tên hoặc động tới object &#9312;, muốn tách hẳn hai bên phải chép và chép tới mức nào là chọn &#9313;, hàm cũng chỉ là một cái tên mới dán lên object cũ &#9314;, và ranh giới mutable quyết định ba phần trên có xảy ra hay không &#9315;.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><strong>Gán là dán tên, không phải sao chép.</strong> Cần bản độc lập thì <code>list(a)</code> cho một tầng, <code>deepcopy</code> cho mọi tầng.</li>
-    <li><strong>Đừng để mặc định là object khả biến.</strong> Dùng <code>None</code> rồi khởi tạo trong thân hàm — &#9312; cột phải chỉ chạy một lần.</li>
-    <li><strong>Một hàm chọn một phong cách:</strong> trả object mới, hoặc sửa tại chỗ rồi trả <code>None</code>. Đừng trộn hai cột của &#9314;.</li>
-    <li><strong><code>is</code> chỉ dành cho <code>None</code> và sentinel.</strong> Mọi so sánh giá trị dùng <code>==</code>.</li>
-  </ul>
-
-  <p class="stripnote"><span>còn một câu chưa trả lời: <em>object hết được trỏ tới thì biến mất lúc nào</em></span><span>đọc tiếp <a href="../memory-management-gc/index.html"><em>Memory management &amp; GC</em></a></span></p>
-</section>
-
-<section id="memory-s11" class="lesson">
-  <div class="sh"><b>11</b><h2>Hỏi đáp</h2></div>
+  <details class="qa"><summary>Biến trong Python là gì?</summary>
+  <p>Là một <b>cái tên</b> nằm trong namespace, giữ địa chỉ của một object trên heap — không phải một ô nhớ chứa giá trị. Nên <code>b = a</code> chỉ chép địa chỉ: hai tên, một object, <code>id(a) == id(b)</code> trả về <code>True</code>. Toàn bộ hành vi còn lại của bài suy ra từ đúng câu này.</p></details>
 
   <details class="qa"><summary>Python truyền tham số theo giá trị hay theo tham chiếu?</summary>
-  <p>Cả hai đều không chính xác. Python truyền theo cách gọi là <em>pass by assignment</em>: tham số trong hàm là một tên mới được dán lên cùng object mà người gọi truyền vào. Nên nếu hàm <b>sửa</b> object khả biến thì người gọi thấy; nếu hàm <b>gán lại</b> tên đó thì người gọi không thấy. Đó là lý do <code>lst.append(4)</code> ảnh hưởng ra ngoài còn <code>lst = [9]</code> thì không.</p></details>
+  <p>Cả hai đều không chính xác. Tên gọi đúng là <em>pass by assignment</em>: tham số trong hàm là một tên mới được dán lên cùng object mà người gọi truyền vào. Nên nếu hàm <b>sửa</b> object khả biến thì người gọi thấy; nếu hàm <b>gán lại</b> tên đó thì người gọi không thấy. Đó là lý do <code>lst.append(4)</code> ảnh hưởng ra ngoài còn <code>lst = [9]</code> thì không.</p></details>
+
+  <details class="qa"><summary>Mutable và immutable khác nhau thế nào?</summary>
+  <p>Mutable là object <b>sửa được ruột tại chỗ</b> — <code>list</code>, <code>dict</code>, <code>set</code>, <code>bytearray</code>. Immutable thì không: <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>bytes</code>, <code>tuple</code>, <code>frozenset</code>, <code>None</code>. Với immutable, mọi thao tác trông như "sửa" thật ra tạo object mới rồi gán lại tên, nên các tên khác không bao giờ bị ảnh hưởng.</p></details>
+
+  <details class="qa"><summary><code>tuple</code> là immutable, vậy sao <code>t[1].append(4)</code> vẫn chạy?</summary>
+  <p>Vì immutable ở đây là <b>nông</b>. Tuple chỉ đảm bảo <em>danh sách tham chiếu</em> nó giữ không đổi — không thể thay phần tử thứ <em>i</em> sang object khác. Nhưng bản thân các object được trỏ tới thì nó không quản, nên list nằm bên trong vẫn sửa được như thường. Hệ quả trực tiếp: <code>hash(t)</code> ném <code>TypeError</code> vì tuple đó không thật sự bất biến.</p></details>
 
   <details class="qa"><summary>Khác biệt giữa shallow copy và deep copy?</summary>
-  <p>Shallow copy — <code>a[:]</code>, <code>list(a)</code>, <code>copy.copy</code> — tạo container mới nhưng các object bên trong vẫn dùng chung, nên sửa một list lồng bên trong vẫn ảnh hưởng bản gốc. Deep copy sao chép đệ quy toàn bộ nên hoàn toàn độc lập, đổi lại chậm hơn, tốn bộ nhớ hơn, và có thể lỗi với object không sao chép được như socket hay khoá. Với dữ liệu lồng nhau tôi thường ưu tiên thiết kế bất biến hơn là deepcopy.</p></details>
+  <p>Shallow copy — <code>a[:]</code>, <code>list(a)</code>, <code>copy.copy</code> — tạo container mới nhưng các object bên trong vẫn dùng chung, nên sửa một list lồng bên trong vẫn ảnh hưởng bản gốc. Deep copy chép đệ quy toàn bộ nên hoàn toàn độc lập, đổi lại chậm hơn, tốn bộ nhớ hơn, và có thể lỗi với object không sao chép được như socket hay khoá.</p></details>
 
   <details class="qa"><summary>Vì sao không nên dùng list làm giá trị mặc định của tham số?</summary>
   <p>Vì giá trị mặc định được lượng giá <b>một lần duy nhất khi hàm được định nghĩa</b>, không phải mỗi lần gọi. Nên mọi lần gọi đều dùng lại cùng một list và dữ liệu tích luỹ giữa các lần gọi — một bug rất khó tìm vì hàm trông hoàn toàn bình thường. Cách chuẩn là mặc định <code>None</code> rồi khởi tạo trong thân hàm.</p></details>
 
-  <details class="qa"><summary>is và == khác nhau thế nào, khi nào dùng is?</summary>
-  <p><code>==</code> so giá trị qua <code>__eq__</code>; <code>is</code> so danh tính, tức có phải cùng một object trong bộ nhớ. Chỉ dùng <code>is</code> cho <code>None</code>, <code>True</code>, <code>False</code> và sentinel do mình tạo — vì đó là những object duy nhất. Không dùng <code>is</code> để so số hay chuỗi: nó có thể trả về True nhờ interning của CPython nhưng đó là chi tiết cài đặt, thay đổi theo phiên bản và theo ngữ cảnh code.</p></details>
+  <details class="qa"><summary><code>is</code> và <code>==</code> khác nhau thế nào, khi nào dùng <code>is</code>?</summary>
+  <p><code>==</code> so giá trị qua <code>__eq__</code>; <code>is</code> so danh tính, tức có phải cùng một object trong bộ nhớ. Chỉ dùng <code>is</code> cho <code>None</code>, <code>True</code>, <code>False</code> và sentinel do mình tạo — vì đó là những object duy nhất. Không dùng <code>is</code> để so số hay chuỗi: nó có thể trả về <code>True</code> nhờ interning của CPython nhưng đó là chi tiết cài đặt, thay đổi theo phiên bản và theo ngữ cảnh code.</p></details>
 
+  <details class="qa"><summary><code>+=</code> trên list và trên tuple khác nhau chỗ nào?</summary>
+  <p>Với list, <code>b += [9]</code> gọi <code>__iadd__</code> và sửa tại chỗ — giống <code>extend</code>, nên mọi tên trỏ vào cái list đó đều thấy thay đổi. Với tuple, số hay chuỗi thì không có <code>__iadd__</code>, Python quay về <code>__add__</code>: tạo object mới rồi gán lại tên, các tên khác không đổi. Cùng một toán tử, hai nhánh khác nhau, chọn theo kiểu dữ liệu.</p></details>
 </section>
 
-<footer>Deep dive · mô hình bộ nhớ &amp; mutability · bài tiếp theo: <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>.</footer>
+<footer>Deep dive · memory model &amp; mutability · bài tiếp theo: <a href="../memory-management-gc/index.html">Memory management &amp; GC</a> · kiểm trên CPython 3.12, 64-bit.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>

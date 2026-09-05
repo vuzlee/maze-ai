@@ -48,7 +48,8 @@
 
 <section id="constraint-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Bốn loại ràng buộc</h2></div>
-  <p>Ràng buộc (constraint) là luật database tự kiểm tra ở mọi <code>INSERT</code>/<code>UPDATE</code> — vi phạm thì câu lệnh bị từ chối trước khi dữ liệu sai kịp ghi xuống. Không phụ thuộc ứng dụng nào gọi vào, không thể "quên gọi validate".</p>
+  <p class="key">Ràng buộc (constraint) là luật database <em>tự</em> kiểm tra ở mọi <code>INSERT</code>/<code>UPDATE</code>: vi phạm thì câu lệnh bị từ chối trước khi dữ liệu sai kịp ghi xuống.</p>
+  <p>Không phụ thuộc ứng dụng nào gọi vào, nên không thể "quên gọi validate".</p>
   <div class="stack">
     <div class="s"><b><code>NOT NULL</code></b><span>cột bắt buộc có giá trị · <code>email TEXT NOT NULL</code></span></div>
     <div class="s"><b><code>UNIQUE</code></b><span>không hai dòng nào trùng giá trị ở cột này · <code>email TEXT UNIQUE</code></span></div>
@@ -73,7 +74,7 @@
 
 <section id="constraint-s2" class="lesson">
   <div class="sh"><b>02</b><h2>NULL cư xử ra sao</h2></div>
-  <p>SQL dùng logic ba giá trị (three-valued logic): mọi biểu thức boolean trả về <code>TRUE</code>, <code>FALSE</code>, hoặc <code>UNKNOWN</code> — không phải chỉ hai giá trị như hầu hết ngôn ngữ lập trình.</p>
+  <p>SQL dùng <b>logic ba giá trị</b> (three-valued logic): mọi biểu thức boolean trả về <code>TRUE</code>, <code>FALSE</code>, hoặc <code>UNKNOWN</code> — không phải hai như hầu hết ngôn ngữ.</p>
 <div class="strip">
     <div class="c on"><i>NULL = NULL</i><b>UNKNOWN</b><u>không phải TRUE</u></div>
     <div class="c on"><i>NULL = 5</i><b>UNKNOWN</b><u>không so sánh được</u></div>
@@ -83,7 +84,12 @@
     <div class="c on"><i>TRUE AND UNKNOWN</i><b>UNKNOWN</b><u>chưa kết luận được</u></div>
     <div class="c f"><i>FALSE AND UNKNOWN</i><b>FALSE</b><u>FALSE áp đảo</u></div>
   </div>
-  <p><code>NULL</code> nghĩa là "giá trị không xác định", không phải "giá trị rỗng" hay "số 0" — vì vậy so sánh hai NULL không cho ra TRUE: không thể khẳng định hai điều không xác định là bằng nhau. Hệ quả trực tiếp: <code>WHERE col = NULL</code> không bao giờ khớp dòng nào, kể cả dòng có <code>col IS NULL</code> — luôn phải dùng <code>IS NULL</code> / <code>IS NOT NULL</code>.</p>
+  <p><code>NULL</code> nghĩa là "giá trị không xác định", không phải "rỗng" hay "số 0".</p>
+  <ul class="why">
+    <li>So sánh hai NULL không ra TRUE: không thể khẳng định hai điều không xác định là bằng nhau.</li>
+    <li><code>WHERE col = NULL</code> vì vậy không bao giờ khớp dòng nào, kể cả dòng có <code>col IS NULL</code>.</li>
+    <li>Luôn phải dùng <code>IS NULL</code> / <code>IS NOT NULL</code>.</li>
+  </ul>
   <div class="note warn">
     <h4>NULL trong UNIQUE</h4>
     Chuẩn SQL và PostgreSQL coi <b>nhiều NULL không vi phạm UNIQUE</b> — vì NULL không bằng chính nó nên không có "trùng" để bắt. Một cột <code>UNIQUE</code> vẫn cho phép chèn bao nhiêu dòng NULL tuỳ ý. Nếu nghiệp vụ cần "tối đa một dòng NULL", phải tự thêm ràng buộc khác (ví dụ unique index có điều kiện, <code>CREATE UNIQUE INDEX ... WHERE col IS NULL</code>).
@@ -114,7 +120,11 @@ CREATE TABLE employees (
 );
 <span class="cm">-- xoá một quản lý → nhân viên dưới quyền không bị xoá theo,
 -- chỉ mất liên kết quản lý (manager_id = NULL)</span></code></pre>
-  <p>Chọn hành vi nào là câu hỏi <b>nghiệp vụ</b>, không phải kỹ thuật: order_items không có lý do tồn tại nếu order của nó biến mất, nên CASCADE hợp lý; nhưng CASCADE giữa product và order_items là sai — xoá một sản phẩm không nên xoá luôn lịch sử đơn hàng đã bán sản phẩm đó.</p>
+  <p>Chọn hành vi nào là câu hỏi <b>nghiệp vụ</b>, không phải kỹ thuật.</p>
+  <ul class="why">
+    <li><code>order_items</code> không có lý do tồn tại nếu order của nó biến mất — CASCADE hợp lý.</li>
+    <li>CASCADE giữa <code>product</code> và <code>order_items</code> thì sai: xoá một sản phẩm không nên xoá luôn lịch sử đơn hàng.</li>
+  </ul>
 </section>
 
 <section id="constraint-s4" class="lesson">
@@ -130,7 +140,11 @@ CREATE TABLE employees (
       <p><b>Bỏ qua được không</b> không — mọi đường ghi dữ liệu đều đi qua nó</p>
       <p><b>Race condition</b> an toàn tự nhiên: kiểm tra ngay lúc ghi, có transaction bảo vệ</p></div>
   </div>
-  <p>Validate ở tầng ứng dụng cho tốc độ phản hồi và thông điệp lỗi thân thiện; ràng buộc ở tầng database cho sự đảm bảo tuyệt đối rằng dữ liệu không bao giờ sai <i>bất kể nó đi vào bằng đường nào</i> — kể cả một job nền, một script one-off, hay một service khác trong tương lai mà tác giả gốc không lường trước.</p>
+  <ul class="why">
+    <li>Validate ở <b>tầng ứng dụng</b> cho phản hồi nhanh và thông điệp lỗi thân thiện.</li>
+    <li>Ràng buộc ở <b>tầng database</b> đảm bảo dữ liệu không bao giờ sai <i>bất kể đi vào bằng đường nào</i>.</li>
+    <li>Kể cả một job nền, một script one-off, hay một service tương lai mà tác giả gốc không lường trước.</li>
+  </ul>
 </section>
 
 <section id="constraint-s5" class="lesson">

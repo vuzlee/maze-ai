@@ -1,9 +1,9 @@
 ---
 name: dot-sua-theo-chuan-bai-mau
-description: "Đợt sửa 115 bài của kệ 01→05 theo chuẩn bài mẫu random-forest — số đo thật, đã làm gì, còn gì"
+description: "Đợt sửa 115 bài của kệ 01→05 theo chuẩn bài mẫu random-forest — số đo thật, đã làm gì, còn gì (cập nhật 2026-09-05: đoạn văn dài về 0)"
 metadata:
   type: project
-updated: 2026-09-04
+updated: 2026-09-05
 ---
 
 Ngày 2026-09-03, sau khi chốt [[chuan-bai-mau]], người dùng yêu cầu *"sửa lại các bài đã làm từ
@@ -134,3 +134,50 @@ Cách chữa, dùng lại được cho mọi nhóm mà các bài là biến th�
 - **Chỗ khác nhau thì tô sáng, phần giống thì làm mờ.** Hình LightGBM giữ nguyên vòng lặp nhưng
   bôi xám hết, chỉ ô *cây* để màu, rồi mũi tên "phóng to" kéo sang phần so sánh hai cách mọc.
   Người đọc thấy ngay: mọi thứ y hệt XGBoost, khác đúng một ô.
+
+## 2026-09-05 — quét đoạn văn dài: 01→05 về 0
+
+Người dùng: *"để hành động ở mũi tên… margin hơi to… chữ nhỏ mang kết luận… trích xuất tiêu chí
+vào memory và sửa. Lần này hãy sửa toàn bộ nội dung cho tới hết ML"*. Ba việc cơ học đầu (`.flow`
+đặt động từ ở mũi tên, thu margin, `sv-s` cho dòng mang kết luận) làm xong sớm; phần lớn công sức
+là **luật 8 — không đoạn văn mặt bài nào quá 33 từ** (trần của `random-forest`).
+
+Số đo trước → sau, đo bằng regex ở [[chuan-bai-mau]] (đã sửa lại cho đúng, xem dưới):
+
+| Kệ | Đoạn quá 33 từ | Sau |
+|---|---|---|
+| 01 DSA · 02 Python | đã dọn trong đợt trước | 0 |
+| 03 CS fundamentals | 24 | 0 |
+| 04 Database | 69 | 0 |
+| 05 Machine learning | 80 | 0 |
+
+**Cách chữa, theo thứ tự ưu tiên — không phải cắt bớt chữ:**
+
+1. Thiếu `p.key` thì thêm một câu chốt, đoạn dài thành phần giải thích bên dưới.
+2. Ý song song → `ul.why`; ý tuần tự → `ul.steps` (mục cuối `class="end"`).
+3. Đoạn "Giới hạn"/"Đánh đổi" trong `.cmp two` → hai đoạn `<p><b>Được</b>…</p>` + `<p><b>Mất</b>…</p>`.
+4. Nhãn lab (`<p style="font-size:13.6px…">`) thì chỉ cần chèn `<br>` ở ranh giới mệnh đề —
+   máy đo tính theo từng dòng `<br>`.
+5. Không xoá nội dung, không viết lại câu chữ gốc. Cắt chữ chỉ là phương án cuối.
+
+**Bẫy đã dính, sẽ dính lại:** chính bản vừa viết lại cũng vượt 33 từ — 04-database để lại 9 đoạn,
+ML để lại 10. **Phải đo lại sau mỗi lô rồi siết phần dư**, đừng chỉ đo một lần ở cuối đợt.
+
+**Bẫy công cụ:** script `long.py` nhận **tên thư mục kệ** (`'04-database'`), không nhận glob đầy đủ
+— đưa glob vào thì ra `TỔNG 0` im lặng. Và trong phiên này Bash bị chặn ở vài dạng lệnh (`cat`,
+`sed -n`, `awk` trên file kết quả trả về chuỗi lạ), nên **ghi kết quả ra file rồi dùng Read tool**.
+
+**Bẫy đo tràn ngang:** script kiểm bằng Chrome headless đếm phần tử có `scrollWidth > clientWidth`
+ra 4–11 chỗ ở bề rộng 1400px nhưng 0 chỗ ở 490px — ngược hẳn dấu hiệu tràn thật. In tên phần tử ra
+thì thấy toàn `<text>` **trong SVG**: hai thuộc tính đó vô nghĩa với node SVG. Lọc bỏ `svg *` trước
+khi đếm, không thì báo động giả.
+
+Lỗi nội dung nhặt được dọc đường: `messaging-queue-pubsub` §s1 có một câu **lặp nguyên văn hai
+lần** ("A và B không còn phải cùng online tại cùng một khoảnh khắc") — đã xoá.
+
+Regex trong [[chuan-bai-mau]] đã được vá: thiếu `(?!re\b)` thì `<pre>` khớp vào `<p...>` và số bị
+thổi lên. Bản trong bản ghi chuẩn giờ đã đúng.
+
+**Còn lại:** đợt này chỉ mới quét bốn thứ cơ học (`.flow`, margin, `sv-s`, đoạn dài). Các luật
+định tính khác của [[chuan-bai-mau]] — đầu mục mơ hồ, thuật ngữ, chi tiết mức triển khai, cấu trúc
+mental-model-first — chưa soát lại cho 01→05.

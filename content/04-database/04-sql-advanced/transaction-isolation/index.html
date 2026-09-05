@@ -51,15 +51,14 @@
   <div class="sh"><b>01</b><h2>Transaction là gì</h2></div>
 <p class="key">Một transaction = một nhóm lệnh chạy <em>trọn vẹn hoặc không gì cả</em>.</p>
   <div class="flow">
-    <div class="n"><h5>BEGIN</h5><p>mở transaction</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>trừ 100 ở tài khoản A</h5><p>bên ngoài chưa thấy gì</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>cộng 100 ở tài khoản B</h5><p>bên ngoài chưa thấy gì</p></div>
-    <div class="a">→</div>
-    <div class="n ok"><h5>COMMIT</h5><p>tới đây mới thành vĩnh viễn</p></div>
+    <div class="n"><h5>Ngoài transaction</h5><p>A: 500 &#183; B: 300</p></div>
+    <div class="a act"><i>BEGIN, rồi trừ A cộng B</i>&#8594;</div>
+    <div class="n"><h5>Đang dở</h5><p>bên ngoài vẫn thấy A: 500 &#183; B: 300</p></div>
+    <div class="a act"><i>COMMIT</i>&#8594;</div>
+    <div class="n ok"><h5>Đã chốt</h5><p>A: 400 &#183; B: 400 &#8212; tới đây mới thành vĩnh viễn</p></div>
   </div>
-  <p>Phần khó không nằm ở một transaction, mà ở <strong>nhiều transaction chạy cùng lúc</strong>. Isolation level là cái núm điều chỉnh: cô lập càng chặt càng ít lỗi dữ liệu, nhưng càng nhiều xung đột và càng chậm.</p>
+  <p class="key">Phần khó không nằm ở một transaction, mà ở <strong>nhiều transaction chạy cùng lúc</strong>.</p>
+  <p>Isolation level là cái núm điều chỉnh: cô lập càng chặt càng ít lỗi dữ liệu, nhưng càng nhiều xung đột và càng chậm.</p>
   <div class="note key">
     <h4>Nhớ một câu</h4>
     Isolation level không phải cài đặt "hiệu năng" — nó là <strong>hợp đồng về những gì transaction của bạn được phép nhìn thấy</strong>. Chọn mức thấp nghĩa là bạn <em>chấp nhận</em> một số hiện tượng dị thường và tự lo phần còn lại trong code.
@@ -74,7 +73,7 @@
     <div class="s ok"><b>I — Isolation · chạy song song mà như chạy lần lượt</b><span>MVCC và khoá — <i>đây là phần của bài này</i></span></div>
     <div class="s"><b>D — Durability · đã commit là không mất, kể cả mất điện</b><span>WAL ghi xuống đĩa trước khi báo commit</span></div>
   </div>
-  <p>Ba tính chất đầu gần như luôn được đảm bảo. <strong>Isolation là tính chất duy nhất bạn phải chọn mức</strong> — và cũng là nơi phần lớn bug dữ liệu trong hệ thống thật phát sinh.</p>
+  <p>Ba tính chất đầu gần như luôn được đảm bảo. <strong>Isolation là tính chất duy nhất phải chọn mức</strong> — và là nơi phần lớn bug dữ liệu phát sinh.</p>
 </section>
 
 <section id="sqltx-s3" class="lesson">
@@ -126,8 +125,8 @@
   </table>
   <div class="note key">
     <h4>Hai điều về PostgreSQL mà bảng chuẩn không nói</h4>
-    <p><strong>1. Không có READ UNCOMMITTED thật.</strong> Khai báo mức đó thì PostgreSQL âm thầm chạy như READ COMMITTED. Nhờ MVCC, dirty read <em>không bao giờ</em> xảy ra được — không có cơ chế nào để đọc dữ liệu chưa commit.</p>
-    <p><strong>2. REPEATABLE READ chặn luôn phantom.</strong> Chuẩn SQL cho phép phantom ở mức này, nhưng PostgreSQL cài bằng snapshot isolation — chụp một ảnh dữ liệu tại thời điểm bắt đầu và đọc mãi từ ảnh đó, nên dòng mới không thể xuất hiện.</p>
+    <p><strong>1. Không có READ UNCOMMITTED thật.</strong> Khai mức đó thì PostgreSQL âm thầm chạy như READ COMMITTED. Nhờ MVCC, dirty read <em>không bao giờ</em> xảy ra được.</p>
+    <p><strong>2. REPEATABLE READ chặn luôn phantom.</strong> Chuẩn SQL cho phép phantom ở mức này, nhưng PostgreSQL cài bằng snapshot isolation: chụp ảnh dữ liệu lúc bắt đầu rồi đọc mãi từ ảnh đó.</p>
   </div>
 <pre><code>BEGIN ISOLATION LEVEL REPEATABLE READ;
 <span class="cm">-- hoặc</span>
@@ -176,7 +175,7 @@ SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;</code></pre>
     <div class="c on"><i>bản mới</i><b>balance = 50</b><u>xmin 77 · xmax null</u></div>
   </div>
   <p class="stripnote"><span>vẫn còn đó cho ai đang đọc dở</span><span><em>xmin = ai tạo · xmax = ai xoá</em></span><span>bản mọi người thấy từ giờ</span></p>
-  <p>Mỗi transaction có một <strong>snapshot</strong> quy định nó thấy phiên bản nào: chỉ những bản được tạo bởi transaction đã commit trước thời điểm chụp ảnh, và chưa bị xoá tại thời điểm đó.</p>
+  <p>Mỗi transaction có một <strong>snapshot</strong> quy định nó thấy phiên bản nào: chỉ bản do transaction đã commit trước lúc chụp tạo ra, và chưa bị xoá khi đó.</p>
   <div class="cmp two">
     <div><h5>Được gì</h5>
       <p>Người đọc không chặn người ghi và ngược lại. Dirty read là <b>bất khả thi về cơ chế</b>. Có ảnh chụp nhất quán mà không cần khoá.</p></div>
@@ -225,7 +224,7 @@ SELECT ... FOR SHARE;                 <span class="cm">-- người khác đọc 
       <p>Không khoá; kiểm tra lúc ghi bằng cột <code>version</code>. Tốt khi xung đột <b>hiếm</b>.</p>
       <p>Cái giá: phải viết logic thử lại ở tầng ứng dụng.</p></div>
   </div>
-  <p><code>SKIP LOCKED</code> là một mẫu rất hữu ích trong thực tế: nó cho phép nhiều worker cùng lấy việc từ một bảng hàng đợi mà không bao giờ tranh nhau cùng một dòng — mỗi worker lấy dòng nào đang rảnh.</p>
+  <p><code>SKIP LOCKED</code> là mẫu rất hữu ích: nhiều worker cùng lấy việc từ một bảng hàng đợi mà không tranh nhau cùng một dòng — mỗi worker lấy dòng đang rảnh.</p>
 </section>
 
 <section id="sqltx-s9" class="lesson">
@@ -240,7 +239,8 @@ stock = db.query(<span class="st">"SELECT stock FROM items WHERE id = 1"</span>)
 <pre><code>UPDATE items SET stock = stock - <span class="st">1</span>
 WHERE id = <span class="st">1</span> AND stock &gt; <span class="st">0</span>;
 <span class="cm">-- kiểm tra số dòng bị ảnh hưởng: 0 nghĩa là hết hàng</span></code></pre>
-  <p>Phép tính và điều kiện đều nằm trong một câu lệnh nên cơ sở dữ liệu tự lo phần nguyên tử. Không cần khoá thủ công, không cần thử lại, không cần đổi mức cô lập. <strong>Đây là lời giải nên nêu trước.</strong></p>
+  <p>Phép tính và điều kiện nằm chung một câu lệnh nên database tự lo phần nguyên tử: không khoá thủ công, không thử lại, không đổi mức cô lập.</p>
+  <p><strong>Nên nêu lời giải này trước.</strong></p>
   <h3>Cách 2 — khoá bi quan</h3>
 <pre><code>BEGIN;
 SELECT stock FROM items WHERE id = <span class="st">1</span> FOR UPDATE;   <span class="cm">-- khoá dòng</span>
@@ -252,7 +252,7 @@ COMMIT;</code></pre>
 <pre><code>UPDATE items SET stock = <span class="st">9</span>, version = version + <span class="st">1</span>
 WHERE id = <span class="st">1</span> AND version = <span class="st">42</span>;      <span class="cm">-- version đọc được lúc đầu</span>
 <span class="cm">-- 0 dòng bị ảnh hưởng → có người sửa trước → đọc lại và thử lại</span></code></pre>
-  <p>Không khoá gì nên thông lượng cao khi xung đột hiếm. Đổi lại ứng dụng phải xử lý việc thử lại. Đây là cơ chế mà phần lớn ORM dùng cho tính năng optimistic locking.</p>
+  <p>Không khoá gì nên thông lượng cao khi xung đột hiếm; đổi lại ứng dụng phải tự thử lại. Đây là cơ chế phần lớn ORM dùng cho optimistic locking.</p>
 </section>
 
 <section id="sqltx-s10" class="lesson">
@@ -319,7 +319,12 @@ SET statement_timeout = <span class="st">'10s'</span>;</code></pre>
     <div class="s ok"><b><code>40P01</code> · deadlock_detected</b><span>thử lại toàn bộ transaction</span></div>
     <div class="s warn"><b><code>23505</code> · unique_violation</b><span><b>không</b> thử lại — lỗi logic, thử lại cũng thế</span></div>
   </div>
-  <p><strong>Điều kiện để thử lại an toàn:</strong> transaction phải <em>idempotent</em> — chạy lại không gây tác dụng phụ nhân đôi. Nếu bên trong có gửi email hay gọi API thanh toán thì thử lại là nguy hiểm. Cách chuẩn là tách phần ghi cơ sở dữ liệu ra khỏi phần tác dụng phụ, và dùng một khoá idempotency cho phần bên ngoài.</p>
+  <p><strong>Điều kiện để thử lại an toàn:</strong> transaction phải <em>idempotent</em> — chạy lại không gây tác dụng phụ nhân đôi.</p>
+  <ul class="why">
+    <li>Bên trong có gửi email hay gọi API thanh toán thì thử lại là nguy hiểm.</li>
+    <li>Cách chuẩn: tách phần ghi database khỏi phần tác dụng phụ.</li>
+    <li>Rồi dùng một khoá idempotency cho phần bên ngoài.</li>
+  </ul>
 </section>
 
 <section id="sqltx-s13" class="lesson">
@@ -332,7 +337,7 @@ SET statement_timeout = <span class="st">'10s'</span>;</code></pre>
     <div class="s warn"><b>Ràng buộc phức tạp qua nhiều bảng → SERIALIZABLE + thử lại</b><span>database tự bắt mọi xung đột, đổi lại nhiều lỗi <code>40001</code></span></div>
     <div class="s"><b>Hàng đợi nhiều worker → READ COMMITTED + <code>FOR UPDATE SKIP LOCKED</code></b><span>worker không tranh nhau cùng một dòng</span></div>
   </div>
-  <p>Lưu ý về thứ tự ưu tiên: <strong>tăng mức cô lập là lựa chọn sau cùng</strong>. Trước đó hãy thử viết câu lệnh nguyên tử, dùng ràng buộc <code>UNIQUE</code>, hoặc khoá tường minh — cả ba đều rẻ hơn và dễ suy luận hơn.</p>
+  <p>Thứ tự ưu tiên: <strong>tăng mức cô lập là lựa chọn sau cùng</strong>. Trước đó hãy thử câu lệnh nguyên tử, ràng buộc <code>UNIQUE</code>, hoặc khoá tường minh.</p>
 </section>
 
 <section id="sqltx-s14" class="lesson">
@@ -396,13 +401,13 @@ SET statement_timeout = <span class="st">'10s'</span>;</code></pre>
       <text class="sv-h" x="20" y="270" fill="#F79BAB">&#9315; LOST UPDATE — KHÔNG MỨC MẶC ĐỊNH NÀO CHẶN, PHẢI CHỮA BẰNG CÂU LỆNH</text>
       <rect x="20" y="278" width="264" height="40" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
       <text class="sv-t" x="30" y="296" fill="#8EE0BE">1 · UPDATE nguyên tử</text>
-      <text class="sv-d" x="30" y="311" fill="#7A6F63">stock = stock − 1 WHERE stock &gt; 0 — ưu tiên</text>
+      <text class="sv-s" x="30" y="311" fill="#7A6F63">stock = stock − 1 WHERE stock &gt; 0 — ưu tiên</text>
       <rect x="296" y="278" width="264" height="40" rx="5" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
       <text class="sv-t" x="306" y="296" fill="#A8BEF6">2 · Khoá bi quan</text>
-      <text class="sv-d" x="306" y="311" fill="#7A6F63">SELECT … FOR UPDATE — logic nhiều bước</text>
+      <text class="sv-s" x="306" y="311" fill="#7A6F63">SELECT … FOR UPDATE — logic nhiều bước</text>
       <rect x="572" y="278" width="264" height="40" rx="5" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
       <text class="sv-t" x="582" y="296" fill="#A8BEF6">3 · Khoá lạc quan</text>
-      <text class="sv-d" x="582" y="311" fill="#7A6F63">WHERE version = 42 — thử lại khi 0 dòng</text>
+      <text class="sv-s" x="582" y="311" fill="#7A6F63">WHERE version = 42 — thử lại khi 0 dòng</text>
 
       <line x1="8" y1="342" x2="852" y2="342" stroke="#2E2822"/>
       <text class="sv-l" x="8" y="360">&#9312;&#9313; một mình thì luôn đúng — hiện tượng lạ chỉ sinh ra khi có người chạy cùng lúc</text>

@@ -137,7 +137,7 @@ Index Scan using idx_orders_user on orders
     </div>
     <div id="qview"></div>
     <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Tăng dần tỉ lệ khớp: quanh mức <strong>vài phần trăm</strong>, quét toàn bảng bắt đầu thắng. Lý do là index scan đọc <em>ngẫu nhiên</em> từng trang, còn seq scan đọc <em>tuần tự</em> nên rẻ hơn mỗi trang và được đọc trước. Đây là toàn bộ câu trả lời cho câu hỏi "vì sao có index mà nó không dùng".
+      Tăng dần tỉ lệ khớp: quanh mức <strong>vài phần trăm</strong>, quét toàn bảng bắt đầu thắng.<br>Index scan đọc <em>ngẫu nhiên</em> từng trang; seq scan đọc <em>tuần tự</em> nên rẻ hơn mỗi trang và được đọc trước.<br>Đây là toàn bộ câu trả lời cho "vì sao có index mà nó không dùng".
     </p>
   </div>
 </section>
@@ -181,7 +181,7 @@ Index Scan using idx_orders_user on orders
   </div>
   <div class="note key">
     <h4>Hai quy tắc xếp thứ tự cột</h4>
-    <p><strong>1. Cột so bằng trước, cột so khoảng sau.</strong> Vì sau một điều kiện khoảng, các cột tiếp theo trong index không còn được sắp liên tục nên không dùng để tìm được nữa.</p>
+    <p><strong>1. Cột so bằng trước, cột so khoảng sau.</strong> Sau một điều kiện khoảng, các cột tiếp theo không còn sắp liên tục nên không dùng để tìm được nữa.</p>
     <p><strong>2. Cột chọn lọc hơn đặt trước</strong> — trong các cột đều so bằng. Nó thu hẹp không gian tìm kiếm nhanh hơn.</p>
   </div>
   <p>Một index tổ hợp <code>(a, b)</code> thay được index đơn <code>(a)</code>, nên đừng tạo cả hai — index đơn trên <code>a</code> là dư thừa và chỉ tốn thêm chi phí ghi.</p>
@@ -197,7 +197,7 @@ CREATE INDEX i1 ON orders (user_id);              <span class="cm">→ Index Sca
 
 <span class="cm">-- index chứa cả total: trả lời xong ngay trong index</span>
 CREATE INDEX i2 ON orders (user_id) INCLUDE (total);   <span class="cm">→ Index Only Scan</span></code></pre>
-  <p>Khi mọi cột mà truy vấn cần đều nằm trong index, cơ sở dữ liệu <strong>không phải chạm vào bảng</strong>. Đó là Index Only Scan, và nó thường nhanh hơn vài lần vì bỏ được toàn bộ phần đọc ngẫu nhiên.</p>
+  <p>Khi mọi cột truy vấn cần đều nằm trong index, database <strong>không phải chạm vào bảng</strong>. Đó là Index Only Scan — nhanh hơn vài lần vì bỏ hết đọc ngẫu nhiên.</p>
   <p><code>INCLUDE</code> khác với việc thêm cột vào khoá: cột trong <code>INCLUDE</code> chỉ được <em>chở theo</em>, không tham gia sắp xếp — nên index không phình lên nhiều và không đổi thứ tự.</p>
   <div class="note warn">
     <h4>Trong PostgreSQL, index-only scan có điều kiện</h4>
@@ -235,7 +235,7 @@ CREATE INDEX i2 ON orders (user_id) INCLUDE (total);   <span class="cm">→ Inde
     <div class="s"><b>→ Seq Scan on users · rows=10000</b><span>bảng ngoài, quét một lần</span></div>
     <div class="s warn"><b>→ Seq Scan on orders · rows=500 · <em>loops=10000</em></b><span>quét lại bảng <code>orders</code> mười nghìn lần → thiếu index trên <code>orders(user_id)</code></span></div>
   </div>
-  <p>Chú ý <code>loops=10000</code>: nó cho biết nút bên trong chạy mười nghìn lần. Đây là chi tiết hay bị bỏ qua khi đọc plan — thời gian thật của một nút là <code>actual time × loops</code>, không phải chỉ <code>actual time</code>.</p>
+  <p>Chú ý <code>loops=10000</code>: nút bên trong chạy mười nghìn lần. Thời gian thật của một nút là <code>actual time × loops</code>, không phải chỉ <code>actual time</code>.</p>
   <div class="note key">
     <h4>Hash Join không xấu</h4>
     Nhiều người thấy Hash Join là tưởng thiếu index. Với hai bảng lớn cần ghép toàn bộ, hash join <em>là</em> lựa chọn tối ưu — nó quét tuần tự cả hai bảng, không đọc ngẫu nhiên. Chỉ khi bảng ngoài nhỏ mà bảng trong lớn thì nested loop kèm index mới thắng.
@@ -244,7 +244,7 @@ CREATE INDEX i2 ON orders (user_id) INCLUDE (total);   <span class="cm">→ Inde
 
 <section id="sqlindex-s11" class="lesson">
   <div class="sh"><b>11</b><h2>Thống kê và plan xấu</h2></div>
-  <p>Planner không xem dữ liệu thật — nó xem <strong>thống kê</strong>: số dòng ước lượng, biểu đồ phân phối giá trị, danh sách giá trị hay gặp nhất, số giá trị khác nhau.</p>
+  <p>Planner không xem dữ liệu thật, nó xem <strong>thống kê</strong>: số dòng ước lượng, phân phối giá trị, giá trị hay gặp nhất, số giá trị khác nhau.</p>
 <pre><code>ANALYZE orders;                    <span class="cm">-- cập nhật thống kê thủ công</span>
 
 <span class="cm">-- xem PostgreSQL đang nghĩ gì về một cột</span>

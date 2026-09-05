@@ -50,11 +50,13 @@
   <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
   <p class="key">Dữ liệu đi vào <a href="../data-warehouse-lake/index.html">warehouse hoặc lake</a> <em>bằng cách nào</em>? Dữ liệu thô gần như không bao giờ dùng ngay được — sai định dạng ngày, thiếu giá trị, trùng khoá, lệch đơn vị tiền. Nó phải đi qua ba bước:</p>
   <div class="flow">
-    <div class="n"><h5>Extract</h5><p>lấy từ nguồn: OLTP, log, API</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>Transform</h5><p>làm sạch, chuẩn hoá, tính lại</p></div>
-    <div class="a">→</div>
-    <div class="n ok"><h5>Load</h5><p>ghi vào kho đích</p></div>
+    <div class="n"><h5>Nguồn</h5><p>OLTP, log, API</p></div>
+    <div class="a act"><i>Extract</i>&#8594;</div>
+    <div class="n"><h5>Dữ liệu thô</h5><p>còn nằm ngoài kho đích</p></div>
+    <div class="a act"><i>Transform</i>&#8594;</div>
+    <div class="n"><h5>Dữ liệu đã sạch</h5><p>đã chuẩn hoá, tính lại</p></div>
+    <div class="a act"><i>Load</i>&#8594;</div>
+    <div class="n ok"><h5>Kho đích</h5><p>chỉ nhận bản đã sạch</p></div>
   </div>
   <ul class="why">
     <li>Ba bước là cố định. Câu hỏi duy nhất là <b>thứ tự Transform và Load</b> — đổi chỗ là ra hai kiến trúc khác hẳn.</li>
@@ -65,11 +67,13 @@
   <div class="sh"><b>02</b><h2>ETL — transform trước khi load</h2></div>
   <p class="key">Extract → Transform → Load: làm sạch và định hình dữ liệu ở một hạ tầng transform riêng, rồi mới ghi bản đã sạch vào kho đích.</p>
   <div class="flow">
-    <div class="n"><h5>1 · Extract</h5><p>đọc từ database nguồn, API, file log</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>2 · Transform</h5><p>làm sạch, join, tính toán — trên engine transform riêng (Spark, script ETL)</p></div>
-    <div class="a">→</div>
-    <div class="n ok"><h5>3 · Load</h5><p>ghi bản đã sạch, đúng schema, vào warehouse</p></div>
+    <div class="n"><h5>Nguồn</h5><p>database, API, file log</p></div>
+    <div class="a act"><i>Extract</i>&#8594;</div>
+    <div class="n"><h5>Bản thô ngoài kho</h5><p>nằm trên engine transform riêng &#8212; Spark, script ETL</p></div>
+    <div class="a act"><i>Transform</i>&#8594;</div>
+    <div class="n"><h5>Bản đã sạch, đúng schema</h5><p>làm sạch, join, tính toán xong ở ngoài</p></div>
+    <div class="a act"><i>Load</i>&#8594;</div>
+    <div class="n ok"><h5>Warehouse</h5><p>chỉ dữ liệu sạch mới vào tới đây</p></div>
   </div>
   <ul class="why">
     <li>Hợp với data warehouse truyền thống — nơi <em>schema-on-write</em> đòi hỏi dữ liệu phải đúng khuôn <em>trước khi</em> vào bảng.</li>
@@ -82,23 +86,30 @@
   <div class="sh"><b>03</b><h2>ELT — load trước, transform sau</h2></div>
   <p class="key">Extract → Load → Transform: đổ dữ liệu gần như thô vào thẳng kho đích, rồi transform bằng chính sức mạnh tính toán của kho đích đó.</p>
   <div class="flow">
-    <div class="n"><h5>1 · Extract</h5><p>đọc từ database nguồn, API, file log</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>2 · Load</h5><p>đổ thẳng dữ liệu gần như thô vào warehouse/lake</p></div>
-    <div class="a">→</div>
-    <div class="n ok"><h5>3 · Transform</h5><p>chạy SQL/dbt ngay trong warehouse để làm sạch, tạo bảng tổng hợp</p></div>
+    <div class="n"><h5>Nguồn</h5><p>database, API, file log</p></div>
+    <div class="a act"><i>Extract</i>&#8594;</div>
+    <div class="n"><h5>Dữ liệu gần như thô</h5><p>chưa làm gì nhiều</p></div>
+    <div class="a act"><i>Load</i>&#8594;</div>
+    <div class="n"><h5>Đã nằm trong warehouse</h5><p>vào kho trước, sạch sau</p></div>
+    <div class="a act"><i>Transform bằng SQL/dbt</i>&#8594;</div>
+    <div class="n ok"><h5>Bảng tổng hợp</h5><p>làm sạch ngay tại chỗ, dùng chính sức của kho</p></div>
   </div>
   <ul class="why">
     <li>Phổ biến từ khi warehouse cloud (Snowflake, BigQuery) vừa rẻ vừa mạnh — mượn luôn engine column-oriented đó để transform.</li>
     <li>Transform viết bằng SQL (thường qua dbt), nằm ngay trong kho đích — dễ đọc, dễ version hơn script ETL rời rạc.</li>
     <li>Hợp cả warehouse lẫn lake: dữ liệu thô vào trước, mỗi nhóm tự transform theo nhu cầu thay vì chờ pipeline chung.</li>
   </ul>
-  <p>Đây cũng là lý do ELT hợp tự nhiên với data lake ở bài trước: lake vốn đã theo triết lý "lưu thô, tính cấu trúc lúc đọc" — ELT chỉ là áp triết lý đó vào pipeline nạp dữ liệu.</p>
+  <p>Đây cũng là lý do ELT hợp với data lake: lake vốn theo triết lý "lưu thô, tính cấu trúc lúc đọc", ELT chỉ áp triết lý đó vào pipeline nạp.</p>
 </section>
 
 <section id="etl-elt-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Batch job vs incremental load</h2></div>
-  <p>Dù chọn ETL hay ELT, bước Extract/Load còn một trục quyết định khác: chạy <b>toàn bộ dữ liệu mỗi lần</b> (full batch — đơn giản, chạy lại là an toàn, nhưng chậm khi bảng lớn) hay chỉ lấy <b>phần thay đổi từ lần trước</b> (incremental load — nhanh hơn nhiều nhưng phải xử lý đúng phần xoá/sửa). Có hai cách lấy phần thay đổi đó:</p>
+  <p>Dù chọn ETL hay ELT, bước Extract/Load còn một trục quyết định nữa.</p>
+  <ul class="why">
+    <li><b>Full batch</b> chạy toàn bộ dữ liệu mỗi lần — đơn giản, chạy lại là an toàn, nhưng chậm khi bảng lớn.</li>
+    <li><b>Incremental load</b> chỉ lấy phần thay đổi — nhanh hơn nhiều nhưng phải xử lý đúng phần xoá/sửa.</li>
+  </ul>
+  <p>Có hai cách lấy phần thay đổi đó:</p>
 
   <div class="cmp two">
     <div><h5>Timestamp</h5>
@@ -111,7 +122,8 @@
       <p><b>Cái giá</b> cần quyền replication, thêm một thành phần phải vận hành, sự kiện có thể tới trùng nên bên nhận phải idempotent</p></div>
   </div>
 
-  <p>CDC chính là chỗ ranh giới batch/stream mờ đi: nó biến một database quan hệ thành một <em>luồng sự kiện</em>. Đây là bước đệm dẫn sang câu hỏi rộng hơn — pipeline nên chạy theo <em>lô định kỳ</em> hay theo <em>sự kiện liên tục</em>: xem tiếp ở <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</p>
+  <p>CDC là chỗ ranh giới batch/stream mờ đi: nó biến một database quan hệ thành một <em>luồng sự kiện</em>.</p>
+  <p>Từ đó là câu hỏi rộng hơn — pipeline chạy theo <em>lô định kỳ</em> hay <em>sự kiện liên tục</em>: xem <a href="../batch-stream-processing/index.html">Batch vs stream processing</a>.</p>
 </section>
 
 <section id="etl-elt-s5" class="lesson">

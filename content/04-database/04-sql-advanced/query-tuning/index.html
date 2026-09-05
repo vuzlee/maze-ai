@@ -65,13 +65,14 @@
 
 <section id="tuning-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Đọc plan — tìm ba dấu hiệu này trước</h2></div>
-  <p>Cơ chế đọc <code>EXPLAIN</code> đã học kỹ ở <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>. Ở đây là thứ tự tìm khi <em>không biết</em> plan có gì — quét theo đúng ba dấu hiệu này trước khi đọc chi tiết từng nút.</p>
+  <p>Cơ chế đọc <code>EXPLAIN</code> đã học kỹ ở <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>. Ở đây là thứ tự tìm khi <em>chưa biết</em> plan có gì: quét ba dấu hiệu này trước.</p>
 <div class="stack">
     <div class="s warn"><b>Seq Scan trên bảng lớn</b><span>nút <code>Seq Scan on orders</code> với <code>rows</code> lớn → có thể thiếu index, nhưng chỉ đáng lo nếu điều kiện lọc chọn lọc</span></div>
     <div class="s warn"><b>estimate lệch xa actual</b><span><code>rows=5</code> ước lượng vs <code>actual rows=48000</code> → thống kê cũ, mọi quyết định sau đó của planner dựa trên số sai</span></div>
     <div class="s warn"><b>Nested Loop với loops lớn</b><span><code>loops=12000</code> trên một nút bên trong → thiếu index trên cột join, nút đó bị quét lại 12.000 lần</span></div>
   </div>
-  <p>Sau khi khoanh được nút nghi vấn, nhân <code>actual time</code> với <code>loops</code> để biết nó thật sự chiếm bao nhiêu phần trăm tổng thời gian — đừng sửa nút chỉ vì nó "nhìn đáng ngờ" mà không chiếm phần lớn thời gian truy vấn.</p>
+  <p>Khoanh được nút nghi vấn rồi thì nhân <code>actual time</code> với <code>loops</code> để biết nó chiếm bao nhiêu phần trăm tổng thời gian.</p>
+  <p>Đừng sửa một nút chỉ vì nó "nhìn đáng ngờ" mà không chiếm phần lớn thời gian.</p>
   <div class="note warn">
     <h4>Seq Scan không tự động là thủ phạm</h4>
     Nếu bảng nhỏ hoặc điều kiện khớp phần lớn dòng, Seq Scan là <strong>lựa chọn đúng</strong> của planner, không phải lỗi. Đừng thêm index chỉ vì thấy chữ "Seq Scan" trong plan — xem lại mục điểm giao nhau ở bài index &amp; query plan trước khi kết luận.
@@ -108,7 +109,12 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
 
 <section id="tuning-s4" class="lesson">
   <div class="sh"><b>04</b><h2>N+1 query — dấu hiệu và cách gộp</h2></div>
-  <p>Không phải mọi truy vấn chậm là <em>một</em> câu SQL chậm. Rất thường xuyên, mỗi câu SQL riêng lẻ chạy dưới 1ms nhưng ứng dụng gọi nó <strong>hàng trăm lần</strong> trong một request — đây là bài toán N+1, nguyên nhân chậm phổ biến nhất khi dùng ORM.</p>
+  <p class="key">Không phải mọi truy vấn chậm là <em>một</em> câu SQL chậm.</p>
+  <ul class="why">
+    <li>Rất thường xuyên, mỗi câu SQL riêng lẻ chạy dưới 1ms.</li>
+    <li>Nhưng ứng dụng gọi nó <strong>hàng trăm lần</strong> trong một request.</li>
+    <li>Đó là bài toán N+1 — nguyên nhân chậm phổ biến nhất khi dùng ORM.</li>
+  </ul>
 <div class="bars">
     <div class="b"><i>một truy vấn nặng</i><u style="width:60%"></u><b>1 × 200 ms = 200 ms · dễ thấy trong log</b></div>
     <div class="b bad"><i>N+1 · cùng một câu lặp lại, chỉ khác tham số</i><u style="width:100%"></u><b>100 × 3 ms = 300 ms · không câu nào trông đáng ngờ</b></div>
@@ -127,7 +133,7 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
 
 <section id="tuning-s5" class="lesson">
   <div class="sh"><b>05</b><h2>OFFSET lớn và keyset pagination</h2></div>
-  <p>Một bẫy hiệu năng riêng, đủ phổ biến để tách mục: phân trang bằng <code>OFFSET</code> chậm dần khi trang càng sâu, vì cơ sở dữ liệu vẫn phải <strong>đếm và bỏ qua</strong> hết số dòng ở các trang trước.</p>
+  <p>Một bẫy hiệu năng đủ phổ biến để tách mục: phân trang bằng <code>OFFSET</code> chậm dần khi trang càng sâu, vì database vẫn phải <strong>đếm và bỏ qua</strong> hết số dòng phía trước.</p>
 <div class="cmp two">
     <div><h5>OFFSET — chậm dần theo trang</h5>
       <p><code>… ORDER BY id LIMIT 20 OFFSET 100000</code></p>
@@ -136,7 +142,8 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
       <p><code>… WHERE id &gt; 100020 ORDER BY id LIMIT 20</code></p>
       <p>Nhớ vị trí cuối trang trước rồi nhảy thẳng tới đó. <code>id &gt; x</code> là một Index Scan trực tiếp.</p></div>
   </div>
-  <p>Đánh đổi: keyset pagination không cho nhảy thẳng tới "trang số N" bất kỳ — chỉ đi tiếp/lùi tuần tự từ vị trí đang đứng. Đủ tốt cho infinite scroll và hầu hết API, nhưng không hợp với UI có ô nhập "tới trang 42".</p>
+  <p><b>Đánh đổi</b> keyset pagination không nhảy thẳng tới "trang số N", chỉ tiến/lùi từ vị trí đang đứng.</p>
+  <p>Đủ tốt cho infinite scroll và hầu hết API, nhưng không hợp UI có ô nhập "tới trang 42".</p>
   <div class="note">
     <h4>Vì sao đây là chủ đề của bài này, không phải bài index</h4>
     Vấn đề không nằm ở thiếu index — cột <code>id</code> đã có index sẵn. Vấn đề là <strong>cấu trúc câu truy vấn</strong> buộc cơ sở dữ liệu duyệt qua phần bị bỏ. Đây đúng là kiểu bẫy mà mục 03 nói tới: sửa câu lệnh, không sửa index.
@@ -145,12 +152,17 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
 
 <section id="tuning-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Connection pooling — sơ lược</h2></div>
-  <p>Một góc dễ bị bỏ quên khi "truy vấn tự nó đã nhanh mà cả hệ thống vẫn chậm": mở một kết nối TCP mới tới database tốn vài đến vài chục ms, đắt hơn nhiều truy vấn thật sự cần. <strong>Connection pool</strong> giữ sẵn một số kết nối đã mở, ứng dụng mượn rồi trả lại thay vì mở mới mỗi lần.</p>
+  <p class="key">Một góc dễ quên khi "truy vấn đã nhanh mà hệ thống vẫn chậm": mở một kết nối TCP mới tới database tốn vài đến vài chục ms — đắt hơn nhiều truy vấn thật.</p>
+  <p><strong>Connection pool</strong> giữ sẵn một số kết nối đã mở; ứng dụng mượn rồi trả lại, thay vì mở mới mỗi lần.</p>
   <table>
     <tr><th>Pool quá nhỏ</th><th>Pool quá lớn</th></tr>
     <tr><td>Request phải xếp hàng chờ kết nối rảnh dù database còn dư sức xử lý</td><td>Database tốn RAM cho từng kết nối, và có thể vượt giới hạn <code>max_connections</code> cấu hình sẵn</td></tr>
   </table>
-  <p>Kích thước pool hợp lý gắn với số CPU core của database và độ dài trung bình một transaction — không phải con số càng lớn càng an toàn. Đây là lý do một transaction mở quá lâu (nhắc ở bài <a href="../transaction-isolation/index.html">transaction &amp; isolation</a>) không chỉ gây khoá mà còn giữ chết một kết nối trong pool, làm cạn pool nhanh hơn tưởng.</p>
+  <ul class="why">
+    <li>Kích thước pool hợp lý gắn với số CPU core của database và độ dài trung bình một transaction — không phải càng lớn càng an toàn.</li>
+    <li>Vì vậy một transaction mở quá lâu (xem <a href="../transaction-isolation/index.html">transaction &amp; isolation</a>) không chỉ gây khoá.</li>
+    <li>Nó còn giữ chết một kết nối trong pool, làm cạn pool nhanh hơn tưởng.</li>
+  </ul>
 </section>
 
 <section id="tuning-s7" class="lesson">

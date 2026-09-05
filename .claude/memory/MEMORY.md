@@ -14,13 +14,15 @@ Hai thư mục, phân theo tuổi thọ:
 - [Quy ước viết bài overview](chuan/quy-uoc-viet-overview.md) — macro→micro, không ép khuôn, không nhồi timeline
 - [Khuôn .eq cho công thức](chuan/khuon-eq-cong-thuc.md) — chọn HTML thay KaTeX; ranh giới .eq vs `<pre>`; vẽ đường cong bằng SVG
 - [Cách trả lời: thật ngắn](chuan/cach-tra-loi-ngan-gon.md) — phần giao diện nói kết quả nhìn thấy, đừng kể tên class
+- [Sửa nhanh, ít vòng kiểm](chuan/sua-nhanh-it-vong-kiem.md) — chụp ảnh xác minh chỉ khi đổi hình học, không phải mọi lần sửa chữ
 
 ## nhat-ky/ — tiến độ
 
 - [Tiến độ nội dung](nhat-ky/tien-do-noi-dung.md) — bài đã viết / khung còn lại theo từng kệ
-- [Đợt sửa theo chuẩn bài mẫu](nhat-ky/dot-sua-theo-chuan-bai-mau.md) — kệ 01→05 đã cắt bullet + thêm mục tổng kết một hình; mật độ hình còn xa [[chuan-bai-mau]]
+- [Đợt sửa theo chuẩn bài mẫu](nhat-ky/dot-sua-theo-chuan-bai-mau.md) — kệ 01→05: bullet, mục tổng kết một hình, và đoạn văn quá 33 từ đều đã về 0; mật độ hình còn xa [[chuan-bai-mau]]
 - [Soát kệ 02-python](nhat-ky/soat-ke-02-python.md) — 2026-09-02: tách bài memory, gộp mục trùng, thêm 2 bài
 - [Sửa bài Memory management & GC](nhat-ky/sua-bai-memory-management-gc.md) — 2026-09-04: một bản đồ vẽ lại ở mọi mục, mental model lên 01, bóc dần từng ô thành thứ tự học; ngoại lệ luật 7
+- [Sửa 3 bài kệ 02-python](nhat-ky/sua-3-bai-ke-02-python.md) — 2026-09-05: dict, iterator, memory-model theo khuôn một bản đồ; cách đo để chọn bài cần sửa
 - [Soát kệ 04-database](nhat-ky/soat-ke-04-database.md) — 2026-09-02: 2 khung cuối, 2 chỗ trùng, 4 lỗ hổng
 - [Soát kệ 05-machine-learning](nhat-ky/soat-ke-05-machine-learning.md) — 2026-09-03: viết lại tree-models, đồng bộ cả kệ
 - [Tách bài overfitting → Core concepts](nhat-ky/tach-bai-overfitting-core-concepts.md) — trùng thì tách, đừng viết mới

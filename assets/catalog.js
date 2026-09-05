@@ -327,7 +327,7 @@ window.CATALOG = [
       "title": "Memory model & mutability",
       "tag": "Python internals",
       "blurb": "Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.",
-      "n": 11,
+      "n": 10,
       "path": "content/02-python/02-language-core/memory-model-mutability/index.html",
       "skeleton": false,
       "lc": 0
@@ -371,7 +371,7 @@ window.CATALOG = [
       "title": "Iterator & generator",
       "tag": "Python",
       "blurb": "Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.",
-      "n": 11,
+      "n": 10,
       "path": "content/02-python/02-language-core/iterator-generator/index.html",
       "skeleton": false,
       "lc": 0
@@ -420,8 +420,8 @@ window.CATALOG = [
       "slug": "dict",
       "title": "Python dict & hash table",
       "tag": "Python internals",
-      "blurb": "Hash function, hashable, collision, probe sequence, clustering, tombstone, resize, insertion order. Công thức lấy đúng theo mã nguồn CPython.",
-      "n": 23,
+      "blurb": "Hash function, hashable, collision, probe sequence, tombstone, load factor, resize, insertion order — đủ để trả lời mọi câu dict trong phỏng vấn.",
+      "n": 12,
       "path": "content/02-python/03-builtin-structures/dict-hash-table/index.html",
       "skeleton": false,
       "lc": 0

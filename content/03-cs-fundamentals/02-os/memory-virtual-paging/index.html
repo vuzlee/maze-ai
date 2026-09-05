@@ -100,17 +100,28 @@
 <section id="osmem-s2">
   <div class="sh"><b>02</b><h2>Phân trang</h2></div>
 
-  <p>Bộ nhớ được chia thành các <b>page</b> — khối kích thước cố định, thường 4KB. Mỗi process có một <b>page table</b> (bảng trang) riêng, ánh xạ mỗi page ảo sang một <b>frame</b> — page vật lý tương ứng trong RAM. Mọi địa chỉ CPU dùng đều là địa chỉ ảo; phần cứng phải dịch nó sang địa chỉ vật lý trước khi thật sự chạm vào RAM.</p>
+  <p class="key">Mọi địa chỉ CPU dùng đều là <em>địa chỉ ảo</em> — phần cứng phải dịch sang địa chỉ vật lý trước khi chạm vào RAM.</p>
+
+  <ul class="why">
+    <li><b>Page</b> — khối kích thước cố định, thường 4KB, đơn vị chia bộ nhớ.</li>
+    <li><b>Frame</b> — page vật lý tương ứng trong RAM.</li>
+    <li><b>Page table</b> — bảng riêng của mỗi process, ánh xạ page ảo sang frame.</li>
+  </ul>
 
   <div class="flow">
-    <div class="n"><h5>1 · Địa chỉ ảo</h5><p>CPU phát ra, chưa biết nằm ở đâu trong RAM</p></div>
-    <div class="a">→</div>
-    <div class="n ok"><h5>2 · Tra TLB</h5><p>hit → có ngay địa chỉ vật lý</p></div>
-    <div class="a">→</div>
-    <div class="n"><h5>3 · Tra page table</h5><p>chỉ khi TLB miss — nằm trong RAM, chậm hơn nhiều</p></div>
+    <div class="n"><h5>Địa chỉ ảo</h5><p>CPU phát ra, chưa biết nằm ở đâu trong RAM</p></div>
+    <div class="a act"><i>tra TLB</i>&#8594;</div>
+    <div class="n ok"><h5>Địa chỉ vật lý</h5><p>TLB hit &#8212; có ngay, vài chu kỳ</p></div>
+    <div class="a act"><i>TLB miss, tra page table</i>&#8594;</div>
+    <div class="n"><h5>Vẫn ra địa chỉ vật lý</h5><p>nhưng phải đọc thêm bảng nằm trong RAM &#8212; chậm hơn nhiều</p></div>
   </div>
 
-  <p><b>TLB (Translation Lookaside Buffer)</b> là một cache rất nhỏ nằm ngay trong CPU, lưu sẵn các ánh xạ page → frame vừa dùng gần đây. Tra TLB chỉ mất một vài chu kỳ CPU; tra page table phải đi ra RAM, chậm hơn hẳn. Vì mọi lệnh truy cập bộ nhớ đều cần dịch địa chỉ, <b>TLB miss</b> — tức không tìm thấy ánh xạ trong TLB, phải quay lại tra page table — là một trong những nguồn chậm âm thầm nhất, vì nó lặp lại ở từng lệnh chứ không phải một lần.</p>
+  <p><b>TLB (Translation Lookaside Buffer)</b> là cache rất nhỏ nằm trong CPU, lưu sẵn các ánh xạ page → frame vừa dùng.</p>
+
+  <ul class="why">
+    <li>Tra TLB mất vài chu kỳ CPU; tra page table phải đi ra RAM, chậm hơn hẳn.</li>
+    <li><b>TLB miss</b> lặp lại ở <em>từng lệnh</em> truy cập bộ nhớ, không phải một lần — nên nó là nguồn chậm âm thầm nhất.</li>
+  </ul>
 
   <div class="note key">
     <h4>Vì sao TLB miss đắt</h4>
@@ -138,7 +149,13 @@
     <div class="b bad"><i>HDD (~10ms)</i><u style="width:100%"></u><b>~100.000 lần chậm hơn RAM</b></div>
   </div>
 
-  <p><b>Cái giá của swap:</b> khi RAM không đủ chứa mọi page đang cần, hệ điều hành đẩy bớt page ít dùng ra đĩa (swap out) để nhường chỗ, rồi đọc lại (swap in) khi cần tới. Việc này giữ được ảo giác "đủ bộ nhớ" ở mục 01, nhưng mỗi lần swap in là một major fault. Nếu tình trạng thiếu RAM kéo dài, hệ thống liên tục swap ra rồi swap vào cùng những page — gọi là <b>thrashing</b> — và máy dành phần lớn thời gian hoán đổi page thay vì chạy việc thật, khiến hiệu năng sập hẳn dù CPU gần như không rảnh.</p>
+  <p><b>Cái giá của swap.</b> RAM không đủ thì hệ điều hành đẩy page ít dùng ra đĩa (swap out), đọc lại khi cần (swap in).</p>
+
+  <ul class="why">
+    <li>Nó giữ được ảo giác "đủ bộ nhớ" ở mục 01 — nhưng mỗi lần swap in là một major fault.</li>
+    <li>Thiếu RAM kéo dài thì máy swap ra rồi swap vào cùng những page — gọi là <b>thrashing</b>.</li>
+    <li>Lúc đó máy dành phần lớn thời gian hoán đổi page thay vì chạy việc thật, hiệu năng sập hẳn.</li>
+  </ul>
 
   <div class="note warn">
     <h4>Thrashing trông giống CPU quá tải, nhưng không phải</h4>
@@ -149,7 +166,7 @@
 <section id="osmem-s4">
   <div class="sh"><b>04</b><h2>Tính cục bộ</h2></div>
 
-  <p><b>Locality of reference</b> (tính cục bộ) là lý do duyệt một mảng tuần tự nhanh hơn duyệt ngẫu nhiên cùng lượng dữ liệu đó nhiều lần, dù độ phức tạp Big-O như nhau. Có hai dạng:</p>
+  <p class="key"><b>Locality of reference</b> là lý do duyệt mảng tuần tự nhanh hơn duyệt ngẫu nhiên <em>nhiều lần</em>, dù Big-O như nhau. Hai dạng:</p>
 
   <ul class="why">
     <li><b>Spatial locality</b> — cache và page nạp theo <em>khối liền kề</em>, nên chạm một phần tử là kéo sẵn cả hàng xóm vào cache.</li>
@@ -161,9 +178,17 @@
     <div class="b hi"><i>truy cập tuần tự</i><u style="width:8%"></u><b>tận dụng prefetch, hiếm miss</b></div>
   </div>
 
-  <p>Duyệt một mảng theo đúng thứ tự tận dụng được <b>prefetching</b> của CPU — phần cứng đoán trước và nạp sẵn khối tiếp theo trước khi chương trình chạm tới — và giữ tỉ lệ cache miss, page fault ở mức thấp. Truy cập ngẫu nhiên (nhảy tới vị trí bất kỳ trong một mảng rất lớn, hoặc đi theo con trỏ trong một <em>linked list</em> lớn không vừa cache) phá vỡ cả hai loại locality: mỗi bước nhảy có thể rơi vào một khối bộ nhớ hoàn toàn khác, buộc CPU phải đợi nạp lại từ cache thấp hơn hoặc từ RAM.</p>
+  <ul class="why">
+    <li><b>Duyệt tuần tự</b> — CPU <b>prefetch</b>: nạp sẵn khối tiếp theo trước khi chương trình chạm tới, nên hiếm cache miss.</li>
+    <li><b>Truy cập ngẫu nhiên</b> — mỗi bước nhảy rơi vào một khối bộ nhớ khác, CPU phải đợi nạp lại từ RAM.</li>
+  </ul>
 
-  <p>Đây chính là lý do thực tế đứng sau nhận xét quen thuộc "mảng nhanh hơn linked list dù cùng độ phức tạp Big-O": <a href="../../../01-dsa/03-data-structures/array-string/index.html">mảng</a> lưu liền kề nên tận dụng trọn locality, còn <a href="../../../01-dsa/03-data-structures/linked-list/index.html">linked list</a> mỗi node có thể nằm rải rác ở bất cứ đâu trên heap, nên mỗi bước duyệt có nguy cơ là một cache miss riêng.</p>
+  <p>Đây là lý do thật đứng sau câu "mảng nhanh hơn linked list dù cùng Big-O":</p>
+
+  <ul class="why">
+    <li><a href="../../../01-dsa/03-data-structures/array-string/index.html">Mảng</a> lưu liền kề — tận dụng trọn locality.</li>
+    <li><a href="../../../01-dsa/03-data-structures/linked-list/index.html">Linked list</a> rải rác trên heap — mỗi bước duyệt có nguy cơ là một cache miss riêng.</li>
+  </ul>
 </section>
 
 <section id="osmem-s5" class="lesson">
@@ -200,7 +225,7 @@
       <text class="sv-l" x="20" y="182">cache nhỏ ngay trong CPU</text>
       <rect x="270" y="146" width="250" height="46" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
       <text class="sv-t" x="282" y="164" fill="#EDB44A">TLB miss &#8594; tra page table</text>
-      <text class="sv-l" x="282" y="182">phải đi ra RAM &#183; chậm hơn hẳn</text>
+      <text class="sv-s" x="282" y="182">phải đi ra RAM &#183; chậm hơn hẳn</text>
       <text class="sv-l" x="536" y="164">TLB chỉ chứa vài trăm tới vài nghìn ánh xạ</text>
       <text class="sv-d" x="536" y="182" fill="#7A6F63">nhảy lung tung qua nhiều vùng &#8594; miss ở gần như mỗi lần truy cập</text>
 

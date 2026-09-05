@@ -49,7 +49,7 @@
 <section id="shard-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Nhân bản trước</h2></div>
 
-  <p>Trước khi nghĩ tới chia nhỏ dữ liệu, bước rẻ hơn và nên làm trước luôn là <b>replication</b>: giữ nhiều bản sao giống hệt nhau của cùng một tập dữ liệu trên nhiều máy.</p>
+  <p>Trước khi nghĩ tới chia nhỏ dữ liệu, bước rẻ hơn và nên làm trước là <b>replication</b>: giữ nhiều bản sao giống hệt nhau trên nhiều máy.</p>
 
   <h3>Master-slave (leader-follower)</h3>
 <figure>
@@ -82,10 +82,15 @@
     </svg>
     <figcaption>Mọi lệnh ghi đi qua đúng một leader nên không có xung đột ghi cần giải quyết.</figcaption>
   </figure>
-  <p>Mọi lệnh ghi đi qua đúng một leader; các follower chỉ nhận và áp lại luồng thay đổi đó. Đây là cách phổ biến nhất vì đơn giản: không có hai bên cùng ghi nên không có xung đột ghi cần giải quyết.</p>
+  <p>Mọi lệnh ghi đi qua đúng một leader; follower chỉ nhận và áp lại luồng thay đổi. Phổ biến nhất vì đơn giản: không hai bên cùng ghi nên không có xung đột.</p>
 
   <h3>Master-master (multi-leader)</h3>
-  <p>Nhiều node cùng nhận ghi, mỗi node phát thay đổi của mình cho các node còn lại. Giải quyết được vấn đề "leader ở xa" cho ứng dụng nhiều vùng địa lý, nhưng đổi lại phải <b>tự xử lý xung đột ghi</b>: hai vùng cùng sửa một dòng gần như đồng thời thì ai thắng? Cần một chiến lược trộn (last-write-wins theo timestamp, CRDT, hoặc merge thủ công) — độ phức tạp tăng hẳn so với một leader duy nhất.</p>
+  <ul class="why">
+      <li>Nhiều node cùng nhận ghi, mỗi node phát thay đổi của mình cho các node còn lại.</li>
+      <li>Giải được vấn đề "leader ở xa" cho ứng dụng nhiều vùng địa lý.</li>
+      <li>Đổi lại phải <b>tự xử lý xung đột ghi</b>: hai vùng cùng sửa một dòng thì ai thắng?</li>
+      <li>Cần một chiến lược trộn — last-write-wins theo timestamp, CRDT, hoặc merge thủ công.</li>
+    </ul>
 
   <h3>Đồng bộ vs bất đồng bộ</h3>
   <div class="cmp two">
@@ -100,10 +105,18 @@
       <p>Đổi lấy: <b>latency ghi thấp</b> nhưng nếu leader chết đúng lúc đó, những bản ghi chưa kịp sao chép <b>mất luôn</b>.</p>
     </div>
   </div>
-  <p>Phần lớn hệ thống thật dùng bất đồng bộ cho tốc độ, và chấp nhận một cửa sổ rủi ro mất dữ liệu rất nhỏ; một số hệ dùng "semi-sync" — chờ đúng một follower xác nhận, các follower khác vẫn bất đồng bộ — để cân bằng.</p>
+  <ul class="why">
+    <li>Phần lớn hệ thống thật dùng bất đồng bộ cho tốc độ, chấp nhận cửa sổ rủi ro mất dữ liệu rất nhỏ.</li>
+    <li>Một số hệ dùng "semi-sync" để cân bằng: chờ đúng một follower xác nhận, các follower khác vẫn bất đồng bộ.</li>
+  </ul>
 
   <h3>Replication lag</h3>
-  <p><b>Replication lag</b> là khoảng thời gian giữa lúc leader ghi xong và lúc follower áp lại xong bản ghi đó — luôn tồn tại ở chế độ bất đồng bộ, và có thể giãn ra khi follower quá tải hoặc mạng chậm. Hệ quả trực tiếp: đọc từ follower ngay sau khi vừa ghi vào leader có thể <b>không thấy thay đổi vừa rồi</b> — người dùng cập nhật hồ sơ, bấm reload, thấy dữ liệu cũ.</p>
+  <p class="key"><b>Replication lag</b> là khoảng cách giữa lúc leader ghi xong và lúc follower áp lại xong bản ghi đó.</p>
+  <ul class="why">
+    <li>Luôn tồn tại ở chế độ bất đồng bộ, và giãn ra khi follower quá tải hoặc mạng chậm.</li>
+    <li>Đọc từ follower ngay sau khi ghi vào leader có thể <b>không thấy thay đổi vừa rồi</b>.</li>
+    <li>Người dùng cập nhật hồ sơ, bấm reload, thấy dữ liệu cũ.</li>
+  </ul>
 
   <div class="note key">
     <h4>Vì sao replicate</h4>
@@ -176,14 +189,22 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
     <div class="c dim"><i>Shard B</i><b>1 – 2 triệu</b><u>user cũ, gần như rảnh</u></div>
     <div class="c f"><i>Shard C</i><b>2 – 3 triệu</b><u>hotspot — user mới đổ hết vào đây</u></div>
   </div>
-  <p>Chia theo khoảng giá trị liên tục của khoá. Dễ hiểu, hỗ trợ tốt truy vấn theo dải (range query — "lấy user id từ X tới Y"). Nhược điểm: dữ liệu mới thường rơi vào một đầu dải (id tăng dần theo thời gian) nên dễ tạo <b>hotspot</b> — một shard nhận toàn bộ ghi mới trong khi các shard cũ gần như rảnh.</p>
+  <ul class="why">
+      <li>Chia theo khoảng giá trị liên tục của khoá — dễ hiểu, hợp truy vấn theo dải ("lấy user id từ X tới Y").</li>
+      <li>Nhược: dữ liệu mới thường rơi vào một đầu dải, vì id tăng dần theo thời gian.</li>
+      <li>Thành <b>hotspot</b>: một shard nhận hết ghi mới, các shard cũ gần như rảnh.</li>
+    </ul>
 
   <h3>Hash-based sharding</h3>
 <pre><code>shard_index = hash(user_id) % N     <span class="cm">// N = số shard hiện có</span></code></pre>
-  <p>Băm khoá rồi chia đều theo modulo số shard — phân bố tải rất đều, tránh hotspot của range-based. Nhược điểm lớn: <b>thêm hoặc bớt một node đổi N</b>, khiến gần như toàn bộ khoá đổi kết quả <code>hash % N</code> — phải rebalance lại gần hết dữ liệu trong hệ thống, rất tốn kém khi hệ đang chạy.</p>
+  <ul class="why">
+      <li>Băm khoá rồi chia theo modulo số shard — phân bố tải rất đều, tránh hotspot của range-based.</li>
+      <li>Nhược lớn: <b>thêm hoặc bớt một node là đổi N</b>, gần như mọi khoá đổi kết quả <code>hash % N</code>.</li>
+      <li>Phải rebalance gần hết dữ liệu — rất tốn kém khi hệ đang chạy.</li>
+    </ul>
 
   <h3>Consistent hashing</h3>
-  <p>Giải đúng nhược điểm trên của hash-based thuần. Ý tưởng: đặt cả node và khoá lên cùng một <b>vòng tròn hash</b> (ví dụ 0 → 2³²−1); mỗi khoá thuộc về node gần nhất theo chiều kim đồng hồ trên vòng đó.</p>
+  <p>Giải đúng nhược điểm của hash-based thuần: đặt cả node và khoá lên cùng một <b>vòng tròn hash</b> (0 → 2³²−1), mỗi khoá thuộc node gần nhất theo chiều kim đồng hồ.</p>
 <figure>
     <svg viewBox="0 0 700 280" role="img" aria-label="Vòng tròn hash với các node đặt trên vòng, thêm node mới chỉ dịch một cung">
       <circle cx="350" cy="140" r="105" fill="none" stroke="#2E2822" stroke-width="2"/>
@@ -199,7 +220,11 @@ SELECT * FROM orders WHERE created_at &gt;= <span class="st">'2026-08-01'</span>
     </svg>
     <figcaption>Thêm hay bớt một node chỉ dịch khoảng <code>1/N</code> dữ liệu, thay vì gần như toàn bộ như <code>hash % N</code>.</figcaption>
   </figure>
-  <p>Khi thêm hoặc bớt một node, chỉ những khoá nằm trong đoạn cung liền kề node đó cần dịch chuyển — trung bình chỉ khoảng <code>1/N</code> tổng dữ liệu, thay vì gần như toàn bộ như hash-based thuần. Đây là lý do consistent hashing là kỹ thuật nền của DynamoDB, Cassandra và phần lớn hệ phân tán hiện đại. Triển khai thật còn thêm <b>virtual node</b> (mỗi node vật lý ánh xạ vào nhiều điểm ảo trên vòng) để tải chia đều hơn khi số node ít.</p>
+  <ul class="why">
+      <li>Thêm hoặc bớt một node thì chỉ khoá trong đoạn cung liền kề phải dịch chuyển — trung bình <code>1/N</code> tổng dữ liệu.</li>
+      <li>Vì vậy consistent hashing là kỹ thuật nền của DynamoDB, Cassandra và phần lớn hệ phân tán hiện đại.</li>
+      <li>Triển khai thật thêm <b>virtual node</b>: mỗi node vật lý ánh xạ vào nhiều điểm ảo trên vòng, để tải chia đều hơn khi số node ít.</li>
+    </ul>
 
   <h3>Ba tiêu chí chọn shard key</h3>
   <ul class="why">

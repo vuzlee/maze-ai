@@ -186,7 +186,7 @@ WHERE rn &lt;= <span class="st">3</span>;</code></pre>
     <div id="wsql" style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--rule);border-left:2px solid var(--filled);border-radius:6px;padding:12px 14px;margin-bottom:14px;white-space:pre;overflow-x:auto"></div>
     <div id="wview"></div>
     <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Để ý hai người cùng lương trong cùng phòng: <code>ROW_NUMBER</code> vẫn đánh số khác nhau một cách tuỳ ý, <code>RANK</code> cho cùng hạng rồi <strong>nhảy số</strong>, <code>DENSE_RANK</code> cho cùng hạng và <strong>không nhảy</strong>. Bỏ tick <code>PARTITION BY</code> để thấy phép tính chạy trên toàn bảng.
+      Để ý hai người cùng lương trong cùng phòng: <code>ROW_NUMBER</code> vẫn đánh số khác nhau tuỳ ý.<br><code>RANK</code> cho cùng hạng rồi <strong>nhảy số</strong>; <code>DENSE_RANK</code> cho cùng hạng và <strong>không nhảy</strong>.<br>Bỏ tick <code>PARTITION BY</code> để thấy phép tính chạy trên toàn bảng.
     </p>
   </div>
 </section>
@@ -241,7 +241,11 @@ CROSS JOIN LATERAL (
   SELECT name, salary FROM employees e
   WHERE e.dept = d.dept ORDER BY salary DESC LIMIT <span class="st">3</span>
 ) t;</code></pre>
-  <p>Bản window chỉ quét bảng một lần nên gần như luôn thắng bản truy vấn con tương quan. Bản <code>LATERAL</code> có thể nhanh hơn cả window khi <strong>số nhóm nhỏ mà mỗi nhóm rất nhiều dòng</strong>, vì nó dùng index để lấy đúng 3 dòng đầu mỗi nhóm thay vì sắp xếp toàn bộ. Nêu được đánh đổi này là câu trả lời ở mức cao.</p>
+  <ul class="why">
+    <li>Bản <b>window</b> chỉ quét bảng một lần, nên gần như luôn thắng truy vấn con tương quan.</li>
+    <li>Bản <b>LATERAL</b> có thể nhanh hơn cả window khi <strong>số nhóm nhỏ mà mỗi nhóm rất nhiều dòng</strong>.</li>
+    <li>Lý do: nó dùng index lấy đúng 3 dòng đầu mỗi nhóm, thay vì sắp xếp toàn bộ.</li>
+  </ul>
 </section>
 
 <section id="sqlwindow-s8" class="lesson">
@@ -263,7 +267,12 @@ FROM monthly;
 LEAD(cột, n, giá_trị_mặc_định)   <span class="cm">-- tiến n dòng</span>
 
 LAG(revenue, <span class="st">1</span>, <span class="st">0</span>)                <span class="cm">-- thay NULL ở dòng đầu bằng 0</span></code></pre>
-  <p>Nhóm bài dùng <code>LAG</code>/<code>LEAD</code>: tăng trưởng theo kỳ, khoảng cách giữa hai lần đăng nhập, phát hiện đứt chuỗi ngày liên tiếp, tính thời gian giữa hai trạng thái của cùng một đơn hàng.</p>
+  <p>Nhóm bài dùng <code>LAG</code>/<code>LEAD</code>:</p>
+  <ul class="why">
+    <li>Tăng trưởng theo kỳ; khoảng cách giữa hai lần đăng nhập.</li>
+    <li>Phát hiện đứt chuỗi ngày liên tiếp.</li>
+    <li>Thời gian giữa hai trạng thái của cùng một đơn hàng.</li>
+  </ul>
   <div class="note">
     <h4>Mẹo: gom nhóm các dòng liên tiếp</h4>
     Bài "tìm chuỗi ngày hoạt động liên tục" giải bằng kỹ thuật <em>gaps and islands</em>: lấy <code>ngày trừ ROW_NUMBER()</code> — mọi ngày liên tiếp cho ra cùng một hiệu, nên chỉ cần <code>GROUP BY</code> theo hiệu đó là ra từng chuỗi. Rất gọn, và là một trong những mẫu SQL đáng thuộc nhất.
@@ -296,7 +305,7 @@ LAG(revenue, <span class="st">1</span>, <span class="st">0</span>)              
     <div><h5>Thêm <code>ORDER BY</code></h5>
       <p><code>SUM(x) OVER (PARTITION BY d ORDER BY t)</code> → khung tự đổi thành <code>UNBOUNDED PRECEDING … CURRENT ROW</code>, cho ra <b>tổng luỹ tiến</b>.</p></div>
   </div>
-  <p>Chỉ cần thêm <code>ORDER BY</code> là <code>SUM</code> đổi từ "tổng nhóm" sang "tổng luỹ tiến" — mà không có từ khoá nào báo hiệu điều đó. Đây là chi tiết hay bị hỏi vặn.</p>
+  <p>Chỉ thêm <code>ORDER BY</code> là <code>SUM</code> đổi từ "tổng nhóm" sang "tổng luỹ tiến", mà không từ khoá nào báo hiệu. Đây là chi tiết hay bị hỏi vặn.</p>
   <div class="note warn">
     <h4><code>ROWS</code> hay <code>RANGE</code> khi có giá trị trùng</h4>
     Khung mặc định là <code>RANGE</code>, nghĩa là mọi dòng có cùng giá trị <code>ORDER BY</code> đều được tính vào cửa sổ của nhau. Với ba giao dịch cùng ngày, <code>SUM ... ORDER BY date</code> cho cả ba <em>cùng một</em> tổng luỹ tiến — thường không phải điều bạn muốn. Cần luỹ tiến từng dòng thì phải viết rõ <code>ROWS</code>.
@@ -313,7 +322,11 @@ FROM employees;
 
 <span class="cm">-- top_earner: đúng</span>
 <span class="cm">-- low_earner: trả về CHÍNH DÒNG HIỆN TẠI, không phải người lương thấp nhất</span></code></pre>
-  <p>Nguyên nhân là khung mặc định khi có <code>ORDER BY</code>: nó kết thúc ở <code>CURRENT ROW</code>. <code>FIRST_VALUE</code> may mắn đúng vì phần tử đầu khung cũng là phần tử đầu nhóm. <code>LAST_VALUE</code> thì "cuối khung" chính là dòng hiện tại.</p>
+  <p>Nguyên nhân là khung mặc định khi có <code>ORDER BY</code>: nó kết thúc ở <code>CURRENT ROW</code>.</p>
+  <ul class="why">
+    <li><code>FIRST_VALUE</code> may mắn đúng: đầu khung cũng là đầu nhóm.</li>
+    <li><code>LAST_VALUE</code> thì "cuối khung" chính là dòng hiện tại.</li>
+  </ul>
 <pre><code><span class="cm">-- cách chữa: mở rộng khung ra hết nhóm</span>
 LAST_VALUE(name) OVER (
   PARTITION BY dept ORDER BY salary DESC
@@ -322,7 +335,7 @@ LAST_VALUE(name) OVER (
 
 <span class="cm">-- hoặc đơn giản hơn: đảo chiều sắp xếp rồi dùng FIRST_VALUE</span>
 FIRST_VALUE(name) OVER (PARTITION BY dept ORDER BY salary ASC)</code></pre>
-  <p>Cách thứ hai gọn hơn và ít sai hơn. Nói được cả hai, và giải thích được nguyên nhân gốc là khung mặc định, thì đây là một câu trả lời rất mạnh — vì nó cho thấy bạn hiểu cơ chế frame chứ không chỉ nhớ tên hàm.</p>
+  <p>Cách thứ hai gọn hơn và ít sai hơn. Chỉ ra nguyên nhân gốc là <em>khung mặc định</em> cho thấy bạn hiểu cơ chế frame, không chỉ nhớ tên hàm.</p>
 </section>
 
 <section id="sqlwindow-s11" class="lesson">
@@ -344,7 +357,8 @@ FROM transactions;
 SELECT dept, COUNT(*) AS n,
        ROUND(<span class="st">100.0</span> * COUNT(*) / SUM(COUNT(*)) OVER (), <span class="st">1</span>) AS pct_of_all
 FROM employees GROUP BY dept;</code></pre>
-  <p>Ví dụ cuối trông lạ nhưng hợp lệ: <code>SUM(COUNT(*)) OVER ()</code> — hàm gộp bên trong chạy ở tầng <code>GROUP BY</code>, còn window chạy sau đó trên kết quả đã gộp. Đúng theo thứ tự thực thi ở mục 04.</p>
+  <p>Ví dụ cuối trông lạ nhưng hợp lệ: <code>SUM(COUNT(*)) OVER ()</code>.</p>
+  <p>Hàm gộp bên trong chạy ở tầng <code>GROUP BY</code>, window chạy sau trên kết quả đã gộp — đúng thứ tự ở mục 04.</p>
 </section>
 
 <section id="sqlwindow-s12" class="lesson">
