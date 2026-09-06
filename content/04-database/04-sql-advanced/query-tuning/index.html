@@ -48,35 +48,264 @@
 
 <section id="tuning-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Quy trình sáu bước</h2></div>
-  <p>Đây chính là checklist đã nêu ở cuối bài <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>, viết lại thành quy trình đầy đủ để dùng trực tiếp khi có báo cáo "trang này load chậm".</p>
-<div class="stack">
-    <div class="s ok"><b>1 · Đo trước khi sửa</b><span><code>EXPLAIN ANALYZE</code> truy vấn thật, với dữ liệu thật</span></div>
-    <div class="s"><b>2 · Đọc plan</b><span>tìm nút tốn nhất — nhân <code>actual time</code> với <code>loops</code></span></div>
-    <div class="s warn"><b>3 · So estimate với actual</b><span>lệch nhiều → chạy <code>ANALYZE table</code> trước, đừng vội đổi gì khác</span></div>
-    <div class="s"><b>4 · Xác định loại vấn đề</b><span>một truy vấn chậm, hay N+1 — nhiều truy vấn nhỏ?</span></div>
-    <div class="s"><b>5 · Sửa đúng chỗ</b><span>thêm/sửa index, viết lại câu lệnh, hoặc gộp truy vấn</span></div>
-    <div class="s ok"><b>6 · Đo lại</b><span><code>EXPLAIN ANALYZE</code> lần nữa — xác nhận đã hết nút thắt cũ</span></div>
-  </div>
-  <div class="note key">
-    <h4>Quy tắc quan trọng nhất của cả bài</h4>
-    <strong>Không đoán, đo.</strong> Trực giác về truy vấn nào chậm thường sai — nút thắt thật thường nằm ở một nơi không ai ngờ (một <code>ORDER BY</code> phụ, một cột JOIN thiếu index). Chạy <code>EXPLAIN ANALYZE</code> luôn là bước đầu tiên, không phải bước cuối cùng khi mọi cách khác đã thử.
-  </div>
+  <p class="key">Truy vấn chậm gần như không bao giờ chậm ở chỗ bạn đang nhìn. Nên bước đầu không phải <em>sửa gì</em>, mà là <em>đây là loại nào</em>.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 330" role="img" aria-label="Một request 800 ms: hai câu chậm nhìn thấy được cộng lại 380 ms, còn 140 câu nhỏ không câu nào bị ghi log lại chiếm 420 ms">
+<text class="sv-hv" x="0" y="18">MỘT REQUEST 800 ms — MẮT NHÌN VÀO Ô SAI</text>
+<text class="sv-s" x="0" y="36" fill="var(--probe)">1 câu tổng hợp cho biểu đồ</text>
+<text class="sv-d" x="340" y="36" fill="var(--probe)" text-anchor="end">200 ms</text>
+<rect x="0" y="44" width="85.0" height="20" rx="3" fill="rgba(var(--amber-a),.22)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="0" y="78" fill="var(--muted)">nút nặng — hiện ngay trong EXPLAIN</text>
+<text class="sv-s" x="0" y="92" fill="var(--probe)">1 câu phân trang OFFSET 100000</text>
+<text class="sv-d" x="340" y="92" fill="var(--probe)" text-anchor="end">180 ms</text>
+<rect x="0" y="100" width="76.5" height="20" rx="3" fill="rgba(var(--amber-a),.22)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="0" y="134" fill="var(--muted)">đọc rồi bỏ 100.000 dòng — cũng hiện ngay</text>
+<text class="sv-s" x="0" y="148" fill="var(--tomb)">140 câu nạp user, mỗi câu 3 ms</text>
+<text class="sv-d" x="340" y="148" fill="var(--tomb)" text-anchor="end">420 ms</text>
+<rect x="0" y="156" width="178.5" height="20" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/>
+<line x1="1.27" y1="157" x2="1.27" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="2.55" y1="157" x2="2.55" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="3.83" y1="157" x2="3.83" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="5.1" y1="157" x2="5.1" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="6.38" y1="157" x2="6.38" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="7.65" y1="157" x2="7.65" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="8.93" y1="157" x2="8.93" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="10.2" y1="157" x2="10.2" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="11.47" y1="157" x2="11.47" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="12.75" y1="157" x2="12.75" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="14.03" y1="157" x2="14.03" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="15.3" y1="157" x2="15.3" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="16.57" y1="157" x2="16.57" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="17.85" y1="157" x2="17.85" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="19.12" y1="157" x2="19.12" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="20.4" y1="157" x2="20.4" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="21.68" y1="157" x2="21.68" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="22.95" y1="157" x2="22.95" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="24.23" y1="157" x2="24.23" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="25.5" y1="157" x2="25.5" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="26.77" y1="157" x2="26.77" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="28.05" y1="157" x2="28.05" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="29.32" y1="157" x2="29.32" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="30.6" y1="157" x2="30.6" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="31.88" y1="157" x2="31.88" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="33.15" y1="157" x2="33.15" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="34.42" y1="157" x2="34.42" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="35.7" y1="157" x2="35.7" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="36.98" y1="157" x2="36.98" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="38.25" y1="157" x2="38.25" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="39.52" y1="157" x2="39.52" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="40.8" y1="157" x2="40.8" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="42.08" y1="157" x2="42.08" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="43.35" y1="157" x2="43.35" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="44.62" y1="157" x2="44.62" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="45.9" y1="157" x2="45.9" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="47.17" y1="157" x2="47.17" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="48.45" y1="157" x2="48.45" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="49.73" y1="157" x2="49.73" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="51.0" y1="157" x2="51.0" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="52.27" y1="157" x2="52.27" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="53.55" y1="157" x2="53.55" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="54.83" y1="157" x2="54.83" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="56.1" y1="157" x2="56.1" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="57.38" y1="157" x2="57.38" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="58.65" y1="157" x2="58.65" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="59.92" y1="157" x2="59.92" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="61.2" y1="157" x2="61.2" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="62.48" y1="157" x2="62.48" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="63.75" y1="157" x2="63.75" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="65.03" y1="157" x2="65.03" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="66.3" y1="157" x2="66.3" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="67.58" y1="157" x2="67.58" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="68.85" y1="157" x2="68.85" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="70.12" y1="157" x2="70.12" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="71.4" y1="157" x2="71.4" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="72.67" y1="157" x2="72.67" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="73.95" y1="157" x2="73.95" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="75.22" y1="157" x2="75.22" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="76.5" y1="157" x2="76.5" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="77.78" y1="157" x2="77.78" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="79.05" y1="157" x2="79.05" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="80.33" y1="157" x2="80.33" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="81.6" y1="157" x2="81.6" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="82.88" y1="157" x2="82.88" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="84.15" y1="157" x2="84.15" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="85.42" y1="157" x2="85.42" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="86.7" y1="157" x2="86.7" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="87.97" y1="157" x2="87.97" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="89.25" y1="157" x2="89.25" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="90.53" y1="157" x2="90.53" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="91.8" y1="157" x2="91.8" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="93.08" y1="157" x2="93.08" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="94.35" y1="157" x2="94.35" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="95.62" y1="157" x2="95.62" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="96.9" y1="157" x2="96.9" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="98.17" y1="157" x2="98.17" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="99.45" y1="157" x2="99.45" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="100.72" y1="157" x2="100.72" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="102.0" y1="157" x2="102.0" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="103.28" y1="157" x2="103.28" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="104.55" y1="157" x2="104.55" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="105.83" y1="157" x2="105.83" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="107.1" y1="157" x2="107.1" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="108.38" y1="157" x2="108.38" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="109.65" y1="157" x2="109.65" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="110.92" y1="157" x2="110.92" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="112.2" y1="157" x2="112.2" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="113.47" y1="157" x2="113.47" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="114.75" y1="157" x2="114.75" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="116.03" y1="157" x2="116.03" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="117.3" y1="157" x2="117.3" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="118.58" y1="157" x2="118.58" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="119.85" y1="157" x2="119.85" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="121.12" y1="157" x2="121.12" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="122.4" y1="157" x2="122.4" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="123.67" y1="157" x2="123.67" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="124.95" y1="157" x2="124.95" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="126.22" y1="157" x2="126.22" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="127.5" y1="157" x2="127.5" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="128.78" y1="157" x2="128.78" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="130.05" y1="157" x2="130.05" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="131.32" y1="157" x2="131.32" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="132.6" y1="157" x2="132.6" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="133.88" y1="157" x2="133.88" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="135.15" y1="157" x2="135.15" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="136.43" y1="157" x2="136.43" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="137.7" y1="157" x2="137.7" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="138.97" y1="157" x2="138.97" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="140.25" y1="157" x2="140.25" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="141.53" y1="157" x2="141.53" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="142.8" y1="157" x2="142.8" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="144.07" y1="157" x2="144.07" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="145.35" y1="157" x2="145.35" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="146.62" y1="157" x2="146.62" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="147.9" y1="157" x2="147.9" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="149.18" y1="157" x2="149.18" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="150.45" y1="157" x2="150.45" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="151.72" y1="157" x2="151.72" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="153.0" y1="157" x2="153.0" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="154.28" y1="157" x2="154.28" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="155.55" y1="157" x2="155.55" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="156.82" y1="157" x2="156.82" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="158.1" y1="157" x2="158.1" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="159.38" y1="157" x2="159.38" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="160.65" y1="157" x2="160.65" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="161.93" y1="157" x2="161.93" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="163.2" y1="157" x2="163.2" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="164.47" y1="157" x2="164.47" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="165.75" y1="157" x2="165.75" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="167.03" y1="157" x2="167.03" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="168.3" y1="157" x2="168.3" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="169.57" y1="157" x2="169.57" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="170.85" y1="157" x2="170.85" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="172.12" y1="157" x2="172.12" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="173.4" y1="157" x2="173.4" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="174.68" y1="157" x2="174.68" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="175.95" y1="157" x2="175.95" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<line x1="177.22" y1="157" x2="177.22" y2="175" stroke="var(--tomb)" stroke-width="0.5" stroke-opacity=".55"/>
+<text class="sv-d" x="0" y="190" fill="var(--muted)">3 ms &lt; ngưỡng 100 ms — log IM LẶNG</text>
+<line x1="0" y1="200" x2="340" y2="200" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-d" x="0.0" y="216" fill="var(--faint)" text-anchor="start">0</text>
+<text class="sv-d" x="85.0" y="216" fill="var(--faint)" text-anchor="middle">200</text>
+<text class="sv-d" x="170.0" y="216" fill="var(--faint)" text-anchor="middle">400</text>
+<text class="sv-d" x="255.0" y="216" fill="var(--faint)" text-anchor="middle">600</text>
+<text class="sv-d" x="340.0" y="216" fill="var(--faint)" text-anchor="end">800 ms</text>
+<text class="sv-s" x="0" y="244" fill="var(--dim)">Hai ô vàng = 380 ms bạn NHÌN THẤY, và sẽ sửa. Ô đỏ =</text>
+<text class="sv-s" x="0" y="262" fill="var(--dim)">420 ms bạn không thấy, vì không câu nào trong đó đủ</text>
+<text class="sv-s" x="0" y="280" fill="var(--dim)">chậm để bị ghi log.</text>
+<text class="sv-hv" x="372" y="18">ĐO XONG MỚI PHÂN ĐƯỢC LOẠI — BỐN LOẠI, BỐN CHỖ SỬA</text>
+<rect x="372" y="32" width="132" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="53.0" fill="var(--filled)">Một câu chậm</text>
+<text class="sv-d" x="518" y="53.0" fill="var(--muted)">EXPLAIN chỉ đúng nút tốn → sửa index hay câu lệnh · mục 02–03</text>
+<rect x="372" y="72" width="132" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="93.0" fill="var(--filled)">N+1</text>
+<text class="sv-d" x="518" y="93.0" fill="var(--muted)">đếm SỐ câu trong một request → gộp lại · mục 04</text>
+<rect x="372" y="112" width="132" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="133.0" fill="var(--filled)">OFFSET sâu</text>
+<text class="sv-d" x="518" y="133.0" fill="var(--muted)">trang càng sâu càng chậm → keyset · mục 05</text>
+<rect x="372" y="152" width="132" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="173.0" fill="var(--filled)">Chờ, chưa chạy</text>
+<text class="sv-d" x="518" y="173.0" fill="var(--muted)">pool cạn kết nối → chỉnh cỡ pool · mục 06</text>
+<line x1="372" y1="194" x2="860" y2="194" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-hv" x="372" y="218">BA BƯỚC ĐẦU GIỐNG NHAU DÙ LÀ LOẠI NÀO</text>
+<rect x="372" y="228" width="73" height="28" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="408.5" y="247" fill="var(--ok)" text-anchor="middle">1 đo</text>
+<rect x="453" y="228" width="73" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="489.5" y="247" fill="var(--filled)" text-anchor="middle">2 plan</text>
+<rect x="534" y="228" width="73" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="570.5" y="247" fill="var(--filled)" text-anchor="middle">3 ANALYZE</text>
+<rect x="615" y="228" width="73" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="651.5" y="247" fill="var(--filled)" text-anchor="middle">4 loại</text>
+<rect x="696" y="228" width="73" height="28" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="732.5" y="247" fill="var(--filled)" text-anchor="middle">5 sửa</text>
+<rect x="777" y="228" width="73" height="28" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="813.5" y="247" fill="var(--ok)" text-anchor="middle">6 đo lại</text>
+<path d="M813.5 262 L813.5 272 L408.5 272 L408.5 266" fill="none" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3"/><polygon points="408.5,260 404.5,268 412.5,268" fill="var(--ok)"/>
+<text class="sv-s" x="372" y="294" fill="var(--dim)">Chỉ BƯỚC 4 mới rẽ nhánh — nên câu đầu tiên khi có báo cáo "trang này chậm"</text>
+<text class="sv-s" x="372" y="312" fill="var(--dim)">không phải "sửa gì", mà là "đây là loại nào". Không đoán, đo.</text>
+</svg>
+  <figcaption>Một request thật 800 ms. Hai câu đủ chậm để lọt vào log truy vấn chậm chiếm 380 ms; 140 câu mỗi câu 3 ms — dưới mọi ngưỡng cảnh báo — chiếm 420 ms còn lại.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Sáu bước là <b>1 · đo</b> bằng <code>EXPLAIN ANALYZE</code> trên dữ liệu thật → <b>2 · đọc plan</b>, tìm nút tốn nhất → <b>3 · so estimate với actual</b>, lệch nhiều thì chạy <code>ANALYZE table</code> trước → <b>4 · xác định loại vấn đề</b> → <b>5 · sửa đúng chỗ</b> → <b>6 · đo lại</b>.</li>
+    <li>Chỉ bước 4 rẽ nhánh, năm bước còn lại làm y hệt nhau dù cuối cùng hoá ra là <b>một câu chậm</b>, <b>N+1</b>, <b>OFFSET</b> sâu hay <b>connection pool</b> cạn — đó là lý do quy trình bắt đầu bằng đo chứ không bằng đoán.</li>
+    <li><b>Không đoán, đo.</b> Trực giác về truy vấn nào chậm thường sai, vì thứ chậm nhất trong hình lại là thứ duy nhất không câu nào riêng lẻ trông đáng ngờ.</li>
+  </ul>
 </section>
 
 <section id="tuning-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Đọc plan — tìm ba dấu hiệu này trước</h2></div>
-  <p>Cơ chế đọc <code>EXPLAIN</code> đã học kỹ ở <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>. Ở đây là thứ tự tìm khi <em>chưa biết</em> plan có gì: quét ba dấu hiệu này trước.</p>
-<div class="stack">
-    <div class="s warn"><b>Seq Scan trên bảng lớn</b><span>nút <code>Seq Scan on orders</code> với <code>rows</code> lớn → có thể thiếu index, nhưng chỉ đáng lo nếu điều kiện lọc chọn lọc</span></div>
-    <div class="s warn"><b>estimate lệch xa actual</b><span><code>rows=5</code> ước lượng vs <code>actual rows=48000</code> → thống kê cũ, mọi quyết định sau đó của planner dựa trên số sai</span></div>
-    <div class="s warn"><b>Nested Loop với loops lớn</b><span><code>loops=12000</code> trên một nút bên trong → thiếu index trên cột join, nút đó bị quét lại 12.000 lần</span></div>
-  </div>
-  <p>Khoanh được nút nghi vấn rồi thì nhân <code>actual time</code> với <code>loops</code> để biết nó chiếm bao nhiêu phần trăm tổng thời gian.</p>
-  <p>Đừng sửa một nút chỉ vì nó "nhìn đáng ngờ" mà không chiếm phần lớn thời gian.</p>
-  <div class="note warn">
-    <h4>Seq Scan không tự động là thủ phạm</h4>
-    Nếu bảng nhỏ hoặc điều kiện khớp phần lớn dòng, Seq Scan là <strong>lựa chọn đúng</strong> của planner, không phải lỗi. Đừng thêm index chỉ vì thấy chữ "Seq Scan" trong plan — xem lại mục điểm giao nhau ở bài index &amp; query plan trước khi kết luận.
-  </div>
+  <p>Cơ chế đọc <code>EXPLAIN</code> đã học kỹ ở <a href="../sql-index-query-plan/index.html">index &amp; query plan</a>. Ở đây là thứ tự tìm khi <em>chưa biết</em> plan có gì.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 354" role="img" aria-label="Một plan EXPLAIN ANALYZE với ba dấu hiệu được tô: estimate lệch xa actual, Seq Scan nằm trong vòng lặp, và loops 12000 khiến nút 0,05 ms thành 600 ms">
+<text class="sv-hv" x="0" y="18">EXPLAIN ANALYZE — QUÉT BA DẤU HIỆU NÀY TRƯỚC</text>
+<rect x="0" y="28" width="470" height="236" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<rect x="8" y="33" width="454" height="18" rx="2" fill="rgba(var(--red-a),.14)" stroke="none" stroke-width="0"/>
+<text class="sv-l" x="12" y="46" fill="var(--tomb)">Nested Loop  (cost=0.43..98234.11 rows=5 width=64)</text>
+<rect x="8" y="55" width="454" height="18" rx="2" fill="rgba(var(--red-a),.14)" stroke="none" stroke-width="0"/>
+<text class="sv-l" x="12" y="68" fill="var(--tomb)">  (actual time=0.09..612.4 rows=48231 loops=1)</text>
+<text class="sv-l" x="30" y="90" fill="var(--dim)">-&gt;  Seq Scan on users u  (rows=12000)</text>
+<text class="sv-l" x="30" y="112" fill="var(--dim)">      (actual time=0.01..3.2 rows=12000 loops=1)</text>
+<text class="sv-l" x="30" y="134" fill="var(--dim)">      Filter: (active = true)</text>
+<rect x="8" y="143" width="454" height="18" rx="2" fill="rgba(var(--amber-a),.14)" stroke="none" stroke-width="0"/>
+<text class="sv-l" x="30" y="156" fill="var(--probe)">-&gt;  Seq Scan on orders o  (cost=0.00..8.12 rows=1)</text>
+<rect x="8" y="165" width="454" height="18" rx="2" fill="rgba(var(--red-a),.14)" stroke="none" stroke-width="0"/>
+<text class="sv-l" x="30" y="178" fill="var(--tomb)">      (actual time=0.04..0.05 rows=4 loops=12000)</text>
+<rect x="8" y="187" width="454" height="18" rx="2" fill="rgba(var(--amber-a),.14)" stroke="none" stroke-width="0"/>
+<text class="sv-l" x="30" y="200" fill="var(--probe)">      Filter: (o.user_id = u.id)</text>
+<text class="sv-l" x="12" y="222" fill="var(--dim)"></text>
+<text class="sv-l" x="12" y="244" fill="var(--dim)">Execution Time: 618.7 ms</text>
+<rect x="496" y="36" width="364" height="76" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-t" x="508" y="56" fill="var(--tomb)">rows=5  →  actual 48231</text>
+<text class="sv-s" x="508" y="74" fill="var(--dim)">thống kê cũ. Mọi quyết định sau đó của planner dựa</text>
+<text class="sv-s" x="508" y="89" fill="var(--dim)">trên con số sai.</text>
+<text class="sv-d" x="508" y="107" fill="var(--muted)">chạy ANALYZE orders TRƯỚC, đừng đổi gì khác</text>
+<path d="M474 42 C 482 42, 484 52, 492 52" fill="none" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="496" y="124" width="364" height="76" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-t" x="508" y="144" fill="var(--probe)">Seq Scan on orders</text>
+<text class="sv-s" x="508" y="162" fill="var(--dim)">quét cả bảng — nhưng chỉ đáng lo vì nó nằm BÊN TRONG</text>
+<text class="sv-s" x="508" y="177" fill="var(--dim)">vòng lặp.</text>
+<text class="sv-d" x="508" y="195" fill="var(--muted)">bảng nhỏ, lọc ít chọn lọc thì Seq Scan là plan ĐÚNG</text>
+<path d="M474 152 C 482 152, 484 140, 492 140" fill="none" stroke="var(--probe)" stroke-width="1" stroke-dasharray="4 3"/>
+<rect x="496" y="212" width="364" height="76" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-t" x="508" y="232" fill="var(--tomb)">loops=12.000</text>
+<text class="sv-s" x="508" y="250" fill="var(--dim)">0,05 ms nhìn thì rẻ, nhưng chạy lại 12.000 lần.</text>
+<text class="sv-d" x="508" y="268" fill="var(--muted)">0,05 × 12.000 = 600 ms / 618,7 ms — hết 97% thời gian</text>
+<path d="M474 174 C 482 174, 484 228, 492 228" fill="none" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="4 3"/>
+<line x1="0" y1="302" x2="860" y2="302" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-s" x="0" y="320" fill="var(--dim)">Nút tốn nhất KHÔNG phải nút có con số to nhất trong plan — nó là nút có actual time × loops lớn nhất. Ở đây 0,05 ms là con số nhỏ nhất</text>
+<text class="sv-s" x="0" y="338" fill="var(--dim)">cả plan, mà nhân với 12.000 lần thì thành 600 ms, tức là gần như toàn bộ 618,7 ms.</text>
+</svg>
+  <figcaption>Cùng một plan, ba chỗ đáng khoanh: <b>Seq Scan</b> trên bảng lớn, <b>estimate lệch xa actual</b>, và <b>Nested Loop với loops lớn</b>. Chỉ dấu hiệu thứ ba mới thật sự là nút thắt ở đây.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Seq Scan không tự động là thủ phạm.</b> Bảng nhỏ hoặc điều kiện khớp phần lớn dòng thì quét cả bảng là plan <em>đúng</em>; nó chỉ đắt vì nằm bên trong vòng lặp — xem mục điểm giao nhau ở bài index &amp; query plan.</li>
+    <li><b>Estimate lệch xa actual thì chữa thống kê trước.</b> <code>rows=5</code> so với <code>actual rows=48231</code> nghĩa là mọi quyết định sau đó của planner dựa trên số sai — chạy <code>ANALYZE table</code> rồi đo lại, rất nhiều "plan xấu" biến mất ở đúng bước này.</li>
+    <li>Nút tốn nhất là nút có <b><code>actual time</code> × <code>loops</code></b> lớn nhất, không phải nút có con số to nhất. Đừng sửa một nút chỉ vì nó nhìn đáng ngờ mà không chiếm phần lớn thời gian.</li>
+  </ul>
 </section>
 
 <section id="tuning-s3" class="lesson">
@@ -109,25 +338,16 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
 
 <section id="tuning-s4" class="lesson">
   <div class="sh"><b>04</b><h2>N+1 query — dấu hiệu và cách gộp</h2></div>
-  <p class="key">Không phải mọi truy vấn chậm là <em>một</em> câu SQL chậm.</p>
-  <ul class="why">
-    <li>Rất thường xuyên, mỗi câu SQL riêng lẻ chạy dưới 1ms.</li>
-    <li>Nhưng ứng dụng gọi nó <strong>hàng trăm lần</strong> trong một request.</li>
-    <li>Đó là bài toán N+1 — nguyên nhân chậm phổ biến nhất khi dùng ORM.</li>
-  </ul>
-<div class="bars">
-    <div class="b"><i>một truy vấn nặng</i><u style="width:60%"></u><b>1 × 200 ms = 200 ms · dễ thấy trong log</b></div>
-    <div class="b bad"><i>N+1 · cùng một câu lặp lại, chỉ khác tham số</i><u style="width:100%"></u><b>100 × 3 ms = 300 ms · không câu nào trông đáng ngờ</b></div>
-  </div>
-  <p class="stripnote"><span><code>SELECT * FROM orders WHERE user_id = 1</code> … rồi 2, rồi 3…</span><span><em>100 user trong trang danh sách = 100 lần đi vòng qua mạng</em></span></p>
+  <p class="key">Dải đỏ ở hình mục 01 chính là nó. Mục này trả lời hai câu tiếp theo: <em>nhận ra bằng gì</em>, và <em>gộp lại thế nào</em>.</p>
+  <p>Dấu hiệu không nằm trong <code>EXPLAIN</code> của bất kỳ câu nào — nó nằm ở <b>log truy vấn của cả request</b>: một câu SQL gần như giống hệt lặp lại hàng chục, hàng trăm lần, chỉ khác tham số (<code>WHERE user_id = 1</code>, rồi <code>2</code>, rồi <code>3</code>…). Công cụ APM đếm <b>số lượng</b> query trên một request phát hiện đáng tin hơn nhiều so với xem từng câu SQL.</p>
 <div class="stack">
     <div class="s ok"><b><code>WHERE user_id IN (1,2,3,…)</code></b><span>đơn giản nhất, sửa được ngay cả khi không đổi ORM</span></div>
     <div class="s"><b><code>JOIN</code> lấy hết trong một truy vấn</b><span>khi cần dữ liệu hai bảng cùng lúc, chấp nhận trùng lặp cột bên "một"</span></div>
     <div class="s"><b>Eager loading của ORM</b><span><code>selectinload</code> · <code>includes</code> · <code>with()</code> — khai báo trước quan hệ cần nạp thay vì để nó lười tải từng dòng</span></div>
   </div>
   <div class="note key">
-    <h4>Vì sao N+1 nguy hiểm hơn một truy vấn chậm</h4>
-    Một truy vấn 200ms rất dễ bị chú ý và đưa vào EXPLAIN. N+1 thì mỗi truy vấn chỉ 1–2ms — <strong>không câu nào riêng lẻ trông đáng ngờ</strong> — nhưng cộng thời gian đi vòng qua mạng (round-trip) của 100 lần gọi lại thành hàng trăm ms. Công cụ APM đếm số lượng query trên một request là cách phát hiện đáng tin hơn nhìn từng câu SQL.
+    <h4>Thứ đắt không phải câu SQL, mà là lần đi vòng qua mạng</h4>
+    Mỗi câu 3 ms thì phần lớn trong đó là <strong>round-trip</strong> tới database, không phải công xử lý. Nên gộp 140 câu thành một câu không phải tiết kiệm 139 lần chạy SQL — nó tiết kiệm 139 lần đi và về. Cùng lý do đó, <code>IN (…)</code> quá dài lại phản tác dụng: danh sách vài nghìn phần tử làm planner bỏ index, lúc ấy chia thành từng mẻ vài trăm là hợp lý hơn.
   </div>
 </section>
 
@@ -168,95 +388,62 @@ WHERE created_at &gt;= <span class="st">'2024-01-01'</span> AND created_at &lt; 
 <section id="tuning-s7" class="lesson">
   <div class="sh"><b>07</b><h2>Tổng kết một hình</h2></div>
 
-  <p class="key">Cả bài là một vòng đo → đọc → phân loại → sửa đúng chỗ → đo lại; ba nhánh sửa nằm ở ba chỗ khác hẳn nhau.</p>
+  <p class="key">Cùng request ở mục 01, sau khi sửa hết: <b>800 ms → 41 ms</b>. Nhưng phần cắt được nhiều nhất lại đến từ chỗ không ai nhìn.</p>
 
   <figure class="scrollx">
-  <svg viewBox="0 0 860 536" role="img" aria-label="Tổng kết query tuning: vòng sáu bước, ba dấu hiệu đọc plan, phân loại sửa index hay sửa câu lệnh, N+1, OFFSET lớn và connection pool">
-    <text class="sv-h" x="0" y="12">&#9312; VÒNG SÁU BƯỚC — KHÔNG ĐOÁN, ĐO</text>
-
-    <rect x="8" y="26" width="122" height="32" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-l" x="69" y="46" text-anchor="middle" fill="var(--filled-lo)">1 · đo trước</text>
-    <line x1="134" y1="42" x2="152" y2="42" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="156" y="26" width="122" height="32" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-l" x="217" y="46" text-anchor="middle" fill="var(--filled-lo)">2 · đọc plan</text>
-    <line x1="282" y1="42" x2="300" y2="42" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="304" y="26" width="150" height="32" rx="5" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
-    <text class="sv-l" x="379" y="46" text-anchor="middle" fill="#EDB44A">3 · estimate vs actual</text>
-    <line x1="458" y1="42" x2="476" y2="42" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="480" y="26" width="134" height="32" rx="5" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
-    <text class="sv-l" x="547" y="46" text-anchor="middle" fill="#EDB44A">4 · loại vấn đề</text>
-    <line x1="618" y1="42" x2="636" y2="42" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="640" y="26" width="112" height="32" rx="5" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
-    <text class="sv-l" x="696" y="46" text-anchor="middle" fill="#8EE0BE">5 · sửa</text>
-    <line x1="756" y1="42" x2="774" y2="42" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="778" y="26" width="74" height="32" rx="5" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
-    <text class="sv-l" x="815" y="46" text-anchor="middle" fill="#8EE0BE">6 · đo lại</text>
-    <path d="M 815 62 L 815 76 L 69 76 L 69 62" fill="none" stroke="#3D352C" stroke-dasharray="3 3"/>
-    <text class="sv-d" x="430" y="92" text-anchor="middle">EXPLAIN ANALYZE là bước ĐẦU, không phải bước cuối khi mọi cách khác đã thử</text>
-
-    <text class="sv-h" x="0" y="126">&#9313; ĐỌC PLAN — QUÉT BA DẤU HIỆU NÀY TRƯỚC</text>
-
-    <rect x="8" y="138" width="272" height="60" rx="5" fill="#EDB44A" fill-opacity="0.10" stroke="#EDB44A"/>
-    <text class="sv-l" x="20" y="158" fill="#EDB44A">Seq Scan trên bảng lớn</text>
-    <text class="sv-d" x="20" y="176">chỉ đáng lo nếu điều kiện lọc</text>
-    <text class="sv-d" x="20" y="190">chọn lọc — bảng nhỏ thì đó là plan ĐÚNG</text>
-
-    <rect x="294" y="138" width="272" height="60" rx="5" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
-    <text class="sv-l" x="306" y="158" fill="#F79BAB">rows=5 vs actual rows=48000</text>
-    <text class="sv-d" x="306" y="176">thống kê cũ — chạy ANALYZE table</text>
-    <text class="sv-d" x="306" y="190">TRƯỚC, đừng vội đổi gì khác</text>
-
-    <rect x="580" y="138" width="272" height="60" rx="5" fill="#F2718A" fill-opacity="0.10" stroke="#F2718A"/>
-    <text class="sv-l" x="592" y="158" fill="#F79BAB">Nested Loop · loops=12000</text>
-    <text class="sv-d" x="592" y="176">thiếu index trên cột join —</text>
-    <text class="sv-d" x="592" y="190">nút bên trong bị quét lại 12.000 lần</text>
-
-    <text class="sv-d" x="0" y="216">khoanh được nút nghi vấn rồi thì nhân actual time × loops — sửa nút chiếm phần lớn thời gian, không sửa nút &quot;nhìn đáng ngờ&quot;</text>
-
-    <text class="sv-h" x="0" y="250">&#9314; SỬA INDEX HAY SỬA CÂU LỆNH</text>
-
-    <rect x="8" y="262" width="410" height="102" rx="5" fill="#8CA9F2" fill-opacity="0.08" stroke="#8CA9F2"/>
-    <text class="sv-l" x="20" y="282" fill="var(--filled-lo)">SỬA INDEX</text>
-    <text class="sv-d" x="20" y="300">cột lọc/join chưa có index, selectivity đủ cao</text>
-    <text class="sv-d" x="20" y="316">phải quay lại bảng lấy vài cột → INCLUDE</text>
-    <text class="sv-d" x="20" y="332">index tổ hợp sai thứ tự — leftmost prefix</text>
-    <text class="sv-d" x="20" y="348">thống kê cũ → ANALYZE</text>
-
-    <rect x="442" y="262" width="410" height="102" rx="5" fill="#5BCFA0" fill-opacity="0.08" stroke="#5BCFA0"/>
-    <text class="sv-l" x="454" y="282" fill="#8EE0BE">SỬA CÂU LỆNH</text>
-    <text class="sv-d" x="454" y="300">hàm bọc cột — YEAR(created_at) = 2024</text>
-    <text class="sv-d" x="454" y="316">SELECT * rồi lọc ở tầng ứng dụng</text>
-    <text class="sv-d" x="454" y="332">cấu trúc truy vấn tự nó gây N+1</text>
-    <text class="sv-d" x="454" y="348">OFFSET quá lớn</text>
-
-    <text class="sv-h" x="0" y="392">&#9315; N+1 — CHẬM MÀ KHÔNG CÂU NÀO TRÔNG ĐÁNG NGỜ</text>
-
-    <rect x="8" y="404" width="150" height="24" rx="4" fill="#EDB44A" fill-opacity="0.22" stroke="#EDB44A"/>
-    <text class="sv-l" x="166" y="421" fill="#EDB44A">1 × 200 ms — dễ thấy trong log</text>
-    <rect x="8" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
-    <rect x="22" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
-    <rect x="36" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
-    <rect x="50" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
-    <rect x="64" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
-    <rect x="78" y="434" width="10" height="24" rx="2" fill="#F2718A" fill-opacity="0.30" stroke="#F2718A"/>
-    <text class="sv-l" x="166" y="451" fill="#F79BAB">100 × 3 ms = 300 ms — mỗi câu 1–2 ms, không câu nào bị chú ý</text>
-    <text class="sv-d" x="480" y="421">chữa: IN (…) &#183; JOIN &#183; eager loading</text>
-    <text class="sv-d" x="480" y="451">phát hiện: đếm SỐ LƯỢNG query trên một request</text>
-
-    <text class="sv-h" x="0" y="486">&#9316; HAI GÓC DỄ QUÊN</text>
-    <rect x="8" y="496" width="410" height="26" rx="4" fill="none" stroke="#3D352C"/>
-    <text class="sv-l" x="20" y="513">OFFSET 100000 → keyset: WHERE id &gt; 100020</text>
-    <rect x="442" y="496" width="410" height="26" rx="4" fill="none" stroke="#3D352C"/>
-    <text class="sv-l" x="454" y="513">connection pool — mở kết nối mới tốn hơn truy vấn</text>
-  </svg>
-  <figcaption>Đọc từ trên xuống: &#9312; quy trình chung, &#9313; nhìn plan thấy gì, &#9314; kết luận sửa ở đâu, &#9315; loại chậm không nằm trong một câu SQL nào, &#9316; hai bẫy cấu trúc riêng.</figcaption>
+<svg viewBox="0 0 860 442" role="img" aria-label="Cùng request 800 ms sau khi sửa còn 41 ms; sửa hai câu chậm nhìn thấy chỉ cắt 351 ms, còn gộp 140 câu nhỏ cắt 408 ms">
+<text class="sv-hv" x="0" y="18">BƯỚC 6 — ĐO LẠI: 800 ms  →  41 ms</text>
+<text class="sv-s" x="0" y="38" fill="var(--text)">câu tổng hợp</text>
+<rect x="0" y="46" width="85.0" height="14" rx="2" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="340" y="57" fill="var(--tomb)" text-anchor="end">200 ms</text>
+<rect x="0" y="64" width="10.6" height="14" rx="2" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="18.6" y="75" fill="var(--ok)">25 ms · thêm index tổ hợp (khach_id, ngay)</text>
+<text class="sv-s" x="0" y="96" fill="var(--text)">phân trang OFFSET</text>
+<rect x="0" y="104" width="76.5" height="14" rx="2" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="340" y="115" fill="var(--tomb)" text-anchor="end">180 ms</text>
+<rect x="0" y="122" width="1.7" height="14" rx="2" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="9.7" y="133" fill="var(--ok)">4 ms · keyset: WHERE id &gt; id_cuoi</text>
+<text class="sv-s" x="0" y="154" fill="var(--text)">140 câu nạp user</text>
+<rect x="0" y="162" width="178.5" height="14" rx="2" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="340" y="173" fill="var(--tomb)" text-anchor="end">420 ms</text>
+<rect x="0" y="180" width="5.1" height="14" rx="2" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="13.1" y="191" fill="var(--ok)">12 ms · gộp còn 1 câu: WHERE user_id IN (…)</text>
+<line x1="0" y1="204" x2="340" y2="204" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-s" x="0" y="224" fill="var(--dim)">Dải đỏ là trước, dải xanh là sau — cùng một trục.</text>
+<text class="sv-s" x="0" y="242" fill="var(--dim)">Bước 6 không phải thủ tục: nó là chỗ duy nhất chứng</text>
+<text class="sv-s" x="0" y="260" fill="var(--dim)">minh nút thắt cũ đã thật sự biến mất, chứ không phải</text>
+<text class="sv-s" x="0" y="278" fill="var(--dim)">dời sang chỗ khác.</text>
+<text class="sv-hv" x="372" y="18">SỬA CÁI NHÌN THẤY TRƯỚC THÌ ĐƯỢC BAO NHIÊU?</text>
+<rect x="372" y="34" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="56" fill="var(--tomb)">Sửa hai câu chậm nhìn thấy: cắt 351 ms</text>
+<text class="sv-s" x="388" y="74" fill="var(--dim)">request còn 449 ms — người dùng vẫn kêu chậm</text>
+<rect x="372" y="102" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="124" fill="var(--ok)">Gộp 140 câu nhỏ: cắt 408 ms</text>
+<text class="sv-s" x="388" y="142" fill="var(--dim)">một dòng sửa trong ORM, không đụng tới database</text>
+<line x1="372" y1="172" x2="860" y2="172" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-s" x="372" y="196" fill="var(--dim)">Hai câu nhìn thấy được là hai thứ ai cũng sửa trước — và chúng chỉ đóng góp</text>
+<text class="sv-s" x="372" y="214" fill="var(--dim)">351 trong 759 ms cắt được. Phần lớn nằm ở chỗ không ai nhìn vì log im lặng.</text>
+<text class="sv-s" x="372" y="232" fill="var(--dim)">Đó là lý do bước 1 là ĐO chứ không phải SỬA.</text>
+<text class="sv-hv" x="372" y="264">BA NHÁNH SỬA NẰM Ở BA CHỖ KHÁC HẲN NHAU</text>
+<rect x="372" y="274" width="150" height="32" rx="4" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="295.0" fill="var(--filled)">trong database</text>
+<text class="sv-d" x="536" y="295.0" fill="var(--muted)">thêm/sửa index — mục 03</text>
+<rect x="372" y="314" width="150" height="32" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="335.0" fill="var(--probe)">trong câu lệnh</text>
+<text class="sv-d" x="536" y="335.0" fill="var(--muted)">viết lại: keyset, bỏ hàm bọc cột — mục 03, 05</text>
+<rect x="372" y="354" width="150" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="375.0" fill="var(--ok)">trong tầng ứng dụng</text>
+<text class="sv-d" x="536" y="375.0" fill="var(--muted)">gộp truy vấn, chỉnh cỡ pool — mục 04, 06</text>
+<text class="sv-s" x="372" y="406" fill="var(--dim)">Ba chỗ này không thay được cho nhau — đó là lý do phải phân loại ở bước 4</text>
+<text class="sv-s" x="372" y="424" fill="var(--dim)">trước khi mở tay sửa.</text>
+</svg>
+  <figcaption>Sửa hai câu chậm nhìn thấy được — thêm index, đổi sang keyset — cắt 351 ms. Gộp 140 câu nhỏ thành một câu cắt 408 ms, nhiều hơn cả hai cộng lại, bằng một dòng sửa trong tầng ứng dụng.</figcaption>
   </figure>
 
   <ul class="why">
-    <li><b>Đo trước khi sửa</b> — ở &#9312;: trực giác về truy vấn nào chậm thường sai, nên vòng mở và đóng bằng EXPLAIN ANALYZE.</li>
-    <li><b>Selectivity &amp; thống kê</b> — ở &#9313;: Seq Scan không tự động là thủ phạm; estimate lệch xa actual thì chạy ANALYZE trước.</li>
-    <li><b>Hàm bọc cột</b> — ở &#9314;: ranh giới thật giữa hai nhánh sửa — không index nào cứu được một cột bị hàm bọc.</li>
-    <li><b>N+1 &amp; keyset pagination</b> — ở &#9315;&#9316;: hai kiểu chậm do cấu trúc truy vấn, chữa bằng viết lại chứ không bằng thêm index.</li>
+    <li><b>Bước 6 không phải thủ tục.</b> Nó là chỗ duy nhất chứng minh nút thắt cũ đã biến mất chứ không phải dời sang chỗ khác — thêm index xong mà không đo lại thì chỉ biết mình đã làm gì đó, không biết nó có tác dụng không.</li>
+    <li><b>Ba nhánh sửa nằm ở ba nơi khác hẳn nhau</b> và không thay được cho nhau: trong database (index), trong câu lệnh (viết lại), trong tầng ứng dụng (gộp truy vấn, chỉnh cỡ pool). Phân loại sai ở bước 4 thì sửa đúng cách ở nhánh sai vẫn không nhanh lên.</li>
+    <li>Thứ tự sửa theo <b>phần thời gian nó chiếm</b>, không theo phần dễ nhìn thấy. Xếp hạng đó chỉ có sau khi đo, nên nó là lý do tồn tại của cả năm bước đầu.</li>
   </ul>
 </section>
 

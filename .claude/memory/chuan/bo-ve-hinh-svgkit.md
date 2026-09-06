@@ -1,6 +1,6 @@
 ---
 name: bo-ve-hinh-svgkit
-description: tools/svgkit là bộ vẽ hình dùng chung cho luật 1 — dùng nó, đừng chép sang /tmp; và ba chỗ máy soát KHÔNG bắt được
+description: tools/svgkit là bộ vẽ hình dùng chung cho luật 1 — dùng nó, đừng chép sang /tmp; và bảy chỗ máy soát KHÔNG bắt được
 metadata:
   type: reference
 updated: 2026-09-05
@@ -24,7 +24,7 @@ panel dài đều lọt qua phép 1** mà máy vẫn báo sạch. Cách đo: d�
 mở bằng chrome headless, đọc `getComputedTextLength()` chia cho `len(s) × font-size`. Số thật là
 `0.78` / `0.80`. Đo lại mỗi khi đổi font hoặc đổi `style.css`.
 
-## Năm chỗ máy soát không bắt được
+## Bảy chỗ máy soát không bắt được
 
 **1. Hình đúng hình học mà sai ý.** Biểu đồ early stopping của `gradient-boosting` vẽ **lộn
 ngược**: trong SVG trục y tăng *xuống dưới*, nên "lỗi giảm dần" ra thành đường đi lên. check.py
@@ -52,6 +52,17 @@ thì hoặc bỏ hẳn, hoặc đặt nhãn lệch sang bên. Ảnh chụp là c
 **5. Chạy check.py trên cả `index.html`.** Một bài mười hình, mỗi hình một hệ toạ độ riêng;
 gộp phẳng thành một mặt phẳng thì sinh hàng chục va chạm ma. **Chạy từng file `.svg`** mới là
 bản đúng.
+
+**6. Hình học của khuôn HTML nói ngược lại đoạn văn.** `.cmp two` là hai cột song song — hình
+học đó có nghĩa **"chọn A hoặc B"**. `dsa-overview` §02 dùng nó cho *giải thuật / cấu trúc dữ
+liệu*, trong khi câu ngay dưới nói giải thuật **chạy trên** cấu trúc. Không phép nào bắt được vì
+lỗi nằm giữa hình và chữ, không nằm trong hình. Soát tay: **đọc hình trước, đọc chữ sau, hỏi hai
+thứ có nói cùng một câu không** — hình sai ý tệ hơn không có hình.
+
+**7. Một màu một nghĩa — tính TRONG từng hình.** Quy ước bốn màu là toàn kho, nhưng chặt hơn:
+trong một hình, `--tomb` không được vừa làm màu nhấn cho một mục vừa mang nghĩa "sai". Bản đầu
+của `cs-map` tô lớp Messaging đỏ chỉ để phân biệt với ba lớp kia; sửa thành cả bốn lớp xanh, đỏ
+chỉ dành cho kiểu hỏng mà mỗi lớp mua thêm.
 
 ## Bẫy Python đã mắc
 

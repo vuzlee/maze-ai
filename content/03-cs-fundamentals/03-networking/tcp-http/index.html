@@ -47,19 +47,58 @@
 </header>
 
 <section id="http-s1">
-  <div class="sh"><b>01</b><h2>TCP và HTTP nằm ở đâu</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 <p class="key">Trước khi server làm <em>bất cứ việc gì</em>, đã có bốn lượt đi-về tiêu tốn thời gian.</p>
-  <div class="bars">
-    <div class="b"><i>1 · DNS — tên miền thành địa chỉ IP</i><u style="width:25%"></u><b>1 RTT nếu chưa cache</b></div>
-    <div class="b"><i>2 · TCP — three-way handshake</i><u style="width:25%"></u><b>1 RTT</b></div>
-    <div class="b"><i>3 · TLS — thoả thuận khoá</i><u style="width:40%"></u><b>1–2 RTT</b></div>
-    <div class="b hi"><i>4 · HTTP — request và response</i><u style="width:25%"></u><b>1 RTT + thời gian xử lý</b></div>
-  </div>
-  <p class="stripnote"><span>với RTT = 100 ms</span><span><em>một kết nối mới tốn 400–500 ms trước khi server bắt đầu làm việc</em></span></p>
-  <div class="note key">
-    <h4>Nhớ một câu</h4>
-    Trong hệ thống phân tán, <strong>số vòng khứ hồi quan trọng hơn băng thông</strong>. Băng thông mua được; RTT bị chặn bởi tốc độ ánh sáng và khoảng cách địa lý. Nên mọi tối ưu mạng đều là một dạng <em>giảm số vòng khứ hồi</em> — tái dùng kết nối, cache, đặt server gần người dùng.
-  </div>
+  <figure class="gist">
+<svg viewBox="0 0 860 398" role="img" aria-label="Cùng một lời gọi HTTP vẽ ba lần trên một trục mili-giây: kết nối mới 430 ms, tái dùng kết nối 130 ms, cache 0 ms — chỉ 30 ms là việc thật">
+<text class="sv-hv" x="0" y="18">CÙNG MỘT LỜI GỌI HTTP, BA CÁCH — CÙNG MỘT TRỤC MILI-GIÂY</text>
+<text class="sv-t" x="0" y="46" fill="var(--tomb)">Kết nối mới</text>
+<text class="sv-l" x="860" y="46" fill="var(--tomb)" text-anchor="end">430 ms</text>
+<rect x="0.0" y="54" width="187.0" height="22" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="93.5" y="70" fill="var(--tomb)" text-anchor="middle">DNS</text>
+<rect x="187.0" y="54" width="187.0" height="22" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="280.4" y="70" fill="var(--tomb)" text-anchor="middle">TCP</text>
+<rect x="373.9" y="54" width="187.0" height="22" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="467.4" y="70" fill="var(--tomb)" text-anchor="middle">TLS</text>
+<rect x="560.9" y="54" width="187.0" height="22" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="654.3" y="70" fill="var(--tomb)" text-anchor="middle">HTTP</text>
+<rect x="747.8" y="54" width="56.1" height="22" rx="3" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="775.9" y="70" fill="var(--ok)" text-anchor="middle">xử lý</text>
+<text class="sv-s" x="0" y="92" fill="var(--dim)">client mở kết nối cho từng request</text>
+<text class="sv-t" x="0" y="118" fill="var(--probe)">Tái dùng kết nối</text>
+<text class="sv-l" x="860" y="118" fill="var(--probe)" text-anchor="end">130 ms</text>
+<rect x="0.0" y="126" width="187.0" height="22" rx="3" fill="rgba(var(--amber-a),.22)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="93.5" y="142" fill="var(--probe)" text-anchor="middle">HTTP</text>
+<rect x="187.0" y="126" width="56.1" height="22" rx="3" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="215.0" y="142" fill="var(--ok)" text-anchor="middle">xử lý</text>
+<text class="sv-s" x="0" y="164" fill="var(--dim)">keep-alive · connection pool</text>
+<text class="sv-t" x="0" y="190" fill="var(--ok)">Cache còn hạn</text>
+<text class="sv-l" x="860" y="190" fill="var(--ok)" text-anchor="end">0 ms</text>
+<rect x="0" y="198" width="3" height="22" rx="1" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-s" x="14" y="214" fill="var(--dim)">trả từ bộ nhớ máy — 0 vòng khứ hồi</text>
+<text class="sv-s" x="0" y="236" fill="var(--dim)">không ra mạng lần nào</text>
+<line x1="0" y1="250" x2="860" y2="250" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-d" x="0.0" y="266" fill="var(--faint)" text-anchor="start">0</text>
+<text class="sv-d" x="187.0" y="266" fill="var(--faint)" text-anchor="middle">100</text>
+<text class="sv-d" x="373.9" y="266" fill="var(--faint)" text-anchor="middle">200</text>
+<text class="sv-d" x="560.9" y="266" fill="var(--faint)" text-anchor="middle">300</text>
+<text class="sv-d" x="747.8" y="266" fill="var(--faint)" text-anchor="middle">400</text>
+<text class="sv-d" x="860" y="266" fill="var(--faint)" text-anchor="end">ms  (RTT = 100 ms)</text>
+<rect x="0" y="284" width="860" height="52" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-t" x="16" y="306" fill="var(--probe)">Chỉ ô "xử lý" là việc thật — 30 ms trong 430 ms</text>
+<text class="sv-s" x="16" y="324" fill="var(--dim)">bốn ô còn lại chỉ là đi và về. Băng thông mua được; RTT bị chặn bởi tốc độ ánh sáng và khoảng cách.</text>
+<text class="sv-s" x="0" y="362" fill="var(--dim)">Cả bài chỉ làm hai việc trên hình này: CẮT BỚT VÒNG (tái dùng kết nối, cache, HTTP/2, HTTP/3) và XỬ LÝ KHI MỘT VÒNG KHÔNG VỀ (timeout,</text>
+<text class="sv-s" x="0" y="380" fill="var(--dim)">thử lại có backoff, idempotency, circuit breaker).</text>
+</svg>
+    <figcaption>Cùng một lời gọi, vẽ ba lần trên một trục. Bốn chặng đầu của hàng trên không làm việc gì cả — chúng chỉ đi và về, và đó là toàn bộ lý do tồn tại của mọi kỹ thuật trong bài.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Trong hệ thống phân tán, <b>số vòng khứ hồi quan trọng hơn băng thông</b> — băng thông mua được, RTT thì bị chặn bởi tốc độ ánh sáng.</li>
+    <li>Nên mọi tối ưu mạng đều là một dạng <b>giảm số vòng</b>: tái dùng kết nối (430 → 130), cache (→ 0), đặt server gần người dùng (giảm chính RTT).</li>
+    <li>Hàng dưới cùng cho thấy vì sao <b>connection pool là tối ưu rẻ nhất</b>: nó cắt ba trong bốn chặng mà không đổi một dòng logic nào.</li>
+  </ul>
+
 </section>
 
 <section id="http-s2">
@@ -74,7 +113,7 @@
     <tr><td>Có cache và còn hạn</td><td><strong>0</strong> — không ra mạng</td></tr>
   </table>
   <div class="note key">
-    <h4>Hai dòng cuối là nơi có gần hết lợi ích</h4>
+    <h4>Nén và keep-alive mang gần hết lợi ích</h4>
     Từ 5 RTT xuống 1 RTT là nhờ <strong>tái dùng kết nối</strong> — keep-alive và connection pool, gần như miễn phí về công sức. Từ 1 xuống 0 là nhờ <strong>cache</strong>. Mọi thứ khác — nâng TLS, đổi HTTP/3 — chỉ tiết kiệm được một hai vòng. Nêu thứ tự ưu tiên này là dấu hiệu bạn tối ưu theo tác động, không theo độ mới của công nghệ.
   </div>
   <p><strong>Hệ quả cho code.</strong></p>
@@ -144,7 +183,7 @@
     <tr><td>Head-of-line ở tầng HTTP</td><td>Có</td><td>Giải quyết</td><td>Giải quyết</td></tr>
     <tr><td>Head-of-line ở tầng TCP</td><td>Có</td><td><strong>Vẫn có</strong></td><td>Giải quyết</td></tr>
     <tr><td>Nén header</td><td>Không</td><td>HPACK</td><td>QPACK</td></tr>
-    <tr><td>Bắt tay</td><td>TCP + TLS riêng</td><td>TCP + TLS riêng</td><td><strong>Gộp một lần</strong></td></tr>
+    <tr><td>Handshake</td><td>TCP + TLS riêng</td><td>TCP + TLS riêng</td><td><strong>Gộp một lần</strong></td></tr>
   </table>
   <div class="note key">
     <h4>Chi tiết hay được hỏi vặn: HTTP/2 chưa giải quyết hết head-of-line</h4>
@@ -158,8 +197,50 @@
   </ul>
 </section>
 
-<section id="http-s6">
-  <div class="sh"><b>06</b><h2>Idempotency và khi nào được thử lại</h2></div>
+<section id="http-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Khi một vòng không về</h2></div>
+
+  <p class="key">Bốn mục trên vẽ chuyện lúc mọi thứ chạy tốt. Từ đây là <em>chuyện lúc một vòng không về</em> — ba lớp phòng thủ dưới đây, mỗi lớp một mục, đều tồn tại vì cùng một lý do.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 304" role="img" aria-label="Ba lớp phòng thủ khi một lời gọi không về, và hiệu ứng nhân tải mà cả ba cùng chặn">
+<text class="sv-hv" x="0" y="18">MỘT VÒNG KHÔNG VỀ — TIMEOUT KHÔNG CÓ NGHĨA LÀ THẤT BẠI</text>
+<rect x="0" y="26" width="860" height="46" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-t" x="16" y="46" fill="var(--tomb)">Client hết giờ chờ. Server có thể đã tạo đơn — chỉ là câu trả lời chưa về.</text>
+<text class="sv-s" x="16" y="64" fill="var(--dim)">nên "thử lại" và "thử lại an toàn" là hai chuyện khác nhau</text>
+<line x1="430.0" y1="74" x2="430.0" y2="82" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="430.0,90 425.8,82 434.2,82" fill="var(--tomb)"/>
+<rect x="0.0" y="98" width="274.7" height="96" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-t" x="14.0" y="122" fill="var(--ok)">Thử lại có được không?</text>
+<text class="sv-s" x="14.0" y="144" fill="var(--dim)">Idempotency-Key trên mỗi POST</text>
+<text class="sv-s" x="14.0" y="162" fill="var(--dim)">server thấy khoá cũ → trả kết quả cũ</text>
+<text class="sv-s" x="14.0" y="180" fill="var(--dim)">GET · PUT · DELETE vốn đã an toàn</text>
+<rect x="292.7" y="98" width="274.7" height="96" rx="5" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-t" x="306.7" y="122" fill="var(--probe)">Thử lại thế nào?</text>
+<text class="sv-s" x="306.7" y="144" fill="var(--dim)">backoff hàm mũ CỘNG jitter</text>
+<text class="sv-s" x="306.7" y="162" fill="var(--dim)">tối đa 3 lần · ngân sách 10% lưu lượng</text>
+<text class="sv-s" x="306.7" y="180" fill="var(--dim)">KHÔNG retry lồng nhau: 3×3×3 = 27 lượt</text>
+<rect x="585.3" y="98" width="274.7" height="96" rx="5" fill="rgba(var(--blue-a),.08)" stroke="var(--filled)" stroke-width="1.4"/>
+<text class="sv-t" x="599.3" y="122" fill="var(--filled)">Khi nào ngừng thử?</text>
+<text class="sv-s" x="599.3" y="144" fill="var(--dim)">timeout giảm dần theo chiều gọi</text>
+<text class="sv-s" x="599.3" y="162" fill="var(--dim)">gateway 3s → A 2s → B 1s → DB 500ms</text>
+<text class="sv-s" x="599.3" y="180" fill="var(--dim)">breaker: CLOSED → OPEN → HALF-OPEN</text>
+<line x1="430.0" y1="206" x2="430.0" y2="214" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="430.0,222 425.8,214 434.2,214" fill="var(--rule-hi)"/>
+<rect x="0" y="230" width="860" height="52" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-t" x="16" y="252" fill="var(--tomb)">Cả ba cùng chặn MỘT thứ: hiệu ứng nhân tải</text>
+<text class="sv-s" x="16" y="270" fill="var(--dim)">service yếu đi → mọi client cùng thử lại → tải tăng gấp bội → sự cố nhỏ thành sập hệ thống</text>
+</svg>
+    <figcaption>Ba ô giữa trả lời ba câu khác nhau, nhưng dòng dưới cùng mới là lý do cả ba tồn tại: không có chúng, một service chậm đi sẽ tự biến thành một service sập.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Mục 07 &#8212; ô trái &#8212; là chỗ <code>POST</code> khác mọi method còn lại: thử lại nó có thể tạo <b>đơn thứ hai</b>, nên phải có khoá idempotency mới được thử lại.</li>
+    <li>Mục 08 &#8212; ô giữa: <b>jitter quan trọng ngang backoff</b> — không có nó, mọi client cùng chờ đúng 1s rồi cùng bắn lại một lúc, đúng thứ backoff định tránh.</li>
+    <li>Mục 10 &#8212; ô phải: timeout phải <b>giảm dần theo chiều gọi</b>, không thì tầng ngoài bỏ cuộc trước khi tầng trong kịp trả lời — công đã làm mà không ai nhận.</li>
+  </ul>
+</section>
+
+<section id="http-s7">
+  <div class="sh"><b>07</b><h2>Idempotency và khi nào được thử lại</h2></div>
 <p class="key">Idempotent = gọi nhiều lần cho kết quả <em>giống hệt</em> gọi một lần.</p>
   <div class="strip">
     <div class="c t"><i>GET</i><b>an toàn</b><u>thử lại tự do</u></div>
@@ -182,8 +263,8 @@
   <p>Đây là cách mọi API thanh toán làm. Nêu được nó khi bàn về retry cho thấy bạn đã nghĩ tới trường hợp <em>phản hồi mất</em>, không chỉ trường hợp server lỗi.</p>
 </section>
 
-<section id="http-s7">
-  <div class="sh"><b>07</b><h2>Backoff và jitter</h2></div>
+<section id="http-s8">
+  <div class="sh"><b>08</b><h2>Backoff và jitter</h2></div>
 <div class="stack">
     <div class="s warn"><b>Sai · thử lại ngay lập tức</b><span>server đang quá tải mà bạn đổ thêm tải vào → làm nó sập hẳn</span></div>
     <div class="s"><b>Tốt hơn · backoff theo hàm mũ</b><span>chờ 1s, 2s, 4s, 8s… — nhưng mọi client cùng hỏng lúc t=0 sẽ cùng thử lại lúc t=1, t=3, t=7 → tải đến theo từng đợt đồng bộ</span></div>
@@ -203,8 +284,8 @@
   </div>
 </section>
 
-<section id="http-s8">
-  <div class="sh"><b>08</b><h2>Mã trạng thái — theo góc nhìn vận hành</h2></div>
+<section id="http-s9">
+  <div class="sh"><b>09</b><h2>Mã trạng thái — theo góc nhìn vận hành</h2></div>
   <table>
     <tr><th>Mã</th><th>Nghĩa</th><th>Có thử lại?</th></tr>
     <tr><td>200 / 201</td><td>Thành công</td><td>—</td></tr>
@@ -223,8 +304,8 @@
   </div>
 </section>
 
-<section id="http-s9">
-  <div class="sh"><b>09</b><h2>Timeout và circuit breaker</h2></div>
+<section id="http-s10">
+  <div class="sh"><b>10</b><h2>Timeout và circuit breaker</h2></div>
 <p class="key">Mọi lời gọi ra ngoài <em>phải</em> có timeout — không có thì một upstream chậm sẽ giữ hết luồng và kết nối của bạn, service của bạn chết theo dù bản thân nó hoàn toàn ổn.</p>
   <div class="axis">
     <div class="stop"><b>gateway · 3s</b><span>ngoài cùng, chờ lâu nhất</span></div>
@@ -250,67 +331,6 @@
     <li>Có tái dùng kết nối chưa? RTT tới người dùng bao nhiêu?</li>
     <li>Cache hit bao nhiêu phần trăm? Có N+1 query không?</li>
     <li class="end">Có lời gọi nào không timeout, hay retry lồng nhau nhân tải không?</li>
-  </ul>
-</section>
-
-<section id="http-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Đếm vòng khứ hồi trước, rồi mới bàn tới chuyện gì xảy ra khi một vòng không về.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 386" role="img" aria-label="Tổng kết TCP và HTTP: bốn chặng bắt tay, cách giảm số RTT, và ba lớp phòng thủ khi lời gọi hỏng">
-      <text class="sv-h" x="16" y="26">&#9312; TRƯỚC KHI SERVER LÀM VIỆC — BỐN CHẶNG</text>
-
-      <rect x="16" y="38" width="180" height="34" rx="6" fill="rgba(140,169,242,.12)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-l" x="36" y="60" fill="#8CA9F2">DNS · 1 RTT</text>
-      <rect x="204" y="38" width="180" height="34" rx="6" fill="rgba(140,169,242,.12)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-l" x="224" y="60" fill="#8CA9F2">TCP · 1 RTT</text>
-      <rect x="392" y="38" width="180" height="34" rx="6" fill="rgba(140,169,242,.12)" stroke="#8CA9F2" stroke-width="2"></rect>
-      <text class="sv-l" x="412" y="60" fill="#8CA9F2">TLS · 1–2 RTT</text>
-      <rect x="580" y="38" width="180" height="34" rx="6" fill="rgba(237,180,74,.14)" stroke="#EDB44A" stroke-width="2"></rect>
-      <text class="sv-l" x="600" y="60" fill="#EDB44A">HTTP · 1 RTT</text>
-      <text class="sv-d" x="16" y="90">RTT 100 ms → một kết nối mới tốn 400–500 ms trước khi server bắt đầu</text>
-
-      <text class="sv-h" x="16" y="122">&#9313; CẮT SỐ VÒNG — THEO ĐÚNG THỨ TỰ LỢI ÍCH</text>
-      <rect x="16" y="134" width="828" height="76" rx="8" fill="rgba(91,207,160,.06)" stroke="#3D352C" stroke-width="2"></rect>
-      <rect x="36" y="148" width="330" height="14" rx="3" fill="#F2718A"></rect>
-      <rect x="36" y="170" width="66" height="14" rx="3" fill="#EDB44A"></rect>
-      <rect x="36" y="192" width="6" height="14" rx="3" fill="#5BCFA0"></rect>
-      <text class="sv-l" x="386" y="160" fill="#F79BAB">kết nối mới · 5 RTT — client mới cho từng request</text>
-      <text class="sv-l" x="386" y="182" fill="#EDB44A">tái dùng kết nối · 1 RTT — keep-alive, connection pool</text>
-      <text class="sv-l" x="386" y="204" fill="#8EE0BE">cache còn hạn · 0 RTT — không ra mạng</text>
-
-      <text class="sv-h" x="16" y="242">&#9314; KHI MỘT VÒNG KHÔNG VỀ — BA LỚP</text>
-      <rect x="16" y="254" width="268" height="86" rx="8" fill="rgba(242,113,138,.08)" stroke="#F2718A" stroke-width="2"></rect>
-      <text class="sv-l" x="36" y="276" fill="#F2718A">timeout ≠ thất bại</text>
-      <text class="sv-d" x="36" y="294">chỉ có nghĩa là không biết</text>
-      <text class="sv-l" x="36" y="316" fill="#8EE0BE">→ Idempotency-Key</text>
-      <text class="sv-d" x="36" y="332">server thấy khoá cũ thì trả kết quả cũ</text>
-
-      <rect x="296" y="254" width="268" height="86" rx="8" fill="rgba(237,180,74,.08)" stroke="#EDB44A" stroke-width="2"></rect>
-      <text class="sv-l" x="316" y="276" fill="#EDB44A">thử lại đúng cách</text>
-      <text class="sv-d" x="316" y="294">backoff hàm mũ CỘNG jitter</text>
-      <text class="sv-d" x="316" y="312">giới hạn 3 lần · ngân sách 10%</text>
-      <text class="sv-d" x="316" y="330">không retry lồng nhau: 3×3×3 = 27</text>
-
-      <rect x="576" y="254" width="268" height="86" rx="8" fill="rgba(91,207,160,.08)" stroke="#5BCFA0" stroke-width="2"></rect>
-      <text class="sv-l" x="596" y="276" fill="#5BCFA0">thất bại nhanh</text>
-      <text class="sv-d" x="596" y="294">timeout giảm dần theo chiều gọi</text>
-      <text class="sv-d" x="596" y="312">gateway 3s → A 2s → B 1s → DB 500ms</text>
-      <text class="sv-d" x="596" y="330">circuit breaker: CLOSED → OPEN → HALF-OPEN</text>
-
-      <line x1="16" y1="356" x2="844" y2="356" stroke="#2E2822"></line>
-      <text class="sv-l" x="16" y="378" fill="#7A6F63">&#9314; ba lớp cùng chặn một thứ: <tspan fill="#F79BAB">hiệu ứng nhân tải</tspan> — service yếu đi thì mọi client cùng thử lại, biến sự cố nhỏ thành sập hệ thống</text>
-    </svg>
-    <figcaption>Hai hàng trên là chuyện lúc mọi thứ chạy tốt; hàng dưới là chuyện lúc không, và cả ba ô đều tồn tại để chặn cùng một vòng xoáy.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li>&#9313; là lý do connection pool dùng chung là tối ưu rẻ nhất — nâng TLS hay đổi HTTP/3 chỉ cắt được một hai vòng.</li>
-    <li>&#9314; ô trái là chỗ <code>POST</code> khác mọi method còn lại: thử lại nó có thể tạo đơn thứ hai, nên phải có khoá idempotency.</li>
-    <li>HTTP/2 dọn head-of-line ở tầng HTTP nhưng TCP vẫn giữ thứ tự byte, nên nghẽn chỉ chuyển xuống dưới — HTTP/3 mới dọn hết.</li>
-    <li>Cache ở dòng 0 RTT có bài riêng: <a href="../caching/index.html">Caching</a>; phần bắt tay TLS ở <a href="../dns-tls/index.html">DNS &amp; TLS</a>.</li>
   </ul>
 </section>
 

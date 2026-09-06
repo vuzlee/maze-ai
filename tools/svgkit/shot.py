@@ -11,6 +11,10 @@ import subprocess, sys, os
 CSS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                    'assets', 'style.css')
 CSS = os.path.abspath(CSS)
+FONTS = ('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;'
+         '1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700'
+         '&family=JetBrains+Mono:wght@400;500;600&display=swap')
+
 CHROME = ['google-chrome', '--headless', '--disable-gpu', '--no-sandbox',
           '--hide-scrollbars', '--virtual-time-budget=3000']
 
@@ -18,6 +22,8 @@ CHROME = ['google-chrome', '--headless', '--disable-gpu', '--no-sandbox',
 def shoot(d, name, width=920, height=540, scale=2):
     svg = open(f'{d}/{name}.svg', encoding='utf-8').read()
     html = (f'<html><head><meta charset="utf-8">'
+            f'<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+            f'<link rel="stylesheet" href="{FONTS}">'
             f'<link rel="stylesheet" href="file://{CSS}">'
             f'<style>body{{background:var(--bg);margin:0;padding:18px}}'
             f'figure{{margin:0}}svg{{width:100%;height:auto}}</style>'

@@ -47,9 +47,69 @@
 </header>
 
 <section id="dnstls-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>DNS phân giải thế nào</h2></div>
-  <p class="key">DNS ánh xạ tên miền (<code>example.com</code>) sang địa chỉ IP mà TCP dùng để mở kết nối. Không có một máy chủ nào biết hết mọi tên miền — việc tra cứu đi qua nhiều tầng, và mỗi tầng đều có thể trả lời từ cache trước khi phải hỏi tiếp.</p>
-<pre><code>Trình duyệt/máy         Resolver (ISP)          Root NS         .com TLD NS      example.com NS
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+
+  <p class="key">Trước khi gửi được byte dữ liệu đầu tiên, trình duyệt phải trả ba món: <em>tìm ra IP</em>, <em>dựng kênh mã hoá</em>, và <em>tin được đầu bên kia là ai</em>.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 197" role="img" aria-label="Ba ý của bài: phân giải DNS, bắt tay TLS, chuỗi chứng chỉ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① DNS &#8212; tên thành IP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">hỏi xuống từng tầng, dừng ở tầng nào có cache</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② TLS bắt tay</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">trả trước mấy vòng khứ hồi để có kênh mã hoá</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Certificate</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">xác minh ngược tới điểm neo cài sẵn trong máy</text>
+<text class="sv-hv" x="372" y="18">BA Ý CỦA BÀI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--muted)">Bản đồ chung</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi mục sau tô sáng một ô</text>
+</svg>
+  <figcaption>Cả bài là ba ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
+  </figure>
+</section>
+
+<section id="dnstls-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>DNS phân giải thế nào</h2></div>
+
+  <p class="key">DNS ánh xạ tên miền sang địa chỉ IP mà TCP dùng để mở kết nối. Không máy chủ nào biết hết mọi tên miền — việc tra cứu <em>đi xuống từng tầng</em>, và mỗi tầng đều có thể trả lời từ cache trước khi phải hỏi tiếp.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Ba ý của bài: phân giải DNS, bắt tay TLS, chuỗi chứng chỉ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">① DNS &#8212; tên thành IP</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">hỏi xuống từng tầng, dừng ở tầng nào có cache</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② TLS bắt tay</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">trả trước mấy vòng khứ hồi để có kênh mã hoá</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Certificate</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">xác minh ngược tới điểm neo cài sẵn trong máy</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">DỪNG Ở TẦNG NÀO CÓ CACHE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Trình duyệt &#183; hệ điều hành</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">gần nhất, phạm vi hẹp nhất</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Resolver của ISP</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">dùng chung &#8594; đa số truy vấn dừng ở đây</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Root &#8594; TLD &#8594; authoritative</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">chuỗi đầy đủ &#183; chỉ khi không tầng nào có sẵn</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">TTL</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">giữ được bao lâu &#183; dài thì ít hỏi, chậm đổi IP</text>
+</svg>
+  <figcaption>Ô &#9312; sáng lên. Chuỗi hỏi đầy đủ chỉ xảy ra khi không tầng nào có cache.</figcaption>
+  </figure>
+
+<pre><code>Trình duyệt/máy      Resolver (ISP)      Root NS      .com TLD NS      example.com NS
      │  "example.com ở đâu?"  │                     │                │                │
      │───────────────────────►│                     │                │                │
      │                        │──"ai giữ .com?"────►│                │                │
@@ -61,7 +121,7 @@
      │◄───────────── trả IP ──│
      ▼
 Đây là chuỗi ĐẦY ĐỦ — chỉ xảy ra khi KHÔNG tầng nào có sẵn trong cache.
-Bình thường resolver của ISP đã nhớ từ lần tra cứu trước, và toàn bộ chuỗi trên rút gọn còn 0 vòng hỏi thêm.</code></pre>
+Bình thường resolver của ISP đã nhớ từ lần trước, cả chuỗi trên rút gọn còn 0 vòng hỏi.</code></pre>
   <table>
     <tr><th>Tầng cache</th><th>Vị trí</th></tr>
     <tr><td>Cache trình duyệt</td><td>Nhanh nhất, phạm vi một tab/process</td></tr>
@@ -74,8 +134,36 @@ Bình thường resolver của ISP đã nhớ từ lần tra cứu trước, và
   </div>
 </section>
 
-<section id="dnstls-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>TLS bắt tay</h2></div>
+<section id="dnstls-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>TLS bắt tay</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 218" role="img" aria-label="Ba ý của bài: phân giải DNS, bắt tay TLS, chuỗi chứng chỉ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① DNS &#8212; tên thành IP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">hỏi xuống từng tầng, dừng ở tầng nào có cache</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">② TLS bắt tay</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">trả trước mấy vòng khứ hồi để có kênh mã hoá</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Certificate</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">xác minh ngược tới điểm neo cài sẵn trong máy</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ĐẾM VÒNG KHỨ HỒI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">TLS 1.2</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">2 RTT bắt tay &#183; cộng 1 RTT của TCP</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">TLS 1.3</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">1 RTT &#183; gộp bớt bước thoả thuận</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">0-RTT (resume)</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">gửi ngay &#183; đổi lại là rủi ro replay</text>
+</svg>
+  <figcaption>Ô &#9313; sáng lên. Cái giá tính bằng số vòng khứ hồi.</figcaption>
+  </figure>
   <p class="key">TLS thoả thuận thuật toán mã hoá và trao đổi khoá trước khi gửi được byte dữ liệu ứng dụng nào. Số vòng khứ hồi cần cho việc đó khác nhau giữa hai phiên bản đang dùng phổ biến — đúng con số đã nêu ở bảng "Đếm vòng khứ hồi" của bài TCP &amp; HTTP.</p>
   <div class="cmp two">
     <div class="c">
@@ -104,8 +192,36 @@ Bình thường resolver của ISP đã nhớ từ lần tra cứu trước, và
   </div>
 </section>
 
-<section id="dnstls-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Chứng chỉ</h2></div>
+<section id="dnstls-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Chứng chỉ</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 218" role="img" aria-label="Ba ý của bài: phân giải DNS, bắt tay TLS, chuỗi chứng chỉ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① DNS &#8212; tên thành IP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">hỏi xuống từng tầng, dừng ở tầng nào có cache</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② TLS bắt tay</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">trả trước mấy vòng khứ hồi để có kênh mã hoá</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">③ Certificate</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">xác minh ngược tới điểm neo cài sẵn trong máy</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">XÁC MINH TỪ DƯỚI LÊN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Chứng chỉ của site</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">ký bởi CA trung gian</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">CA trung gian</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">ký bởi root CA</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Root CA</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">cài sẵn trong máy &#8212; điểm neo, không ai ký cho nó</text>
+</svg>
+  <figcaption>Ô &#9314; sáng lên. Niềm tin đi từ dưới lên tới điểm neo.</figcaption>
+  </figure>
   <p class="key">Certificate của server chứng minh nó đúng là <code>example.com</code>, không phải kẻ đứng giữa giả mạo. Trình duyệt không tin server một cách trực tiếp — nó lần theo một <strong>chuỗi tin cậy (chain of trust)</strong> ngược lên tới một điểm neo đã cài sẵn.</p>
   <div class="stack">
     <div class="s ok"><b>Root CA</b><span>certificate authority gốc, cài sẵn trong hệ điều hành/trình duyệt — điểm neo tin cậy tuyệt đối</span></div>
@@ -117,77 +233,6 @@ Bình thường resolver của ISP đã nhớ từ lần tra cứu trước, và
     <li>Chữ ký trên certificate của server phải khớp khoá công khai của Intermediate CA.</li>
     <li>Chữ ký trên Intermediate phải khớp khoá công khai của một Root CA đã tin cậy sẵn.</li>
     <li class="end">Đứt một mắt xích — hết hạn, sai tên miền, ký bởi CA lạ — trình duyệt chặn ngay.</li>
-  </ul>
-</section>
-
-<section id="dnstls-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Trước byte dữ liệu đầu tiên, trình duyệt phải trả lời hai câu hỏi: <em>máy đó ở đâu</em> (DNS) và <em>có đúng là nó không</em> (TLS).</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 372" role="img" aria-label="DNS đi qua bốn tầng và dừng ở tầng nào có cache, TLS bắt tay tốn 2 hoặc 1 RTT, certificate lần ngược lên root CA">
-
-      <text class="sv-h" x="8" y="16">&#9312; DNS — HỎI XUỐNG TỪNG TẦNG, DỪNG Ở TẦNG NÀO CÓ CACHE</text>
-      <rect x="8" y="26" width="128" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="18" y="46" fill="var(--filled-lo)">Trình duyệt</text>
-      <path d="M136 41 h20" stroke="#7A6F63"/><path d="M156 41 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="158" y="26" width="150" height="30" rx="4" fill="rgba(91,207,160,.12)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="168" y="46" fill="#8EE0BE">Resolver ISP</text>
-      <path d="M308 41 h20" stroke="#7A6F63" stroke-dasharray="3 3"/><path d="M328 41 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="330" y="26" width="106" height="30" rx="4" fill="rgba(140,169,242,.06)" stroke="#3D352C"/>
-      <text class="sv-t" x="340" y="46" fill="var(--filled-lo)">Root NS</text>
-      <path d="M436 41 h20" stroke="#7A6F63" stroke-dasharray="3 3"/><path d="M456 41 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="458" y="26" width="118" height="30" rx="4" fill="rgba(140,169,242,.06)" stroke="#3D352C"/>
-      <text class="sv-t" x="468" y="46" fill="var(--filled-lo)">.com TLD</text>
-      <path d="M576 41 h20" stroke="#7A6F63" stroke-dasharray="3 3"/><path d="M596 41 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="598" y="26" width="164" height="30" rx="4" fill="rgba(140,169,242,.06)" stroke="#3D352C"/>
-      <text class="sv-t" x="608" y="46" fill="var(--filled-lo)">authoritative NS</text>
-      <text class="sv-l" x="8" y="76" fill="#8EE0BE">đường liền: gần như mọi truy vấn dừng ở đây — resolver đã nhớ từ lần trước</text>
-      <text class="sv-l" x="330" y="76" fill="#7A6F63">đường đứt: chuỗi đầy đủ, chỉ chạy khi không tầng nào có sẵn</text>
-      <rect x="8" y="86" width="754" height="26" rx="4" fill="rgba(237,180,74,.08)" stroke="#EDB44A"/>
-      <text class="sv-t" x="18" y="104" fill="#EDB44A">TTL quyết định cache được bao lâu — dài thì ít truy vấn, nhưng đổi IP cũng lâu lan ra khắp nơi</text>
-
-      <text class="sv-h" x="8" y="142">&#9313; TLS BẮT TAY — TRẢ BAO NHIÊU VÒNG KHỨ HỒI TRƯỚC KHI GỬI ĐƯỢC DỮ LIỆU</text>
-      <rect x="8" y="152" width="264" height="76" rx="5" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-t" x="20" y="172" fill="#F79BAB">TLS 1.2 &#183; 2 RTT</text>
-      <text class="sv-l" x="20" y="190">Hello &#8594; Hello + Certificate &#8592;</text>
-      <text class="sv-l" x="20" y="206">KeyExchange &#8594; rồi mới có dữ liệu</text>
-      <text class="sv-d" x="20" y="222" fill="#7A6F63">trao khoá ở vòng thứ hai</text>
-      <rect x="284" y="152" width="264" height="76" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="296" y="172" fill="#EDB44A">TLS 1.3 &#183; 1 RTT</text>
-      <text class="sv-l" x="296" y="190">Hello + key share &#8594;</text>
-      <text class="sv-l" x="296" y="206">Hello + Certificate + Finished &#8592;</text>
-      <text class="sv-d" x="296" y="222" fill="#7A6F63">gộp đề xuất khoá vào lượt đầu</text>
-      <rect x="560" y="152" width="288" height="76" rx="5" fill="rgba(91,207,160,.08)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="572" y="172" fill="#8EE0BE">0-RTT resumption</text>
-      <text class="sv-s" x="572" y="190">nối lại phiên cũ &#8594; gửi ngay gói đầu</text>
-      <text class="sv-l" x="572" y="206" fill="#F79BAB">đổi lại: dữ liệu đó bị replay được</text>
-      <text class="sv-d" x="572" y="222" fill="#7A6F63">chỉ dùng cho request idempotent</text>
-
-      <text class="sv-h" x="8" y="258">&#9314; CERTIFICATE — XÁC MINH NGƯỢC TỪ DƯỚI LÊN TỚI ĐIỂM NEO CÀI SẴN</text>
-      <rect x="8" y="268" width="234" height="30" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="18" y="288" fill="var(--filled-lo)">Certificate của example.com</text>
-      <path d="M242 283 h22" stroke="#7A6F63"/><path d="M264 283 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="266" y="268" width="196" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="276" y="288" fill="var(--filled-lo)">Intermediate CA ký</text>
-      <path d="M462 283 h22" stroke="#7A6F63"/><path d="M484 283 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="486" y="268" width="234" height="30" rx="4" fill="rgba(91,207,160,.12)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="496" y="288" fill="#8EE0BE">Root CA — cài sẵn trong máy</text>
-      <text class="sv-l" x="8" y="316" fill="#F79BAB">đứt một mắt xích — hết hạn, sai tên miền, ký bởi CA lạ — trình duyệt chặn ngay</text>
-
-      <line x1="8" y1="330" x2="852" y2="330" stroke="#2E2822"/>
-      <text class="sv-l" x="8" y="348">&#9312; cache là thứ làm DNS gần như miễn phí — nhưng TTL cũng là thứ làm failover chậm</text>
-      <text class="sv-l" x="8" y="364">&#9313;&#9314; TLS trả giá bằng RTT để đổi lấy chứng minh danh tính; TLS 1.3 cắt một nửa cái giá đó</text>
-    </svg>
-    <figcaption>Đọc theo số: DNS đi xuống từng tầng và dừng ở tầng nào có cache &#9312;, TLS bắt tay tốn 2 hay 1 vòng tuỳ phiên bản &#9313;, và certificate được xác minh ngược lên tới root CA cài sẵn &#9314;.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><strong>RTT</strong> là đơn vị đo chung của &#9313; — mọi con số ở đó là số vòng khứ hồi, nên client càng xa càng đắt.</li>
-    <li><strong>Keep-alive</strong> và connection pool là cách trả hai chặng &#9312;&#9313; đúng một lần thay vì trả lại cho mỗi request.</li>
-    <li><strong>Idempotency</strong> là điều kiện để 0-RTT ở &#9313; an toàn: một request bị gửi lặp mà không đổi kết quả thì replay vô hại.</li>
-    <li><strong>Man-in-the-middle</strong> là mối nguy mà &#9314; tồn tại để chặn — không có chuỗi tin cậy thì vẫn mã hoá, với kẻ giả mạo.</li>
   </ul>
 </section>
 

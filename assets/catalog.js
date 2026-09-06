@@ -82,7 +82,7 @@ window.CATALOG = [
       "title": "Hash map & set",
       "tag": "Data structure",
       "blurb": "Vì sao O(1) trung bình, va chạm xử lý thế nào, khi nào tụt về O(n), và ba pattern đổi thời gian lấy bộ nhớ.",
-      "n": 6,
+      "n": 7,
       "path": "content/01-dsa/03-data-structures/hash-map/index.html",
       "skeleton": false,
       "lc": 8
@@ -316,7 +316,7 @@ window.CATALOG = [
       "title": "Language core overview",
       "tag": "Overview",
       "blurb": "Các quy tắc nhất quán của Python — mô hình object, tham chiếu, giao thức, và phạm vi biến.",
-      "n": 5,
+      "n": 4,
       "path": "content/02-python/02-language-core/language-core-overview/index.html",
       "skeleton": false,
       "lc": 0
@@ -382,7 +382,7 @@ window.CATALOG = [
       "title": "Decorator & context manager",
       "tag": "Python",
       "blurb": "Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.",
-      "n": 8,
+      "n": 7,
       "path": "content/02-python/02-language-core/decorator-context-manager/index.html",
       "skeleton": false,
       "lc": 0
@@ -466,7 +466,7 @@ window.CATALOG = [
       "title": "LeetCode toolkit",
       "tag": "Toolkit",
       "blurb": "bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.",
-      "n": 6,
+      "n": 7,
       "path": "content/02-python/05-toolkit/leetcode-toolkit/index.html",
       "skeleton": false,
       "lc": 0
@@ -517,7 +517,7 @@ window.CATALOG = [
       "title": "Profiling & performance",
       "tag": "Performance",
       "blurb": "Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.",
-      "n": 6,
+      "n": 7,
       "path": "content/02-python/08-performance/performance-profiling/index.html",
       "skeleton": false,
       "lc": 0
@@ -580,7 +580,7 @@ window.CATALOG = [
       "title": "Virtual memory & paging",
       "tag": "CS",
       "blurb": "Địa chỉ ảo tới địa chỉ vật lý, page fault, và vì sao chương trình tưởng mình có cả bộ nhớ máy.",
-      "n": 6,
+      "n": 7,
       "path": "content/03-cs-fundamentals/02-os/memory-virtual-paging/index.html",
       "skeleton": false,
       "lc": 0
@@ -591,7 +591,7 @@ window.CATALOG = [
       "title": "Lock, deadlock & race condition",
       "tag": "CS",
       "blurb": "Bốn điều kiện gây deadlock, mutex khác semaphore, và vì sao một phép cộng cũng có thể hỏng.",
-      "n": 6,
+      "n": 7,
       "path": "content/03-cs-fundamentals/02-os/lock-deadlock-race/index.html",
       "skeleton": false,
       "lc": 0
@@ -641,7 +641,7 @@ window.CATALOG = [
       "title": "Caching",
       "tag": "Networking",
       "blurb": "Cache HTTP, năm tầng cache, ba chiến lược vô hiệu hoá, thundering herd, và khác biệt giữa no-cache với no-store.",
-      "n": 8,
+      "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/caching/index.html",
       "skeleton": false,
       "lc": 0
@@ -1200,7 +1200,7 @@ window.CATALOG = [
       "title": "Overfitting & regularization",
       "tag": "Generalization",
       "blurb": "Chẩn đoán bằng số, đọc learning curve để biết có nên thêm dữ liệu, các cách regularize, và vì sao random search thắng grid.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/04-core-concepts/overfitting-regularization/index.html",
       "skeleton": false,
       "lc": 0
@@ -1261,7 +1261,7 @@ window.CATALOG = [
       "title": "Ridge, Lasso & Elastic Net",
       "tag": "ML",
       "blurb": "Ba cách regularize model tuyến tính: L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở hình dạng vùng phạt.",
-      "n": 8,
+      "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
       "skeleton": false,
       "lc": 0
@@ -1311,7 +1311,7 @@ window.CATALOG = [
       "title": "Tree models overview",
       "tag": "Overview",
       "blurb": "Bài đầu tiên của nhánh: người ta đang cố giải quyết vấn đề gì, lịch sử 40 năm của nhánh này, hai hướng bagging và boosting, và học theo thứ tự nào.",
-      "n": 9,
+      "n": 10,
       "path": "content/05-machine-learning/06-tree-models/tree-family-overview/index.html",
       "skeleton": false,
       "lc": 0
@@ -1322,7 +1322,7 @@ window.CATALOG = [
       "title": "Decision tree",
       "tag": "ML",
       "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba hyperparameter để hãm nó lại.",
-      "n": 13,
+      "n": 11,
       "path": "content/05-machine-learning/06-tree-models/decision-tree/index.html",
       "skeleton": false,
       "lc": 0
@@ -1330,11 +1330,22 @@ window.CATALOG = [
      {
       "dir": "random-forest",
       "slug": "rf",
-      "title": "Random forest & bagging",
+      "title": "Random forest",
       "tag": "Ensemble",
       "blurb": "Hỏi một cây thì hay sai — random forest trồng hàng trăm cây rồi cho bỏ phiếu. Ba bước của thuật toán, vì sao nó chạy được, và cái bẫy của bảng feature importance.",
-      "n": 12,
+      "n": 11,
       "path": "content/05-machine-learning/06-tree-models/random-forest/index.html",
+      "skeleton": false,
+      "lc": 0
+     },
+     {
+      "dir": "adaboost",
+      "slug": "ada",
+      "title": "AdaBoost",
+      "tag": "Ensemble",
+      "blurb": "Boosting đầu tiên: đội trọng số vào điểm đang sai, chấm điểm alpha cho từng stump, rồi bỏ phiếu có trọng số.",
+      "n": 10,
+      "path": "content/05-machine-learning/06-tree-models/adaboost/index.html",
       "skeleton": false,
       "lc": 0
      },
@@ -1344,7 +1355,7 @@ window.CATALOG = [
       "title": "Gradient boosting",
       "tag": "Ensemble",
       "blurb": "Cộng cây nông theo phần dư, vì sao gọi là gradient, learning_rate bù trừ với n_estimators, và vì sao dữ liệu bảng vẫn thuộc về boosting.",
-      "n": 11,
+      "n": 10,
       "path": "content/05-machine-learning/06-tree-models/gradient-boosting/index.html",
       "skeleton": false,
       "lc": 0
@@ -1355,7 +1366,7 @@ window.CATALOG = [
       "title": "XGBoost",
       "tag": "Ensemble",
       "blurb": "Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.",
-      "n": 11,
+      "n": 9,
       "path": "content/05-machine-learning/06-tree-models/xgboost/index.html",
       "skeleton": false,
       "lc": 0
@@ -1394,7 +1405,7 @@ window.CATALOG = [
       "title": "K-means & clustering",
       "tag": "ML",
       "blurb": "Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/07-clustering/kmeans-clustering/index.html",
       "skeleton": false,
       "lc": 0
@@ -1405,7 +1416,7 @@ window.CATALOG = [
       "title": "DBSCAN",
       "tag": "ML",
       "blurb": "Cụm là vùng đông đúc nối nhau: không cần biết k trước, bắt được cụm hình bất kỳ, và tự đánh dấu điểm nhiễu.",
-      "n": 9,
+      "n": 10,
       "path": "content/05-machine-learning/07-clustering/dbscan/index.html",
       "skeleton": false,
       "lc": 0
@@ -1416,7 +1427,7 @@ window.CATALOG = [
       "title": "HDBSCAN",
       "tag": "ML",
       "blurb": "Chạy DBSCAN ở mọi mức eps cùng lúc, dựng cây phân cấp rồi giữ lại cụm nào bền nhất — bỏ được tham số khó chọn nhất.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/07-clustering/hdbscan/index.html",
       "skeleton": false,
       "lc": 0
@@ -1433,7 +1444,7 @@ window.CATALOG = [
       "title": "PCA & dimensionality reduction",
       "tag": "ML",
       "blurb": "Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/08-dimensionality/pca-dimensionality/index.html",
       "skeleton": false,
       "lc": 0
@@ -1461,7 +1472,7 @@ window.CATALOG = [
       "title": "Metric & confusion matrix",
       "tag": "Evaluation",
       "blurb": "Bốn ô sinh ra mọi chỉ số: precision với recall chọn theo chi phí lỗi, vì sao accuracy nói dối khi dữ liệu lệch, và chốt ngưỡng bằng tiền thay vì bằng F1.",
-      "n": 13,
+      "n": 11,
       "path": "content/05-machine-learning/09-evaluation/metrics-confusion-matrix/index.html",
       "skeleton": false,
       "lc": 0

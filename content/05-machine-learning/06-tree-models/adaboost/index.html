@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdaBoost — MazeAI</title>
+<meta name="description" content="Boosting đầu tiên: đội trọng số vào điểm đang sai, chấm điểm alpha cho từng stump, rồi bỏ phiếu có trọng số.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/adaboost/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="AdaBoost">
+<meta property="og:description" content="Boosting đầu tiên: đội trọng số vào điểm đang sai, chấm điểm alpha cho từng stump, rồi bỏ phiếu có trọng số.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/adaboost/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">&#8592; Tất cả b&#224;i</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-ada" data-title="AdaBoost" data-tag="Ensemble" data-blurb="Boosting đầu tiên: đội trọng số vào điểm đang sai, chấm điểm alpha cho từng stump, rồi bỏ phiếu có trọng số.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning &#183; Tree models</p>
+  <h1>Ada<em>Boost</em></h1>
+  <p class="lede">Boosting đầu ti&#234;n, v&#224; l&#224; bản dễ nh&#236;n thấy nhất: model cơ sở l&#224; <b>stump</b> &#8212; c&#226;y đ&#250;ng một tầng, vẽ được đ&#250;ng một l&#225;t cắt thẳng. Vẽ h&#236;nh n&#243; ra l&#224; hiểu ngay v&#236; sao một stump kh&#244;ng đủ v&#224; v&#236; sao cộng bốn mươi stump lại th&#224;nh một bi&#234;n cong. Học b&#224;i n&#224;y trước th&#236; <a href="../gradient-boosting/index.html">Gradient boosting</a> chỉ c&#242;n l&#224; đổi một chi tiết.</p>
+</header>
+
+<section id="ada-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+
+  <p class="key">Dữ liệu v&#224;o l&#224; dữ liệu thường; <em>AdaBoost tự g&#225;n cho mỗi điểm một trọng số</em> rồi tự đổi n&#243; qua từng v&#242;ng. Trồng một stump lo cho c&#225;c điểm nặng nhất, chấm cho n&#243; một số phiếu <em>&#945;</em>, rồi <em>đội trọng số</em> những điểm n&#243; đo&#225;n sai l&#234;n cho v&#242;ng sau. Lặp lại v&#224; cộng phiếu &#8212; hết.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 528" role="img" aria-label="Một vòng AdaBoost gồm bốn việc vẽ nối tiếp: bảng dữ liệu thường kèm cột trọng số do thuật toán tự gán, vẽ thành thanh dài ngắn, trồng stump lo cho điểm nặng, chấm điểm alpha theo sai số, đội trọng số các điểm đoán sai; mũi tên đứt quay lại đầu vòng. Bên dưới là dãy bốn mươi stump nối tiếp nhau, mỗi stump một alpha, cộng lại thành kết quả">
+<text class="sv-hv" x="0" y="18">MỘT VÒNG ADABOOST — BỐN VIỆC, RỒI LẶP LẠI</text>
+<text class="sv-t" x="0" y="54" fill="var(--filled)">①  AdaBoost tự gán trọng số</text>
+<rect x="0" y="62" width="190" height="150" rx="5" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-s" x="12" y="80" fill="var(--dim)">điểm</text>
+<text class="sv-s" x="62" y="80" fill="var(--dim)">wᵢ (tự gán)</text>
+<text class="sv-d" x="12" y="103" fill="var(--muted)">x₁ +1</text>
+<rect x="62" y="93" width="15.6" height="13" rx="2" fill="rgba(var(--blue-a),.35)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-s" x="146" y="103" fill="var(--rule-hi)">0,06</text>
+<text class="sv-d" x="12" y="122" fill="var(--muted)">x₂ −1</text>
+<rect x="62" y="112" width="78.0" height="13" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-s" x="146" y="122" fill="var(--tomb)">0,30</text>
+<text class="sv-d" x="12" y="141" fill="var(--muted)">x₃ +1</text>
+<rect x="62" y="131" width="15.6" height="13" rx="2" fill="rgba(var(--blue-a),.35)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-s" x="146" y="141" fill="var(--rule-hi)">0,06</text>
+<text class="sv-d" x="12" y="160" fill="var(--muted)">x₄ −1</text>
+<rect x="62" y="150" width="78.0" height="13" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-s" x="146" y="160" fill="var(--tomb)">0,30</text>
+<text class="sv-d" x="12" y="179" fill="var(--muted)">x₅ +1</text>
+<rect x="62" y="169" width="15.6" height="13" rx="2" fill="rgba(var(--blue-a),.35)" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-s" x="146" y="179" fill="var(--rule-hi)">0,06</text>
+<text class="sv-d" x="12" y="198" fill="var(--muted)">x₆ +1</text>
+<rect x="62" y="188" width="57.2" height="13" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-s" x="146" y="198" fill="var(--tomb)">0,22</text>
+<text class="sv-s" x="0" y="230" fill="var(--dim)">vào là dữ liệu thường,</text>
+<text class="sv-s" x="0" y="246" fill="var(--dim)">KHÔNG cần cột trọng số</text>
+<text class="sv-t" x="218" y="54" fill="var(--probe)">②  Trồng stump</text>
+<rect x="218" y="62" width="190" height="150" rx="5" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.2"/>
+<rect x="283" y="80" width="60" height="22" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="313" y="95" fill="var(--probe)" text-anchor="middle">x₁ ≤ t</text>
+<line x1="297" y1="102" x2="273" y2="124" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="329" y1="102" x2="353" y2="124" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<rect x="251" y="124" width="44" height="22" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="273" y="139" fill="var(--tomb)" text-anchor="middle">−1</text>
+<rect x="331" y="124" width="44" height="22" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="353" y="139" fill="var(--ok)" text-anchor="middle">+1</text>
+<text class="sv-d" x="230" y="172" fill="var(--muted)">thử mọi cột × mọi ngưỡng,</text>
+<text class="sv-d" x="230" y="188" fill="var(--muted)">giữ cái có err nhỏ nhất</text>
+<text class="sv-s" x="218" y="230" fill="var(--dim)">err = Σ wᵢ của điểm đoán sai</text>
+<text class="sv-s" x="218" y="246" fill="var(--dim)">nên điểm nặng được ưu tiên chữa</text>
+<text class="sv-t" x="436" y="54" fill="var(--ok)">③  Chấm điểm α</text>
+<rect x="436" y="62" width="190" height="150" rx="5" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="448" y="88" fill="var(--ok)">α = ½·ln( (1−err)/err )</text>
+<rect x="448" y="110" width="62" height="20" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-s" x="454" y="124" fill="var(--muted)">err 0,10</text>
+<line x1="514" y1="121" x2="522" y2="121" stroke="var(--rule-hi)" stroke-width="1.1"/><polygon points="530,121 522,116.8 522,125.2" fill="var(--rule-hi)"/>
+<text class="sv-s" x="536" y="124" fill="var(--ok)">α = 1,10</text>
+<rect x="448" y="134" width="62" height="20" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-s" x="454" y="148" fill="var(--muted)">err 0,37</text>
+<line x1="514" y1="145" x2="522" y2="145" stroke="var(--rule-hi)" stroke-width="1.1"/><polygon points="530,145 522,140.8 522,149.2" fill="var(--rule-hi)"/>
+<text class="sv-s" x="536" y="148" fill="var(--ok)">α = 0,26</text>
+<rect x="448" y="158" width="62" height="20" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-s" x="454" y="172" fill="var(--muted)">err 0,50</text>
+<line x1="514" y1="169" x2="522" y2="169" stroke="var(--rule-hi)" stroke-width="1.1"/><polygon points="530,169 522,164.8 522,173.2" fill="var(--rule-hi)"/>
+<text class="sv-s" x="536" y="172" fill="var(--ok)">α = 0,00</text>
+<text class="sv-s" x="448" y="196" fill="var(--dim)">sai ít → phiếu nặng</text>
+<text class="sv-s" x="436" y="230" fill="var(--dim)">err = 0,5 → α = 0:</text>
+<text class="sv-s" x="436" y="246" fill="var(--dim)">stump đó câm luôn</text>
+<text class="sv-t" x="654" y="54" fill="var(--tomb)">④  Đội trọng số điểm sai</text>
+<rect x="654" y="62" width="190" height="150" rx="5" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="666" y="88" fill="var(--tomb)">wᵢ ← wᵢ · e^(−α·yᵢ·h(xᵢ))</text>
+<rect x="666" y="106" width="166" height="26" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-s" x="674" y="123" fill="var(--ok)">đoán ĐÚNG  → e^(−α) &lt; 1</text>
+<rect x="666" y="138" width="166" height="26" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-s" x="674" y="155" fill="var(--tomb)">đoán SAI    → e^(+α) &gt; 1</text>
+<text class="sv-d" x="666" y="184" fill="var(--muted)">chuẩn hoá lại cho Σwᵢ = 1</text>
+<text class="sv-s" x="654" y="230" fill="var(--dim)">thanh đỏ ở ① chính là kết</text>
+<text class="sv-s" x="654" y="246" fill="var(--dim)">quả của bước này</text>
+<line x1="192" y1="137" x2="206" y2="137" stroke="var(--text)" stroke-width="1.4"/><polygon points="214,137 206,132.8 206,141.2" fill="var(--text)"/>
+<line x1="410" y1="137" x2="424" y2="137" stroke="var(--text)" stroke-width="1.4"/><polygon points="432,137 424,132.8 424,141.2" fill="var(--text)"/>
+<line x1="628" y1="137" x2="642" y2="137" stroke="var(--text)" stroke-width="1.4"/><polygon points="650,137 642,132.8 642,141.2" fill="var(--text)"/>
+<path d="M850 218 L850 288 L204 288 L204 226" fill="none" stroke="var(--text)" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polygon points="204,218 199.8,226 208.2,226" fill="var(--text)"/>
+<text class="sv-d" x="220" y="280" fill="var(--text)">lặp T vòng — dữ liệu KHÔNG đổi, chỉ w đổi</text>
+<line x1="0" y1="302" x2="860" y2="302" stroke="var(--rule)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-hv" x="0" y="320">T STUMP NỐI TIẾP — MỖI CÁI CHỮA PHẦN CÁI TRƯỚC CÒN SAI</text>
+<g opacity="1">
+<text class="sv-hv" x="54" y="339" fill="var(--probe)" text-anchor="middle">h₁</text>
+<rect x="34.0" y="346" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<line x1="54" y1="362" x2="28.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<line x1="54" y1="362" x2="80.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<rect x="8.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<rect x="60.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="54" y="399" fill="var(--muted)" text-anchor="middle">α 1,10</text>
+</g>
+<g opacity="1">
+<text class="sv-hv" x="166" y="339" fill="var(--probe)" text-anchor="middle">h₂</text>
+<rect x="146.0" y="346" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<line x1="166" y1="362" x2="140.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<line x1="166" y1="362" x2="192.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<rect x="120.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<rect x="172.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="166" y="399" fill="var(--muted)" text-anchor="middle">α 0,74</text>
+</g>
+<line x1="96" y1="366" x2="116" y2="366" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="124,366 116,361.8 116,370.2" fill="var(--rule-hi)"/>
+<g opacity="1">
+<text class="sv-hv" x="278" y="339" fill="var(--probe)" text-anchor="middle">h₃</text>
+<rect x="258.0" y="346" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<line x1="278" y1="362" x2="252.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<line x1="278" y1="362" x2="304.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<rect x="232.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<rect x="284.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="278" y="399" fill="var(--muted)" text-anchor="middle">α 0,52</text>
+</g>
+<line x1="208" y1="366" x2="228" y2="366" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="236,366 228,361.8 228,370.2" fill="var(--rule-hi)"/>
+<g opacity="1">
+<text class="sv-hv" x="390" y="339" fill="var(--probe)" text-anchor="middle">h₄</text>
+<rect x="370.0" y="346" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<line x1="390" y1="362" x2="364.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<line x1="390" y1="362" x2="416.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<rect x="344.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<rect x="396.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="390" y="399" fill="var(--muted)" text-anchor="middle">α 0,26</text>
+</g>
+<line x1="320" y1="366" x2="340" y2="366" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="348,366 340,361.8 340,370.2" fill="var(--rule-hi)"/>
+<g opacity="1">
+<text class="sv-hv" x="502" y="339" fill="var(--probe)" text-anchor="middle">h₅</text>
+<rect x="482.0" y="346" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<line x1="502" y1="362" x2="476.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<line x1="502" y1="362" x2="528.0" y2="370" stroke="var(--probe)" stroke-width="1.1"/>
+<rect x="456.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<rect x="508.0" y="370" width="40" height="16" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="502" y="399" fill="var(--muted)" text-anchor="middle">α 0,19</text>
+</g>
+<line x1="432" y1="366" x2="452" y2="366" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="460,366 452,361.8 452,370.2" fill="var(--rule-hi)"/>
+<g opacity="0.42">
+<text class="sv-hv" x="614" y="339" fill="var(--rule-hi)" text-anchor="middle">…</text>
+<rect x="594.0" y="346" width="40" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<line x1="614" y1="362" x2="588.0" y2="370" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="614" y1="362" x2="640.0" y2="370" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<rect x="568.0" y="370" width="40" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<rect x="620.0" y="370" width="40" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-d" x="614" y="399" fill="var(--muted)" text-anchor="middle">tới h_T</text>
+</g>
+
+<line x1="544" y1="366" x2="564" y2="366" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="572,366 564,361.8 564,370.2" fill="var(--rule-hi)"/>
+<rect x="0" y="442" width="860" height="44" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-t" x="16" y="470" fill="var(--ok)">Kết quả  =  sign( α₁·h₁(x) + α₂·h₂(x) + … + α_T·h_T(x) )</text>
+<text class="sv-s" x="556" y="470" fill="var(--dim)">bỏ phiếu có trọng số, không phải đếm phiếu</text>
+<text class="sv-s" x="0" y="512" fill="var(--dim)">Đo thật trên biên tròn, nhiễu nhãn 5%: 1 stump đúng 58,5% test → 40 stump đúng 88,2%.</text>
+</svg>
+    <figcaption>Bốn việc n&#224;y l&#224; to&#224;n bộ AdaBoost. C&#225;c mục sau chỉ ph&#243;ng to từng việc một.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Kh&#225;c random forest ở chỗ căn bản: rừng trồng c&#226;y <b>song song</b> tr&#234;n c&#225;c mẫu bootstrap kh&#225;c nhau, boosting trồng <b>tuần tự</b> tr&#234;n c&#249;ng một tập, chỉ đổi trọng số.</li>
+    <li>Rừng đếm phiếu <b>ngang nhau</b>. AdaBoost bỏ phiếu <b>c&#243; trọng số</b>: stump n&#224;o sai &#237;t th&#236; tiếng n&#243;i nặng hơn.</li>
+    <li>Trọng số l&#224; c&#225;i duy nhất mang th&#244;ng tin từ v&#242;ng trước sang v&#242;ng sau. Bỏ n&#243; đi th&#236; bốn mươi stump sẽ giống hệt nhau v&#224; kh&#244;ng c&#243; g&#236; kh&#225; l&#234;n.</li>
+  </ul>
+
+  <div class="note">
+    <h4>B&#224;i n&#224;y giả định bạn đ&#227; đọc</h4>
+    C&#225;ch một c&#226;y học nằm ở <a href="../decision-tree/index.html">Decision tree</a>.
+    So s&#225;nh đầy đủ hai hướng gộp c&#226;y &#8212; bagging v&#224; boosting &#8212; nằm ở
+    <a href="../tree-family-overview/index.html">Tree models overview</a>.
+  </div>
+</section>
+
+<section id="ada-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Stump &#8212; model yếu</h2></div>
+
+  <p class="key">Stump l&#224; c&#226;y quyết định c&#243; đ&#250;ng <em>một</em> tầng: một c&#226;u hỏi kiểu <code>x1 &#8804; 0,4</code>, hai c&#226;u trả lời. N&#243; yếu tới mức <b>một m&#236;nh th&#236; gần như v&#244; dụng</b> &#8212; v&#224; đ&#243; ch&#237;nh l&#224; điều kiện để boosting hoạt động.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 472" role="img" aria-label="Hình một stump: cây đúng một tầng với một câu hỏi và hai lá; bên cạnh là mặt phẳng có biên tròn mà một lát cắt thẳng của stump không bao giờ vẽ được">
+<text class="sv-hv" x="0.0" y="18">MỘT STUMP LÀ GÌ</text>
+<text class="sv-t" x="0.0" y="40" fill="var(--tomb)">Stump = cây đúng MỘT tầng: một câu hỏi, hai câu trả lời</text>
+<rect x="75.78" y="74" width="130.41" height="22" rx="4" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-h" x="140.98" y="89" fill="var(--probe)" text-anchor="middle">x1 ≤ 0,4</text>
+<line x1="112.79" y1="96" x2="49.34" y2="118" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="169.18" y1="96" x2="232.62" y2="118" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<rect x="10.57" y="118" width="77.54" height="22" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-h" x="49.34" y="133" fill="var(--tomb)" text-anchor="middle">−1</text>
+<rect x="193.85" y="118" width="77.54" height="22" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-h" x="232.62" y="133" fill="var(--ok)" text-anchor="middle">+1</text>
+<text class="sv-s" x="31.72" y="112" fill="var(--dim)" text-anchor="end">có</text>
+<text class="sv-s" x="253.77" y="112" fill="var(--dim)">không</text>
+<text class="sv-d" x="140.98" y="160" fill="var(--faint)" text-anchor="middle">HẾT. Không có tầng thứ hai.</text>
+<rect x="461.72" y="70" width="253.77" height="144" rx="6" fill="none" stroke="var(--rule)" stroke-width="1.0"/>
+<circle cx="588.61" cy="142" r="58" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-d" x="588.61" y="146" fill="var(--ok)" text-anchor="middle">lớp +1</text>
+<text class="sv-s" x="461.72" y="60" fill="var(--dim)">biên thật: TRÒN</text>
+<line x1="556.89" y1="70" x2="556.89" y2="214" stroke="var(--probe)" stroke-width="1.8" stroke-dasharray="5 3"/>
+<text class="sv-s" x="719.02" y="252" fill="var(--probe)" text-anchor="end">lát cắt của stump</text>
+<circle cx="539.33" cy="146.72014292358398" r="2.4" fill="var(--tomb)"/>
+<circle cx="543.35" cy="113.64780016290344" r="2.4" fill="var(--tomb)"/>
+<circle cx="551.23" cy="91.94957411685172" r="2.4" fill="var(--tomb)"/>
+<circle cx="520.14" cy="111.79684636840041" r="2.4" fill="var(--tomb)"/>
+<circle cx="548.16" cy="95.41251279293888" r="2.4" fill="var(--tomb)"/>
+<circle cx="511.22" cy="174.0795326846006" r="2.4" fill="var(--tomb)"/>
+<circle cx="549.84" cy="170.6854702102382" r="2.4" fill="var(--tomb)"/>
+<circle cx="552.81" cy="96.85431360616155" r="2.4" fill="var(--tomb)"/>
+<circle cx="531.68" cy="132.17494439304525" r="2.4" fill="var(--tomb)"/>
+<circle cx="553.59" cy="190.94813398631032" r="2.4" fill="var(--tomb)"/>
+<circle cx="539.26" cy="120.77198982450523" r="2.4" fill="var(--tomb)"/>
+<circle cx="498.34" cy="154.35795629620372" r="2.4" fill="var(--tomb)"/>
+<circle cx="541.8" cy="137.3376304747944" r="2.4" fill="var(--tomb)"/>
+<circle cx="551.07" cy="128.890551626622" r="2.4" fill="var(--tomb)"/>
+<circle cx="552.87" cy="112.38923858288935" r="2.4" fill="var(--tomb)"/>
+<circle cx="529.82" cy="135.08820668726264" r="2.4" fill="var(--tomb)"/>
+<circle cx="555.12" cy="124.25818957588262" r="2.4" fill="var(--tomb)"/>
+<circle cx="536.88" cy="101.54451033308177" r="2.4" fill="var(--tomb)"/>
+<circle cx="529.09" cy="118.37135339600222" r="2.4" fill="var(--tomb)"/>
+<circle cx="518.96" cy="119.79614531370545" r="2.4" fill="var(--tomb)"/>
+<circle cx="548.94" cy="125.03885316185074" r="2.4" fill="var(--tomb)"/>
+<circle cx="537.36" cy="95.90417684468434" r="2.4" fill="var(--tomb)"/>
+<circle cx="526.89" cy="120.64405469470479" r="2.4" fill="var(--tomb)"/>
+<circle cx="542.05" cy="180.59685854057568" r="2.4" fill="var(--tomb)"/>
+<circle cx="526.79" cy="173.12722718310016" r="2.4" fill="var(--tomb)"/>
+<circle cx="503.96" cy="117.60349143575252" r="2.4" fill="var(--tomb)"/>
+<circle cx="545.08" cy="144.90984656169562" r="2.4" fill="var(--tomb)"/>
+<circle cx="510.77" cy="142.22624712088626" r="2.4" fill="var(--tomb)"/>
+<circle cx="553.98" cy="122.21195628866437" r="2.4" fill="var(--tomb)"/>
+<circle cx="530.5" cy="123.72700707190356" r="2.4" fill="var(--tomb)"/>
+<circle cx="517.85" cy="147.92572870770348" r="2.4" fill="var(--tomb)"/>
+<circle cx="508.03" cy="133.9841055711533" r="2.4" fill="var(--tomb)"/>
+<circle cx="543.88" cy="138.17336383056693" r="2.4" fill="var(--tomb)"/>
+<circle cx="517.73" cy="175.42702045789818" r="2.4" fill="var(--tomb)"/>
+<circle cx="513.97" cy="151.3656159305098" r="2.4" fill="var(--tomb)"/>
+<circle cx="517.37" cy="178.70562406870064" r="2.4" fill="var(--tomb)"/>
+<circle cx="506.06" cy="123.2436257015525" r="2.4" fill="var(--tomb)"/>
+<circle cx="540.11" cy="107.82531494958866" r="2.4" fill="var(--tomb)"/>
+<circle cx="541.59" cy="154.37749024388268" r="2.4" fill="var(--tomb)"/>
+<circle cx="510.24" cy="142.03304164638655" r="2.4" fill="var(--tomb)"/>
+<circle cx="512.6" cy="168.4830810791198" r="2.4" fill="var(--tomb)"/>
+<circle cx="529.57" cy="117.17237772061695" r="2.4" fill="var(--tomb)"/>
+<circle cx="532.04" cy="151.13707987179444" r="2.4" fill="var(--tomb)"/>
+<circle cx="553.78" cy="113.4316083239847" r="2.4" fill="var(--tomb)"/>
+<circle cx="550.21" cy="163.91316885886334" r="2.4" fill="var(--tomb)"/>
+<circle cx="526.96" cy="127.10939642822325" r="2.4" fill="var(--tomb)"/>
+<circle cx="555.14" cy="171.26310969967378" r="2.4" fill="var(--tomb)"/>
+<circle cx="538.73" cy="165.23170152959932" r="2.4" fill="var(--tomb)"/>
+<circle cx="530.24" cy="116.24024947726606" r="2.4" fill="var(--tomb)"/>
+<circle cx="529.78" cy="163.84924615421343" r="2.4" fill="var(--tomb)"/>
+<circle cx="542.52" cy="180.96335873607373" r="2.4" fill="var(--tomb)"/>
+<circle cx="553.52" cy="133.81407334407453" r="2.4" fill="var(--tomb)"/>
+<circle cx="512.0" cy="177.6369181626701" r="2.4" fill="var(--tomb)"/>
+<circle cx="549.45" cy="126.7028709575201" r="2.4" fill="var(--tomb)"/>
+<circle cx="495.86" cy="124.3700627304199" r="2.4" fill="var(--tomb)"/>
+<circle cx="534.08" cy="151.08244774241481" r="2.4" fill="var(--tomb)"/>
+<circle cx="546.24" cy="159.65501535477443" r="2.4" fill="var(--tomb)"/>
+<circle cx="550.15" cy="160.77068142875166" r="2.4" fill="var(--tomb)"/>
+<circle cx="544.51" cy="169.12712393277596" r="2.4" fill="var(--tomb)"/>
+<circle cx="528.25" cy="183.61218242481752" r="2.4" fill="var(--tomb)"/>
+<circle cx="553.33" cy="107.46340466922112" r="2.4" fill="var(--tomb)"/>
+<circle cx="507.47" cy="165.03395799980763" r="2.4" fill="var(--tomb)"/>
+<circle cx="544.57" cy="129.55427980144782" r="2.4" fill="var(--tomb)"/>
+<circle cx="515.67" cy="117.50642750097424" r="2.4" fill="var(--tomb)"/>
+<circle cx="529.34" cy="108.82817148119236" r="2.4" fill="var(--tomb)"/>
+<circle cx="532.58" cy="115.33607137980829" r="2.4" fill="var(--tomb)"/>
+<circle cx="530.94" cy="145.1533536426198" r="2.4" fill="var(--tomb)"/>
+<circle cx="501.55" cy="142.047708294003" r="2.4" fill="var(--tomb)"/>
+<circle cx="504.09" cy="127.04863638452846" r="2.4" fill="var(--tomb)"/>
+<circle cx="538.47" cy="96.94669165082574" r="2.4" fill="var(--tomb)"/>
+<circle cx="555.33" cy="181.5409082571469" r="2.4" fill="var(--tomb)"/>
+<circle cx="509.23" cy="110.01631082271626" r="2.4" fill="var(--tomb)"/>
+<circle cx="524.81" cy="141.69478491506266" r="2.4" fill="var(--tomb)"/>
+<circle cx="551.86" cy="138.20133458639015" r="2.4" fill="var(--tomb)"/>
+<circle cx="528.53" cy="184.62517219762702" r="2.4" fill="var(--tomb)"/>
+<circle cx="533.94" cy="106.86392492041662" r="2.4" fill="var(--tomb)"/>
+<text class="sv-s" x="461.72" y="232" fill="var(--tomb)">mảng đỏ: stump này luôn sai</text>
+<line x1="0.0" y1="288" x2="860.0" y2="288" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0.0" y="306">ĐO THẬT · 400 điểm · nhiễu nhãn 5%</text>
+<rect x="0.0" y="318" width="246.72" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="21.15" y="339.0" fill="var(--tomb)">một stump</text>
+<text class="sv-d" x="271.39" y="339.0" fill="var(--muted)">đúng 62,7% train · 58,5% test — nhỉnh hơn tung đồng xu</text>
+<rect x="0.0" y="358" width="246.72" height="32" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-d" x="21.15" y="379.0" fill="var(--probe)">5 stump</text>
+<text class="sv-d" x="271.39" y="379.0" fill="var(--muted)">đúng 84,0% train · 78,5% test</text>
+<rect x="0.0" y="398" width="246.72" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="21.15" y="419.0" fill="var(--ok)">40 stump</text>
+<text class="sv-d" x="271.39" y="419.0" fill="var(--muted)">đúng 91,0% train · 88,2% test — biên tròn hiện ra</text>
+<text class="sv-s" x="0.0" y="454" fill="var(--dim)">Không stump nào tự khá lên. Cái khá lên là TỔNG có trọng số của chúng.</text>
+</svg>
+    <figcaption>B&#234;n tr&#225;i l&#224; cấu tr&#250;c thật của một stump. B&#234;n phải l&#224; l&#253; do n&#243; kh&#244;ng bao giờ đủ: một đường thẳng kh&#244;ng cắt được một h&#236;nh tr&#242;n.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>H&#236;nh b&#234;n phải l&#224; điều kh&#244;ng bảng số n&#224;o n&#243;i được: d&#249; chọn ngưỡng ở đ&#226;u, một l&#225;t cắt thẳng lu&#244;n <b>bỏ lại một mảng đỏ</b>. Sai s&#243;t đ&#243; kh&#244;ng phải do stump chọn dở, m&#224; do <b>h&#236;nh dạng của n&#243;</b>.</li>
+    <li>Đo thật tr&#234;n 400 điểm, nhiễu nh&#227;n 5%: một stump đ&#250;ng <b>58,5%</b> tr&#234;n test &#8212; nhỉnh hơn tung đồng xu. Bốn mươi stump cộng lại đ&#250;ng <b>88,2%</b>.</li>
+    <li>Điều kiện duy nhất AdaBoost đ&#242;i ở model cơ sở l&#224; <b>tốt hơn đo&#225;n bừa</b> (err &lt; 0,5). Đ&#250;ng bằng 50% th&#236; &#945; = 0 v&#224; stump đ&#243; kh&#244;ng c&#243; tiếng n&#243;i n&#224;o.</li>
+    <li>V&#236; sao phải yếu chứ kh&#244;ng phải mạnh: model mạnh sẽ đ&#250;ng gần hết ngay v&#242;ng một, trọng số kh&#244;ng c&#242;n g&#236; để dồn, v&#242;ng sau kh&#244;ng học được th&#234;m. Boosting sống nhờ việc <b>mỗi v&#242;ng c&#242;n dư sai s&#243;t để chữa</b>.</li>
+  </ul>
+</section>
+
+<section id="ada-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>V&#242;ng lặp đổi trọng số</h2></div>
+
+  <p class="key">Dữ liệu kh&#244;ng đổi qua c&#225;c v&#242;ng. C&#225;i đổi l&#224; <em>điểm n&#224;o đang được coi l&#224; quan trọng</em> &#8212; v&#224; ch&#237;nh n&#243; buộc v&#242;ng sau phải cắt ở chỗ kh&#225;c v&#242;ng trước.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 370" role="img" aria-label="Ô đội trọng số sáng lên; bên phải công thức nhân trọng số và bảng đo thật cho thấy sau bốn mươi vòng thì mười phần trăm điểm nặng nhất giữ ba mươi sáu phẩy bốn phần trăm tổng trọng số">
+<text class="sv-hv" x="0.0" y="18">③ ĐỘI TRỌNG SỐ</text>
+<text class="sv-t" x="0.0" y="40" fill="var(--ok)">Dữ liệu không đổi. Cái đổi là điểm nào đang được coi là quan trọng.</text>
+<text class="sv-d" x="0.0" y="70" fill="var(--muted)">w ← w · e^(−α·y·h)  rồi chia chuẩn hoá lại cho tổng bằng 1</text>
+<rect x="0.0" y="86" width="232.62" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="21.15" y="107.0" fill="var(--ok)">đoán ĐÚNG</text>
+<text class="sv-d" x="257.3" y="107.0" fill="var(--muted)">nhân e^(−α) &lt; 1 → nhẹ đi, vòng sau ít để ý</text>
+<rect x="0.0" y="126" width="232.62" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="21.15" y="147.0" fill="var(--tomb)">đoán SAI</text>
+<text class="sv-d" x="257.3" y="147.0" fill="var(--muted)">nhân e^(+α) &gt; 1 → nặng lên, vòng sau phải lo</text>
+<line x1="0.0" y1="174" x2="860.0" y2="174" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0.0" y="192">ĐO THẬT · 300 ĐIỂM · TRỌNG SỐ DỒN VỀ ĐÂU</text>
+<text class="sv-s" x="0.0" y="218" fill="var(--dim)">sau</text>
+<text class="sv-s" x="123.36" y="218" fill="var(--dim)">10% điểm nặng nhất giữ</text>
+<text class="sv-s" x="440.57" y="218" fill="var(--dim)">nặng nhất / nhẹ nhất</text>
+<rect x="0.0" y="226" width="112.79" height="22" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<text class="sv-d" x="14.1" y="241" fill="var(--rule-hi)">1 vòng</text>
+<text class="sv-l" x="123.36" y="241" fill="var(--rule-hi)">15,2%</text>
+<text class="sv-d" x="440.57" y="241" fill="var(--muted)">2 lần</text>
+<rect x="0.0" y="254" width="112.79" height="22" rx="3" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-d" x="14.1" y="269" fill="var(--filled)">5 vòng</text>
+<text class="sv-l" x="123.36" y="269" fill="var(--filled)">18,5%</text>
+<text class="sv-d" x="440.57" y="269" fill="var(--muted)">8 lần</text>
+<rect x="0.0" y="282" width="112.79" height="22" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.1"/>
+<text class="sv-d" x="14.1" y="297" fill="var(--probe)">20 vòng</text>
+<text class="sv-l" x="123.36" y="297" fill="var(--probe)">28,0%</text>
+<text class="sv-d" x="440.57" y="297" fill="var(--muted)">21 lần</text>
+<rect x="0.0" y="310" width="112.79" height="22" rx="3" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-d" x="14.1" y="325" fill="var(--tomb)">40 vòng</text>
+<text class="sv-l" x="123.36" y="325" fill="var(--tomb)">36,4%</text>
+<text class="sv-d" x="440.57" y="325" fill="var(--muted)">89 lần</text>
+<text class="sv-s" x="0.0" y="352" fill="var(--dim)">Vừa là sức mạnh vừa là điểm yếu: dồn vào chỗ khó cũng là dồn vào chỗ NHIỄU.</text>
+</svg>
+    <figcaption>Trọng số dồn dần về những điểm kh&#243;. Sau bốn mươi v&#242;ng, ch&#234;nh lệch nặng nhất so với nhẹ nhất l&#234;n tới 89 lần.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Ba d&#242;ng, hết thuật to&#225;n: trồng stump theo trọng số &#8594; t&#237;nh <code>&#945; = &#189;&#183;ln((1&#8722;err)/err)</code> &#8594; nh&#226;n trọng số với <code>e^(&#8722;&#945;&#183;y&#183;h)</code> rồi chuẩn ho&#225; lại.</li>
+    <li>C&#244;ng thức &#945; kh&#244;ng phải quy ước t&#249;y &#253;: n&#243; l&#224; <b>nghiệm tối ưu</b> của việc tối thiểu ho&#225; exponential loss theo &#945;. err = 0,5 cho &#945; = 0; err c&#224;ng nhỏ th&#236; &#945; c&#224;ng lớn, ph&#226;n k&#236; tới v&#244; c&#249;ng khi err &#8594; 0.</li>
+    <li>Sai s&#243; c&#243; trọng số của stump lu&#244;n dao động quanh <b>0,34&#8211;0,46</b> chứ kh&#244;ng giảm dần. Đ&#243; l&#224; đ&#250;ng: sau mỗi v&#242;ng, b&#224;i to&#225;n đ&#227; bị l&#224;m kh&#243; l&#234;n cho v&#242;ng sau.</li>
+    <li>N&#234;n <b>độ ch&#237;nh x&#225;c của từng stump kh&#244;ng tăng</b> &#8212; c&#225;i tăng l&#224; tổng c&#243; trọng số của ch&#250;ng: 62,7% &#8594; 84,0% &#8594; 91,0% tr&#234;n train sau 1, 5 v&#224; 40 v&#242;ng.</li>
+  </ul>
+</section>
+
+<section id="ada-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Loss function</h2></div>
+
+  <p class="key">C&#244;ng thức đội trọng số <code>e^(&#8722;&#945;&#183;y&#183;h)</code> kh&#244;ng phải mẹo nghĩ ra cho hay. N&#243; l&#224; hệ quả của việc AdaBoost đang giảm dần một h&#224;m mất m&#225;t cụ thể: <b>exponential loss</b>.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 386" role="img" aria-label="Hàm mất mát của AdaBoost: công thức L = Σ exp(−y·F(x)) tách thành từng khối có chú giải, đường cong phạt theo margin so với 0–1 loss, và bảng đo thật cho thấy loss giảm đơn điệu còn tỷ lệ sai thì không">
+<text class="sv-hv" x="0" y="18">HÀM MẤT MÁT — TỪNG KHỐI NGHĨA LÀ GÌ</text>
+<rect x="0" y="34" width="860" height="52" rx="5" fill="none" stroke="var(--text)" stroke-width="1.4"/>
+<text class="sv-t" x="20" y="68" fill="var(--text)">L  =</text>
+<rect x="72" y="44" width="92" height="32" rx="4" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-t" x="118.0" y="66" fill="var(--probe)" text-anchor="middle">Σᵢ</text>
+<rect x="180" y="44" width="80" height="32" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-t" x="220.0" y="66" fill="var(--ok)" text-anchor="middle">exp</text>
+<text class="sv-t" x="280" y="66" fill="var(--faint)">( −</text>
+<rect x="326" y="44" width="62" height="32" rx="4" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-t" x="357.0" y="66" fill="var(--filled)" text-anchor="middle">yᵢ</text>
+<rect x="400" y="44" width="98" height="32" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-t" x="449.0" y="66" fill="var(--tomb)" text-anchor="middle">F(xᵢ)</text>
+<text class="sv-t" x="518" y="66" fill="var(--faint)">)</text>
+<line x1="118.0" y1="78" x2="118.0" y2="84" stroke="var(--probe)" stroke-width="1"/><polygon points="118.0,92 113.8,84 122.2,84" fill="var(--probe)"/>
+<text class="sv-s" x="118.0" y="108" fill="var(--probe)" text-anchor="middle">cộng qua mọi điểm</text>
+<line x1="220.0" y1="78" x2="220.0" y2="104" stroke="var(--ok)" stroke-width="1"/><polygon points="220.0,112 215.8,104 224.2,104" fill="var(--ok)"/>
+<text class="sv-s" x="220.0" y="128" fill="var(--ok)" text-anchor="middle">phạt theo hàm mũ</text>
+<line x1="357.0" y1="78" x2="357.0" y2="84" stroke="var(--filled)" stroke-width="1"/><polygon points="357.0,92 352.8,84 361.2,84" fill="var(--filled)"/>
+<text class="sv-s" x="357.0" y="108" fill="var(--filled)" text-anchor="middle">nhãn thật ±1</text>
+<line x1="449.0" y1="78" x2="449.0" y2="104" stroke="var(--tomb)" stroke-width="1"/><polygon points="449.0,112 444.8,104 453.2,104" fill="var(--tomb)"/>
+<text class="sv-s" x="449.0" y="128" fill="var(--tomb)" text-anchor="middle">tổng phiếu Σ α·h</text>
+<text class="sv-d" x="596" y="66" fill="var(--muted)">yᵢ·F(xᵢ) gọi là MARGIN</text>
+<text class="sv-s" x="596" y="108" fill="var(--dim)">cùng dấu = đoán đúng</text>
+<text class="sv-s" x="596" y="126" fill="var(--dim)">càng lớn = càng chắc chắn</text>
+<line x1="0" y1="150" x2="860" y2="150" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0" y="170">PHẠT NHIỀU HAY ÍT — THEO MARGIN</text>
+<rect x="8" y="180" width="400" height="168" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="48" y1="314" x2="378" y2="314" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="213.0" y1="190" x2="213.0" y2="314" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<polyline points="48.0,202.2 53.5,209.4 59.0,216.1 64.5,222.4 70.0,228.3 75.5,233.9 81.0,239.0 86.5,243.9 92.0,248.4 97.5,252.6 103.0,256.6 108.5,260.3 114.0,263.7 119.5,267.0 125.0,270.0 130.5,272.9 136.0,275.5 141.5,278.0 147.0,280.3 152.5,282.5 158.0,284.5 163.5,286.4 169.0,288.2 174.5,289.9 180.0,291.4 185.5,292.9 191.0,294.2 196.5,295.5 202.0,296.7 207.5,297.8 213.0,298.9 218.5,299.8 224.0,300.8 229.5,301.6 235.0,302.4 240.5,303.2 246.0,303.9 251.5,304.5 257.0,305.1 262.5,305.7 268.0,306.2 273.5,306.7 279.0,307.2 284.5,307.6 290.0,308.0 295.5,308.4 301.0,308.8 306.5,309.1 312.0,309.4 317.5,309.7 323.0,310.0 328.5,310.3 334.0,310.5 339.5,310.7 345.0,310.9 350.5,311.1 356.0,311.3 361.5,311.5 367.0,311.7 372.5,311.8 378.0,312.0" fill="none" stroke="var(--ok)" stroke-width="1.8"/>
+<line x1="48" y1="298" x2="213.0" y2="298" stroke="var(--tomb)" stroke-width="1.6" stroke-dasharray="5 4"/>
+<line x1="213.0" y1="314" x2="378" y2="314" stroke="var(--tomb)" stroke-width="1.6" stroke-dasharray="5 4"/>
+<text class="sv-s" x="52" y="204" fill="var(--ok)">exp(−margin)</text>
+<text class="sv-s" x="370" y="290.32" fill="var(--tomb)" text-anchor="end">0–1 loss</text>
+<text class="sv-s" x="207.0" y="330" fill="var(--dim)" text-anchor="end">0</text>
+<text class="sv-s" x="48" y="330" fill="var(--tomb)">sai nặng</text>
+<text class="sv-s" x="378" y="330" fill="var(--ok)" text-anchor="end">đúng chắc</text>
+<text class="sv-s" x="398" y="204" fill="var(--dim)" text-anchor="end">margin = y·F(x)</text>
+<rect x="440" y="196" width="412" height="48" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-t" x="454" y="216" fill="var(--tomb)">Sai càng nặng, phạt càng dốc</text>
+<text class="sv-s" x="454" y="234" fill="var(--dim)">margin = −1 → phạt 2,7 · margin = −2 → phạt 7,4</text>
+<rect x="440" y="252" width="412" height="48" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-t" x="454" y="272" fill="var(--ok)">Đúng rồi vẫn còn phạt chút ít</text>
+<text class="sv-s" x="454" y="290" fill="var(--dim)">nên vòng sau vẫn cố đẩy margin ra xa hơn</text>
+<rect x="440" y="308" width="412" height="48" rx="4" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.1"/>
+<text class="sv-t" x="454" y="328" fill="var(--probe)">0–1 loss thì bằng phẳng</text>
+<text class="sv-s" x="454" y="346" fill="var(--dim)">không có độ dốc để bám — nên không tối ưu trực tiếp được</text>
+</svg>
+    <figcaption>Đọc c&#244;ng thức từ trong ra ngo&#224;i: t&#237;nh margin của một điểm &#8594; đổi th&#224;nh h&#236;nh phạt bằng h&#224;m mũ &#8594; cộng qua mọi điểm.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Margin</b> <code>y&#183;F(x)</code> l&#224; thứ đ&#225;ng nhớ nhất ở đ&#226;y: kh&#244;ng chỉ hỏi &#8220;đo&#225;n đ&#250;ng kh&#244;ng&#8221; m&#224; hỏi &#8220;đ&#250;ng tới mức n&#224;o&#8221;. Dấu &#226;m l&#224; sai, dấu dương l&#224; đ&#250;ng, trị tuyệt đối l&#224; độ chắc chắn.</li>
+    <li>V&#236; sao kh&#244;ng tối ưu thẳng tỷ lệ sai (0&#8211;1 loss)? V&#236; n&#243; l&#224; h&#224;m <b>bậc thang</b>: đổi ngưỡng một ch&#250;t th&#236; hoặc kh&#244;ng đổi g&#236;, hoặc nhảy hẳn. Kh&#244;ng c&#243; độ dốc để b&#225;m theo. Exponential loss l&#224; <b>bản trơn nằm tr&#234;n</b> n&#243; &#8212; giảm được c&#225;i n&#224;y th&#236; k&#233;o c&#225;i kia xuống theo.</li>
+    <li>Đạo h&#224;m của L theo F tại điểm i ra đ&#250;ng <code>&#8722;y&#7522;&#183;e^(&#8722;y&#7522;F(x&#7522;))</code> &#8212; ch&#237;nh l&#224; trọng số w&#7522;. <b>Trọng số kh&#244;ng phải thứ ph&#225;t minh th&#234;m, n&#243; l&#224; gradient</b>. Đ&#243; l&#224; c&#226;u nối sang <a href="../gradient-boosting/index.html">gradient boosting</a>.</li>
+    <li>Đo thật 400 điểm, bi&#234;n tr&#242;n, nhiễu 5%: L giảm <b>đơn điệu</b> 0,946 &#8594; 0,801 &#8594; 0,620 &#8594; 0,574 qua c&#225;c v&#242;ng 1 / 5 / 20 / 40, trong khi tỷ lệ sai <b>kh&#244;ng đơn điệu</b> (11,3% ở v&#242;ng 20 rồi xấu lại th&#224;nh 12,0% ở v&#242;ng 40). Thứ AdaBoost thật sự k&#233;o xuống l&#224; L.</li>
+    <li>Mặt tr&#225;i nằm ngay trong h&#236;nh: margin &#226;m bị phạt theo h&#224;m <b>mũ</b>. Một nh&#227;n sai s&#243;t sẽ mãi c&#243; margin &#226;m v&#224; h&#250;t trọng số kh&#244;ng giới hạn &#8212; đ&#243; l&#224; gốc rễ của bẫy ở mục 07.</li>
+  </ul>
+</section>
+
+<section id="ada-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Cả qu&#225; tr&#236;nh nh&#236;n từ xa</h2></div>
+
+  <p class="key">Nh&#236;n một v&#242;ng th&#236; thấy c&#244;ng thức; nh&#236;n bốn v&#242;ng cạnh nhau mới thấy thứ quan trọng hơn: <b>mũi t&#234;n chỉ đi một chiều</b>, v&#224; đường ch&#237;nh x&#225;c của từng v&#242;ng kh&#244;ng hề đi l&#234;n.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 476" role="img" aria-label="Bốn vòng đầu của AdaBoost vẽ nối tiếp: mỗi vòng cùng một dữ liệu nhưng trọng số khác nên lát cắt khác, mũi tên chỉ đi một chiều; bên dưới đối chiếu bagging trồng song song với boosting trồng nối tiếp">
+<text class="sv-hv" x="0" y="18">BỐN VÒNG ĐẦU — CÙNG MỘT DỮ LIỆU, KHÁC TRỌNG SỐ</text>
+<rect x="0" y="44" width="196" height="62" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-hv" x="10" y="36" fill="var(--filled)">vòng 1</text>
+<line x1="59" y1="47" x2="59" y2="103" stroke="var(--filled)" stroke-width="1.6" stroke-dasharray="4 3"/>
+<circle cx="101.44707704291895" cy="87.16949003606918" r="1.8" fill="var(--dim)"/>
+<circle cx="170.20558061398387" cy="66.65233498969398" r="1.8" fill="var(--dim)"/>
+<circle cx="139.72564624671898" cy="83.10344431634661" r="1.8" fill="var(--dim)"/>
+<circle cx="123.3048633726966" cy="59.531230101034964" r="1.8" fill="var(--dim)"/>
+<circle cx="23.823686914354603" cy="70.40390942831772" r="1.8" fill="var(--dim)"/>
+<circle cx="136.63476675888907" cy="65.17458789492464" r="1.8" fill="var(--dim)"/>
+<circle cx="98.25129874506769" cy="67.75582439285535" r="2.7" fill="var(--dim)"/>
+<circle cx="152.3042004713369" cy="92.66529452755401" r="1.8" fill="var(--dim)"/>
+<circle cx="82.56945890759299" cy="94.77837716185299" r="1.8" fill="var(--dim)"/>
+<circle cx="29.351829668383644" cy="87.4043251375233" r="2.7" fill="var(--dim)"/>
+<circle cx="156.8496275337144" cy="61.148326257390565" r="1.8" fill="var(--dim)"/>
+<circle cx="130.23315892481787" cy="77.33682934623349" r="1.8" fill="var(--dim)"/>
+<circle cx="169.37345680250422" cy="63.493197176572025" r="1.8" fill="var(--dim)"/>
+<circle cx="104.2662533772354" cy="90.17585831816922" r="1.8" fill="var(--dim)"/>
+<circle cx="119.75963479017608" cy="67.42903734874633" r="1.8" fill="var(--dim)"/>
+<circle cx="32.43625232832765" cy="92.45031354542485" r="1.8" fill="var(--dim)"/>
+<circle cx="93.93864026948437" cy="94.69422293279861" r="1.8" fill="var(--dim)"/>
+<circle cx="41.80399964923723" cy="87.38826472920317" r="1.8" fill="var(--dim)"/>
+<circle cx="147.13768949025712" cy="91.66460889270635" r="1.8" fill="var(--dim)"/>
+<circle cx="22.39642081752588" cy="69.928611952999" r="1.8" fill="var(--dim)"/>
+<circle cx="27.70169815891004" cy="85.00074219613552" r="1.8" fill="var(--dim)"/>
+<circle cx="75.2078241935846" cy="93.23316708368644" r="1.8" fill="var(--dim)"/>
+<text class="sv-d" x="10" y="122" fill="var(--filled)">cắt x1 ≤ −2,96</text>
+<rect x="216" y="44" width="196" height="62" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-hv" x="226" y="36" fill="var(--probe)">vòng 2</text>
+<line x1="306" y1="47" x2="306" y2="103" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="4 3"/>
+<circle cx="317.447077042919" cy="87.16949003606918" r="3.6" fill="var(--tomb)"/>
+<circle cx="386.2055806139839" cy="66.65233498969398" r="1.8" fill="var(--dim)"/>
+<circle cx="355.72564624671895" cy="83.10344431634661" r="1.8" fill="var(--dim)"/>
+<circle cx="339.3048633726966" cy="59.531230101034964" r="3.6" fill="var(--tomb)"/>
+<circle cx="239.8236869143546" cy="70.40390942831772" r="1.8" fill="var(--dim)"/>
+<circle cx="352.6347667588891" cy="65.17458789492464" r="1.8" fill="var(--dim)"/>
+<circle cx="314.2512987450677" cy="67.75582439285535" r="3.6" fill="var(--tomb)"/>
+<circle cx="368.3042004713369" cy="92.66529452755401" r="1.8" fill="var(--dim)"/>
+<circle cx="298.569458907593" cy="94.77837716185299" r="1.8" fill="var(--dim)"/>
+<circle cx="245.35182966838363" cy="87.4043251375233" r="3.6" fill="var(--tomb)"/>
+<circle cx="372.8496275337144" cy="61.148326257390565" r="1.8" fill="var(--dim)"/>
+<circle cx="346.2331589248179" cy="77.33682934623349" r="1.8" fill="var(--dim)"/>
+<circle cx="385.3734568025042" cy="63.493197176572025" r="1.8" fill="var(--dim)"/>
+<circle cx="320.2662533772354" cy="90.17585831816922" r="1.8" fill="var(--dim)"/>
+<circle cx="335.75963479017605" cy="67.42903734874633" r="1.8" fill="var(--dim)"/>
+<circle cx="248.43625232832764" cy="92.45031354542485" r="1.8" fill="var(--dim)"/>
+<circle cx="309.9386402694844" cy="94.69422293279861" r="3.6" fill="var(--tomb)"/>
+<circle cx="257.8039996492372" cy="87.38826472920317" r="1.8" fill="var(--dim)"/>
+<circle cx="363.1376894902571" cy="91.66460889270635" r="1.8" fill="var(--dim)"/>
+<circle cx="238.3964208175259" cy="69.928611952999" r="3.6" fill="var(--tomb)"/>
+<circle cx="243.70169815891003" cy="85.00074219613552" r="1.8" fill="var(--dim)"/>
+<circle cx="291.2078241935846" cy="93.23316708368644" r="1.8" fill="var(--dim)"/>
+<text class="sv-d" x="226" y="122" fill="var(--probe)">cắt x2 ≤  1,70</text>
+<rect x="432" y="44" width="196" height="62" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-hv" x="442" y="36" fill="var(--ok)">vòng 3</text>
+<line x1="554" y1="47" x2="554" y2="103" stroke="var(--ok)" stroke-width="1.6" stroke-dasharray="4 3"/>
+<circle cx="533.447077042919" cy="87.16949003606918" r="4.4" fill="var(--tomb)"/>
+<circle cx="602.2055806139839" cy="66.65233498969398" r="1.8" fill="var(--dim)"/>
+<circle cx="571.725646246719" cy="83.10344431634661" r="1.8" fill="var(--dim)"/>
+<circle cx="555.3048633726966" cy="59.531230101034964" r="4.4" fill="var(--tomb)"/>
+<circle cx="455.8236869143546" cy="70.40390942831772" r="4.4" fill="var(--tomb)"/>
+<circle cx="568.6347667588891" cy="65.17458789492464" r="1.8" fill="var(--dim)"/>
+<circle cx="530.2512987450677" cy="67.75582439285535" r="4.4" fill="var(--tomb)"/>
+<circle cx="584.3042004713369" cy="92.66529452755401" r="4.4" fill="var(--tomb)"/>
+<circle cx="514.569458907593" cy="94.77837716185299" r="1.8" fill="var(--dim)"/>
+<circle cx="461.35182966838363" cy="87.4043251375233" r="4.4" fill="var(--tomb)"/>
+<circle cx="588.8496275337144" cy="61.148326257390565" r="4.4" fill="var(--tomb)"/>
+<circle cx="562.2331589248179" cy="77.33682934623349" r="1.8" fill="var(--dim)"/>
+<circle cx="601.3734568025043" cy="63.493197176572025" r="1.8" fill="var(--dim)"/>
+<circle cx="536.2662533772354" cy="90.17585831816922" r="4.4" fill="var(--tomb)"/>
+<circle cx="551.759634790176" cy="67.42903734874633" r="1.8" fill="var(--dim)"/>
+<circle cx="464.43625232832767" cy="92.45031354542485" r="1.8" fill="var(--dim)"/>
+<circle cx="525.9386402694844" cy="94.69422293279861" r="4.4" fill="var(--tomb)"/>
+<circle cx="473.8039996492372" cy="87.38826472920317" r="1.8" fill="var(--dim)"/>
+<circle cx="579.1376894902571" cy="91.66460889270635" r="1.8" fill="var(--dim)"/>
+<circle cx="454.3964208175259" cy="69.928611952999" r="4.4" fill="var(--tomb)"/>
+<circle cx="459.70169815891006" cy="85.00074219613552" r="1.8" fill="var(--dim)"/>
+<circle cx="507.2078241935846" cy="93.23316708368644" r="1.8" fill="var(--dim)"/>
+<text class="sv-d" x="442" y="122" fill="var(--ok)">cắt x2 ≤ −1,34</text>
+<rect x="648" y="44" width="196" height="62" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-hv" x="658" y="36" fill="var(--tomb)">vòng 4</text>
+<line x1="801" y1="47" x2="801" y2="103" stroke="var(--tomb)" stroke-width="1.6" stroke-dasharray="4 3"/>
+<circle cx="749.447077042919" cy="87.16949003606918" r="5.3" fill="var(--tomb)"/>
+<circle cx="818.2055806139839" cy="66.65233498969398" r="5.3" fill="var(--tomb)"/>
+<circle cx="787.725646246719" cy="83.10344431634661" r="1.8" fill="var(--dim)"/>
+<circle cx="771.3048633726966" cy="59.531230101034964" r="5.3" fill="var(--tomb)"/>
+<circle cx="671.8236869143547" cy="70.40390942831772" r="5.3" fill="var(--tomb)"/>
+<circle cx="784.6347667588891" cy="65.17458789492464" r="1.8" fill="var(--dim)"/>
+<circle cx="746.2512987450677" cy="67.75582439285535" r="5.3" fill="var(--tomb)"/>
+<circle cx="800.3042004713369" cy="92.66529452755401" r="5.3" fill="var(--tomb)"/>
+<circle cx="730.569458907593" cy="94.77837716185299" r="1.8" fill="var(--dim)"/>
+<circle cx="677.3518296683836" cy="87.4043251375233" r="5.3" fill="var(--tomb)"/>
+<circle cx="804.8496275337144" cy="61.148326257390565" r="5.3" fill="var(--tomb)"/>
+<circle cx="778.2331589248179" cy="77.33682934623349" r="1.8" fill="var(--dim)"/>
+<circle cx="817.3734568025043" cy="63.493197176572025" r="1.8" fill="var(--dim)"/>
+<circle cx="752.2662533772354" cy="90.17585831816922" r="5.3" fill="var(--tomb)"/>
+<circle cx="767.759634790176" cy="67.42903734874633" r="5.3" fill="var(--tomb)"/>
+<circle cx="680.4362523283277" cy="92.45031354542485" r="1.8" fill="var(--dim)"/>
+<circle cx="741.9386402694844" cy="94.69422293279861" r="5.3" fill="var(--tomb)"/>
+<circle cx="689.8039996492372" cy="87.38826472920317" r="5.3" fill="var(--tomb)"/>
+<circle cx="795.1376894902571" cy="91.66460889270635" r="1.8" fill="var(--dim)"/>
+<circle cx="670.3964208175258" cy="69.928611952999" r="5.3" fill="var(--tomb)"/>
+<circle cx="675.7016981589101" cy="85.00074219613552" r="5.3" fill="var(--tomb)"/>
+<circle cx="723.2078241935847" cy="93.23316708368644" r="1.8" fill="var(--dim)"/>
+<text class="sv-d" x="658" y="122" fill="var(--tomb)">cắt x2 ≤ −2,97</text>
+<text class="sv-s" x="0" y="144" fill="var(--dim)">chấm to = đang nặng trọng số · chấm đỏ = vòng trước đoán sai</text>
+<rect x="0" y="162" width="196" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
+<text class="sv-l" x="12" y="184" fill="var(--filled)">stump 1</text>
+<text class="sv-l" x="96" y="184" fill="var(--muted)">α = 0,261</text>
+<line x1="98.0" y1="148" x2="98.0" y2="152" stroke="var(--filled)" stroke-width="1.2"/><polygon points="98.0,160 93.8,152 102.2,152" fill="var(--filled)"/>
+<line x1="198" y1="179" x2="206" y2="179" stroke="var(--ok)" stroke-width="1.4"/><polygon points="214,179 206,174.8 206,183.2" fill="var(--ok)"/>
+<rect x="216" y="162" width="196" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.3"/>
+<text class="sv-l" x="228" y="184" fill="var(--probe)">stump 2</text>
+<text class="sv-l" x="312" y="184" fill="var(--muted)">α = 0,303</text>
+<line x1="314.0" y1="148" x2="314.0" y2="152" stroke="var(--probe)" stroke-width="1.2"/><polygon points="314.0,160 309.8,152 318.2,152" fill="var(--probe)"/>
+<line x1="414" y1="179" x2="422" y2="179" stroke="var(--ok)" stroke-width="1.4"/><polygon points="430,179 422,174.8 422,183.2" fill="var(--ok)"/>
+<rect x="432" y="162" width="196" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
+<text class="sv-l" x="444" y="184" fill="var(--ok)">stump 3</text>
+<text class="sv-l" x="528" y="184" fill="var(--muted)">α = 0,256</text>
+<line x1="530.0" y1="148" x2="530.0" y2="152" stroke="var(--ok)" stroke-width="1.2"/><polygon points="530.0,160 525.8,152 534.2,152" fill="var(--ok)"/>
+<line x1="630" y1="179" x2="638" y2="179" stroke="var(--ok)" stroke-width="1.4"/><polygon points="646,179 638,174.8 638,183.2" fill="var(--ok)"/>
+<rect x="648" y="162" width="196" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.3"/>
+<text class="sv-l" x="660" y="184" fill="var(--tomb)">stump 4</text>
+<text class="sv-l" x="744" y="184" fill="var(--muted)">α = 0,304</text>
+<line x1="746.0" y1="148" x2="746.0" y2="152" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="746.0,160 741.8,152 750.2,152" fill="var(--tomb)"/>
+<text class="sv-s" x="0" y="218" fill="var(--ok)">MŨI TÊN CHỈ ĐI MỘT CHIỀU — vòng sau cần kết quả vòng trước, không chạy song song được</text>
+<rect x="0" y="234" width="860" height="40" rx="5" fill="none" stroke="var(--text)" stroke-width="1.3"/>
+<text class="sv-l" x="12" y="259" fill="var(--text)">Model = sign( α₁·stump₁ + α₂·stump₂ + α₃·stump₃ + … )</text>
+<text class="sv-d" x="486" y="259" fill="var(--dim)">đúng train:</text>
+<text class="sv-l" x="560" y="259" fill="var(--filled)">62,7%</text>
+<text class="sv-d" x="602" y="259" fill="var(--faint)">→</text>
+<text class="sv-l" x="622" y="259" fill="var(--probe)">57,3%</text>
+<text class="sv-d" x="664" y="259" fill="var(--faint)">→</text>
+<text class="sv-l" x="684" y="259" fill="var(--ok)">76,2%</text>
+<text class="sv-d" x="726" y="259" fill="var(--faint)">→</text>
+<text class="sv-l" x="746" y="259" fill="var(--tomb)">62,7%</text>
+<text class="sv-s" x="0" y="296" fill="var(--dim)">Không đơn điệu: vòng 2 tụt xuống 57,3% rồi vòng 3 vọt lên 76,2%. Từng vòng có thể tệ đi —</text>
+<text class="sv-s" x="0" y="314" fill="var(--dim)">cái đi lên là TỔNG sau bốn mươi vòng: 91,0%.</text>
+<line x1="0" y1="334" x2="860" y2="334" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0" y="350">HAI CÁCH GỘP CÂY — KHÁC NHAU Ở CHIỀU MŨI TÊN</text>
+<rect x="0" y="362" width="418" height="82" rx="5" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-t" x="14" y="384" fill="var(--filled)">Bagging — song song</text>
+<rect x="20" y="396" width="56" height="24" rx="4" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-d" x="48" y="412" fill="var(--filled)" text-anchor="middle">cây 1</text>
+<line x1="48" y1="424" x2="48" y2="426" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="48,434 43.8,426 52.2,426" fill="var(--rule-hi)"/>
+<rect x="88" y="396" width="56" height="24" rx="4" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-d" x="116" y="412" fill="var(--filled)" text-anchor="middle">cây 2</text>
+<line x1="116" y1="424" x2="116" y2="426" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="116,434 111.8,426 120.2,426" fill="var(--rule-hi)"/>
+<rect x="156" y="396" width="56" height="24" rx="4" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-d" x="184" y="412" fill="var(--filled)" text-anchor="middle">cây 3</text>
+<line x1="184" y1="424" x2="184" y2="426" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="184,434 179.8,426 188.2,426" fill="var(--rule-hi)"/>
+<rect x="224" y="396" width="56" height="24" rx="4" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-d" x="252" y="412" fill="var(--filled)" text-anchor="middle">cây 4</text>
+<line x1="252" y1="424" x2="252" y2="426" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="252,434 247.8,426 256.2,426" fill="var(--rule-hi)"/>
+<text class="sv-d" x="300" y="412" fill="var(--muted)">không cây nào</text>
+<text class="sv-d" x="300" y="428" fill="var(--muted)">biết cây kia</text>
+<rect x="442" y="362" width="418" height="82" rx="5" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-t" x="456" y="384" fill="var(--ok)">Boosting — nối tiếp</text>
+<rect x="462" y="396" width="56" height="24" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="490" y="412" fill="var(--ok)" text-anchor="middle">cây 1</text>
+<line x1="520" y1="408" x2="520" y2="408" stroke="var(--ok)" stroke-width="1.3"/><polygon points="528,408 520,403.8 520,412.2" fill="var(--ok)"/>
+<rect x="530" y="396" width="56" height="24" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="558" y="412" fill="var(--ok)" text-anchor="middle">cây 2</text>
+<line x1="588" y1="408" x2="588" y2="408" stroke="var(--ok)" stroke-width="1.3"/><polygon points="596,408 588,403.8 588,412.2" fill="var(--ok)"/>
+<rect x="598" y="396" width="56" height="24" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="626" y="412" fill="var(--ok)" text-anchor="middle">cây 3</text>
+<line x1="656" y1="408" x2="656" y2="408" stroke="var(--ok)" stroke-width="1.3"/><polygon points="664,408 656,403.8 656,412.2" fill="var(--ok)"/>
+<rect x="666" y="396" width="56" height="24" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="694" y="412" fill="var(--ok)" text-anchor="middle">cây 4</text>
+<text class="sv-d" x="742" y="412" fill="var(--muted)">cây sau đứng</text>
+<text class="sv-d" x="742" y="428" fill="var(--muted)">trên cây trước</text>
+<text class="sv-s" x="0" y="458" fill="var(--dim)">đếm phiếu ngang nhau · trồng cùng lúc được · thêm cây luôn an toàn</text>
+<text class="sv-s" x="442" y="458" fill="var(--dim)">phiếu có trọng số α · bắt buộc tuần tự · thêm vòng có thể tệ đi</text>
+</svg>
+  </figure>
+
+  <ul class="why">
+    <li>Bốn v&#242;ng đầu cắt ở <b>bốn chỗ kh&#225;c nhau</b> (x1 &#8804; &#8722;2,96 &#8594; x2 &#8804; 1,70 &#8594; x2 &#8804; &#8722;1,34 &#8594; x2 &#8804; &#8722;2,97) d&#249; dữ liệu kh&#244;ng đổi một điểm n&#224;o. C&#225;i đổi chỉ l&#224; <b>trọng số</b>.</li>
+    <li>Độ ch&#237;nh x&#225;c cộng dồn tr&#234;n train l&#224; 62,7% &#8594; 57,3% &#8594; 76,2% &#8594; 62,7%. <b>V&#242;ng 2 l&#224;m tệ đi</b>, v&#224; đ&#243; l&#224; b&#236;nh thường &#8212; c&#225;i đảm bảo đi l&#234;n l&#224; tổng sau nhiều v&#242;ng (91,0% sau 40 v&#242;ng), kh&#244;ng phải từng bước.</li>
+    <li>Bagging trồng c&#226;y <b>song song</b>: chia bốn m&#225;y chạy c&#249;ng l&#250;c cũng ra kết quả y hệt. Boosting <b>bắt buộc tuần tự</b> &#8212; v&#242;ng sau cần trọng số m&#224; v&#242;ng trước đẻ ra. Đ&#243; l&#224; l&#253; do boosting kh&#243; song song ho&#225; v&#224; c&#225;c thư viện phải t&#236;m c&#225;ch kh&#225;c (song song ho&#225; b&#234;n <i>trong</i> một c&#226;y).</li>
+    <li>K&#232;m theo chiều mũi t&#234;n l&#224; một hệ quả kh&#243; chịu: th&#234;m c&#226;y v&#224;o bagging gần như lu&#244;n an to&#224;n, c&#242;n th&#234;m v&#242;ng v&#224;o boosting th&#236; <b>c&#243; thể tệ đi</b> &#8212; xem mục 07.</li>
+  </ul>
+</section>
+
+<section id="ada-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Mẫu code cần thuộc</h2></div>
+
+  <p class="key">To&#224;n bộ AdaBoost gọn trong mười d&#242;ng &#8212; đọc một lần l&#224; nhớ, v&#236; n&#243; ch&#237;nh l&#224; ba &#244; trong bản đồ.</p>
+
+<pre><code>w = [1/n] * n                       # ① mọi điểm nặng bằng nhau
+models = []
+
+for t in range(T):
+    h   = fit_stump(X, y, w)        # ② chọn lát cắt sai ít nhất THEO w
+    err = sum(w[i] for i in range(n) if h(X[i]) != y[i])
+    if err &gt;= 0.5: break            #    yếu hơn đoán bừa thì dừng
+
+    alpha = 0.5 * log((1 - err) / err)      # ③ chấm điểm cho stump này
+    models.append((h, alpha))
+
+    for i in range(n):              # ④ sai thì nặng lên, đúng thì nhẹ đi
+        w[i] *= exp(-alpha * y[i] * h(X[i]))
+    w = [x / sum(w) for x in w]     #    chuẩn hoá cho tổng bằng 1
+
+predict = lambda x: sign(sum(a * h(x) for h, a in models))</code></pre>
+
+  <ul class="why">
+    <li><code>y</code> phải m&#227; ho&#225; l&#224; <b>&#8722;1 / +1</b> chứ kh&#244;ng phải 0/1 &#8212; to&#224;n bộ c&#244;ng thức dựa v&#224;o t&#237;ch <code>y&#183;h</code> bằng +1 khi đ&#250;ng v&#224; &#8722;1 khi sai.</li>
+    <li>D&#242;ng <code>if err &gt;= 0.5</code> l&#224; điều kiện sống c&#242;n: qua ngưỡng đ&#243; th&#236; &#945; &#226;m v&#224; model bắt đầu đi ngược.</li>
+    <li><code>fit_stump</code> phải nhận <code>w</code> &#8212; kh&#244;ng phải đếm số điểm sai m&#224; l&#224; <b>cộng trọng số</b> của ch&#250;ng. Bỏ qua chi tiết n&#224;y l&#224; c&#224;i đặt sai phổ biến nhất.</li>
+  </ul>
+</section>
+
+<section id="ada-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Bẫy nhiễu nh&#227;n</h2></div>
+
+  <p class="key">Điểm mạnh v&#224; điểm yếu của AdaBoost l&#224; <em>c&#249;ng một cơ chế</em>: n&#243; b&#225;m v&#224;o thứ đang sai. M&#224; một nh&#227;n bị ghi sai th&#236; <b>lu&#244;n</b> sai &#8212; v&#224; n&#243; kh&#244;ng c&#243; c&#225;ch n&#224;o ph&#226;n biệt hai thứ đ&#243;.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 324" role="img" aria-label="Bảng đo thật theo mức nhiễu nhãn: độ chính xác của bốn mươi stump tụt dần khi nhiễu tăng, và tỉ lệ trọng số rơi vào các điểm bị ghi sai nhãn tăng lên bốn mươi ba phẩy ba phần trăm">
+<text class="sv-hv" x="0.0" y="18">CÁI GIÁ CỦA VIỆC BÁM VÀO ĐIỂM KHÓ</text>
+<text class="sv-t" x="0.0" y="40" fill="var(--tomb)">AdaBoost không phân biệt được "khó" với "nhãn bị ghi sai"</text>
+<text class="sv-s" x="0.0" y="70" fill="var(--dim)">nhiễu nhãn</text>
+<text class="sv-s" x="162.13" y="70" fill="var(--dim)">1 stump</text>
+<text class="sv-s" x="310.16" y="70" fill="var(--dim)">40 stump</text>
+<text class="sv-s" x="461.72" y="70" fill="var(--dim)">trọng số rơi vào điểm bị ghi sai</text>
+<rect x="0.0" y="78" width="133.93" height="24" rx="3" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-l" x="17.62" y="94" fill="var(--ok)">0%</text>
+<text class="sv-l" x="162.13" y="94" fill="var(--faint)">0,663</text>
+<text class="sv-l" x="310.16" y="94" fill="var(--ok)">0,933</text>
+<text class="sv-l" x="461.72" y="94" fill="var(--muted)">—</text>
+<rect x="0.0" y="108" width="133.93" height="24" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.1"/>
+<text class="sv-l" x="17.62" y="124" fill="var(--probe)">5%</text>
+<text class="sv-l" x="162.13" y="124" fill="var(--faint)">0,663</text>
+<text class="sv-l" x="310.16" y="124" fill="var(--probe)">0,920</text>
+<text class="sv-l" x="461.72" y="124" fill="var(--muted)">28,6%</text>
+<rect x="0.0" y="138" width="133.93" height="24" rx="3" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="17.62" y="154" fill="var(--tomb)">15%</text>
+<text class="sv-l" x="162.13" y="154" fill="var(--faint)">0,663</text>
+<text class="sv-l" x="310.16" y="154" fill="var(--tomb)">0,850</text>
+<text class="sv-l" x="461.72" y="154" fill="var(--muted)">37,4%</text>
+<rect x="0.0" y="168" width="133.93" height="24" rx="3" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="17.62" y="184" fill="var(--tomb)">30%</text>
+<text class="sv-l" x="162.13" y="184" fill="var(--faint)">0,660</text>
+<text class="sv-l" x="310.16" y="184" fill="var(--tomb)">0,830</text>
+<text class="sv-l" x="461.72" y="184" fill="var(--muted)">43,3%</text>
+<text class="sv-s" x="0.0" y="214" fill="var(--dim)">Chỉ 7% số điểm bị ghi sai nhãn mà ngốn 28,6% toàn bộ trọng số —</text>
+<text class="sv-s" x="0.0" y="232" fill="var(--dim)">model dành gần một phần ba công sức để học thuộc mấy điểm SAI.</text>
+<rect x="0.0" y="242" width="860.0" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.0"/>
+<text class="sv-t" x="28.2" y="264" fill="var(--filled)">Vì thế gradient boosting thay chỗ AdaBoost</text>
+<text class="sv-s" x="28.2" y="282" fill="var(--dim)">đổi hàm mất mát là đổi được độ nhạy với ngoại lai — mục 08</text>
+</svg>
+    <figcaption>C&#249;ng một thuật to&#225;n, chỉ đổi mức nhiễu nh&#227;n. Cột cuối l&#224; phần trăm trọng số rơi v&#224;o đ&#250;ng những điểm bị ghi sai.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Ở mức nhiễu 5%: chỉ <b>21 tr&#234;n 300 điểm</b> bị ghi sai nh&#227;n, m&#224; ch&#250;ng ngốn <b>28,6%</b> to&#224;n bộ trọng số. Model d&#224;nh gần một phần ba c&#244;ng sức để học thuộc mấy d&#242;ng hỏng.</li>
+    <li>Nguy hiểm ở chỗ <b>kh&#244;ng b&#225;o lỗi g&#236;</b>: exponential loss tr&#234;n train vẫn giảm đều mỗi v&#242;ng, chỉ c&#243; test l&#224; xấu đi. Kh&#244;ng chấm điểm tr&#234;n tập ri&#234;ng th&#236; kh&#244;ng thấy.</li>
+    <li>Thủ phạm l&#224; <b>exponential loss</b>: phạt theo h&#224;m mũ n&#234;n một điểm sai nặng k&#233;o cả model. Logistic loss phạt gần như tuyến t&#237;nh &#8212; đ&#226;y ch&#237;nh l&#224; l&#253; do gradient boosting thay chỗ AdaBoost.</li>
+    <li>Dữ liệu nghi c&#243; nh&#227;n bẩn th&#236; <a href="../random-forest/index.html">random forest</a> an to&#224;n hơn hẳn: n&#243; lấy trung b&#236;nh chứ kh&#244;ng dồn sức v&#224;o điểm sai.</li>
+  </ul>
+</section>
+
+<section id="ada-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Từ AdaBoost sang gradient boosting</h2></div>
+
+  <p class="key">Gradient boosting kh&#244;ng phải &#253; tưởng mới. N&#243; l&#224; AdaBoost viết lại theo ng&#244;n ngữ tối ưu ho&#225;: <em>đội trọng số</em> chỉ l&#224; một c&#225;ch cụ thể của <em>đi theo gradient</em>.</p>
+
+  <div class="cmp two">
+    <div>
+      <h4>AdaBoost</h4>
+      <ul>
+        <li>V&#242;ng sau biết chỗ n&#224;o đang sai qua <b>trọng số mẫu</b></li>
+        <li>H&#224;m mất m&#225;t cố định: <b>exponential loss</b></li>
+        <li>Model cơ sở thường l&#224; <b>stump</b> (1 tầng)</li>
+        <li>Mỗi model c&#243; <b>&#945; ri&#234;ng</b>, t&#237;nh từ err</li>
+        <li>Chỉ l&#224;m ph&#226;n loại</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Gradient boosting</h4>
+      <ul>
+        <li>V&#242;ng sau biết chỗ n&#224;o đang sai qua <b>phần dư</b> r = y &#8722; F</li>
+        <li>H&#224;m mất m&#225;t <b>thay được</b>: MSE, logistic, Huber&#8230;</li>
+        <li>Model cơ sở l&#224; <b>c&#226;y n&#244;ng</b> 3&#8211;6 tầng</li>
+        <li>Mọi c&#226;y d&#249;ng chung một <b>&#951;</b> nhỏ cố định</li>
+        <li>L&#224;m cả hồi quy lẫn ph&#226;n loại</li>
+      </ul>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Điểm nối ch&#237;nh x&#225;c: chạy gradient boosting với exponential loss th&#236; ra <b>đ&#250;ng AdaBoost</b>. Trọng số <code>e^(&#8722;&#945;&#183;y&#183;h)</code> ch&#237;nh l&#224; gradient của h&#224;m mất m&#225;t đ&#243; tại mỗi điểm.</li>
+    <li>Thay được h&#224;m mất m&#225;t l&#224; thay được <b>độ nhạy với ngoại lai</b> &#8212; ch&#237;nh l&#224; c&#225;ch chữa bẫy ở mục 07.</li>
+    <li>Thực tế: AdaBoost hầu như kh&#244;ng c&#242;n d&#249;ng trong sản phẩm. Gi&#225; trị của n&#243; l&#224; <b>gi&#225; trị dạy học</b> &#8212; đọc n&#243; xong th&#236; gradient boosting kh&#244;ng c&#242;n g&#236; lạ. B&#224;i thật th&#236; d&#249;ng <a href="../lightgbm/index.html">LightGBM</a> hoặc <a href="../xgboost/index.html">XGBoost</a>: AdaBoost để hiểu, kh&#244;ng để chạy.</li>
+  </ul>
+</section>
+
+<section id="ada-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
+
+  <p class="key">Ba lỗi đầu cho ra model <em>sai m&#224; kh&#244;ng b&#225;o g&#236;</em> &#8212; điểm tr&#234;n train vẫn đẹp.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Chạy tr&#234;n dữ liệu c&#243; nh&#227;n bẩn</h4><p>Train loss giảm đều, kh&#244;ng cảnh b&#225;o g&#236;, m&#224; test tụt dần. Đo thật: nhiễu 15% l&#224;m 40 stump rơi từ 0,933 xuống 0,850, với 37,4% trọng số n&#233;m v&#224;o mấy điểm ghi sai.</p></div>
+    <div class="card bad"><h4>M&#227; ho&#225; nh&#227;n 0/1</h4><p>C&#244;ng thức cần &#8722;1/+1. D&#249;ng 0/1 th&#236; <code>y&#183;h</code> lu&#244;n bằng 0 với lớp 0, trọng số của nửa dữ liệu kh&#244;ng bao giờ đổi &#8212; model vẫn chạy, vẫn ra số, chỉ l&#224; sai.</p></div>
+    <div class="card bad"><h4><code>fit_stump</code> bỏ qu&#234;n trọng số</h4><p>Đếm số điểm sai thay v&#236; cộng trọng số th&#236; mọi v&#242;ng chọn c&#249;ng một l&#225;t cắt. Bốn mươi stump giống hệt nhau, độ ch&#237;nh x&#225;c đứng y&#234;n ở mức của một stump.</p></div>
+    <div class="card bad"><h4>Đổi stump th&#224;nh c&#226;y s&#226;u cho &#8220;mạnh hơn&#8221;</h4><p>C&#226;y s&#226;u đ&#250;ng gần hết ngay v&#242;ng một, err &#8594; 0, &#945; ph&#226;n k&#236;, v&#224; kh&#244;ng c&#242;n g&#236; cho v&#242;ng sau. Boosting cần model yếu, kh&#244;ng phải model mạnh.</p></div>
+  </div>
+</section>
+
+<section id="ada-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Hỏi đ&#225;p</h2></div>
+
+  <details class="qa"><summary>V&#236; sao model cơ sở phải <em>yếu</em>? Mạnh hơn kh&#244;ng tốt hơn sao?</summary>
+    <p>Boosting sống nhờ việc mỗi v&#242;ng c&#242;n dư sai s&#243;t để v&#242;ng sau chữa. Model mạnh đ&#250;ng gần hết ngay v&#242;ng đầu, err &#8594; 0, &#945; ph&#226;n k&#236; v&#224; trọng số kh&#244;ng c&#242;n g&#236; để dồn &#8212; c&#242;n lại một model đơn lẻ đ&#227; học thuộc.</p></details>
+
+  <details class="qa"><summary>Sai số của stump kh&#244;ng giảm qua c&#225;c v&#242;ng &#8212; vậy c&#243; hỏng kh&#244;ng?</summary>
+    <p>Kh&#244;ng, đ&#243; l&#224; dấu hiệu chạy đ&#250;ng. Đo thật: err dao động 0,34&#8211;0,46 suốt 40 v&#242;ng. Mỗi v&#242;ng đ&#227; l&#224;m b&#224;i to&#225;n kh&#243; l&#234;n cho v&#242;ng sau, n&#234;n từng stump kh&#244;ng kh&#225; l&#234;n. C&#225;i kh&#225; l&#234;n l&#224; tổng c&#243; trọng số: 62,7% &#8594; 91,0% tr&#234;n train.</p></details>
+
+  <details class="qa"><summary>AdaBoost kh&#225;c random forest ở đ&#226;u l&#224; căn bản nhất?</summary>
+    <p>Ở chỗ th&#244;ng tin c&#243; chảy giữa c&#225;c c&#226;y hay kh&#244;ng. Rừng: c&#225;c c&#226;y độc lập, trồng song song được, đếm phiếu ngang nhau, th&#234;m c&#226;y lu&#244;n an to&#224;n. AdaBoost: c&#226;y sau phụ thuộc c&#226;y trước qua trọng số, bắt buộc tuần tự, phiếu c&#243; trọng số, v&#224; th&#234;m v&#242;ng c&#243; thể l&#224;m tệ đi.</p></details>
+
+  <details class="qa"><summary>C&#243; n&#234;n d&#249;ng AdaBoost trong b&#224;i thật kh&#244;ng?</summary>
+    <p>Gần như kh&#244;ng. LightGBM v&#224; XGBoost tốt hơn ở mọi mặt đo được: nhanh hơn, chịu nhiễu tốt hơn, thay được h&#224;m mất m&#225;t, c&#243; early stopping s&#7861;n. Gi&#225; trị của AdaBoost l&#224; dạy học &#8212; hiểu n&#243; rồi th&#236; gradient boosting chỉ l&#224; đổi c&#225;ch b&#225;o &#8220;chỗ n&#224;o đang sai&#8221;.</p></details>
+
+  <details class="qa"><summary>Nhiễu nh&#227;n l&#224;m hỏng AdaBoost th&#236; chữa theo thứ tự n&#224;o?</summary>
+    <p>Một, hạ <code>learning_rate</code> v&#224; giảm số v&#242;ng &#8212; &#237;t v&#242;ng th&#236; trọng số chưa kịp dồn. Hai, chuyển sang gradient boosting với logistic loss. Ba, nếu nghi nh&#227;n bẩn nặng th&#236; đổi hẳn sang random forest. Bốn, đi soi lại nh&#227;n &#8212; thường đ&#226;y mới l&#224; c&#225;ch chữa thật.</p></details>
+</section>
+
+<footer>Machine learning &#183; AdaBoost &#183; số đo tr&#234;n c&#224;i đặt thuần Python, 400 điểm hai chiều, bi&#234;n tr&#242;n, nhiễu nh&#227;n 5%. Bản tổng qu&#225;t ho&#225; nằm ở <a href="../gradient-boosting/index.html">Gradient boosting</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

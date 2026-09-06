@@ -6,6 +6,9 @@ metadata:
 updated: 2026-09-05
 ---
 
+> **Số trong ghi chú này là ảnh chụp lúc viết.** Mốc hiện tại của cả kho:
+> [[ban-do-ver-bai-toan-kho]] (đo lại từ file 2026-09-06).
+
 Nối tiếp [[dot-luat-1-ke-04-database]]. Người dùng: *"làm các bài khó trước và trong quá trình làm
 cải thiện memory dần, tự self-improve rồi làm tới các bài dễ hơn. làm hết từ đầu cho tới hết kệ ML
 đi"* — nên **dài nhất trước**, và mỗi bài rút được bài học chung thì vá thẳng vào

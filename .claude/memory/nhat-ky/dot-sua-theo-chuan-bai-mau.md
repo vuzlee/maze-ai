@@ -6,6 +6,9 @@ metadata:
 updated: 2026-09-05
 ---
 
+> **Số trong ghi chú này là ảnh chụp lúc viết.** Mốc hiện tại của cả kho:
+> [[ban-do-ver-bai-toan-kho]] (đo lại từ file 2026-09-06).
+
 Ngày 2026-09-03, sau khi chốt [[chuan-bai-mau]], người dùng yêu cầu *"sửa lại các bài đã làm từ
 đầu cho tới ML"* — tức 115 bài đã viết của năm kệ 01→05 (bỏ qua bài khung).
 

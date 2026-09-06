@@ -47,14 +47,89 @@
 </header>
 
 <section id="osmem-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Vì sao cần virtual memory</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+
+  <p class="key">Mọi địa chỉ chương trình dùng đều là địa chỉ giả; cả bài là <em>cái giá của lần dịch địa chỉ đó</em> — rẻ khi trúng cache, đắt khi phải chạm đĩa.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: ảo giác và cô lập, dịch địa chỉ, page fault, tính cục bộ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Ảo giác &amp; cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi process một không gian địa chỉ riêng</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Dịch địa chỉ</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">page &#8594; frame qua page table, cache ở TLB</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Page fault</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">page chưa có trong RAM &#8212; minor hay major</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Tính cục bộ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">cách chạm bộ nhớ quyết định rẻ hay đắt</text>
+<text class="sv-hv" x="372" y="18">BỐN Ý CỦA BÀI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--muted)">Bản đồ chung</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi mục sau tô sáng một ô</text>
+</svg>
+  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
+  </figure>
+
+  <div class="note">
+    <h4>Bài này nối tiếp</h4>
+    Ranh giới cô lập giữa process và thread, và chi phí context switch, nằm ở bài
+    <a href="../process-thread-scheduling/index.html">Process, thread &amp; scheduling</a>. Virtual memory là cơ chế đứng sau đúng ranh giới cô lập đó.
+  </div>
+</section>
+
+<section id="osmem-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Ảo giác và cô lập</h2></div>
 
   <p class="key">Virtual memory giải quyết hai vấn đề cùng lúc: <b>cô lập</b> giữa các process, và <b>ảo giác</b> mỗi process có toàn bộ bộ nhớ máy.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: ảo giác và cô lập, dịch địa chỉ, page fault, tính cục bộ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">① Ảo giác &amp; cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">mỗi process một không gian địa chỉ riêng</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Dịch địa chỉ</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">page &#8594; frame qua page table, cache ở TLB</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Page fault</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">page chưa có trong RAM &#8212; minor hay major</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Tính cục bộ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">cách chạm bộ nhớ quyết định rẻ hay đắt</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">CÔ LẬP VÀ LIÊN TỤC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Cô lập</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">con trỏ của A không với sang vùng của B</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Liên tục ở địa chỉ ảo</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">page liền nhau &#183; frame trong RAM khỏi cần liền</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Swap</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">hết RAM thì đẩy page ít dùng ra đĩa</text>
+</svg>
+  <figcaption>Ô &#9312; sáng lên. Hai việc này là lý do virtual memory tồn tại.</figcaption>
+  </figure>
 
   <ul class="why">
     <li><b>Cô lập</b> — mỗi process có một <b>virtual address space</b> riêng. Con trỏ trong A không chạm được bộ nhớ của B.</li>
     <li><b>Ảo giác không gian liên tục</b> — process tưởng mình sở hữu cả dải 64-bit, dù RAM nhỏ hơn nhiều. Hết RAM thì <b>swap</b>.</li>
   </ul>
+</section>
+
+<section id="osmem-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Hai process, hai page table</h2></div>
+
+  <p class="key">Hai process đều đánh số page từ 0 — <em>trùng số nhưng khác chỗ</em> trong RAM, và page table là thứ quyết định điều đó.</p>
 
   <figure>
     <svg viewBox="0 0 860 250" role="img" aria-label="Hai process có không gian địa chỉ ảo riêng, page table dịch sang các frame rải rác trong RAM">
@@ -89,16 +164,42 @@
     </svg>
     <figcaption>Hai process đều có "page 0" và "page 1" của riêng mình — <b>trùng số nhưng khác chỗ trong RAM</b>. Page table là thứ quyết định ai chạm vào frame nào, nên A không thể với sang vùng của B, và các page liền nhau trong địa chỉ ảo không cần liền nhau trong RAM thật.</figcaption>
   </figure>
-
-  <div class="note">
-    <h4>Bài này nối tiếp</h4>
-    Ranh giới cô lập giữa process và thread, và chi phí context switch, nằm ở bài
-    <a href="../process-thread-scheduling/index.html">Process, thread &amp; scheduling</a>. Virtual memory là cơ chế đứng sau đúng ranh giới cô lập đó.
-  </div>
 </section>
 
-<section id="osmem-s2">
-  <div class="sh"><b>02</b><h2>Phân trang</h2></div>
+<section id="osmem-s4">
+  <div class="sh"><b>04</b><h2>Phân trang</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: ảo giác và cô lập, dịch địa chỉ, page fault, tính cục bộ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Ảo giác &amp; cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi process một không gian địa chỉ riêng</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">② Dịch địa chỉ</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">page &#8594; frame qua page table, cache ở TLB</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Page fault</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">page chưa có trong RAM &#8212; minor hay major</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Tính cục bộ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">cách chạm bộ nhớ quyết định rẻ hay đắt</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">MỘT LẦN DỊCH, HAI ĐƯỜNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">TLB hit</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">vài chu kỳ CPU &#183; cache ngay trong CPU</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">TLB miss</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">phải tra page table nằm trong RAM</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Lặp ở từng lệnh</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">nên miss là nguồn chậm âm thầm nhất</text>
+</svg>
+  <figcaption>Ô &#9313; sáng lên. Mỗi lệnh chạm bộ nhớ đều phải qua bước dịch này.</figcaption>
+  </figure>
 
   <p class="key">Mọi địa chỉ CPU dùng đều là <em>địa chỉ ảo</em> — phần cứng phải dịch sang địa chỉ vật lý trước khi chạm vào RAM.</p>
 
@@ -129,8 +230,40 @@
   </div>
 </section>
 
-<section id="osmem-s3">
-  <div class="sh"><b>03</b><h2>Page fault</h2></div>
+<section id="osmem-s5">
+  <div class="sh"><b>05</b><h2>Page fault</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: ảo giác và cô lập, dịch địa chỉ, page fault, tính cục bộ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Ảo giác &amp; cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi process một không gian địa chỉ riêng</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Dịch địa chỉ</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">page &#8594; frame qua page table, cache ở TLB</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--tomb)">③ Page fault</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">page chưa có trong RAM &#8212; minor hay major</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Tính cục bộ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">cách chạm bộ nhớ quyết định rẻ hay đắt</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HAI LOẠI, CHÊNH BA BẬC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Minor fault</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">page đã trong RAM &#183; chỉ sửa page table</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Major fault</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">đọc từ đĩa &#183; SSD chậm hơn RAM ~1.000 lần</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Thrashing</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">swap ra rồi swap vào cùng những page</text>
+</svg>
+  <figcaption>Ô &#9314; sáng lên. Hai loại fault chênh nhau ba tới năm bậc độ lớn.</figcaption>
+  </figure>
 
   <p><b>Page fault</b> xảy ra khi CPU truy cập một page chưa được ánh xạ vào RAM cho process hiện tại. Có hai loại, chênh lệch tốc độ rất lớn:</p>
 
@@ -163,8 +296,40 @@
   </div>
 </section>
 
-<section id="osmem-s4">
-  <div class="sh"><b>04</b><h2>Tính cục bộ</h2></div>
+<section id="osmem-s6">
+  <div class="sh"><b>06</b><h2>Tính cục bộ</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: ảo giác và cô lập, dịch địa chỉ, page fault, tính cục bộ">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Ảo giác &amp; cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi process một không gian địa chỉ riêng</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Dịch địa chỉ</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">page &#8594; frame qua page table, cache ở TLB</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Page fault</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">page chưa có trong RAM &#8212; minor hay major</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">④ Tính cục bộ</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">cách chạm bộ nhớ quyết định rẻ hay đắt</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">CÙNG BIG-O, KHÁC TỐC ĐỘ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Spatial locality</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nạp theo khối &#183; chạm một, kéo cả hàng xóm</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Temporal locality</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">vừa dùng thì sắp dùng lại &#8594; giữ ở cache</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Ngẫu nhiên</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">mỗi bước một khối khác &#8594; miss liên tục</text>
+</svg>
+  <figcaption>Ô &#9315; sáng lên. Cùng Big-O nhưng khác hẳn số lần miss.</figcaption>
+  </figure>
 
   <p class="key"><b>Locality of reference</b> là lý do duyệt mảng tuần tự nhanh hơn duyệt ngẫu nhiên <em>nhiều lần</em>, dù Big-O như nhau. Hai dạng:</p>
 
@@ -191,73 +356,8 @@
   </ul>
 </section>
 
-<section id="osmem-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Mọi địa chỉ chương trình dùng đều là địa chỉ giả; toàn bộ bài này là <em>cái giá của lần dịch địa chỉ đó</em> &#8212; rẻ khi trúng cache, đắt khi phải chạm đĩa.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 384" role="img" aria-label="Địa chỉ ảo qua page table thành frame, hai mức cache dịch địa chỉ, hai loại page fault và thrashing, tính cục bộ">
-
-      <text class="sv-h" x="8" y="16">&#9312; ĐỊA CHỈ ẢO &#8594; PAGE TABLE &#8594; FRAME TRONG RAM</text>
-      <rect x="8" y="26" width="160" height="30" rx="4" fill="rgba(140,169,242,.12)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="18" y="46" fill="var(--filled-lo)">A &#183; page 0</text>
-      <rect x="8" y="60" width="160" height="30" rx="4" fill="rgba(91,207,160,.12)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="18" y="80" fill="#8EE0BE">B &#183; page 0</text>
-      <text class="sv-d" x="8" y="106" fill="#7A6F63">trùng số, khác process</text>
-      <path d="M172 58 h30" stroke="#EDB44A"/><path d="M202 58 l-7 -4 v8 z" fill="#EDB44A"/>
-      <rect x="206" y="30" width="150" height="56" rx="5" fill="rgba(237,180,74,.12)" stroke="#EDB44A"/>
-      <text class="sv-t" x="216" y="54" fill="#EDB44A">page table</text>
-      <text class="sv-l" x="216" y="72">mỗi process một bảng</text>
-      <path d="M360 58 h30" stroke="#EDB44A"/><path d="M390 58 l-7 -4 v8 z" fill="#EDB44A"/>
-      <rect x="394" y="26" width="200" height="26" rx="4" fill="rgba(91,207,160,.14)" stroke="#5BCFA0"/>
-      <text class="sv-l" x="404" y="43" fill="#8EE0BE">frame &#8212; B page 0</text>
-      <rect x="394" y="56" width="200" height="26" rx="4" fill="rgba(140,169,242,.14)" stroke="#8CA9F2"/>
-      <text class="sv-l" x="404" y="73" fill="var(--filled-lo)">frame &#8212; A page 0</text>
-      <text class="sv-d" x="394" y="98" fill="#7A6F63">RAM thật &#183; rải rác, không cần liền nhau</text>
-      <text class="sv-l" x="614" y="44">cô lập: A không với sang được vùng của B</text>
-      <text class="sv-l" x="614" y="62">liên tục: page liền nhau ở địa chỉ ảo</text>
-      <text class="sv-l" x="614" y="80">là đủ, RAM khỏi cần liền</text>
-
-      <text class="sv-h" x="8" y="136">&#9313; DỊCH ĐỊA CHỈ XẢY RA Ở TỪNG LỆNH &#8212; NÊN PHẢI CÓ CACHE</text>
-      <rect x="8" y="146" width="250" height="46" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="20" y="164" fill="#8EE0BE">TLB hit &#183; vài chu kỳ CPU</text>
-      <text class="sv-l" x="20" y="182">cache nhỏ ngay trong CPU</text>
-      <rect x="270" y="146" width="250" height="46" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="282" y="164" fill="#EDB44A">TLB miss &#8594; tra page table</text>
-      <text class="sv-s" x="282" y="182">phải đi ra RAM &#183; chậm hơn hẳn</text>
-      <text class="sv-l" x="536" y="164">TLB chỉ chứa vài trăm tới vài nghìn ánh xạ</text>
-      <text class="sv-d" x="536" y="182" fill="#7A6F63">nhảy lung tung qua nhiều vùng &#8594; miss ở gần như mỗi lần truy cập</text>
-
-      <rect x="8" y="208" width="840" height="94" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-h" x="20" y="228" fill="#F79BAB">&#9314; PAGE FAULT &#8212; PAGE CHƯA MAP VÀO PROCESS NÀY</text>
-      <rect x="20" y="236" width="400" height="34" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-l" x="30" y="250" fill="#8EE0BE">Minor fault &#183; page đã nằm trong RAM</text>
-      <text class="sv-d" x="30" y="264" fill="#7A6F63">chỉ cập nhật page table &#183; copy-on-write, shared library</text>
-      <rect x="432" y="236" width="404" height="34" rx="4" fill="rgba(242,113,138,.10)" stroke="#F2718A"/>
-      <text class="sv-l" x="442" y="250" fill="#F79BAB">Major fault &#183; phải đọc từ đĩa hoặc swap</text>
-      <text class="sv-d" x="442" y="264" fill="#7A6F63">SSD chậm hơn RAM ~1.000 lần &#183; HDD ~100.000 lần</text>
-      <text class="sv-l" x="20" y="290" fill="#F79BAB">Thiếu RAM kéo dài &#8594; thrashing: swap ra rồi swap vào cùng những page, CPU chờ đĩa chứ không tính</text>
-
-      <text class="sv-h" x="8" y="332">&#9315; TÍNH CỤC BỘ &#8212; VÌ SAO CÙNG BIG-O MÀ KHÁC TỐC ĐỘ</text>
-      <rect x="8" y="342" width="60" height="18" rx="3" fill="rgba(91,207,160,.18)" stroke="#5BCFA0"/>
-      <text class="sv-l" x="78" y="356" fill="#8EE0BE">tuần tự &#8212; spatial locality, prefetch nạp sẵn khối kế tiếp</text>
-      <rect x="8" y="364" width="480" height="14" rx="3" fill="rgba(242,113,138,.16)" stroke="#F2718A"/>
-      <text class="sv-l" x="496" y="376" fill="#F79BAB">ngẫu nhiên &#8212; mỗi bước nhảy một khối khác, miss liên tục</text>
-    </svg>
-    <figcaption>Đọc theo số: page table là thứ vừa cô lập vừa tạo ảo giác liên tục &#9312;, lần dịch địa chỉ lặp ở từng lệnh nên phải có TLB &#9313;, page chưa có trong RAM thì chi phí chênh nhau ba tới năm bậc độ lớn &#9314;, và cách chương trình chạm bộ nhớ quyết định nó rơi vào bên rẻ hay bên đắt &#9315;.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><strong>Page</strong> và <strong>frame</strong> là hai đầu của &#9312;: page là khối ở địa chỉ ảo, frame là khối thật trong RAM, thường 4KB mỗi bên.</li>
-    <li><strong>Swap</strong> giữ được ảo giác ở &#9312; khi RAM không đủ, cũng là nguồn của major fault ở &#9314; — cùng cơ chế, hai mặt.</li>
-    <li><strong>Thrashing</strong> trông giống CPU quá tải nhưng dấu hiệu thật là tỉ lệ major fault cao — tăng tốc CPU không chữa được.</li>
-    <li><strong>Mảng nhanh hơn linked list</strong> dù cùng Big-O chính là &#9315;: <a href="../../../01-dsa/03-data-structures/array-string/index.html">mảng</a> lưu liền kề, <a href="../../../01-dsa/03-data-structures/linked-list/index.html">linked list</a> rải rác trên heap.</li>
-  </ul>
-</section>
-
-<section id="osmem-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+<section id="osmem-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

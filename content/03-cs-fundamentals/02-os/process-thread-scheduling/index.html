@@ -46,9 +46,85 @@
   <p class="lede">Tầng dưới của mọi câu hỏi đồng thời — kể cả câu về GIL của Python.</p>
 </header>
 
-<section id="osproc-s1">
-  <div class="sh"><b>01</b><h2>Process so với thread</h2></div>
-  <p class="key">Một <strong>process</strong> là một chương trình đang chạy, có <em>không gian địa chỉ riêng</em>. Một <strong>thread</strong> là một luồng thực thi <em>bên trong</em> một process.</p>
+<section id="osproc-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+
+  <p class="key">Một ranh giới cô lập quyết định tất cả: <em>chia sẻ bộ nhớ hay không</em> — nó định giá lần chuyển luồng, và định luôn ba lỗi cuối bài.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ranh giới cô lập, giá một lần chuyển, vòng lập lịch, trạng thái tiến trình">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ranh giới cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">chia sẻ bộ nhớ hay không</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Giá một lần chuyển</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">lưu rồi nạp lại trạng thái register</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Vòng lập lịch</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">preemptive — OS ngắt, không xin phép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Trạng thái tiến trình</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">New · Ready · Running · Waiting</text>
+<text class="sv-hv" x="372" y="18">MỘT RANH GIỚI QUYẾT ĐỊNH TẤT CẢ: CHIA SẺ BỘ NHỚ HAY KHÔNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">&#9312; ranh giới</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">process không chia sẻ gì, thread chung heap và global</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">&#9313; nên chuyển luồng đắt hay rẻ</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">đổi address space là phải flush TLB</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">&#9314; ai quyết định lúc chuyển</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">hệ điều hành, theo time slice</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">&#9315; và tiến trình đi qua đâu</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">chỉ vài trạng thái cố định</text>
+</svg>
+  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
+  </figure>
+</section>
+
+<section id="osproc-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Process so với thread</h2></div>
+
+  <p class="key">Bộ nhớ của process này process khác <em>không nhìn thấy</em>; thread cùng process thì dùng chung heap và biến global.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ranh giới cô lập, giá một lần chuyển, vòng lập lịch, trạng thái tiến trình">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">&#9312; Ranh giới cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">chia sẻ bộ nhớ hay không</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Giá một lần chuyển</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">lưu rồi nạp lại trạng thái register</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Vòng lập lịch</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">preemptive — OS ngắt, không xin phép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Trạng thái tiến trình</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">New · Ready · Running · Waiting</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">&#9312; RANH GIỚI CÔ LẬP — CHIA SẺ BỘ NHỚ HAY KHÔNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Process — không gian địa chỉ riêng</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">muốn trao đổi phải qua IPC: pipe, socket, shared memory</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">crash một process</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không kéo process khác chết theo</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Thread — CHUNG heap, global, file descriptor</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">RIÊNG: stack, register, program counter</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">chính phần dùng chung là nguồn race condition</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">nên mới cần lock</text>
+</svg>
+  <figcaption>Ô &#9312; sáng lên. Phần dùng chung chính là nguồn của race condition.</figcaption>
+  </figure>
 
   <ul class="why">
     <li>Bộ nhớ của process này process khác không nhìn thấy, trừ khi đi qua IPC — ranh giới cô lập mạnh nhất hệ điều hành có.</li>
@@ -72,8 +148,44 @@
   </div>
 </section>
 
-<section id="osproc-s2">
-  <div class="sh"><b>02</b><h2>Context switch</h2></div>
+<section id="osproc-s3">
+  <div class="sh"><b>03</b><h2>Context switch</h2></div>
+
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ranh giới cô lập, giá một lần chuyển, vòng lập lịch, trạng thái tiến trình">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ranh giới cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">chia sẻ bộ nhớ hay không</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">&#9313; Giá một lần chuyển</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">lưu rồi nạp lại trạng thái register</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Vòng lập lịch</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">preemptive — OS ngắt, không xin phép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Trạng thái tiến trình</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">New · Ready · Running · Waiting</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">&#9313; GIÁ MỘT LẦN CHUYỂN — LƯU RỒI NẠP LẠI REGISTER</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">gọi hàm thường · vài ns</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">không rời khỏi tiến trình</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">thread switch · 1–4 µs</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">cùng process, address space giữ nguyên</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">process switch · 5–15 µs</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">đổi address space, có thể phải flush TLB</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">thêm thread quá số core (CPU-bound)</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">CPU tốn thời gian lưu/khôi phục hơn làm việc thật</text>
+</svg>
+  <figcaption>Ô &#9313; sáng lên. Đổi address space là khoản đắt nhất.</figcaption>
+  </figure>
   <p class="key">Context switch là lúc CPU dừng một luồng để chạy luồng khác — phải <em>lưu toàn bộ register</em> của luồng cũ rồi nạp register của luồng mới.</p>
 
   <ul class="why">
@@ -92,8 +204,44 @@
   </div>
 </section>
 
-<section id="osproc-s3">
-  <div class="sh"><b>03</b><h2>Lập lịch</h2></div>
+<section id="osproc-s4">
+  <div class="sh"><b>04</b><h2>Lập lịch</h2></div>
+
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ranh giới cô lập, giá một lần chuyển, vòng lập lịch, trạng thái tiến trình">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ranh giới cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">chia sẻ bộ nhớ hay không</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Giá một lần chuyển</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">lưu rồi nạp lại trạng thái register</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">&#9314; Vòng lập lịch</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">preemptive — OS ngắt, không xin phép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Trạng thái tiến trình</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">New · Ready · Running · Waiting</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">&#9314; VÒNG LẬP LỊCH — PREEMPTIVE: OS NGẮT, KHÔNG XIN PHÉP</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">chạy hết time slice → bị ngắt → xếp lại hàng</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">vòng lặp đó chạy mãi</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">cooperative thì tiến trình phải tự nhường</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">một cái treo là khoá cả hệ thống</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">xếp hàng theo ưu tiên</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">round-robin, priority, CFS</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">Priority inversion</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">ưu tiên thấp giữ lock mà ưu tiên cao cần</text>
+</svg>
+  <figcaption>Ô &#9314; sáng lên. Hệ điều hành ngắt ngang, không đợi xin phép.</figcaption>
+  </figure>
   <p class="key">Hai triết lý lập lịch, khác nhau ở chỗ <em>ai có quyền cắt ngang</em>.</p>
 
   <ul class="why">
@@ -114,8 +262,44 @@
   </div>
 </section>
 
-<section id="osproc-s4">
-  <div class="sh"><b>04</b><h2>Trạng thái tiến trình</h2></div>
+<section id="osproc-s5">
+  <div class="sh"><b>05</b><h2>Trạng thái tiến trình</h2></div>
+
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ranh giới cô lập, giá một lần chuyển, vòng lập lịch, trạng thái tiến trình">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ranh giới cô lập</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">chia sẻ bộ nhớ hay không</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Giá một lần chuyển</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">lưu rồi nạp lại trạng thái register</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Vòng lập lịch</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">preemptive — OS ngắt, không xin phép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--tomb)">&#9315; Trạng thái tiến trình</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">New · Ready · Running · Waiting</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">&#9315; TRẠNG THÁI TIẾN TRÌNH</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">New → Ready → Running → Terminated</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đường đi bình thường</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Running → Ready</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">khi hết time slice</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Running → Waiting</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">khi chờ I/O, xong thì về Ready</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">Ready ≠ Running</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">sẵn sàng chạy không có nghĩa là đang được CPU</text>
+</svg>
+  <figcaption>Ô &#9315; sáng lên. Chỉ vài trạng thái, đường đi cố định.</figcaption>
+  </figure>
   <p class="key">Một tiến trình đi qua vài trạng thái cố định; bộ lập lịch chỉ quyết định <em>khi nào</em> nó chuyển trạng thái.</p>
   <div class="flow">
     <div class="n"><h5>New</h5><p>vừa được tạo</p></div>
@@ -132,64 +316,6 @@
     <li>Về lại <strong>Ready</strong> khi hết time slice mà chưa xong — bị preempt, không phải lỗi.</li>
     <li>Sang <strong>Waiting/Blocked</strong> khi phải chờ I/O — đọc file, chờ mạng.</li>
     <li>Chờ xong thì về <strong>Ready</strong>, không được chạy ngay.</li>
-  </ul>
-</section>
-
-<section id="osproc-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Một ranh giới cô lập quyết định tất cả: chia sẻ bộ nhớ hay không &#8212; nó định giá lần chuyển luồng, và định luôn ba lỗi cuối bài.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 372" role="img" aria-label="Ranh giới chia sẻ bộ nhớ giữa process và thread, giá của context switch, vòng lập lịch và trạng thái tiến trình">
-
-      <text class="sv-h" x="8" y="16">&#9312; RANH GIỚI CÔ LẬP &#8212; CHIA SẺ BỘ NHỚ HAY KHÔNG</text>
-      <rect x="8" y="26" width="404" height="80" rx="6" fill="rgba(140,169,242,.06)" stroke="#8CA9F2"/>
-      <text class="sv-t" x="20" y="44" fill="var(--filled-lo)">Process &#8212; không gian địa chỉ riêng</text>
-      <text class="sv-s" x="20" y="62">không chia sẻ gì &#183; muốn trao đổi phải qua IPC</text>
-      <text class="sv-l" x="20" y="78">tạo mới đắt: nhân bản bộ nhớ, bảng trang</text>
-      <text class="sv-d" x="20" y="96" fill="#7A6F63">crash một process không kéo process khác chết theo</text>
-      <rect x="424" y="26" width="424" height="80" rx="6" fill="rgba(237,180,74,.06)" stroke="#EDB44A"/>
-      <text class="sv-t" x="436" y="44" fill="#EDB44A">Thread &#8212; nằm trong một process</text>
-      <text class="sv-s" x="436" y="62">CHUNG: heap, biến global, file descriptor</text>
-      <text class="sv-l" x="436" y="78">RIÊNG: stack, register, program counter</text>
-      <text class="sv-d" x="436" y="96" fill="#7A6F63">chính phần dùng chung là nguồn của race condition &#8594; cần lock</text>
-
-      <text class="sv-h" x="8" y="136">&#9313; GIÁ CỦA MỘT LẦN CHUYỂN &#8212; LƯU RỒI NẠP LẠI TRẠNG THÁI REGISTER</text>
-      <rect x="8" y="146" width="16" height="18" rx="3" fill="rgba(91,207,160,.20)" stroke="#5BCFA0"/>
-      <text class="sv-l" x="32" y="160" fill="#8EE0BE">gọi hàm thường &#183; vài ns</text>
-      <rect x="8" y="170" width="126" height="18" rx="3" fill="rgba(237,180,74,.18)" stroke="#EDB44A"/>
-      <text class="sv-l" x="142" y="184" fill="#EDB44A">thread switch, cùng process &#183; 1&#8211;4 &#181;s &#8212; address space giữ nguyên</text>
-      <rect x="8" y="194" width="420" height="18" rx="3" fill="rgba(242,113,138,.18)" stroke="#F2718A"/>
-      <text class="sv-l" x="436" y="208" fill="#F79BAB">process switch &#183; 5&#8211;15 &#181;s &#8212; đổi address space, có thể phải flush TLB</text>
-      <text class="sv-d" x="8" y="230" fill="#7A6F63">thêm thread quá số core cho tác vụ CPU-bound: CPU tốn thời gian lưu/khôi phục hơn là làm việc thật</text>
-
-      <text class="sv-h" x="8" y="262">&#9314; VÒNG LẬP LỊCH &#8212; PREEMPTIVE: HỆ ĐIỀU HÀNH NGẮT, KHÔNG CẦN XIN PHÉP</text>
-      <rect x="8" y="272" width="170" height="30" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-l" x="18" y="291" fill="#8EE0BE">chạy hết time slice</text>
-      <path d="M182 287 h18" stroke="#7A6F63"/><path d="M200 287 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="204" y="272" width="170" height="30" rx="4" fill="rgba(237,180,74,.12)" stroke="#EDB44A"/>
-      <text class="sv-l" x="214" y="291" fill="#EDB44A">bị ngắt ngang</text>
-      <path d="M378 287 h18" stroke="#7A6F63"/><path d="M396 287 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="400" y="272" width="180" height="30" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-l" x="410" y="291" fill="var(--filled-lo)">xếp lại hàng theo ưu tiên</text>
-      <path d="M490 306 v14 h-400 v-40" stroke="#3D352C" fill="none"/>
-      <text class="sv-l" x="600" y="284">cooperative thì tiến trình phải tự nhường</text>
-      <text class="sv-d" x="600" y="298" fill="#7A6F63">một cái treo là khoá cả hệ thống</text>
-
-      <text class="sv-h" x="8" y="342">&#9315; TRẠNG THÁI TIẾN TRÌNH</text>
-      <text class="sv-l" x="8" y="360" fill="var(--filled-lo)">New &#8594; Ready &#8594; Running &#8594; Terminated</text>
-      <text class="sv-l" x="300" y="360" fill="#EDB44A">Running &#8594; Ready khi hết time slice</text>
-      <text class="sv-l" x="580" y="360" fill="#F79BAB">Running &#8594; Waiting khi chờ I/O, xong thì về Ready</text>
-    </svg>
-    <figcaption>Đọc theo số: chia sẻ bộ nhớ hay không là ranh giới gốc &#9312;, nó quyết định lần chuyển luồng đắt hay rẻ &#9313;, hệ điều hành ngắt ngang theo time slice chứ không đợi xin phép &#9314;, và một tiến trình chỉ đi qua vài trạng thái cố định &#9315;.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><strong>IPC</strong> là cái giá của cột trái &#9312;: pipe, socket, shared memory &#8212; process muốn trao đổi phải đi qua kênh tường minh.</li>
-    <li><strong>Flush TLB</strong> là lý do cột dài nhất ở &#9313; dài đến vậy — chi tiết ở <a href="../memory-virtual-paging/index.html">Virtual memory &amp; paging</a>.</li>
-    <li><strong>Priority inversion</strong> là bẫy của &#9314;: tiến trình ưu tiên thấp giữ lock mà tiến trình ưu tiên cao cần, ưu tiên bị đảo.</li>
-    <li><strong>Contention</strong> nối &#9312; với ba lỗi ngay dưới: tranh lock nhiều thì nhiều thread lại chậm hơn — xem <a href="../lock-deadlock-race/index.html">Lock, deadlock &amp; race condition</a>.</li>
   </ul>
 </section>
 

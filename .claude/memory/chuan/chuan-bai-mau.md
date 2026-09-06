@@ -41,8 +41,11 @@ nên *"đọc mãi không hiểu GC là gì"*. Thứ tự bắt buộc trong m�
 2. **hình mental model** ngay dưới;
 3. `figcaption` chỉ nói **cách đọc hình**, không kết luận hộ.
 
-Tên mục đặt theo nội dung chứ không bắt buộc là chữ "Mental model" — *Vấn đề nó giải*, *GC là gì*
-đều được, miễn hình nằm trong mục đó.
+Tên mục **chốt là `Mental model`** (2026-09-06, người dùng chốt sau khi thấy §01 đang có năm cách
+đặt tên khác nhau trên 115 bài: *Ý tưởng* 23, *Vấn đề* 17, *X là gì* 12, *Mental model* 4, còn lại
+mỗi bài một kiểu). Năm cái tên cho cùng một vai trò thì người đọc không nhận ra §01 luôn là cùng
+một thứ. Ràng buộc cũ vẫn giữ nguyên: hình phải nằm **trong** mục đó. Đổi tên **khi chạm từng
+bài**, đừng mở một đợt sửa 115 file chỉ để đổi chữ.
 
 **Hình nằm *trong* mục 01, không lơ lửng dưới lede.** Sáu bài `06-tree-models` đang đặt
 `figure.gist` ở ngoài mọi mục — mục lục không trỏ tới được, và nó tách khỏi câu định nghĩa. Đó là

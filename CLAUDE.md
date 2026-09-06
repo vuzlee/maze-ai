@@ -47,13 +47,13 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     04-sql-advanced/{sql-advanced-overview, sql-window-functions, sql-index-query-plan, transaction-isolation, query-tuning}
     05-beyond-sql/{nosql-landscape, sharding-replication}
     06-data-systems/{oltp-vs-olap, data-warehouse-lake, etl-elt, batch-stream-processing, data-quality}
-  05-machine-learning/                        38 bài · 0 khung
+  05-machine-learning/                        39 bài · 0 khung
     01-overview/{ml-overview}
     02-math-foundations/{math-foundations-overview, probability-basics, expectation-variance, bayes-theorem, linear-algebra-ml, gradient-optimization, mle-map}
     03-statistics/{statistics, ab-testing}
     04-core-concepts/{core-concepts-overview, supervised-unsupervised, bias-variance-tradeoff, train-val-test-cv, overfitting-regularization, feature-engineering}
     05-classical-ml/{classical-models-overview, linear-regression, logistic-regression, ridge-lasso-elasticnet, svm, knn, naive-bayes}
-    06-tree-models/{tree-family-overview, decision-tree, random-forest, gradient-boosting, xgboost, lightgbm}
+    06-tree-models/{tree-family-overview, decision-tree, random-forest, adaboost, gradient-boosting, xgboost, lightgbm}
     07-clustering/{clustering-overview, kmeans-clustering, dbscan, hdbscan}
     08-dimensionality/{pca-dimensionality}
     09-evaluation/{evaluation-overview, metrics-confusion-matrix, roc-auc-pr, calibration}
@@ -421,7 +421,7 @@ nhất khi một khái niệm chạm nhiều kệ.
 | Python | ✅ **xong** — 17 bài, không còn khung |
 | CS fundamentals | ✅ **xong** — 14 bài, không còn khung |
 | Database & SQL | ✅ **xong** — 23 bài, không còn khung |
-| Machine learning | ✅ **xong** — 38 bài, không còn khung |
+| Machine learning | ✅ **xong** — 39 bài, không còn khung |
 | Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe · Debugging training · **Autoencoder · VAE · GAN** |
 | Transformer & architectures | Architecture overview · Transformer core overview · Tokenization · Embedding · Positional encoding · Encoder, decoder & both · BERT — encoder-only · GPT — decoder-only · T5 — encoder-decoder · Beyond Transformer overview · State space models · Mamba · Hybrid — Hymba · **Efficient attention** |
 | LLM & GenAI | LLM overview · LLM training overview · Pretraining · Scaling law · LLM techniques overview · Mixture of Experts · Long context · Chain-of-Thought · Inference overview · Decoding strategies · Quantization · RAG overview · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use · Model labs overview · LLaMA · Qwen · DeepSeek · Mistral & Mixtral · GPT, Claude & Gemini · **RAG evaluation · CLIP · Vision-language model · Diffusion models · Audio models** |

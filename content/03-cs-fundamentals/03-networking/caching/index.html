@@ -47,9 +47,34 @@
 </header>
 
 <section id="cache-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Vì sao cache là câu trả lời mặc định</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-  <p class="key">Mọi thứ ở bài trước đều tốn <em>ít nhất một vòng khứ hồi</em>. Cache là cách duy nhất đưa con số đó về 0.</p>
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: header HTTP, các tầng cache, ba cách bỏ dữ liệu cũ, thundering herd">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Header HTTP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">ai được giữ, giữ bao lâu, hết hạn thì hỏi ai</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Các tầng cache</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">càng gần người dùng càng rẻ, càng khó thu hồi</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Bỏ dữ liệu cũ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">ba chiến lược &#8212; TTL, xoá khoá, đặt phiên bản</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Thundering herd</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">sự cố do chính cache gây ra</text>
+<text class="sv-hv" x="372" y="18">BỐN Ý CỦA BÀI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--muted)">Bản đồ chung</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi mục sau tô sáng một ô</text>
+</svg>
+  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
+  </figure>
+
+  <p class="key">Cache dễ ở chỗ lưu lại, khó ở chỗ <em>bỏ đi đúng lúc</em> — mọi chiến lược trong bài đều là một cách trả lời câu hỏi thứ hai.</p>
 
   <ul class="why">
     <li>Tối ưu TCP và HTTP chỉ <b>giảm số RTT</b> — từ bốn xuống một. Cache <b>bỏ hẳn</b> chuyến đi.</li>
@@ -65,6 +90,38 @@
 
 <section id="cache-s2">
   <div class="sh"><b>02</b><h2>Cache HTTP</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: header HTTP, các tầng cache, ba cách bỏ dữ liệu cũ, thundering herd">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--probe)">① Header HTTP</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">ai được giữ, giữ bao lâu, hết hạn thì hỏi ai</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Các tầng cache</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">càng gần người dùng càng rẻ, càng khó thu hồi</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Bỏ dữ liệu cũ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">ba chiến lược &#8212; TTL, xoá khoá, đặt phiên bản</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Thundering herd</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">sự cố do chính cache gây ra</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HAI CẶP TÊN GÂY NHẦM NHẤT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">max-age vs s-maxage</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">trình duyệt giữ vs CDN giữ</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">public vs private</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">ai được phép lưu bản sao</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">ETag &amp; revalidate</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">hết hạn thì hỏi lại, không tải lại cả bài</text>
+</svg>
+  <figcaption>Ô &#9312; sáng lên. Header quyết định tầng nào được giữ gì, giữ bao lâu.</figcaption>
+  </figure>
 <div class="strip">
     <div class="c t"><i>max-age=3600</i><b>được cache</b><u>client giữ 1 giờ, không hỏi lại</u></div>
     <div class="c t"><i>s-maxage=86400</i><b>được cache</b><u>dành riêng cho CDN dùng chung</u></div>
@@ -93,7 +150,39 @@
 </section>
 
 <section id="cache-s3">
-  <div class="sh"><b>03</b><h2>Năm tầng cache</h2></div>
+  <div class="sh"><b>03</b><h2>Các tầng cache</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: header HTTP, các tầng cache, ba cách bỏ dữ liệu cũ, thundering herd">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Header HTTP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">ai được giữ, giữ bao lâu, hết hạn thì hỏi ai</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">② Các tầng cache</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">càng gần người dùng càng rẻ, càng khó thu hồi</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Bỏ dữ liệu cũ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">ba chiến lược &#8212; TTL, xoá khoá, đặt phiên bản</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Thundering herd</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">sự cố do chính cache gây ra</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">NĂM TẦNG, XA DẦN NGƯỜI DÙNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Trình duyệt &#183; CDN</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">rẻ nhất, nhưng thu hồi khó nhất</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Reverse proxy &#183; ứng dụng</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">cache-aside là mẫu đọc-ghi mặc định</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Cache của database</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">gần dữ liệu nhất, cắt được ít RTT nhất</text>
+</svg>
+  <figcaption>Ô &#9313; sáng lên. Xếp theo khoảng cách tới người dùng.</figcaption>
+  </figure>
 <div class="stack">
     <div class="s ok"><b>Browser</b><span>nhanh nhất — nhưng gửi header đi rồi thì không thu về được nữa</span></div>
     <div class="s"><b>CDN</b><span>gần người dùng về địa lý, cắt RTT rất nhiều</span></div>
@@ -117,11 +206,43 @@
 
 <section id="cache-s4">
   <div class="sh"><b>04</b><h2>Vô hiệu hoá cache — ba chiến lược</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: header HTTP, các tầng cache, ba cách bỏ dữ liệu cũ, thundering herd">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Header HTTP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">ai được giữ, giữ bao lâu, hết hạn thì hỏi ai</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Các tầng cache</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">càng gần người dùng càng rẻ, càng khó thu hồi</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">③ Bỏ dữ liệu cũ</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">ba chiến lược &#8212; TTL, xoá khoá, đặt phiên bản</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Thundering herd</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">sự cố do chính cache gây ra</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">BA CÁCH, BA ĐÁNH ĐỔI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">TTL</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đơn giản nhất &#183; chấp nhận cũ trong một khoảng</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Xoá khoá</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">tươi ngay &#183; phải nhớ xoá ở mọi đường ghi</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Đặt phiên bản vào URL</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">không bao giờ cũ &#183; phải đổi được URL</text>
+</svg>
+  <figcaption>Ô &#9314; sáng lên. Ba cách, không cách nào miễn phí.</figcaption>
+  </figure>
   <table>
     <tr><th>Chiến lược</th><th>Cách làm</th><th>Đánh đổi</th></tr>
     <tr><td><strong>TTL</strong></td><td>Đặt thời hạn, hết hạn thì lấy lại</td><td>Đơn giản nhất; dữ liệu cũ trong tối đa một TTL</td></tr>
-    <tr><td><strong>Xoá khi ghi</strong></td><td>Khi cập nhật dữ liệu thì xoá khoá cache tương ứng</td><td>Dữ liệu luôn mới; nhưng phải nhớ mọi chỗ ghi, và dễ bỏ sót</td></tr>
-    <tr><td><strong>Khoá có phiên bản</strong></td><td>Đưa số phiên bản hoặc mã băm vào khoá cache</td><td>Không cần xoá gì; bản cũ tự bị bỏ rơi và hết hạn dần</td></tr>
+    <tr><td><strong>Invalidate on write</strong></td><td>Khi cập nhật dữ liệu thì xoá khoá cache tương ứng</td><td>Dữ liệu luôn mới; nhưng phải nhớ mọi chỗ ghi, và dễ bỏ sót</td></tr>
+    <tr><td><strong>Versioned key</strong></td><td>Đưa số phiên bản hoặc mã băm vào khoá cache</td><td>Không cần xoá gì; bản cũ tự bị bỏ rơi và hết hạn dần</td></tr>
   </table>
 <div class="stack">
     <div class="s ok"><b>Cache-aside — phổ biến nhất</b><span>đọc: thử cache, miss thì đọc DB rồi ghi vào cache · ghi: ghi DB rồi <b>xoá</b> khoá cache</span></div>
@@ -136,6 +257,38 @@
 
 <section id="cache-s5">
   <div class="sh"><b>05</b><h2>Thundering herd</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bốn ý của bài: header HTTP, các tầng cache, ba cách bỏ dữ liệu cũ, thundering herd">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Header HTTP</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">ai được giữ, giữ bao lâu, hết hạn thì hỏi ai</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Các tầng cache</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">càng gần người dùng càng rẻ, càng khó thu hồi</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Bỏ dữ liệu cũ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">ba chiến lược &#8212; TTL, xoá khoá, đặt phiên bản</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--tomb)">④ Thundering herd</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">sự cố do chính cache gây ra</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">MỘT KHOÁ NÓNG HẾT HẠN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Triệu chứng</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nghìn request cùng trượt, cùng dội xuống DB</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Jitter</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">TTL cộng phần ngẫu nhiên &#8594; hết hạn lệch nhau</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Khoá dựng lại</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">chỉ một request được đi tính, số còn lại chờ</text>
+</svg>
+  <figcaption>Ô &#9315; sáng lên. Chính cache gây ra sự cố này.</figcaption>
+  </figure>
 <div class="flow">
   <div class="n"><h5>t = 0</h5><p>một khoá rất nóng hết hạn</p></div>
   <div class="a act"><i>mọi request cùng trượt cache</i>&#8594;</div>
@@ -153,89 +306,12 @@
   </table>
   <div class="note key">
     <h4>Vì sao ca này đáng nhớ</h4>
-    Vì nó là một sự cố <strong>do chính cache gây ra</strong> — hệ thống chạy hoàn hảo trong 99.9% thời gian rồi sập đúng lúc cache hết hạn. Nó là ví dụ điển hình của việc phải nghĩ tới hành vi hệ thống ở <em>ranh giới</em>, không chỉ ở trạng thái bình thường. Cách chữa tốt nhất là single-flight kết hợp stale-while-revalidate: một request đi lấy, mọi người khác được trả bản cũ ngay chứ không phải chờ.
+    Vì nó là một sự cố <strong>do chính cache gây ra</strong> — hệ thống chạy hoàn hảo trong 99.9% thời gian rồi sập đúng lúc cache hết hạn. Nó là ví dụ điển hình của việc phải nghĩ tới hành vi hệ thống ở <em>ranh giới</em>, không chỉ ở trạng thái bình thường. Cách chữa tốt nhất là single-flight kết hợp stale-while-revalidate: một request đi lấy, số còn lại nhận bản cũ ngay, không phải chờ.
   </div>
 </section>
 
 <section id="cache-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Cache dễ ở chỗ lưu lại, khó ở chỗ <em>bỏ đi đúng lúc</em> — mọi chiến lược trong bài đều là một cách trả lời câu hỏi thứ hai.</p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 390" role="img" aria-label="Năm tầng cache xếp theo khoảng cách tới người dùng, ba chiến lược vô hiệu hoá, và thundering herd khi một khoá nóng hết hạn">
-
-      <text class="sv-h" x="8" y="16">&#9312; NĂM TẦNG — CÀNG GẦN NGƯỜI DÙNG CÀNG RẺ, CŨNG CÀNG KHÓ THU HỒI</text>
-      <rect x="8" y="26" width="164" height="28" rx="4" fill="rgba(91,207,160,.14)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="18" y="45" fill="#8EE0BE">Browser</text>
-      <rect x="180" y="26" width="164" height="28" rx="4" fill="rgba(91,207,160,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="190" y="45" fill="#8EE0BE">CDN</text>
-      <rect x="352" y="26" width="164" height="28" rx="4" fill="rgba(140,169,242,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="362" y="45" fill="var(--filled-lo)">Reverse proxy</text>
-      <rect x="524" y="26" width="164" height="28" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="534" y="45" fill="var(--filled-lo)">Ứng dụng &#183; Redis</text>
-      <rect x="696" y="26" width="152" height="28" rx="4" fill="rgba(237,180,74,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="706" y="45" fill="#EDB44A">Cơ sở dữ liệu</text>
-      <line x1="8" y1="68" x2="848" y2="68" stroke="#3D352C"/>
-      <text class="sv-d" x="8" y="86" fill="#7A6F63">rẻ nhất &#183; gửi đi rồi thu về không được</text>
-      <text class="sv-d" x="524" y="86" fill="#7A6F63">kiểm soát tốt nhất &#183; xoá khoá được</text>
-
-      <text class="sv-h" x="8" y="116">&#9313; HTTP — HAI CẶP TÊN GÂY NHẦM NHẤT</text>
-      <rect x="8" y="126" width="200" height="34" rx="4" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="18" y="147" fill="#EDB44A">no-cache</text>
-      <text class="sv-d" x="92" y="147" fill="#7A6F63">được lưu, phải xác nhận lại</text>
-      <rect x="216" y="126" width="200" height="34" rx="4" fill="rgba(242,113,138,.10)" stroke="#F2718A"/>
-      <text class="sv-t" x="226" y="147" fill="#F79BAB">no-store</text>
-      <text class="sv-d" x="298" y="147" fill="#7A6F63">không lưu ở bất cứ đâu</text>
-      <text class="sv-l" x="8" y="180">ETag + If-None-Match &#8594; 304 &#183; vẫn tốn 1 RTT nhưng không tốn body</text>
-      <text class="sv-l" x="8" y="196" fill="#8EE0BE">stale-while-revalidate &#8594; 0 RTT chờ: trả bản cũ ngay, làm mới ở nền</text>
-
-      <text class="sv-h" x="440" y="116">&#9314; BA CÁCH BỎ DỮ LIỆU CŨ ĐI</text>
-      <rect x="440" y="126" width="408" height="26" rx="4" fill="rgba(140,169,242,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="450" y="144" fill="var(--filled-lo)">TTL</text>
-      <text class="sv-d" x="500" y="144" fill="#7A6F63">đơn giản nhất &#183; dữ liệu cũ trong tối đa một TTL</text>
-      <rect x="440" y="156" width="408" height="26" rx="4" fill="rgba(237,180,74,.08)" stroke="#3D352C"/>
-      <text class="sv-t" x="450" y="174" fill="#EDB44A">Xoá khi ghi</text>
-      <text class="sv-d" x="540" y="174" fill="#7A6F63">luôn mới &#183; phải nhớ mọi chỗ ghi, dễ bỏ sót</text>
-      <rect x="440" y="186" width="408" height="26" rx="4" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="450" y="204" fill="#8EE0BE">Khoá có phiên bản</text>
-      <text class="sv-d" x="574" y="204" fill="#7A6F63">app.7f3a2c.js &#183; tránh hẳn việc phải vô hiệu hoá</text>
-      <text class="sv-l" x="440" y="230" fill="#F79BAB">cache-aside: khi ghi phải XOÁ khoá, không phải cập nhật giá trị mới vào</text>
-
-      <rect x="8" y="252" width="840" height="80" rx="6" fill="rgba(242,113,138,.07)" stroke="#F2718A"/>
-      <text class="sv-h" x="20" y="272" fill="#F79BAB">&#9315; THUNDERING HERD — SỰ CỐ DO CHÍNH CACHE GÂY RA</text>
-      <rect x="20" y="280" width="150" height="34" rx="5" fill="rgba(237,180,74,.10)" stroke="#EDB44A"/>
-      <text class="sv-t" x="30" y="296" fill="#EDB44A">t = 0</text>
-      <text class="sv-d" x="30" y="309" fill="#7A6F63">khoá nóng hết hạn</text>
-      <path d="M170 297 h22" stroke="#7A6F63"/><path d="M192 297 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="194" y="280" width="170" height="34" rx="5" fill="rgba(242,113,138,.10)" stroke="#3D352C"/>
-      <text class="sv-t" x="204" y="296" fill="#F79BAB">1.000 cache miss</text>
-      <text class="sv-d" x="204" y="309" fill="#7A6F63">cùng lúc, cùng truy vấn</text>
-      <path d="M364 297 h22" stroke="#7A6F63"/><path d="M386 297 l-7 -4 v8 z" fill="#7A6F63"/>
-      <rect x="388" y="280" width="150" height="34" rx="5" fill="rgba(242,113,138,.14)" stroke="#F2718A"/>
-      <text class="sv-t" x="398" y="296" fill="#F79BAB">DB quá tải</text>
-      <text class="sv-d" x="398" y="309" fill="#7A6F63">càng chậm càng dồn</text>
-      <rect x="560" y="280" width="276" height="34" rx="5" fill="rgba(91,207,160,.10)" stroke="#5BCFA0"/>
-      <text class="sv-t" x="570" y="296" fill="#8EE0BE">single-flight + stale-while-revalidate</text>
-      <text class="sv-s" x="570" y="309" fill="#7A6F63">một request đi lấy, mọi người khác nhận bản cũ ngay</text>
-
-      <line x1="8" y1="348" x2="852" y2="348" stroke="#2E2822"/>
-      <text class="sv-l" x="8" y="366">&#9312;&#9313; tối ưu TCP/HTTP chỉ giảm số RTT — cache là thứ duy nhất bỏ hẳn chuyến đi</text>
-      <text class="sv-l" x="8" y="382">&#9314;&#9315; phần khó không nằm ở lúc lưu mà ở lúc bỏ, và ở hành vi hệ thống đúng lúc cache hết hạn</text>
-    </svg>
-    <figcaption>Đọc theo số: năm tầng xếp theo khoảng cách tới người dùng &#9312;, header HTTP quyết định tầng nào được giữ gì &#9313;, ba cách bỏ dữ liệu cũ &#9314;, và tình huống hỏng khi một khoá nóng hết hạn &#9315;.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><strong>Cache-aside</strong> là mẫu đọc-ghi mặc định ở tầng ứng dụng của &#9312;, và chính nó đặt ra luật "xoá chứ không cập nhật" ở &#9314;.</li>
-    <li><strong>Jitter</strong> chữa &#9315; ở gốc: TTL cộng thêm phần ngẫu nhiên thì các khoá không còn hết hạn cùng một khoảnh khắc.</li>
-    <li><strong>CDN</strong> là tầng duy nhất trong &#9312; cắt được RTT về địa lý — <code>s-maxage</code> và <code>private</code> ở &#9313; là hai công tắc của nó.</li>
-    <li><strong>Write-behind</strong> đổi chiều đánh đổi của &#9314;: ghi rất nhanh, đổi lại mất dữ liệu nếu cache chết trước khi kịp đẩy xuống.</li>
-  </ul>
-</section>
-
-<section id="cache-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
 
   <p class="key">Hai lỗi kinh điển: một cái để lại dữ liệu cũ vĩnh viễn, một cái tưởng đã tắt cache mà chưa.</p>
 
@@ -245,8 +321,8 @@
   </div>
 </section>
 
-<section id="cache-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+<section id="cache-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
 
   <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
 

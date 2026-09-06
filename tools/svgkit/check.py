@@ -15,7 +15,8 @@ import re, sys, html
 # getComputedTextLength() trong chrome, không ước bằng mắt: sv-hv thật là 0,79
 # chứ không phải 0,62, nên bản cũ báo lọt mọi nhãn panel dài.
 W = {'sv-t': (12.5, 0.55), 'sv-s': (11.5, 0.55), 'sv-d': (10.5, 0.52),
-     'sv-l': (11, 0.60), 'sv-h': (9.5, 0.78), 'sv-hv': (9.5, 0.80)}
+     'sv-l': (11, 0.60), 'sv-h': (9.5, 0.78), 'sv-hv': (9.5, 0.80),
+     'sv-n': (13, 0.60)}
 TOL = 0.5          # px bỏ qua, tránh báo nhầm vì ước lượng bề rộng
 PANX = 372         # mép trái panel phải — trùng base.PANX
 

@@ -47,12 +47,81 @@
 </header>
 
 <section id="messaging-queue-pubsub-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p class="key">Cách đơn giản nhất để service A nhờ service B làm việc là <strong>gọi trực tiếp, đồng bộ</strong> rồi chờ kết quả. Cách đó buộc hai bên phải <em>cùng sẵn sàng cùng một lúc</em>.</p>
-  <ul class="why">
-    <li>B chậm hoặc đang bảo trì thì A kẹt theo, dù bản thân A không hỏng gì.</li>
-    <li>Nhiều A gọi dồn dập thì B quá tải, vì phải xử lý ngay, không có chỗ nào để xếp hàng chờ.</li>
-  </ul>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+
+  <p class="key">Broker mua được sự <em>tách rời về thời gian</em> giữa hai bên; giá phải trả là message có thể tới trùng, và chống trùng là việc của bên nhận.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Năm ý của bài: tách rời thời gian, queue so với pub/sub, delivery semantics, idempotency, event streaming">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Tách rời về thời gian</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bên gửi không phải chờ bên nhận</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Queue hay Pub/Sub</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">một message cần bao nhiêu bên xử lý</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Delivery semantics</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">broker hứa được gì</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Idempotency</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">chống trùng là việc của consumer</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ Event streaming</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">message ở lại hay biến mất</text>
+<text class="sv-hv" x="372" y="18">NĂM Ý CỦA BÀI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--muted)">Bản đồ chung</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi mục sau tô sáng một ô</text>
+</svg>
+  <figcaption>Cả bài là năm ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
+  </figure>
+</section>
+
+<section id="messaging-queue-pubsub-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Vấn đề</h2></div>
+
+  <p class="key">Gọi trực tiếp thì bên nhận chết là bên gửi lỗi theo. Broker đứng giữa để hai bên <em>không cần cùng sống một lúc</em>.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Năm ý của bài: tách rời thời gian, queue so với pub/sub, delivery semantics, idempotency, event streaming">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">① Tách rời về thời gian</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">bên gửi không phải chờ bên nhận</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Queue hay Pub/Sub</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">một message cần bao nhiêu bên xử lý</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Delivery semantics</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">broker hứa được gì</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Idempotency</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">chống trùng là việc của consumer</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ Event streaming</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">message ở lại hay biến mất</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">VÌ SAO CẦN BROKER</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Gọi trực tiếp</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">bên nhận chết là bên gửi lỗi theo</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Qua broker</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">gửi xong đi tiếp &#183; nhận lúc nào cũng được</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Cái giá</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">thêm một thành phần phải vận hành, và trễ hơn</text>
+</svg>
+  <figcaption>Ô &#9312; sáng lên. Bên gửi không còn phụ thuộc vào việc bên nhận có sống không.</figcaption>
+  </figure>
+
   <div class="cmp two">
     <div>
       <h5>Gọi trực tiếp — A gọi B rồi chờ</h5>
@@ -74,8 +143,44 @@
   </div>
 </section>
 
-<section id="messaging-queue-pubsub-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Queue vs Pub/Sub</h2></div>
+<section id="messaging-queue-pubsub-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Queue vs Pub/Sub</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Năm ý của bài: tách rời thời gian, queue so với pub/sub, delivery semantics, idempotency, event streaming">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Tách rời về thời gian</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bên gửi không phải chờ bên nhận</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">② Queue hay Pub/Sub</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">một message cần bao nhiêu bên xử lý</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Delivery semantics</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">broker hứa được gì</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Idempotency</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">chống trùng là việc của consumer</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ Event streaming</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">message ở lại hay biến mất</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">BAO NHIÊU BÊN XỬ LÝ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Queue</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi message đúng một consumer lấy &#8212; chia việc</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Pub/Sub</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">mọi subscriber đều nhận một bản &#8212; loan tin</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Chọn theo</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">việc cần làm một lần hay nhiều bên cùng quan tâm</text>
+</svg>
+  <figcaption>Ô &#9313; sáng lên. Chia việc hay loan tin — hai chuyện khác nhau.</figcaption>
+  </figure>
   <p>Hai mô hình giải hai bài toán khác nhau, phân biệt bằng câu hỏi: <strong>một message này rốt cuộc cần bao nhiêu bên xử lý?</strong></p>
   <div class="cmp two">
     <div><h5>Queue — point-to-point</h5>
@@ -99,8 +204,44 @@
   </ul>
 </section>
 
-<section id="messaging-queue-pubsub-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Delivery semantics</h2></div>
+<section id="messaging-queue-pubsub-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Delivery semantics</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Năm ý của bài: tách rời thời gian, queue so với pub/sub, delivery semantics, idempotency, event streaming">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Tách rời về thời gian</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bên gửi không phải chờ bên nhận</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Queue hay Pub/Sub</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">một message cần bao nhiêu bên xử lý</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--tomb)">③ Delivery semantics</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">broker hứa được gì</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Idempotency</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">chống trùng là việc của consumer</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ Event streaming</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">message ở lại hay biến mất</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">BROKER HỨA ĐƯỢC GÌ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">At-most-once</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">không trùng, nhưng có thể mất</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">At-least-once</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không mất, nhưng có thể trùng &#8212; mặc định thực tế</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Exactly-once</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">đắt &#183; thường chỉ đúng trong phạm vi một hệ</text>
+</svg>
+  <figcaption>Ô &#9314; sáng lên. At-least-once là mặc định thực tế.</figcaption>
+  </figure>
   <div class="stack">
     <div class="s warn"><b>At-most-once — gửi tối đa một lần, không gửi lại</b><span>nhanh nhất, nhưng <b>mất message</b> nếu lỗi xảy ra trước khi consumer xử lý xong</span></div>
     <div class="s ok"><b>At-least-once — gửi lại nếu chưa nhận được ack</b><span>không mất message, nhưng có thể <b>gửi trùng</b> khi ack rớt trên đường về — lựa chọn phổ biến nhất trong thực tế</span></div>
@@ -112,8 +253,44 @@
   </div>
 </section>
 
-<section id="messaging-queue-pubsub-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Idempotency</h2></div>
+<section id="messaging-queue-pubsub-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Idempotency</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Năm ý của bài: tách rời thời gian, queue so với pub/sub, delivery semantics, idempotency, event streaming">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Tách rời về thời gian</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bên gửi không phải chờ bên nhận</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Queue hay Pub/Sub</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">một message cần bao nhiêu bên xử lý</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Delivery semantics</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">broker hứa được gì</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">④ Idempotency</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">chống trùng là việc của consumer</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ Event streaming</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">message ở lại hay biến mất</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">CHỐNG TRÙNG Ở PHÍA NHẬN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Vì at-least-once</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nên consumer phải chịu được message lặp</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Khoá idempotency</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">ghi kèm id đã xử lý &#8594; lần hai bỏ qua</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Thao tác tự idempotent</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">gán giá trị thay vì cộng dồn</text>
+</svg>
+  <figcaption>Ô &#9315; sáng lên. Broker không hứa được, consumer phải tự lo.</figcaption>
+  </figure>
   <p class="key">Trách nhiệm chống xử lý trùng nằm ở <strong>consumer</strong>, không phải broker.</p>
   <ul class="why">
     <li>Broker (Kafka, RabbitMQ, SQS…) chỉ đảm bảo được việc <em>gửi</em> — và có thể gửi trùng.</li>
@@ -132,8 +309,44 @@
   </div>
 </section>
 
-<section id="messaging-queue-pubsub-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Event streaming</h2></div>
+<section id="messaging-queue-pubsub-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Event streaming</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Năm ý của bài: tách rời thời gian, queue so với pub/sub, delivery semantics, idempotency, event streaming">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① Tách rời về thời gian</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bên gửi không phải chờ bên nhận</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② Queue hay Pub/Sub</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">một message cần bao nhiêu bên xử lý</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ Delivery semantics</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">broker hứa được gì</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ Idempotency</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">chống trùng là việc của consumer</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="298" fill="var(--ok)">⑤ Event streaming</text>
+<text class="sv-d" x="13" y="316" fill="var(--muted)">message ở lại hay biến mất</text>
+<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">Ở LẠI HAY BIẾN MẤT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Queue truyền thống</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">xử lý xong là message biến mất</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Log &#183; Kafka</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">message ở lại &#8594; đọc lại được từ đầu</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Đổi lại</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">phải quản lý offset và thời hạn giữ</text>
+</svg>
+  <figcaption>Ô &#9316; sáng lên. Message ở lại thì đọc lại được.</figcaption>
+  </figure>
   <p class="key">Kafka khác queue truyền thống (RabbitMQ, SQS) ở một điểm cốt lõi: message <strong>không bị xoá</strong> ngay sau khi một consumer xử lý xong.</p>
   <ul class="why">
     <li>Message nằm lại trong một log có thứ tự suốt một khoảng thời gian (retention).</li>
@@ -145,118 +358,6 @@
     <div class="n ok"><h5>Event log (Kafka)</h5><p>message ở lại trong log theo retention → nhiều consumer group đọc độc lập, có thể replay lại từ đầu</p></div>
   </div>
   <p>Message vì vậy thành một "nguồn sự thật" (source of truth) phát lại được, không chỉ là thông báo dùng xong rồi mất — lý do Kafka làm xương sống cho event-driven architecture.</p>
-</section>
-
-<section id="messaging-queue-pubsub-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Tổng kết một hình</h2></div>
-
-  <p class="key">Một message queue mua sự tách rời bằng độ trễ — và trả tiếp bằng việc phải tự lo chuyện message tới trùng.</p>
-
-  <figure class="scrollx">
-  <svg viewBox="0 0 860 552" role="img" aria-label="Tổng kết messaging: tách rời về thời gian, queue so với pub/sub, delivery semantics, idempotency ở consumer, và event log">
-    <text class="sv-h" x="0" y="12">&#9312; TÁCH RỜI VỀ THỜI GIAN</text>
-
-    <rect x="8" y="26" width="86" height="34" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-t" x="51" y="48" text-anchor="middle" fill="var(--filled-lo)">A</text>
-    <line x1="98" y1="43" x2="164" y2="43" stroke="#F2718A" stroke-width="1.5"/>
-    <text class="sv-l" x="131" y="36" text-anchor="middle" fill="#F79BAB">gọi · CHỜ</text>
-    <rect x="168" y="26" width="86" height="34" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-t" x="211" y="48" text-anchor="middle" fill="var(--filled-lo)">B</text>
-    <text class="sv-l" x="8" y="80" fill="#F79BAB">B chậm hoặc bảo trì → A kẹt theo · dồn dập → B phải xử lý ngay, quá tải</text>
-
-    <line x1="300" y1="20" x2="300" y2="88" stroke="#2E2822"/>
-
-    <rect x="326" y="26" width="76" height="34" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-t" x="364" y="48" text-anchor="middle" fill="var(--filled-lo)">A</text>
-    <line x1="406" y1="43" x2="432" y2="43" stroke="#5BCFA0" stroke-width="1.5"/>
-    <rect x="436" y="22" width="130" height="42" rx="5" fill="#5BCFA0" fill-opacity="0.10" stroke="#5BCFA0"/>
-    <rect x="446" y="32" width="10" height="22" rx="2" fill="#5BCFA0" fill-opacity="0.35"/>
-    <rect x="460" y="32" width="10" height="22" rx="2" fill="#5BCFA0" fill-opacity="0.35"/>
-    <rect x="474" y="32" width="10" height="22" rx="2" fill="#5BCFA0" fill-opacity="0.35"/>
-    <text class="sv-l" x="530" y="47" text-anchor="middle" fill="#8EE0BE">queue</text>
-    <line x1="570" y1="43" x2="596" y2="43" stroke="#5BCFA0" stroke-width="1.5"/>
-    <rect x="600" y="26" width="76" height="34" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-t" x="638" y="48" text-anchor="middle" fill="var(--filled-lo)">B</text>
-    <text class="sv-l" x="326" y="80" fill="#8EE0BE">A đẩy rồi đi tiếp · queue giữ hàng · B đọc theo tốc độ của mình</text>
-    <text class="sv-d" x="700" y="40">A không cần biết</text>
-    <text class="sv-d" x="700" y="54">B có đang sống không</text>
-
-    <text class="sv-h" x="0" y="126">&#9313; MỘT MESSAGE NÀY CẦN BAO NHIÊU BÊN XỬ LÝ?</text>
-
-    <rect x="8" y="150" width="104" height="30" rx="5" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
-    <text class="sv-l" x="60" y="169" text-anchor="middle" fill="#EDB44A">queue</text>
-    <line x1="116" y1="165" x2="142" y2="165" stroke="#EDB44A" stroke-width="1.5"/>
-    <rect x="146" y="152" width="70" height="26" rx="4" fill="#EDB44A" fill-opacity="0.22" stroke="#EDB44A"/>
-    <text class="sv-l" x="181" y="169" text-anchor="middle" fill="#EDB44A">C1</text>
-    <rect x="224" y="152" width="70" height="26" rx="4" fill="none" stroke="#3D352C"/>
-    <text class="sv-l" x="259" y="169" text-anchor="middle">C2</text>
-    <rect x="302" y="152" width="70" height="26" rx="4" fill="none" stroke="#3D352C"/>
-    <text class="sv-l" x="337" y="169" text-anchor="middle">C3</text>
-    <text class="sv-d" x="8" y="198">point-to-point — đúng MỘT consumer nhận · nhiều consumer là để chia tải</text>
-
-    <line x1="410" y1="140" x2="410" y2="204" stroke="#2E2822"/>
-
-    <rect x="436" y="150" width="104" height="30" rx="5" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
-    <text class="sv-l" x="488" y="169" text-anchor="middle" fill="#8EE0BE">topic</text>
-    <line x1="544" y1="165" x2="570" y2="165" stroke="#5BCFA0" stroke-width="1.5"/>
-    <rect x="574" y="152" width="80" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.22" stroke="#5BCFA0"/>
-    <text class="sv-l" x="614" y="169" text-anchor="middle" fill="#8EE0BE">email</text>
-    <rect x="662" y="152" width="80" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.22" stroke="#5BCFA0"/>
-    <text class="sv-l" x="702" y="169" text-anchor="middle" fill="#8EE0BE">kho</text>
-    <rect x="750" y="152" width="102" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.22" stroke="#5BCFA0"/>
-    <text class="sv-l" x="801" y="169" text-anchor="middle" fill="#8EE0BE">phân tích</text>
-    <text class="sv-d" x="436" y="198">publish/subscribe — mọi subscriber đều nhận một BẢN SAO riêng</text>
-
-    <text class="sv-h" x="0" y="234">&#9314; DELIVERY SEMANTICS — BROKER HỨA ĐƯỢC GÌ</text>
-
-    <rect x="8" y="246" width="230" height="26" rx="4" fill="#F2718A" fill-opacity="0.12" stroke="#F2718A"/>
-    <text class="sv-l" x="20" y="263" fill="#F79BAB">At-most-once</text>
-    <text class="sv-t" x="256" y="264">nhanh nhất — nhưng <tspan fill="#F79BAB">mất message</tspan> nếu lỗi trước khi xử lý xong</text>
-
-    <rect x="8" y="278" width="230" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.14" stroke="#5BCFA0"/>
-    <text class="sv-l" x="20" y="295" fill="#8EE0BE">At-least-once</text>
-    <text class="sv-t" x="256" y="296">không mất — nhưng <tspan fill="#EDB44A">gửi trùng</tspan> khi ack rớt · phổ biến nhất</text>
-
-    <rect x="8" y="310" width="230" height="26" rx="4" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
-    <text class="sv-l" x="20" y="327" fill="#EDB44A">Exactly-once</text>
-    <text class="sv-t" x="256" y="328">qua mạng không tin cậy thì không có sẵn — xem &#9315;</text>
-
-    <text class="sv-h" x="0" y="360">&#9315; CHỐNG TRÙNG LÀ VIỆC CỦA CONSUMER</text>
-
-    <rect x="8" y="372" width="150" height="34" rx="5" fill="#EDB44A" fill-opacity="0.12" stroke="#EDB44A"/>
-    <text class="sv-l" x="83" y="393" text-anchor="middle" fill="#EDB44A">gửi lại · cùng ID</text>
-    <line x1="162" y1="389" x2="188" y2="389" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="192" y="372" width="160" height="34" rx="5" fill="#8CA9F2" fill-opacity="0.12" stroke="#8CA9F2"/>
-    <text class="sv-l" x="272" y="393" text-anchor="middle" fill="var(--filled-lo)">tra sổ ID đã xử lý</text>
-    <line x1="356" y1="389" x2="382" y2="389" stroke="#3D352C" stroke-width="1.5"/>
-    <rect x="386" y="358" width="180" height="28" rx="4" fill="#F2718A" fill-opacity="0.12" stroke="#F2718A"/>
-    <text class="sv-l" x="398" y="376" fill="#F79BAB">đã có → bỏ qua</text>
-    <rect x="386" y="392" width="230" height="28" rx="4" fill="#5BCFA0" fill-opacity="0.14" stroke="#5BCFA0"/>
-    <text class="sv-l" x="398" y="410" fill="#8EE0BE">chưa có → xử lý, rồi ghi ID</text>
-    <text class="sv-d" x="640" y="382">broker không biết nghiệp vụ,</text>
-    <text class="sv-d" x="640" y="396">nên không tự chống trùng được</text>
-    <text class="sv-d" x="640" y="410">&quot;exactly-once&quot; = &#9314; + &#9315;</text>
-
-    <text class="sv-h" x="0" y="444">&#9316; MESSAGE Ở LẠI HAY BIẾN MẤT</text>
-
-    <rect x="8" y="456" width="380" height="26" rx="4" fill="none" stroke="#3D352C"/>
-    <text class="sv-l" x="20" y="473">Queue truyền thống — đọc xong, message biến mất</text>
-    <rect x="404" y="456" width="448" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
-    <text class="sv-l" x="416" y="473" fill="#8EE0BE">Event log — ở lại theo retention · nhiều consumer group · replay từ đầu</text>
-
-    <line x1="0" y1="504" x2="860" y2="504" stroke="#3D352C"/>
-    <text class="sv-l" x="0" y="524">&#9312;&#9313;  chọn mô hình bằng một câu hỏi: message này rốt cuộc cần bao nhiêu bên xử lý?</text>
-    <text class="sv-l" x="0" y="544">&#9314;&#9315;  broker chỉ hứa được việc GỬI — phần &quot;xử lý đúng một lần&quot; nằm ở consumer</text>
-  </svg>
-  <figcaption>Đọc từ trên xuống: &#9312; vì sao dựng queue, &#9313; chọn queue hay pub/sub, &#9314; broker hứa được tới đâu, &#9315; phần còn lại consumer phải tự lo, &#9316; message sống bao lâu.</figcaption>
-  </figure>
-
-  <ul class="why">
-    <li><b>Tách rời về thời gian</b> — ở &#9312;: queue mua được không phải tốc độ mà là A và B không còn phải cùng online.</li>
-    <li><b>Point-to-point vs publish/subscribe</b> — ở &#9313;: queue chia tải cho nhiều consumer, pub/sub nhân bản cho nhiều hệ thống.</li>
-    <li><b>At-least-once &amp; idempotency</b> — ở &#9314;&#9315;: chọn không-mất-nhưng-có-thể-trùng, rồi dedup theo ID ở consumer. Đó chính là thứ được gọi là &quot;exactly-once&quot;.</li>
-    <li><b>Event log &amp; replay</b> — ở &#9316;: message ở lại trong log biến nó thành nguồn sự thật phát lại được.</li>
-  </ul>
 </section>
 
 <section id="messaging-queue-pubsub-s7" class="lesson">

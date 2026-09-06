@@ -4,13 +4,17 @@
   var el = function (id) { return document.getElementById(id); };
   if (!el("xgblab")) return;
 
-  /* mẫu · g (độ dốc) · h (độ cong) — nhóm trái âm rõ, nhóm phải dương rõ, hai mẫu ở giữa mập mờ */
-  var G = [-2.4, -2.1, -1.8, -0.4, 0.3, 1.9, 2.2, 2.5];
-  var H = [1.0, 1.0, 1.0, 0.9, 0.9, 1.0, 1.0, 1.0];
-  var X = [1, 2, 3, 4, 5, 6, 7, 8];
-  var THR = [1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5];
+  /* ĐÚNG sáu mẫu A–F của hai hình phía trên — đổi ở đây thì phải sửa cả hình, nếu không lab và hình
+     kể hai câu chuyện khác nhau. g là độ dốc, h là độ cong. */
+  var NAME = ["A", "B", "C", "D", "E", "F"];
+  var G = [-2.4, -2.1, -1.8, -0.4, 0.6, 3.2];
+  var H = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4];
+  var X = [1, 2, 3, 4, 5, 6];
+  var THR = [1.5, 2.5, 3.5, 4.5, 5.5];
   var N = X.length;
 
+  /* λ cố định = 1: nó là chuyện của mục trước, lab này chỉ hỏi MỘT câu — tách hay dừng.
+     Thêm núm λ vào đây là bắt người đọc cân hai thứ cùng lúc. */
   var lam = 1, gam = 0.5, cut = 4.5;
   var slow = !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -35,7 +39,7 @@
 
   /* ---------- khung ---------- */
   el("xview").innerHTML =
-    '<p class="labrow"><b>1.</b> Tám mẫu ở nút này — mỗi mẫu mang sẵn một cặp <b>(g, h)</b> tính từ loss</p>' +
+    '<p class="labrow"><b>1.</b> Vẫn sáu mẫu A–F của hình trên — mỗi mẫu mang sẵn một cặp <b>(g, h)</b> tính từ loss</p>' +
     '<div id="xstrip"></div>' +
     '<p class="stripnote" id="xnote"><span></span><span></span></p>' +
     '<p class="labrow"><b>2.</b> Gain của mọi ngưỡng — bấm vào một thanh để xem chi tiết</p>' +
@@ -48,7 +52,7 @@
     var h = '<div class="strip">';
     X.forEach(function (x, i) {
       if (x > cut && X[i - 1] < cut) h += '<div class="cut"></div>';
-      h += '<div class="c ' + (G[i] < 0 ? "t" : "f") + '"><i>' + x + "</i><b>" +
+      h += '<div class="c ' + (G[i] < 0 ? "t" : "f") + '"><i>' + NAME[i] + "</i><b>" +
         (G[i] > 0 ? "+" : "−") + fmt(Math.abs(G[i])) + "</b><u>h " + fmt(H[i]) + "</u></div>";
     });
     el("xstrip").innerHTML = h + "</div>";
@@ -78,16 +82,15 @@
       : "Gain <b>" + fmt(g) + " ≤ 0</b> → <b>không tách</b>, nút này thành lá trả về <b>" + fmt(root.w) +
         "</b>. Cái giá γ = " + fmt(gam) + " của một chiếc lá mới lớn hơn phần lợi thu được.";
 
-    el("xstat").textContent = "λ = " + fmt(lam) + " · γ = " + fmt(gam) +
-      " · ngưỡng tốt nhất " + fmt(best) + " (gain " + fmt(gainAt(best)) + ")";
+    el("xstat").textContent = "γ = " + fmt(gam) + " · ngưỡng tốt nhất " + fmt(best) +
+      " (gain " + fmt(gainAt(best)) + ")";
 
     var v = el("xverdict"), pos = 0;
     THR.forEach(function (t) { if (gainAt(t) > 0) pos++; });
     v.hidden = false;
     v.innerHTML = pos
-      ? "Còn <b>" + pos + "/" + THR.length + "</b> ngưỡng có gain dương — cây vẫn mọc tiếp. " +
-        "Tăng <b>γ</b> để tính tiền mỗi chiếc lá, hoặc tăng <b>λ</b> để ghìm giá trị lá về 0: cả hai đều nằm <b>trong công thức</b>, không phải bước cắt tỉa sau."
-      : "<b>Không ngưỡng nào còn gain dương</b> — cây tự dừng ở đây. Chống overfit và mọc cây là <b>một việc</b>, vì cùng đọc một hàm mục tiêu.";
+      ? "Còn <b>" + pos + "/" + THR.length + "</b> ngưỡng có gain dương — cây vẫn mọc tiếp. Tăng <b>γ</b> lên nữa xem cây dừng ở đâu."
+      : "<b>Không ngưỡng nào còn gain dương</b> — cây tự dừng ở đây, không cần ai cắt tỉa. Chống overfit và mọc cây là <b>một việc</b>, vì cùng đọc một hàm mục tiêu.";
     if (slow) {
       var w = el("xbars");
       w.classList.add("pulse");
@@ -104,19 +107,16 @@
         [].slice.call(el(id).querySelectorAll("button")).forEach(function (x) { x.classList.remove("on"); });
         b.classList.add("on");
         set(parseFloat(b.getAttribute("data-v")));
-        knob("xlam", lam, [0, 1, 5, 20], function (v) { lam = v; });
-        knob("xgam", gam, [0, 0.5, 2, 8], function (v) { gam = v; });
+        knob("xgam", gam, [0.5, 4, 10], function (v) { gam = v; });
         draw();
       };
     });
   }
-  knob("xlam", lam, [0, 1, 5, 20], function (v) { lam = v; });
-  knob("xgam", gam, [0, 0.5, 2, 8], function (v) { gam = v; });
+  knob("xgam", gam, [0.5, 4, 10], function (v) { gam = v; });
 
   el("xrst").onclick = function () {
-    lam = 1; gam = 0.5; cut = 4.5;
-    knob("xlam", lam, [0, 1, 5, 20], function (v) { lam = v; });
-    knob("xgam", gam, [0, 0.5, 2, 8], function (v) { gam = v; });
+    gam = 0.5; cut = 4.5;
+    knob("xgam", gam, [0.5, 4, 10], function (v) { gam = v; });
     draw();
   };
 

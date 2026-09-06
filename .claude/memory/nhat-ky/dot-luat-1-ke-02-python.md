@@ -6,6 +6,9 @@ metadata:
 updated: 2026-09-05
 ---
 
+> **Số trong ghi chú này là ảnh chụp lúc viết.** Mốc hiện tại của cả kho:
+> [[ban-do-ver-bai-toan-kho]] (đo lại từ file 2026-09-06).
+
 Người dùng, sau bài thí điểm `transaction-isolation`: *"thử áp dụng vào các bài khó của python
 tôi xem đã"*. Chọn bài theo cách đếm ở [[dot-sua-theo-chuan-bai-mau]] — bài nào nhiều mục mà ít
 hình thì khó nhất.

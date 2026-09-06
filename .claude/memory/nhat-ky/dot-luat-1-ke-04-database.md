@@ -6,6 +6,9 @@ metadata:
 updated: 2026-09-05
 ---
 
+> **Số trong ghi chú này là ảnh chụp lúc viết.** Mốc hiện tại của cả kho:
+> [[ban-do-ver-bai-toan-kho]] (đo lại từ file 2026-09-06).
+
 Nối tiếp [[dot-luat-1-ke-02-python]] và [[thi-diem-transaction-isolation]]. Người dùng:
 *"được chốt theo hướng tốt nhất, trong quá trình làm thấy vấn đề hay cải thiện gì hay thì cứ
 linh hoạt áp dụng, chung quy vẫn là để dễ học nhất"* — nên chọn bài theo phép 8 của

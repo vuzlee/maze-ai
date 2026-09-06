@@ -153,3 +153,51 @@ def build(elems, bottom, name, aria, outdir, pad=8):
            + '\n'.join(elems) + '\n</svg>')
     open(f'{outdir}/{name}.svg', 'w', encoding='utf-8').write(svg)
     return H
+
+# ── cây: hình thù dùng chung cho cả kệ tree-models ─────────────────────────
+# Mọi bài trong 06-tree-models vẽ cây bằng đúng hai hàm này, để bagging và
+# boosting phân biệt được bằng MẮT (song song vs nối tiếp) chứ không phải bằng
+# chữ. Không tự vẽ cây riêng trong từng bài — xem chuan-bai-mau.md luật 5.
+
+def tree(e, cx, top, col, rgb, depth=2, sp=26, dy=26, label=None,
+         cap=None, alpha='.10', nw=22, nh=13, faded=False):
+    """Một cây nhỏ: nút gốc, hai nhánh, tới depth tầng. Trả về y đáy.
+
+    depth=1 là stump (gốc + hai lá) — đúng cái AdaBoost dùng. depth=2 là cây
+    nông của gradient boosting. cx là trục đối xứng, top là đỉnh nút gốc.
+    """
+    o = '0.42' if faded else '1'
+    e.append(f'<g opacity="{o}">')
+    if label:
+        e.append(txt(cx, top-7, label, 'sv-hv', col, 'middle'))
+    lv = [[cx]]
+    for d in range(depth):
+        step = sp * (2 ** (depth - d - 1)) / 2
+        lv.append([x + s for x in lv[-1] for s in (-step, step)])
+    for d, xs in enumerate(lv):
+        y = top + d*dy
+        for i, x in enumerate(xs):
+            e.append(rect(x-nw/2, y, nw, nh, col, rgb, alpha, sw='1.2', rx=3))
+            if d < depth:
+                for c in (lv[d+1][2*i], lv[d+1][2*i+1]):
+                    e.append(f'<line x1="{x}" y1="{y+nh}" x2="{c}" y2="{y+dy}" '
+                             f'stroke="{col}" stroke-width="1.1"/>')
+    bot = top + depth*dy + nh
+    if cap:
+        e.append(txt(cx, bot+13, cap, 'sv-d', 'var(--muted)', 'middle'))
+        bot += 17
+    e.append('</g>')
+    return bot
+
+def forest(e, x0, top, n, col, rgb, depth=1, gap=96, labels=None, caps=None,
+           faded=None, **kw):
+    """n cây cạnh nhau, cách đều gap. Trả về (y đáy, danh sách trục cx)."""
+    xs, bot = [], top
+    for i in range(n):
+        cx = x0 + gap/2 + i*gap
+        xs.append(cx)
+        bot = max(bot, tree(e, cx, top, col, rgb, depth,
+                            label=labels[i] if labels else None,
+                            cap=caps[i] if caps else None,
+                            faded=bool(faded and faded[i]), **kw))
+    return bot, xs
