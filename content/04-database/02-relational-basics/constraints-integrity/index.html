@@ -47,112 +47,11 @@
 </header>
 
 <section id="constraint-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Các loại ràng buộc</h2></div>
-  <p class="key">Ràng buộc (constraint) là luật database <em>tự</em> kiểm tra ở mọi <code>INSERT</code>/<code>UPDATE</code>: vi phạm thì câu lệnh bị từ chối trước khi dữ liệu sai kịp ghi xuống.</p>
-  <p>Không phụ thuộc ứng dụng nào gọi vào, nên không thể "quên gọi validate".</p>
-  <div class="stack">
-    <div class="s"><b><code>NOT NULL</code></b><span>cột bắt buộc có giá trị · <code>email TEXT NOT NULL</code></span></div>
-    <div class="s"><b><code>UNIQUE</code></b><span>không hai dòng nào trùng giá trị ở cột này · <code>email TEXT UNIQUE</code></span></div>
-    <div class="s"><b><code>CHECK</code></b><span>giá trị phải thoả một biểu thức boolean bất kỳ · <code>CHECK (age &gt;= 0)</code></span></div>
-    <div class="s ok"><b><code>PRIMARY KEY</code></b><span>định danh duy nhất mỗi dòng — gộp <code>NOT NULL</code> + <code>UNIQUE</code> · <code>id BIGSERIAL PRIMARY KEY</code></span></div>
-    <div class="s ok"><b><code>FOREIGN KEY</code></b><span>giá trị phải khớp một dòng có thật ở bảng khác · <code>customer_id REFERENCES customers(id)</code></span></div>
-    <div class="s"><b><code>DEFAULT</code></b><span>không phải constraint thật: giá trị tự điền khi không truyền · <code>status TEXT DEFAULT 'pending'</code></span></div>
-  </div>
-<pre><code>CREATE TABLE orders (
-  id          BIGSERIAL PRIMARY KEY,
-  customer_id BIGINT NOT NULL REFERENCES customers(id),
-  status      TEXT NOT NULL DEFAULT <span class="st">'pending'</span>
-              CHECK (status IN (<span class="st">'pending'</span>, <span class="st">'paid'</span>, <span class="st">'shipped'</span>, <span class="st">'cancelled'</span>)),
-  total       NUMERIC(10,2) NOT NULL CHECK (total &gt;= <span class="st">0</span>),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);</code></pre>
-  <div class="cmp two">
-    <div><h5>Entity integrity</h5><p>Toàn vẹn <i>bên trong một bảng</i>: mỗi dòng phải định danh được, không trùng, không thiếu. Giữ bằng <code>PRIMARY KEY</code> và <code>NOT NULL</code>.</p></div>
-    <div><h5>Referential integrity</h5><p>Toàn vẹn <i>giữa các bảng</i>: mọi khoá ngoại phải trỏ tới một dòng có thật. Giữ bằng <code>FOREIGN KEY</code>.</p></div>
-  </div>
-</section>
-
-<section id="constraint-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>NULL cư xử ra sao</h2></div>
-  <p>SQL dùng <b>logic ba giá trị</b> (three-valued logic): mọi biểu thức boolean trả về <code>TRUE</code>, <code>FALSE</code>, hoặc <code>UNKNOWN</code> — không phải hai như hầu hết ngôn ngữ.</p>
-<div class="strip">
-    <div class="c on"><i>NULL = NULL</i><b>UNKNOWN</b><u>không phải TRUE</u></div>
-    <div class="c on"><i>NULL = 5</i><b>UNKNOWN</b><u>không so sánh được</u></div>
-    <div class="c t"><i>NULL IS NULL</i><b>TRUE</b><u>cách kiểm tra đúng duy nhất</u></div>
-    <div class="cut"></div>
-    <div class="c on"><i>NOT UNKNOWN</i><b>UNKNOWN</b><u>phủ định vẫn không biết</u></div>
-    <div class="c on"><i>TRUE AND UNKNOWN</i><b>UNKNOWN</b><u>chưa kết luận được</u></div>
-    <div class="c f"><i>FALSE AND UNKNOWN</i><b>FALSE</b><u>FALSE áp đảo</u></div>
-  </div>
-  <p><code>NULL</code> nghĩa là "giá trị không xác định", không phải "rỗng" hay "số 0".</p>
-  <ul class="why">
-    <li>So sánh hai NULL không ra TRUE: không thể khẳng định hai điều không xác định là bằng nhau.</li>
-    <li><code>WHERE col = NULL</code> vì vậy không bao giờ khớp dòng nào, kể cả dòng có <code>col IS NULL</code>.</li>
-    <li>Luôn phải dùng <code>IS NULL</code> / <code>IS NOT NULL</code>.</li>
-  </ul>
-  <div class="note warn">
-    <h4>NULL trong UNIQUE</h4>
-    Chuẩn SQL và PostgreSQL coi <b>nhiều NULL không vi phạm UNIQUE</b> — vì NULL không bằng chính nó nên không có "trùng" để bắt. Một cột <code>UNIQUE</code> vẫn cho phép chèn bao nhiêu dòng NULL tuỳ ý. Nếu nghiệp vụ cần "tối đa một dòng NULL", phải tự thêm ràng buộc khác (ví dụ unique index có điều kiện, <code>CREATE UNIQUE INDEX ... WHERE col IS NULL</code>).
-  </div>
-</section>
-
-<section id="constraint-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Khi xoá bản ghi cha</h2></div>
-  <p>Xoá một dòng đang được bảng khác tham chiếu bằng khoá ngoại thì phải quyết định điều gì xảy ra với các dòng con — khai báo bằng <code>ON DELETE</code>.</p>
-  <div class="flow">
-    <div class="n no"><h5>RESTRICT</h5><p>mặc định — từ chối xoá khi còn dòng con</p></div>
-    <div class="n"><h5>CASCADE</h5><p>xoá cha thì xoá luôn mọi dòng con</p></div>
-    <div class="n"><h5>SET NULL</h5><p>giữ dòng con, chỉ cắt liên kết</p></div>
-    <div class="n"><h5>SET DEFAULT</h5><p>trỏ về một "cha mặc định" — ít dùng</p></div>
-  </div>
-  <p class="stripnote"><span><em>RESTRICT</em> an toàn nhất: buộc phải xử lý dòng con trước.</span><span><em>CASCADE</em> chỉ dùng khi dòng con vô nghĩa nếu thiếu cha — như <code>order_items</code> với <code>orders</code>.</span></p>
-<pre><code>CREATE TABLE order_items (
-  order_id   BIGINT REFERENCES orders(id) ON DELETE CASCADE,
-  product_id BIGINT REFERENCES products(id) ON DELETE RESTRICT,
-  quantity   INT NOT NULL CHECK (quantity &gt; 0)
-);
-<span class="cm">-- xoá một order → order_items của nó tự động biến mất (CASCADE)
--- xoá một product đang nằm trong order nào đó → bị chặn (RESTRICT)</span>
-
-CREATE TABLE employees (
-  id         BIGSERIAL PRIMARY KEY,
-  manager_id BIGINT REFERENCES employees(id) ON DELETE SET NULL
-);
-<span class="cm">-- xoá một quản lý → nhân viên dưới quyền không bị xoá theo,
--- chỉ mất liên kết quản lý (manager_id = NULL)</span></code></pre>
-  <p>Chọn hành vi nào là câu hỏi <b>nghiệp vụ</b>, không phải kỹ thuật.</p>
-  <ul class="why">
-    <li><code>order_items</code> không có lý do tồn tại nếu order của nó biến mất — CASCADE hợp lý.</li>
-    <li>CASCADE giữa <code>product</code> và <code>order_items</code> thì sai: xoá một sản phẩm không nên xoá luôn lịch sử đơn hàng.</li>
-  </ul>
-</section>
-
-<section id="constraint-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Ràng buộc ở tầng nào</h2></div>
-  <p>Câu hỏi kinh điển: kiểm tra dữ liệu ở tầng ứng dụng (code) hay tầng database (constraint)? Câu trả lời đúng là <b>cả hai</b>, cho hai mục đích khác nhau.</p>
-  <div class="cmp two">
-    <div><h5>Tầng ứng dụng</h5>
-      <p><b>Mục đích</b> trải nghiệm người dùng — báo lỗi rõ ràng, ngay khi gõ</p>
-      <p><b>Bỏ qua được không</b> có — script chạy thẳng, service khác ghi trực tiếp, migration thủ công</p>
-      <p><b>Race condition</b> dễ dính lost update / trùng dữ liệu khi hai request cùng lúc</p></div>
-    <div><h5>Tầng database</h5>
-      <p><b>Mục đích</b> đảm bảo tính đúng đắn — tuyến phòng thủ cuối cùng</p>
-      <p><b>Bỏ qua được không</b> không — mọi đường ghi dữ liệu đều đi qua nó</p>
-      <p><b>Race condition</b> an toàn tự nhiên: kiểm tra ngay lúc ghi, có transaction bảo vệ</p></div>
-  </div>
-  <ul class="why">
-    <li>Validate ở <b>tầng ứng dụng</b> cho phản hồi nhanh và thông điệp lỗi thân thiện.</li>
-    <li>Ràng buộc ở <b>tầng database</b> đảm bảo dữ liệu không bao giờ sai <i>bất kể đi vào bằng đường nào</i>.</li>
-    <li>Kể cả một job nền, một script one-off, hay một service tương lai mà tác giả gốc không lường trước.</li>
-  </ul>
-</section>
-
-<section id="constraint-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
   <p class="key">Ràng buộc rẻ vì database tự kiểm ở mọi đường ghi — nhưng phải hiểu NULL cư xử ra sao thì mới biết ràng buộc nào thật sự chặn được cái gì.</p>
 
-  <figure class="scrollx">
+  <figure class="gist">
   <svg viewBox="0 0 860 496" role="img" aria-label="Tổng kết constraints và integrity: các loại ràng buộc, logic ba giá trị của NULL, hành vi ON DELETE, và ràng buộc ở tầng ứng dụng so với tầng database">
     <text class="sv-h" x="0" y="12">&#9312; RÀNG BUỘC — LUẬT DATABASE TỰ KIỂM Ở MỌI INSERT/UPDATE</text>
 
@@ -239,12 +138,116 @@ CREATE TABLE employees (
   </ul>
 </section>
 
+<section id="constraint-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Các loại ràng buộc</h2></div>
+  <p class="key">Ràng buộc (constraint) là luật database <em>tự</em> kiểm tra ở mọi <code>INSERT</code>/<code>UPDATE</code>: vi phạm thì câu lệnh bị từ chối trước khi dữ liệu sai kịp ghi xuống.</p>
+  <p>Không phụ thuộc ứng dụng nào gọi vào, nên không thể "quên gọi validate".</p>
+  <div class="stack">
+    <div class="s"><b><code>NOT NULL</code></b><span>cột bắt buộc có giá trị · <code>email TEXT NOT NULL</code></span></div>
+    <div class="s"><b><code>UNIQUE</code></b><span>không hai dòng nào trùng giá trị ở cột này · <code>email TEXT UNIQUE</code></span></div>
+    <div class="s"><b><code>CHECK</code></b><span>giá trị phải thoả một biểu thức boolean bất kỳ · <code>CHECK (age &gt;= 0)</code></span></div>
+    <div class="s ok"><b><code>PRIMARY KEY</code></b><span>định danh duy nhất mỗi dòng — gộp <code>NOT NULL</code> + <code>UNIQUE</code> · <code>id BIGSERIAL PRIMARY KEY</code></span></div>
+    <div class="s ok"><b><code>FOREIGN KEY</code></b><span>giá trị phải khớp một dòng có thật ở bảng khác · <code>customer_id REFERENCES customers(id)</code></span></div>
+    <div class="s"><b><code>DEFAULT</code></b><span>không phải constraint thật: giá trị tự điền khi không truyền · <code>status TEXT DEFAULT 'pending'</code></span></div>
+  </div>
+<pre><code>CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES customers(id),
+  status      TEXT NOT NULL DEFAULT <span class="st">'pending'</span>
+              CHECK (status IN (<span class="st">'pending'</span>, <span class="st">'paid'</span>, <span class="st">'shipped'</span>, <span class="st">'cancelled'</span>)),
+  total       NUMERIC(10,2) NOT NULL CHECK (total &gt;= <span class="st">0</span>),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);</code></pre>
+  <div class="cmp two">
+    <div><h5>Entity integrity</h5><p>Toàn vẹn <i>bên trong một bảng</i>: mỗi dòng phải định danh được, không trùng, không thiếu. Giữ bằng <code>PRIMARY KEY</code> và <code>NOT NULL</code>.</p></div>
+    <div><h5>Referential integrity</h5><p>Toàn vẹn <i>giữa các bảng</i>: mọi khoá ngoại phải trỏ tới một dòng có thật. Giữ bằng <code>FOREIGN KEY</code>.</p></div>
+  </div>
+</section>
+
+<section id="constraint-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>NULL cư xử ra sao</h2></div>
+  <p>SQL dùng <b>logic ba giá trị</b> (three-valued logic): mọi biểu thức boolean trả về <code>TRUE</code>, <code>FALSE</code>, hoặc <code>UNKNOWN</code> — không phải hai như hầu hết ngôn ngữ.</p>
+<div class="strip">
+    <div class="c on"><i>NULL = NULL</i><b>UNKNOWN</b><u>không phải TRUE</u></div>
+    <div class="c on"><i>NULL = 5</i><b>UNKNOWN</b><u>không so sánh được</u></div>
+    <div class="c t"><i>NULL IS NULL</i><b>TRUE</b><u>cách kiểm tra đúng duy nhất</u></div>
+    <div class="cut"></div>
+    <div class="c on"><i>NOT UNKNOWN</i><b>UNKNOWN</b><u>phủ định vẫn không biết</u></div>
+    <div class="c on"><i>TRUE AND UNKNOWN</i><b>UNKNOWN</b><u>chưa kết luận được</u></div>
+    <div class="c f"><i>FALSE AND UNKNOWN</i><b>FALSE</b><u>FALSE áp đảo</u></div>
+  </div>
+  <p><code>NULL</code> nghĩa là "giá trị không xác định", không phải "rỗng" hay "số 0".</p>
+  <ul class="why">
+    <li>So sánh hai NULL không ra TRUE: không thể khẳng định hai điều không xác định là bằng nhau.</li>
+    <li><code>WHERE col = NULL</code> vì vậy không bao giờ khớp dòng nào, kể cả dòng có <code>col IS NULL</code>.</li>
+    <li>Luôn phải dùng <code>IS NULL</code> / <code>IS NOT NULL</code>.</li>
+  </ul>
+  <div class="note warn">
+    <h4>NULL trong UNIQUE</h4>
+    Chuẩn SQL và PostgreSQL coi <b>nhiều NULL không vi phạm UNIQUE</b> — vì NULL không bằng chính nó nên không có "trùng" để bắt. Một cột <code>UNIQUE</code> vẫn cho phép chèn bao nhiêu dòng NULL tuỳ ý. Nếu nghiệp vụ cần "tối đa một dòng NULL", phải tự thêm ràng buộc khác (ví dụ unique index có điều kiện, <code>CREATE UNIQUE INDEX ... WHERE col IS NULL</code>).
+  </div>
+</section>
+
+<section id="constraint-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Khi xoá bản ghi cha</h2></div>
+  <p>Xoá một dòng đang được bảng khác tham chiếu bằng khoá ngoại thì phải quyết định điều gì xảy ra với các dòng con — khai báo bằng <code>ON DELETE</code>.</p>
+  <div class="flow">
+    <div class="n no"><h5>RESTRICT</h5><p>mặc định — từ chối xoá khi còn dòng con</p></div>
+    <div class="n"><h5>CASCADE</h5><p>xoá cha thì xoá luôn mọi dòng con</p></div>
+    <div class="n"><h5>SET NULL</h5><p>giữ dòng con, chỉ cắt liên kết</p></div>
+    <div class="n"><h5>SET DEFAULT</h5><p>trỏ về một "cha mặc định" — ít dùng</p></div>
+  </div>
+  <p class="stripnote"><span><em>RESTRICT</em> an toàn nhất: buộc phải xử lý dòng con trước.</span><span><em>CASCADE</em> chỉ dùng khi dòng con vô nghĩa nếu thiếu cha — như <code>order_items</code> với <code>orders</code>.</span></p>
+<pre><code>CREATE TABLE order_items (
+  order_id   BIGINT REFERENCES orders(id) ON DELETE CASCADE,
+  product_id BIGINT REFERENCES products(id) ON DELETE RESTRICT,
+  quantity   INT NOT NULL CHECK (quantity &gt; 0)
+);
+<span class="cm">-- xoá một order → order_items của nó tự động biến mất (CASCADE)
+-- xoá một product đang nằm trong order nào đó → bị chặn (RESTRICT)</span>
+
+CREATE TABLE employees (
+  id         BIGSERIAL PRIMARY KEY,
+  manager_id BIGINT REFERENCES employees(id) ON DELETE SET NULL
+);
+<span class="cm">-- xoá một quản lý → nhân viên dưới quyền không bị xoá theo,
+-- chỉ mất liên kết quản lý (manager_id = NULL)</span></code></pre>
+  <p>Chọn hành vi nào là câu hỏi <b>nghiệp vụ</b>, không phải kỹ thuật.</p>
+  <ul class="why">
+    <li><code>order_items</code> không có lý do tồn tại nếu order của nó biến mất — CASCADE hợp lý.</li>
+    <li>CASCADE giữa <code>product</code> và <code>order_items</code> thì sai: xoá một sản phẩm không nên xoá luôn lịch sử đơn hàng.</li>
+  </ul>
+</section>
+
+<section id="constraint-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Ràng buộc ở tầng nào</h2></div>
+  <p>Câu hỏi kinh điển: kiểm tra dữ liệu ở tầng ứng dụng (code) hay tầng database (constraint)? Câu trả lời đúng là <b>cả hai</b>, cho hai mục đích khác nhau.</p>
+  <div class="cmp two">
+    <div><h5>Tầng ứng dụng</h5>
+      <p><b>Mục đích</b> trải nghiệm người dùng — báo lỗi rõ ràng, ngay khi gõ</p>
+      <p><b>Bỏ qua được không</b> có — script chạy thẳng, service khác ghi trực tiếp, migration thủ công</p>
+      <p><b>Race condition</b> dễ dính lost update / trùng dữ liệu khi hai request cùng lúc</p></div>
+    <div><h5>Tầng database</h5>
+      <p><b>Mục đích</b> đảm bảo tính đúng đắn — tuyến phòng thủ cuối cùng</p>
+      <p><b>Bỏ qua được không</b> không — mọi đường ghi dữ liệu đều đi qua nó</p>
+      <p><b>Race condition</b> an toàn tự nhiên: kiểm tra ngay lúc ghi, có transaction bảo vệ</p></div>
+  </div>
+  <ul class="why">
+    <li>Validate ở <b>tầng ứng dụng</b> cho phản hồi nhanh và thông điệp lỗi thân thiện.</li>
+    <li>Ràng buộc ở <b>tầng database</b> đảm bảo dữ liệu không bao giờ sai <i>bất kể đi vào bằng đường nào</i>.</li>
+    <li>Kể cả một job nền, một script one-off, hay một service tương lai mà tác giả gốc không lường trước.</li>
+  </ul>
+</section>
+
 <section id="constraint-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
-    <div class="card bad"><h4>Chỉ tin vào tầng ứng dụng</h4><p>Validate kỹ trong code nhưng database không có constraint nào — một script chạy tay, một service khác, hay một migration lỗi sẽ ghi được dữ liệu sai mà không ai biết cho tới khi nó gây hậu quả.</p></div>
-    <div class="card bad"><h4>CASCADE xoá nhầm cả cây</h4><p>Đặt <code>ON DELETE CASCADE</code> tràn lan theo phản xạ "cho khỏi lỗi" — xoá một dòng gốc kéo theo xoá dây chuyền qua nhiều tầng bảng mà không ai lường trước hết. Chỉ CASCADE khi dòng con thật sự vô nghĩa nếu thiếu cha.</p></div>
-    <div class="card bad"><h4>UNIQUE với nhiều NULL</h4><p>Tưởng <code>UNIQUE</code> chặn được "chỉ một dòng chưa có giá trị" nhưng NULL không bị coi là trùng nhau, nên hàng trăm dòng NULL vẫn lọt qua ràng buộc. Cần <code>UNIQUE</code> có điều kiện (partial index) nếu muốn giới hạn.</p></div>
+    <div class="card bad"><h4>Chỉ tin vào tầng ứng dụng</h4><p>Validate kỹ trong code nhưng database không có constraint nào.</p>
+  <p>Một script chạy tay, một service khác, hay một migration lỗi sẽ ghi được dữ liệu sai mà không ai biết cho tới khi nó gây hậu quả.</p></div>
+    <div class="card bad"><h4>CASCADE xoá nhầm cả cây</h4><p>Đặt <code>ON DELETE CASCADE</code> tràn lan theo phản xạ "cho khỏi lỗi" — xoá một dòng gốc kéo theo xoá dây chuyền qua nhiều tầng bảng mà không ai lường trước hết.</p>
+  <p>Chỉ CASCADE khi dòng con thật sự vô nghĩa nếu thiếu cha.</p></div>
+    <div class="card bad"><h4>UNIQUE với nhiều NULL</h4><p>Tưởng <code>UNIQUE</code> chặn được "chỉ một dòng chưa có giá trị" nhưng NULL không bị coi là trùng nhau, nên hàng trăm dòng NULL vẫn lọt qua ràng buộc.</p>
+  <p>Cần <code>UNIQUE</code> có điều kiện (partial index) nếu muốn giới hạn.</p></div>
   </div>
 </section>
 

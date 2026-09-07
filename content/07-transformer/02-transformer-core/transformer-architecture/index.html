@@ -43,11 +43,46 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · Transformer · kiến trúc</p>
   <h1>Transformer <em>architecture</em></h1>
-  <p class="lede">Attention chỉ là một lớp. Bài này lắp phần còn lại: <b>token hoá, embedding, vị trí</b> ở đầu vào; <b>residual, LayerNorm, FFN</b> trong mỗi block; và cách một hidden state biến thành chữ ở đầu ra — kèm lab tự đếm tham số và bộ nhớ.</p>
+  <p class="lede">Attention chỉ là một lớp. Bài này lắp phần còn lại: <b>token hoá, embedding, vị trí</b> ở đầu vào;</p>
+  <p><b>Residual, LayerNorm, FFN</b> trong mỗi block; và cách một hidden state biến thành chữ ở đầu ra —</p>
+  <p>Kèm lab tự đếm tham số và bộ nhớ.</p>
 </header>
 
 <section id="tfm-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Từ một phép attention tới một model</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Một Transformer là <em>cùng một block lặp N lần</em>, kẹp giữa một đầu biến chữ thành vector và một đầu biến vector về lại chữ.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<text class="sv-hv" x="372" y="18">BỐN CHẶNG, KHÔNG HƠN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Attention là một phép</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">bài này ráp nó thành một model chạy được</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Mọi hình dạng giữ nguyên qua block</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">vào (T, d) ra (T, d)</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--muted)">Khác biệt giữa BERT và GPT</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">chỉ nằm ở ô cuối</text>
+</svg>
+  <figcaption>Bốn ô đọc từ trên xuống theo đúng đường dữ liệu chạy. Mỗi mục sau tô sáng đúng một ô.</figcaption>
+  </figure>
+
 
   <p class="key">Attention chỉ là <em>một lớp</em>. Thứ biến nó thành model là những gì bọc quanh: token hoá, embedding, vị trí, residual, FFN, và đầu ra.</p>
 
@@ -65,6 +100,38 @@
 
 <section id="tfm-s2">
   <div class="sh"><b>02</b><h2>Tokenization</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — TOKENIZATION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Không cắt theo từ</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">từ hiếm nổ vocabulary, từ mới thành UNK</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Không cắt theo ký tự</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">chuỗi dài gấp bội, T² đắt lên</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">BPE — gộp cặp hay đi cùng nhau</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">mốc đang dùng, vocab 32k–128k</text>
+</svg>
+  <figcaption>Hai cực đều hỏng, subword nằm giữa.</figcaption>
+  </figure>
+
   <p>Model không đọc chữ, nó đọc số. Tokenizer cắt văn bản thành các mảnh có trong từ điển (thường bằng thuật toán BPE) rồi tra ra id.</p>
 <pre><code><span class="kw">from</span> transformers <span class="kw">import</span> AutoTokenizer
 tok = AutoTokenizer.from_pretrained(<span class="st">"gpt2"</span>)
@@ -87,6 +154,38 @@ tok.encode(<span class="st">"Con mèo ngồi"</span>)      <span class="cm"># 8 
 
 <section id="tfm-s3">
   <div class="sh"><b>03</b><h2>Embedding</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — EMBEDDING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Bảng tra (V, d)</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi token id một dòng vector học được</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Gần nhau nghĩa là dùng giống nhau</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">khoảng cách trong không gian mang nghĩa</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Học cùng cả model</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">không phải tra từ bảng có sẵn</text>
+</svg>
+  <figcaption>Embedding chỉ là một phép tra bảng, cái đắt nằm ở chỗ bảng đó học được.</figcaption>
+  </figure>
+
   <p>Bảng tra cứu: mỗi id ứng với một vector <code>d</code> chiều, học được trong lúc huấn luyện.</p>
 <pre><code>W_emb: (V, d) = (50257, 768)          <span class="cm"># GPT-2 small</span>
 ids:   [1044, 8712, 3390]             <span class="cm"># (T,)</span>
@@ -104,7 +203,43 @@ X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span
 
 <section id="tfm-s4">
   <div class="sh"><b>04</b><h2>Positional encoding</h2></div>
-  <p>Attention là phép tổng có trọng số trên một tập hợp — nó <strong>không có khái niệm thứ tự</strong>. Nếu không thêm gì, "mèo đuổi chuột" và "chuột đuổi mèo" cho ra hidden state giống hệt nhau, chỉ hoán vị dòng.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — VỊ TRÍ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Attention không biết thứ tự</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đảo token thì kết quả y hệt</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Sin/cos cố định</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">bản gốc — ngoại suy được ra ngoài độ dài đã học</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Learned absolute</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">GPT-2 — đơn giản, chết ngoài max length</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">RoPE</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">mốc hiện nay, xoay vector theo vị trí</text>
+</svg>
+  <figcaption>Ô đỏ là chỗ hụt sinh ra ba cách vá bên dưới.</figcaption>
+  </figure>
+
+  <p>Attention là phép tổng có trọng số trên một tập hợp —</p>
+  <p>Nó <strong>không có khái niệm thứ tự</strong>. Nếu không thêm gì, "mèo đuổi chuột" và "chuột đuổi mèo" cho ra hidden state giống hệt nhau, chỉ hoán vị dòng.</p>
 <pre><code><span class="cm"># chứng minh trong đầu: attention(X) với X đảo dòng</span>
 <span class="cm"># = attention(X) rồi đảo dòng kết quả  → permutation equivariant</span></code></pre>
   <h3>Ba cách thêm vị trí</h3>
@@ -113,14 +248,51 @@ X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span
     <div class="s warn"><b>Learned absolute — GPT-2, BERT</b><span>một bảng <code>(T_max, d)</code> học được · đơn giản, nhưng cứng độ dài tối đa, vượt là hỏng</span></div>
     <div class="s ok"><b>RoPE — LLaMA, Qwen, hầu hết model mới</b><span>xoay từng cặp chiều của Q và K một góc tỉ lệ với vị trí · mã hoá <b>khoảng cách tương đối</b>, nới context dễ hơn</span></div>
   </div>
-  <p><strong>Vì sao RoPE thắng:</strong> khi xoay cả Q ở vị trí <code>m</code> và K ở vị trí <code>n</code>, tích vô hướng chỉ còn phụ thuộc hiệu <code>m − n</code>. Model học được quan hệ "cách nhau 3 từ" thay vì "từ này ở ô số 412", nên chuyển sang câu dài hơn ít gãy hơn.</p>
+  <p><strong>Vì sao RoPE thắng:</strong> khi xoay cả Q ở vị trí <code>m</code> và K ở vị trí <code>n</code>, tích vô hướng chỉ còn phụ thuộc hiệu <code>m − n</code>.</p>
+  <p>Model học được quan hệ "cách nhau 3 từ" thay vì "từ này ở ô số 412", nên chuyển sang câu dài hơn ít gãy hơn.</p>
 </section>
 
 <section id="tfm-s5">
   <div class="sh"><b>05</b><h2>Residual và LayerNorm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — RESIDUAL VÀ LAYERNORM</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">x = x + f(x)</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">gradient có đường đi thẳng, không teo qua N tầng</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">LayerNorm chuẩn hoá theo chiều d</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">từng token riêng, không phụ thuộc batch</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Pre-LN — chuẩn hoá trước f</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">mốc hiện nay, huấn luyện ổn định hơn</text>
+</svg>
+  <figcaption>Hai thứ giữ cho chồng block sâu vẫn học được.</figcaption>
+  </figure>
+
   <h3>Residual — đường tắt cho gradient</h3>
-  <p>Mỗi khối con đều viết dưới dạng <code>x = x + f(x)</code>. Nhờ đó đạo hàm luôn có một thành phần bằng 1 chảy thẳng về, không bị nhân dần qua hàng chục lớp. Đây là điều kiện cần để huấn luyện được model sâu 32, 80 hay 100 lớp.</p>
-  <p>Cách nhìn khác, rất hữu ích khi trả lời phỏng vấn: <strong>residual stream là một băng thông tin chạy dọc model</strong>. Mỗi block <em>đọc</em> từ băng đó, tính ra thứ gì đó, rồi <em>cộng thêm</em> vào băng. Không block nào ghi đè thông tin của block trước.</p>
+  <p>Mỗi khối con đều viết dưới dạng <code>x = x + f(x)</code>.</p>
+  <p>Nhờ đó đạo hàm luôn có một thành phần bằng 1 chảy thẳng về, không bị nhân dần qua hàng chục lớp.</p>
+  <p>Đây là điều kiện cần để huấn luyện được model sâu 32, 80 hay 100 lớp.</p>
+  <p>Cách nhìn khác, rất hữu ích khi trả lời phỏng vấn: <strong>residual stream là một băng thông tin chạy dọc model</strong>.</p>
+  <p>Mỗi block <em>đọc</em> từ băng đó, tính ra thứ gì đó, rồi <em>cộng thêm</em> vào băng.</p>
+  <p>Không block nào ghi đè thông tin của block trước.</p>
   <h3>LayerNorm — giữ độ lớn ổn định</h3>
 <pre><code>y = (x - mean(x)) / sqrt(var(x) + eps) * gamma + beta
 <span class="cm"># mean và var tính trên chiều đặc trưng, TỪNG token một</span></code></pre>
@@ -142,6 +314,38 @@ X = W_emb[ids]                        <span class="cm"># (T, d) = (3, 768)</span
 
 <section id="tfm-s6">
   <div class="sh"><b>06</b><h2>FFN — nơi chứa phần lớn tham số</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — FFN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Hai lớp tuyến tính, nở ra 4d rồi co lại</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">xử lý từng token độc lập</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Chứa khoảng hai phần ba tham số</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">attention chỉ chiếm phần nhỏ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Nơi model nhớ tri thức</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">attention trộn, FFN mới là chỗ chứa</text>
+</svg>
+  <figcaption>Nửa còn lại của một block, và là nửa nặng hơn.</figcaption>
+  </figure>
+
 <pre><code>FFN(x) = W_2 @ activation(W_1 @ x + b_1) + b_2
 
 W_1: (d, 4d) = (768, 3072)     <span class="cm"># nở ra 4 lần</span>
@@ -152,7 +356,8 @@ W_2: (4d, d) = (3072, 768)     <span class="cm"># nén lại</span></code></pre>
     <div class="b"><i>Attention — W_q, W_k, W_v, W_o</i><u style="width:33%"></u><b>2,36 M · 33%</b></div>
     <div class="b hi"><i>FFN — W_1, W_2</i><u style="width:67%"></u><b>4,72 M · 67%</b></div>
   </div>
-  <p>Hai phần ba tham số nằm ở FFN. Nghiên cứu diễn giải model cho rằng đây là nơi lưu <strong>kiến thức dạng sự kiện</strong> — hoạt động gần như một bộ nhớ khoá–giá trị, trong khi attention lo phần định tuyến thông tin.</p>
+  <p>Hai phần ba tham số nằm ở FFN. Nghiên cứu diễn giải model cho rằng đây là nơi lưu <strong>kiến thức dạng sự kiện</strong> —</p>
+  <p>Hoạt động gần như một bộ nhớ khoá–giá trị, trong khi attention lo phần định tuyến thông tin.</p>
   <div class="note">
     <h4>Vì sao nở gấp 4</h4>
     Không có định lý nào cả — là hằng số kinh nghiệm từ bài báo gốc và được giữ lại vì hoạt động tốt. Model mới dùng SwiGLU thường lấy khoảng <code>8/3 · d</code> để giữ tổng tham số tương đương, vì SwiGLU cần ba ma trận thay vì hai.
@@ -161,6 +366,37 @@ W_2: (4d, d) = (3072, 768)     <span class="cm"># nén lại</span></code></pre>
 
 <section id="tfm-s7">
   <div class="sh"><b>07</b><h2>Một block hoàn chỉnh</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — MỘT BLOCK ĐẦY ĐỦ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">x = x + attn(ln1(x))</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">trộn thông tin giữa các token</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">x = x + ffn(ln2(x))</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">xử lý từng token riêng lẻ</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Lặp N lần, hình dạng không đổi</text>
+</svg>
+  <figcaption>Cả ô giữa gói lại thành đúng hai dòng này.</figcaption>
+  </figure>
+
   <figure>
     <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ một block Transformer kiểu pre-LN">
       <line x1="40" y1="130" x2="690" y2="130" stroke="#8CA9F2" stroke-width="2"/>
@@ -197,11 +433,44 @@ W_2: (4d, d) = (3072, 768)     <span class="cm"># nén lại</span></code></pre>
         x = x + self.attn(self.ln1(x))    <span class="cm"># trộn giữa các token</span>
         x = x + self.ffn(self.ln2(x))     <span class="cm"># xử lý từng token</span>
         <span class="kw">return</span> x</code></pre>
-  <p>Toàn bộ GPT chỉ là lớp này lặp lại: 12 lần với GPT-2 small, 32 lần với LLaMA-7B, 80 lần với các model 70B. Shape đi vào và đi ra luôn giống hệt nhau — đó là lý do xếp chồng được tuỳ ý.</p>
+  <p>Toàn bộ GPT chỉ là lớp này lặp lại: 12 lần với GPT-2 small, 32 lần với LLaMA-7B, 80 lần với các model 70B.</p>
+  <p>Shape đi vào và đi ra luôn giống hệt nhau — đó là lý do xếp chồng được tuỳ ý.</p>
 </section>
 
 <section id="tfm-s8">
   <div class="sh"><b>08</b><h2>Từ hidden state ra chữ</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — RA CHỮ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">LayerNorm cuối rồi nhân W_out</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">(T, d) thành (T, V)</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Lấy dòng cuối, softmax</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">phân phối cho token kế tiếp</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Weight tying</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">W_out dùng lại bảng embedding, tiết kiệm V·d tham số</text>
+</svg>
+  <figcaption>Ba bước biến hidden state thành xác suất chữ.</figcaption>
+  </figure>
+
 <pre><code>H        (T, d)      = (3, 768)      <span class="cm"># sau block cuối</span>
 H        = final_ln(H)
 logits   = H @ W_out                 <span class="cm"># (3, 50257)</span>
@@ -217,11 +486,44 @@ probs    = softmax(logits / T)       <span class="cm"># T = temperature</span></
     <h4>Thứ tự áp dụng</h4>
     temperature trước, rồi lọc top-k / top-p, rồi mới lấy mẫu. Đảo thứ tự cho kết quả khác hẳn — temperature cao sau khi đã lọc thì không mở rộng được tập lựa chọn nữa.
   </div>
-  <p><strong>Vì sao chỉ lấy dòng cuối:</strong> lúc huấn luyện ta dùng cả T dòng logits để tính mất mát ở mọi vị trí. Lúc sinh chữ, T−1 dòng đầu là dự đoán cho những token đã biết rồi, nên bỏ đi.</p>
+  <p><strong>Vì sao chỉ lấy dòng cuối:</strong> lúc huấn luyện ta dùng cả T dòng logits để tính mất mát ở mọi vị trí.</p>
+  <p>Lúc sinh chữ, T−1 dòng đầu là dự đoán cho những token đã biết rồi, nên bỏ đi.</p>
 </section>
 
 <section id="tfm-s9">
   <div class="sh"><b>09</b><h2>Lab: tự đếm tham số và bộ nhớ</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LAB ĐẾM THAM SỐ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Đổi d, N, vocab</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">xem tham số dịch chuyển giữa attention và FFN</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">FFN luôn thắng về số lượng</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">tỉ lệ khoảng 2 trên 3</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Bộ nhớ huấn luyện gấp nhiều lần trọng số</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">gradient, optimizer state, activation</text>
+</svg>
+  <figcaption>Lab xoay ba số và cho thấy phần nào của model phình ra.</figcaption>
+  </figure>
+
   <p>Nhập cấu hình một model rồi xem tham số nằm ở đâu, cache tốn bao nhiêu. Mặc định là LLaMA-2 7B. Chọn sẵn vài cấu hình quen thuộc ở ô đầu tiên.</p>
   <div class="lab">
     <div class="bar">
@@ -250,12 +552,46 @@ probs    = softmax(logits / T)       <span class="cm"># T = temperature</span></
 
 <section id="tfm-s10">
   <div class="sh"><b>10</b><h2>Encoder, Decoder, hay cả hai</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của một Transformer: chữ vào được tokenize rồi nhúng thành vector cộng thông tin vị trí, đi qua N block giống nhau gồm attention và FFN có residual và LayerNorm, hidden state cuối được chiếu ra phân phối chữ, và cùng một block đó xếp thành encoder, decoder hoặc cả hai">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Chữ vào</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">tokenization rồi embedding + vị trí</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Một block, lặp N lần</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">attention trộn · FFN xử lý riêng · residual + LayerNorm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Hidden state ra chữ</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">LayerNorm cuối, nhân W_out, softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt block ở đâu</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">encoder · decoder · cả hai</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BA CÁCH XẾP BLOCK</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Encoder-only</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nhìn hai chiều — BERT, phân loại và tìm kiếm</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Decoder-only</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">chỉ nhìn về trước — GPT, sinh chữ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Encoder-decoder</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">T5 — dịch, tóm tắt, vào một chuỗi ra chuỗi khác</text>
+</svg>
+  <figcaption>Cùng một block, khác nhau ở mask và ở chỗ đặt.</figcaption>
+  </figure>
+
 <div class="stack">
     <div class="s"><b>Encoder-only — BERT</b><span>attention hai chiều, không mask · học bằng cách đoán token bị che · hợp phân loại, trích xuất, nhúng văn bản</span></div>
     <div class="s ok"><b>Decoder-only — GPT, LLaMA</b><span>attention một chiều với causal mask · học bằng cách đoán token kế tiếp · hợp sinh văn bản, hội thoại, mọi tác vụ ép được về dạng sinh</span></div>
     <div class="s"><b>Encoder–Decoder — T5, model dịch máy</b><span>encoder hai chiều, decoder causal, cộng thêm cross-attention · hợp dịch và tóm tắt, khi nguồn và đích tách bạch</span></div>
   </div>
-  <p><strong>Cross-attention khác self-attention ở đâu:</strong> Q lấy từ decoder, còn K và V lấy từ đầu ra của encoder. Nghĩa là "câu đang viết" đặt câu hỏi cho "câu nguồn". Công thức không đổi một chữ nào — chỉ đổi nguồn của ba đầu vào.</p>
+  <p><strong>Cross-attention khác self-attention ở đâu:</strong> Q lấy từ decoder, còn K và V lấy từ đầu ra của encoder.</p>
+  <p>Nghĩa là "câu đang viết" đặt câu hỏi cho "câu nguồn". Công thức không đổi một chữ nào —</p>
+  <p>Chỉ đổi nguồn của ba đầu vào.</p>
   <div class="note">
     <h4>Vì sao decoder-only thắng thế</h4>
     Một kiến trúc duy nhất, một mục tiêu huấn luyện duy nhất, dùng được mọi dữ liệu văn bản thô, và mọi tác vụ đều ép được về dạng sinh chữ. Đơn giản hơn nên mở rộng quy mô dễ hơn — và ở quy mô lớn, đơn giản thường thắng.

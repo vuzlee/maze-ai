@@ -43,12 +43,48 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · LLM · vận hành</p>
   <h1>Inference &amp; cost <em>optimization</em></h1>
-  <p class="lede">Một model đã huấn luyện xong thì mọi bài toán còn lại là kỹ thuật hệ thống. Bài này chốt khác biệt giữa <b>prefill và decode</b> — và vì sao nó quyết định mọi tối ưu, cách <b>tính dung lượng KV cache</b>, vì sao <b>continuous batching</b> tăng thông lượng nhiều lần, và bảng giảm chi phí xếp theo mức lãi.</p>
+  <p class="lede">Một model đã huấn luyện xong thì mọi bài toán còn lại là kỹ thuật hệ thống.</p>
+  <p>Bài này chốt khác biệt giữa <b>prefill và decode</b> — thứ quyết định mọi tối ưu về sau.</p>
+  <p>Rồi tới cách <b>tính dung lượng KV cache</b>, vì sao <b>continuous batching</b> tăng thông lượng nhiều lần, và bảng giảm chi phí xếp theo mức lãi.</p>
 </header>
 
 
 <section id="inference-s1">
-  <div class="sh"><b>01</b><h2>Inference optimization là gì</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Sinh chữ nghẽn ở <em>băng thông bộ nhớ</em>, không ở phép tính — mọi kỹ thuật đều là cách nhét nhiều token hơn vào một lượt đọc trọng số.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<text class="sv-hv" x="372" y="18">MỘT CÂU HỎI DUY NHẤT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Mỗi byte trọng số đọc lên phục vụ mấy token</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Mọi kỹ thuật trong bài đều nâng con số đó</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Huấn luyện tối ưu FLOPs, suy luận tối ưu băng thông</text>
+</svg>
+  <figcaption>Năm ô đọc từ trên xuống: hai ô đầu là chỗ nghẽn, hai ô giữa là hai hướng vá, ô cuối là cách đo. Mỗi mục sau tô sáng đúng một ô.</figcaption>
+  </figure>
+
   <p class="key">Một request đi qua <em>hai pha có tính chất trái ngược</em> — và mọi kỹ thuật tối ưu chỉ nhằm vào một trong hai.</p>
   <div class="cmp two">
     <div><h5>Prefill — xử lý cả prompt một lượt</h5><p>Nhiều token cùng lúc → <b>giới hạn bởi phép tính</b>. Quyết định <b>TTFT</b>, thời gian tới token đầu tiên.</p></div>
@@ -63,9 +99,45 @@
 
 <section id="inference-s2">
   <div class="sh"><b>02</b><h2>Prefill và decode — vì sao khác nhau về bản chất</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — PREFILL VÀ DECODE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Prefill: cả prompt cùng lúc</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">song song được, nghẽn ở phép tính</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Decode: một token một lượt</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không song song được, nghẽn ở bộ nhớ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Hai pha nên đo và tối ưu riêng</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">TTFT thuộc prefill, TPOT thuộc decode</text>
+</svg>
+  <figcaption>Hai pha khác nhau về bản chất, gộp lại để tối ưu là sai ngay từ đầu.</figcaption>
+  </figure>
+
   <div class="bars">
-    <div class="b hi"><i>prefill · prompt 2000 token</i><u style="width:100%"></u><b>mỗi trọng số đọc 1 lần, dùng cho 2000 token — GPU chạy hết công suất</b></div>
-    <div class="b bad"><i>decode · sinh token thứ 2001</i><u style="width:0.05%"></u><b>mỗi trọng số đọc 1 lần, dùng cho đúng 1 token — GPU đứng chờ bộ nhớ</b></div>
+    <div class="b hi"><i>prefill · prompt 2000 token</i><u style="width:100%"></u><b>1 lần đọc / 2000 token — GPU chạy hết công suất</b></div>
+    <div class="b bad"><i>decode · sinh token thứ 2001</i><u style="width:0.05%"></u><b>1 lần đọc / 1 token — GPU đứng chờ bộ nhớ</b></div>
   </div>
   <p class="stripnote"><span>tỉ lệ phép tính trên mỗi byte đọc</span><span><em>chênh nhau đúng bằng số token trong prompt</em></span></p>
   <div class="eq">
@@ -86,6 +158,41 @@
 
 <section id="inference-s3">
   <div class="sh"><b>03</b><h2>KV cache</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — KV CACHE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">K và V của token cũ không đổi</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nên nhớ lại thay vì tính lại</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Chi phí mỗi bước từ T² xuống T</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Đổi lại bộ nhớ tăng tuyến tính theo độ dài</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">cache thường lớn hơn cả trọng số</text>
+</svg>
+  <figcaption>Đánh đổi cơ bản nhất, và mọi kỹ thuật sau đều xoay quanh cache này.</figcaption>
+  </figure>
+
   <div class="cmp two">
     <div><h5>Không có cache</h5><p>Sinh token thứ n phải tính lại K và V cho cả n−1 token trước → chi phí <b>O(n²)</b> cho cả câu, lặp lại việc đã làm.</p></div>
     <div><h5>Có cache</h5><p>Lưu K, V của mọi token đã xử lý; token mới chỉ tính K, V của chính nó rồi attend vào cache → chi phí <b>O(n)</b>.</p></div>
@@ -113,6 +220,39 @@
 
 <section id="inference-s4">
   <div class="sh"><b>04</b><h2>Lab: KV cache và chi phí</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LAB CHI PHÍ CACHE</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Đổi số tầng, số head, độ dài</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Xem cache vượt trọng số ở mốc nào</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Đó chính là trần batch size của bạn</text>
+</svg>
+  <figcaption>Lab xoay đúng ô KV cache và cho thấy chỗ bộ nhớ vỡ.</figcaption>
+  </figure>
+
   <div class="lab">
     <div class="bar">
       <div><label>số lớp</label><input type="number" id="iL" value="32" min="1"></div>
@@ -133,14 +273,50 @@
       <div><label>VRAM khả dụng cho cache (GB)</label><input type="number" id="ivram" value="64" min="1"></div>
     </div>
     <div id="iview"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Đổi kiểu attention từ GQA sang MHA: KV cache tăng <strong>bốn lần</strong> và số request đồng thời tối đa giảm bốn lần — cùng một GPU, cùng một model. Đó là lý do mọi model mới đều dùng GQA. Lượng tử hoá cache xuống int8 cho thêm một lần gấp đôi.
-    </p>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Đổi kiểu attention từ GQA sang MHA: KV cache tăng <strong>bốn lần</strong> và số request đồng thời tối đa giảm bốn lần —</p>
+  <p>Cùng một GPU, cùng một model. Đó là lý do mọi model mới đều dùng GQA.</p>
+  <p>Lượng tử hoá cache xuống int8 cho thêm một lần gấp đôi.</p>
   </div>
 </section>
 
 <section id="inference-s5">
   <div class="sh"><b>05</b><h2>GQA và MQA — giảm KV cache từ kiến trúc</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — GQA VÀ MQA</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">MHA</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi head một bộ K, V — cache lớn nhất</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">MQA</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">mọi head chung một bộ — nhỏ nhất, tụt chất lượng</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">GQA</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">vài head chung một bộ — mốc hiện nay</text>
+</svg>
+  <figcaption>Cắt cache ngay từ kiến trúc, trước khi chạy dòng code nào.</figcaption>
+  </figure>
+
   <figure>
     <svg viewBox="0 0 900 210" role="img" aria-label="MHA, GQA và MQA khác nhau ở số cặp K V mà các head Q chia sẻ">
       <g class="sv-t" fill="#EDE7DE" text-anchor="middle">
@@ -192,8 +368,43 @@
 
 <section id="inference-s6">
   <div class="sh"><b>06</b><h2>Batching — static và continuous</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BATCHING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Static: chờ đủ batch rồi mới chạy</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">một câu dài kẹt cả lô</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Continuous: xong câu nào thả câu đó</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">GPU không có khoảng rỗng</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Throughput lên nhiều lần, TTFT gần như không đổi</text>
+</svg>
+  <figcaption>Cách rẻ nhất để nhiều token cùng dùng một lượt đọc trọng số.</figcaption>
+  </figure>
+
   <figure>
-    <svg viewBox="0 0 900 250" role="img" aria-label="Static batching để lộ nhiều khe trống, continuous batching lấp đầy ngay">
+    <svg viewBox="0 0 900 272" role="img" aria-label="Static batching để lộ nhiều khe trống, continuous batching lấp đầy ngay">
       <text x="20" y="24" class="sv-t" fill="#F2718A">Static batching — chạy tới khi tất cả xong</text>
       <g class="sv-l" fill="#7A6F63"><text x="20" y="52">A</text><text x="20" y="76">B</text><text x="20" y="100">C</text><text x="20" y="124">D</text></g>
       <g fill="#8CA9F2">
@@ -216,11 +427,13 @@
       <rect x="194" y="200" width="300" height="14" rx="3" fill="#5BCFA0"/>
       <rect x="498" y="200" width="252" height="14" rx="3" fill="#5BCFA0"/>
       <rect x="50" y="224" width="700" height="14" rx="3" fill="#8CA9F2"/>
-      <text x="470" y="184" class="sv-l" fill="#5BCFA0" text-anchor="middle">A xong là rời batch ngay, E gia nhập vào chỗ vừa trống</text>
+      <text x="470" y="258" class="sv-l" fill="#5BCFA0" text-anchor="middle">A xong là rời batch ngay, E gia nhập vào chỗ vừa trống</text>
     </svg>
     <figcaption>Độ dài phản hồi lệch rất mạnh trong thực tế — có request 10 token, có request 2.000 — nên khoảng trống ở hình trên là phần lớn công suất GPU.</figcaption>
   </figure>
-  <p><strong>Vì sao chênh lệch lớn:</strong> độ dài phản hồi trong thực tế lệch rất mạnh — có request sinh 10 token, có request sinh 2000. Với static batching, cả batch bị giữ bởi request dài nhất, nên phần lớn khe trong batch chạy không tải. Continuous batching cho thông lượng cao hơn nhiều lần trên cùng phần cứng, và đây là đóng góp chính của các máy phục vụ như vLLM và TGI.</p>
+  <p><strong>Vì sao chênh lệch lớn:</strong> độ dài phản hồi trong thực tế lệch rất mạnh —</p>
+  <p>Có request sinh 10 token, có request sinh 2000. Với static batching, cả batch bị giữ bởi request dài nhất, nên phần lớn khe trong batch chạy không tải.</p>
+  <p>Continuous batching cho thông lượng cao hơn nhiều lần trên cùng phần cứng, và đây là đóng góp chính của các máy phục vụ như vLLM và TGI.</p>
   <div class="note warn">
     <h4>Đánh đổi giữa thông lượng và độ trễ</h4>
     Batch lớn cho thông lượng cao nhưng làm <strong>TPOT tăng</strong> — mỗi bước decode phải tính cho nhiều request hơn. Nên phải chọn theo yêu cầu sản phẩm: chatbot cần token ra nhanh nên giữ batch vừa phải; xử lý hàng loạt thì đẩy batch lên tối đa. Nêu được đánh đổi này thay vì nói "batch càng lớn càng tốt" là điểm phân biệt rõ.
@@ -229,6 +442,41 @@
 
 <section id="inference-s7">
   <div class="sh"><b>07</b><h2>PagedAttention</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — PAGEDATTENTION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Cache cấp phát theo trang nhỏ</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">không cần một khối liền mạch</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Bỏ được phần cấp thừa cho độ dài tối đa</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">phân mảnh từ khoảng 60% xuống vài phần trăm</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Nhiều chuỗi chung prefix thì chung trang</text>
+</svg>
+  <figcaption>Đúng ý tưởng phân trang của hệ điều hành, đặt vào KV cache.</figcaption>
+  </figure>
+
   <p class="key">Không biết trước request sẽ sinh bao nhiêu token, nên cách ngây thơ phải <em>cấp phát cache theo độ dài tối đa</em> — và phần lớn chỗ đó bỏ không.</p>
   <div class="strip">
     <div class="c on"><i>dùng thật</i><b>200 token</b><u>phần có dữ liệu</u></div>
@@ -240,7 +488,9 @@
     <div class="s"><b>Cache vật lý</b><span>các khối rải rác khắp VRAM, nối lại bằng một bảng ánh xạ — như phân trang của hệ điều hành</span></div>
     <div class="s ok"><b>Kết quả</b><span>cấp phát theo nhu cầu thực, gần như không phân mảnh · và các request có <b>prefix giống nhau</b> dùng chung khối</span></div>
   </div>
-  <p>Lợi ích thứ hai — <strong>chia sẻ prefix</strong> — quan trọng hơn vẻ ngoài. Trong thực tế, hàng nghìn request thường dùng chung một system prompt dài. Với PagedAttention, phần KV cache của prefix đó được lưu <em>một lần</em> và mọi request trỏ vào cùng các khối, thay vì mỗi request giữ một bản riêng.</p>
+  <p>Lợi ích thứ hai — <strong>chia sẻ prefix</strong> — quan trọng hơn vẻ ngoài.</p>
+  <p>Trong thực tế, hàng nghìn request thường dùng chung một system prompt dài.</p>
+  <p>Với PagedAttention, phần KV cache của prefix đó được lưu <em>một lần</em> và mọi request trỏ vào cùng các khối, thay vì mỗi request giữ một bản riêng.</p>
   <div class="note">
     <h4>Cách nói gọn</h4>
     "PagedAttention quản lý KV cache theo khối cố định giống phân trang bộ nhớ, nên không phải cấp phát trước theo độ dài tối đa — bỏ được phân mảnh, và cho phép nhiều request chia sẻ khối của phần prefix giống nhau. Kết quả là số request đồng thời tăng đáng kể trên cùng lượng VRAM."
@@ -249,6 +499,43 @@
 
 <section id="inference-s8">
   <div class="sh"><b>08</b><h2>Lượng tử hoá khi suy luận</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LƯỢNG TỬ HOÁ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">INT8 hoặc INT4 cho trọng số</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đọc ít byte hơn nên decode nhanh hơn</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">AWQ, GPTQ giữ được chất lượng gần nguyên</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Lượng tử hoá cả KV cache</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">nhân đôi batch chứa được</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--tomb)">Xuống quá thấp thì tụt rõ ở tác vụ suy luận</text>
+</svg>
+  <figcaption>Cách trực tiếp nhất để giảm số byte phải đọc mỗi lượt.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Lượng tử hoá gì</th><th>Tác động</th><th>Ghi chú</th></tr>
     <tr><td><strong>Trọng số</strong> — int8, int4</td><td>Model nhỏ hơn 2–4 lần; decode nhanh hơn vì đọc ít byte</td><td>Giúp đúng vào chỗ decode bị chặn: ít byte phải đọc hơn</td></tr>
@@ -259,11 +546,50 @@
     <h4>Vì sao lượng tử hoá trọng số giúp <em>tốc độ</em>, không chỉ dung lượng</h4>
     Vì decode bị chặn bởi băng thông bộ nhớ. Trọng số int4 chỉ cần đọc <strong>1/4 số byte</strong> so với fp16, nên thời gian mỗi bước decode giảm gần tương ứng — dù số phép tính không đổi. Đây là trường hợp mà giảm bộ nhớ trực tiếp thành tăng tốc, khác hẳn với các bài toán bị chặn bởi tính toán. Nói được cơ chế này là câu trả lời ở mức hệ thống.
   </div>
-  <p>Lưu ý về đo lường: lượng tử hoá <em>chỉ trọng số</em> giúp nhiều ở batch nhỏ nơi băng thông là nút thắt, nhưng ở batch rất lớn thì hệ thống chuyển sang bị chặn bởi tính toán và lợi ích giảm đi — vì lúc đó phải giải nén trọng số về dạng tính toán được.</p>
+  <p>Lưu ý về đo lường: lượng tử hoá <em>chỉ trọng số</em> giúp nhiều ở batch nhỏ nơi băng thông là nút thắt,.</p>
+  <p>Nhưng ở batch rất lớn thì hệ thống chuyển sang bị chặn bởi tính toán và lợi ích giảm đi —.</p>
+  <p>Vì lúc đó phải giải nén trọng số về dạng tính toán được.</p>
 </section>
 
 <section id="inference-s9">
   <div class="sh"><b>09</b><h2>Speculative decoding</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — SPECULATIVE DECODING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Model nhỏ đoán trước vài token</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Model lớn kiểm cả loạt trong một lượt</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Phân phối đầu ra không đổi</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">đây không phải xấp xỉ, là tăng tốc thuần</text>
+<rect x="372" y="174" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Đoán trượt nhiều thì lỗ</text>
+<text class="sv-s" x="388" y="214" fill="var(--dim)">cần model nháp đủ giống</text>
+</svg>
+  <figcaption>Nhiều token cho một lượt đọc trọng số, mà không đổi kết quả.</figcaption>
+  </figure>
+
   <p class="key">Dùng một model <em>nhỏ</em> đề xuất trước nhiều token, rồi model lớn kiểm tra tất cả trong <em>một</em> lượt forward.</p>
   <div class="stack">
     <div class="s"><b>1 · Model nháp đề xuất</b><span>model nhỏ, nhanh, sinh k = 4 token</span></div>
@@ -273,14 +599,53 @@
   </div>
   <div class="note key">
     <h4>Vì sao việc này khả thi và không làm đổi kết quả</h4>
-    <p><strong>Khả thi</strong> vì decode bị chặn bởi bộ nhớ: kiểm tra 4 token trong một lượt forward tốn gần bằng sinh 1 token, do trọng số vẫn chỉ được đọc một lần. Phần năng lực tính toán vốn bỏ không giờ được dùng.</p>
-    <p><strong>Không đổi kết quả</strong> vì cơ chế chấp nhận được thiết kế để phân phối đầu ra <em>y hệt</em> khi giải mã bình thường. Đây không phải một phép xấp xỉ — nó là tăng tốc thuần, và điểm này rất hay bị hiểu sai.</p>
+    <p><strong>Khả thi</strong> vì decode bị chặn bởi bộ nhớ: kiểm tra 4 token trong một lượt forward tốn gần bằng sinh 1 token, do trọng số vẫn chỉ được đọc một lần.</p>
+  <p>Phần năng lực tính toán vốn bỏ không giờ được dùng.</p>
+    <p><strong>Không đổi kết quả</strong> vì cơ chế chấp nhận được thiết kế để phân phối đầu ra <em>y hệt</em> khi giải mã bình thường.</p>
+  <p>Đây không phải một phép xấp xỉ — nó là tăng tốc thuần, và điểm này rất hay bị hiểu sai.</p>
   </div>
-  <p>Mức tăng tốc thực tế khoảng 1.5–3 lần, phụ thuộc <strong>tỉ lệ chấp nhận</strong> — tức model nháp giống model chính đến đâu. Với văn bản dễ đoán (code, văn bản có cấu trúc) tỉ lệ chấp nhận cao nên lãi nhiều; với văn bản sáng tạo thì ít hơn. Biến thể không cần model nháp riêng cũng tồn tại, dùng chính n-gram trong prompt để đề xuất.</p>
+  <p>Mức tăng tốc thực tế khoảng 1.5–3 lần, phụ thuộc <strong>tỉ lệ chấp nhận</strong> —</p>
+  <p>Tức model nháp giống model chính đến đâu. Với văn bản dễ đoán (code, văn bản có cấu trúc) tỉ lệ chấp nhận cao nên lãi nhiều;</p>
+  <p>Với văn bản sáng tạo thì ít hơn. Biến thể không cần model nháp riêng cũng tồn tại, dùng chính n-gram trong prompt để đề xuất.</p>
 </section>
 
 <section id="inference-s10">
   <div class="sh"><b>10</b><h2>Cache prompt</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CACHE PROMPT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">System prompt lặp lại ở mọi request</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--ok)">Giữ luôn KV của phần dùng chung</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">bỏ hẳn phần prefill đó</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Lãi lớn nhất khi prompt dài và cố định</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">RAG, agent, few-shot</text>
+</svg>
+  <figcaption>Chỗ dễ lãi nhất mà hay bị bỏ quên nhất.</figcaption>
+  </figure>
+
   <div class="strip">
     <div class="c t"><i>system prompt</i><b>2.000 token</b><u>giống nhau ở mọi request</u></div>
     <div class="c t"><i>tài liệu RAG</i><b>3.000 token</b><u>giống nhau trong một phiên</u></div>
@@ -300,7 +665,45 @@
 </section>
 
 <section id="inference-s11">
-  <div class="sh"><b>11</b><h2>Bốn chỉ số phải đo</h2></div>
+  <div class="sh"><b>11</b><h2>Chỉ số phải đo</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BỐN CHỈ SỐ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">TTFT — chờ bao lâu tới chữ đầu</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">cảm nhận tức thời của người dùng</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">TPOT — mỗi chữ sau cách nhau bao lâu</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">quyết định tốc độ đọc</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Throughput — tổng token mỗi giây</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">quyết định giá thành</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">Batch to thì throughput lên mà TTFT xấu đi</text>
+</svg>
+  <figcaption>Bốn chỉ số kéo nhau, không tối ưu cùng lúc được.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Chỉ số</th><th>Nghĩa</th><th>Quan trọng với</th></tr>
     <tr><td><strong>TTFT</strong><br>time to first token</td><td>Từ lúc nhận request tới token đầu tiên. Chi phối bởi prefill</td><td>Cảm nhận về độ nhạy; quan trọng nhất với chatbot</td></tr>
@@ -316,6 +719,42 @@
 
 <section id="inference-s12">
   <div class="sh"><b>12</b><h2>Giảm chi phí ở tầng ứng dụng — xếp theo mức lãi</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LÃI TỪ TẦNG ỨNG DỤNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Cắt ngắn prompt và output</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">lãi lớn nhất, làm được ngay</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Cache câu trả lời trùng</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Định tuyến câu dễ sang model nhỏ</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--filled)">Rồi mới tới tối ưu tầng phục vụ</text>
+</svg>
+  <figcaption>Xếp theo mức lãi trên công bỏ ra, làm từ trên xuống.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Kỹ thuật</th><th>Mức tiết kiệm</th><th>Ghi chú</th></tr>
     <tr><td><strong>1. Cache câu trả lời</strong></td><td>Bằng đúng tỉ lệ trùng lặp — có thể 30–70%</td><td>Rẻ nhất và lãi nhất. Câu hỏi thật trùng lặp nhiều hơn bạn tưởng</td></tr>
@@ -334,6 +773,42 @@
 
 <section id="inference-s13">
   <div class="sh"><b>13</b><h2>Bảng quyết định</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của inference optimization: sinh chữ là vòng lặp mỗi lượt một token nên phải đọc lại toàn bộ trọng số, nghẽn nằm ở băng thông bộ nhớ chứ không ở phép tính, hai hướng vá là nhét nhiều việc vào một lượt đọc và làm dữ liệu nhỏ đi, và mọi lựa chọn phải đo bằng bốn chỉ số vì tối ưu cái này là đánh đổi cái kia">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Sinh chữ là vòng lặp một token một lượt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi lượt phải đọc lại toàn bộ trọng số</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nghẽn ở băng thông bộ nhớ, không ở phép tính</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU rảnh mà vẫn chậm</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Nhét nhiều việc vào một lượt đọc</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Làm trọng số và cache nhỏ đi</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">lượng tử hoá · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Đo bằng TTFT, TPOT, throughput, chi phí</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tối ưu một chỉ số là đánh đổi chỉ số khác</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BẢNG QUYẾT ĐỊNH</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Cần TTFT thấp</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">batch nhỏ, cache prompt</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Cần throughput cao</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">continuous batching, batch lớn</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Thiếu bộ nhớ</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">lượng tử hoá, GQA, PagedAttention</text>
+</svg>
+  <figcaption>Bảng tra, quay lại khi phải chọn cấu hình phục vụ.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Vấn đề</th><th>Nhắm vào</th><th>Làm gì</th></tr>
     <tr><td>TTFT quá cao</td><td>Prefill</td><td>Cache prompt, rút ngắn prompt, chia nhỏ prefill theo khối</td></tr>

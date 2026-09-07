@@ -43,11 +43,48 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · Deep learning · nền tảng</p>
   <h1>Normalization — BatchNorm &amp; <em>LayerNorm</em></h1>
-  <p class="lede">BatchNorm hay LayerNorm không phải chuyện sở thích — nó quyết định model của bạn có <b>phụ thuộc batch size</b> hay không, và có suy luận từng mẫu được hay không. Bài này giải thích BatchNorm thật sự làm gì, vì sao Transformer bỏ nó, và đặt norm trước hay sau khối residual.</p>
+  <p class="lede">BatchNorm hay LayerNorm không phải chuyện sở thích — nó quyết định model của bạn có <b>phụ thuộc batch size</b> hay không, và có suy luận từng mẫu được hay không.</p>
+  <p>Bài này giải thích BatchNorm thật sự làm gì, vì sao Transformer bỏ nó, và đặt norm trước hay sau khối residual.</p>
 </header>
 
 <section id="norm-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Vì sao cần normalization</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Mọi biến thể là <em>cùng một phép chuẩn hoá</em>, chỉ khác nhau ở chiều dùng để lấy trung bình và độ lệch chuẩn.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<text class="sv-hv" x="372" y="18">MỘT PHÉP, NHIỀU BIẾN THỂ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Mọi biến thể cùng một công thức</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">(x − μ) / σ rồi γ·x̂ + β</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Chỉ khác chiều lấy μ và σ</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">batch, layer, group, instance</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Chọn biến thể = chọn chiều</text>
+</svg>
+  <figcaption>Năm ô đọc từ trên xuống: ô đỏ trên là vấn đề, ba ô giữa là cơ chế, ô đỏ dưới là cái giá. Mỗi mục sau tô sáng đúng một ô.</figcaption>
+  </figure>
+
 
   <p class="key">Khởi tạo chỉ đặt đúng độ lớn ở <em>bước đầu tiên</em>. Chuẩn hoá là thứ giữ nó đúng suốt quá trình huấn luyện.</p>
 
@@ -65,6 +102,41 @@
 
 <section id="norm-s2">
   <div class="sh"><b>02</b><h2>BatchNorm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BATCHNORM</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Lấy μ, σ theo chiều batch</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi kênh một cặp số, tính qua N mẫu</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Huấn luyện dùng thống kê của batch</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Suy luận dùng running average</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">đó là lý do phải gọi model.eval()</text>
+</svg>
+  <figcaption>Chiều lấy thống kê của BatchNorm, và hai chế độ chạy khác nhau của nó.</figcaption>
+  </figure>
+
 <p class="key">Với mỗi đặc trưng, tính thống kê trên <em>toàn batch</em> rồi ép về trung bình 0, phương sai 1.</p>
   <div class="eq">
     <div class="line"><span class="t"><span>x̂</span></span><span class="op">=</span><span class="t b"><span>(x − μ)</span><em>trừ trung bình của batch</em></span><span class="op">/</span><span class="t p"><span>√(σ² + ε)</span><em>chia độ lệch chuẩn của batch</em></span></div>
@@ -74,7 +146,12 @@
       <dt>ε</dt><dd>số rất nhỏ, tránh chia cho 0</dd>
     </dl>
   </div>
-  <p><strong>Vì sao cần <code>γ</code> và <code>β</code>:</strong> chuẩn hoá cứng về trung bình 0 phương sai 1 có thể làm mất khả năng biểu diễn — ví dụ với sigmoid thì vùng quanh 0 gần như tuyến tính. Hai tham số này cho mạng <em>tự học lại</em> thang đo và độ dịch phù hợp, kể cả học ra phép biến đổi ngược nếu chuẩn hoá là có hại.</p>
+  <details class="deep">
+    <summary>Vì sao cần <code>γ</code> và <code>β</code>?</summary>
+    <div class="body">
+      <p>Chuẩn hoá cứng về trung bình 0 phương sai 1 có thể làm mất khả năng biểu diễn — ví dụ với sigmoid thì vùng quanh 0 gần như tuyến tính. Hai tham số này cho mạng <em>tự học lại</em> thang đo và độ dịch phù hợp, kể cả học ra phép biến đổi ngược nếu chuẩn hoá là có hại.</p>
+    </div>
+  </details>
   <h3>Hai chế độ — nguồn của nhiều bug</h3>
   <table>
     <tr><th></th><th>Lúc huấn luyện</th><th>Lúc suy luận</th></tr>
@@ -90,6 +167,44 @@
 
 <section id="norm-s3">
   <div class="sh"><b>03</b><h2>Phụ thuộc batch size — hệ quả thực tế</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — PHỤ THUỘC BATCH SIZE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Batch 2–4 thì μ, σ nhiễu nặng</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">ước lượng từ vài mẫu không đáng tin</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Detection, segmentation hay dính</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">ảnh to nên batch buộc phải nhỏ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Nhiều GPU thì mỗi máy một thống kê</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">phải SyncBN mới khớp</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">Đường thoát: GroupNorm hoặc LayerNorm</text>
+</svg>
+  <figcaption>Bốn hệ quả thực tế của việc thống kê phụ thuộc batch.</figcaption>
+  </figure>
+
 <div class="axis">
     <div class="stop"><b>batch = 256</b><span>thống kê ổn định, chính xác</span></div>
     <div class="stop on"><b>batch = 8</b><span>thống kê nhiễu, chất lượng tụt rõ</span></div>
@@ -110,6 +225,42 @@
 
 <section id="norm-s4">
   <div class="sh"><b>04</b><h2>LayerNorm và các biến thể</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LAYERNORM VÀ HỌ HÀNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">LayerNorm: theo chiều đặc trưng</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">từng mẫu riêng, không đụng batch</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">GroupNorm: chia kênh thành nhóm</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">giữa Batch và Instance</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">RMSNorm: bỏ luôn phần trừ trung bình</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">rẻ hơn, mốc của LLM hiện nay</text>
+</svg>
+  <figcaption>Ba cách chọn chiều khác, đều thoát khỏi sự lệ thuộc batch.</figcaption>
+  </figure>
+
 <p class="key">Bốn loại norm khác nhau đúng một chuyện: <em>gộp thống kê theo chiều nào</em>.</p>
   <figure>
     <svg viewBox="0 0 900 240" role="img" aria-label="BatchNorm gộp theo chiều mẫu, LayerNorm gộp theo chiều đặc trưng, GroupNorm gộp theo nhóm kênh của từng mẫu">
@@ -155,13 +306,52 @@ RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ t
 
 <section id="norm-s5">
   <div class="sh"><b>05</b><h2>BatchNorm thật sự làm gì</h2></div>
-  <p>Bài báo gốc giải thích bằng khái niệm <em>internal covariate shift</em>: phân phối đầu vào của mỗi lớp thay đổi khi các lớp trước cập nhật, và BatchNorm giữ nó ổn định. Cách giải thích này được nhắc lại khắp nơi — nhưng nghiên cứu sau đó cho thấy nó <strong>có lẽ không phải nguyên nhân chính</strong>.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — NÓ THẬT SỰ LÀM GÌ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Không phải vì internal covariate shift</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">giải thích gốc đã bị phản bác</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Làm mặt loss trơn hơn</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">learning rate lớn hơn vẫn không nổ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Thêm nhiễu từ thống kê batch</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">có tác dụng chính quy hoá nhẹ</text>
+</svg>
+  <figcaption>Lý do thật, khác với lý do trong bài báo gốc.</figcaption>
+  </figure>
+
+  <p>Bài báo gốc giải thích bằng khái niệm <em>internal covariate shift</em>: phân phối đầu vào của mỗi lớp thay đổi khi các lớp trước cập nhật, và BatchNorm giữ nó ổn định.</p>
+  <p>Cách giải thích này được nhắc lại khắp nơi — nhưng nghiên cứu sau đó cho thấy nó <strong>có lẽ không phải nguyên nhân chính</strong>.</p>
 <div class="stack">
     <div class="s"><b>Giả thuyết gốc</b><span>BatchNorm giúp vì nó giữ phân phối đầu vào mỗi lớp ổn định (internal covariate shift)</span></div>
     <div class="s warn"><b>Thí nghiệm phản chứng · Santurkar 2018</b><span>cố ý tiêm nhiễu ngay sau lớp BatchNorm để phá vỡ sự ổn định đó</span></div>
     <div class="s ok"><b>Kết quả</b><span>mạng vẫn huấn luyện nhanh và tốt như thường → nếu ổn định phân phối là cơ chế chính thì phá nó phải làm mất lợi ích; nó không mất</span></div>
   </div>
-  <p>Giải thích được cho là đúng hơn: BatchNorm <strong>làm mặt mất mát trơn hơn</strong>. Nó giới hạn độ lớn của gradient và của độ cong, nên bước cập nhật trở nên dự đoán được — cho phép dùng learning rate lớn hơn mà không phân kỳ.</p>
+  <p>Giải thích được cho là đúng hơn: BatchNorm <strong>làm mặt mất mát trơn hơn</strong>.</p>
+  <p>Nó giới hạn độ lớn của gradient và của độ cong, nên bước cập nhật trở nên dự đoán được —</p>
+  <p>Cho phép dùng learning rate lớn hơn mà không phân kỳ.</p>
   <div class="note">
     <h4>Vì sao đáng biết chi tiết này</h4>
     Không phải để bác bỏ ai. Mà vì nếu bạn nói "BatchNorm giảm internal covariate shift" một cách chắc nịch trước một interviewer đã đọc bài báo phản chứng, bạn mất điểm. Cách nói an toàn và chính xác: <em>"Bài báo gốc giải thích bằng internal covariate shift, nhưng công trình sau cho thấy cơ chế chính có lẽ là làm mượt mặt mất mát, cho phép learning rate lớn hơn."</em> Câu này cho thấy bạn đọc cả hai.
@@ -170,6 +360,41 @@ RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ t
 
 <section id="norm-s6">
   <div class="sh"><b>06</b><h2>Đặt norm ở đâu</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — ĐẶT Ở ĐÂU</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Post-LN: x + f(x) rồi mới norm</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">bản gốc — cần warmup, dễ phân kỳ</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Pre-LN: norm trước rồi mới f</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">mốc hiện nay, đường residual sạch</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Sâu hơn thì Pre-LN gần như bắt buộc</text>
+</svg>
+  <figcaption>Hai chỗ đặt, và vì sao cả kho model lớn chuyển sang Pre-LN.</figcaption>
+  </figure>
+
   <h3>Trước hay sau activation</h3>
 <div class="stack">
     <div class="s ok"><b>conv → BN → ReLU</b><span>bài báo gốc · vẫn là mặc định phổ biến nhất</span></div>
@@ -188,7 +413,8 @@ RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ t
     <tr><td>Mạng rất sâu</td><td>Khó huấn luyện</td><td>Huấn luyện được hàng trăm lớp</td></tr>
     <tr><td>Dùng ở</td><td>Transformer gốc, BERT</td><td><strong>GPT, LLaMA, gần như mọi model mới</strong></td></tr>
   </table>
-  <p><strong>Lý do sâu xa:</strong> với Pre-LN, gradient có một đường đi từ loss function về tới lớp đầu mà không đi qua bất kỳ phép chuẩn hoá nào — giống hệt lập luận về residual connection ở bài backprop. Post-LN thì mỗi khối đều có một LayerNorm chắn trên đường đó.</p>
+  <p><strong>Lý do sâu xa:</strong> với Pre-LN, gradient có một đường đi từ loss function về tới lớp đầu mà không đi qua bất kỳ phép chuẩn hoá nào —</p>
+  <p>Giống hệt lập luận về residual connection ở bài backprop. Post-LN thì mỗi khối đều có một LayerNorm chắn trên đường đó.</p>
   <div class="note warn">
     <h4>Chi tiết cài đặt: bỏ bias khi có norm ngay sau</h4>
     <code>conv → BN</code> thì bias của conv là <strong>dư thừa</strong>: BatchNorm trừ trung bình đi nên mọi hằng số cộng vào đều bị triệt tiêu, và <code>β</code> của BN đã đóng vai trò bias. Đặt <code>bias=False</code> để tiết kiệm tham số và một phép cộng. Cùng lý do áp dụng cho <code>Linear → LayerNorm</code>.
@@ -197,6 +423,42 @@ RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ t
 
 <section id="norm-s7">
   <div class="sh"><b>07</b><h2>Weight decay và norm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — WEIGHT DECAY VÀ γ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Norm làm scale của W thành vô nghĩa</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nhân W lên gấp đôi, đầu ra không đổi</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Nên weight decay đổi vai</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không còn ghì biên độ mà đổi tốc độ học hiệu dụng</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Đừng decay γ, β và bias</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">mốc chung của mọi recipe</text>
+</svg>
+  <figcaption>Vì sao có norm thì weight decay phải hiểu lại.</figcaption>
+  </figure>
+
 <p class="key">Weight decay = L2 regularization: phạt tổng bình phương trọng số — nhưng <em>không</em> áp cho mọi tham số.</p>
   <div class="strip">
     <div class="c t"><i>áp weight decay</i><b>ma trận trọng số</b><u>conv, linear · tensor nhiều chiều</u></div>
@@ -204,7 +466,12 @@ RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← bỏ hẳn phần trừ t
     <div class="c f"><i>không áp</i><b>bias</b><u>chỉ dịch chuyển giá trị</u></div>
     <div class="c dim"><i>tuỳ trường hợp</i><b>embedding</b><u>thường không</u></div>
   </div>
-  <p><strong>Vì sao không phạt <code>γ</code>:</strong> nó là tham số thang đo, không phải tham số biểu diễn. Đẩy <code>γ</code> về 0 nghĩa là <em>tắt</em> tín hiệu đi qua lớp đó — không phải làm model đơn giản hơn mà là làm nó mất khả năng. Tương tự, <code>β</code> và bias chỉ dịch chuyển giá trị, không liên quan tới độ phức tạp của hàm mà model biểu diễn.</p>
+  <details class="deep">
+    <summary>Vì sao weight decay không phạt <code>γ</code>?</summary>
+    <div class="body">
+      <p>Nó là tham số thang đo, không phải tham số biểu diễn. Đẩy <code>γ</code> về 0 nghĩa là <em>tắt</em> tín hiệu đi qua lớp đó — không phải làm model đơn giản hơn mà là làm nó mất khả năng. Tương tự, <code>β</code> và bias chỉ dịch chuyển giá trị, không liên quan tới độ phức tạp của hàm mà model biểu diễn.</p>
+    </div>
+  </details>
 <pre><code><span class="cm"># cách làm đúng trong PyTorch — tách tham số thành hai nhóm</span>
 decay, no_decay = [], []
 <span class="kw">for</span> name, p <span class="kw">in</span> model.named_parameters():
@@ -225,6 +492,42 @@ optimizer = torch.optim.AdamW([
 
 <section id="norm-s8">
   <div class="sh"><b>08</b><h2>Chẩn đoán bằng thống kê</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CHẨN ĐOÁN</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Đo μ, σ của activation từng tầng</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">σ tụt dần theo độ sâu thì gradient sắp teo</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--tomb)">γ về gần 0 ở nhiều kênh</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">tầng đó gần như bị tắt</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--probe)">Train tốt eval tệ: nghi running stats</text>
+</svg>
+  <figcaption>Bốn dấu hiệu đọc thẳng từ thống kê, không phải đoán.</figcaption>
+  </figure>
+
   <p>Khi mạng không học, hai đại lượng đáng in ra trước mọi thứ khác:</p>
 <pre><code><span class="cm"># 1. độ lệch chuẩn của activation theo từng lớp</span>
 <span class="kw">for</span> name, m <span class="kw">in</span> model.named_modules():
@@ -252,6 +555,42 @@ optimizer = torch.optim.AdamW([
 
 <section id="norm-s9">
   <div class="sh"><b>09</b><h2>Bảng chọn norm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của normalization: activation trôi khỏi vùng có đạo hàm tốt khi mạng sâu, phép chuẩn hoá kéo về trung bình 0 phương sai 1 và chỉ khác nhau ở chiều lấy thống kê, hai tham số học được trả lại quyền co giãn, chỗ đặt trong block quyết định độ ổn định, và cái giá là sự lệ thuộc vào batch cùng khác biệt giữa lúc huấn luyện và lúc suy luận">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activation trôi khỏi vùng tốt</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">càng sâu càng lệch, gradient teo</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chuẩn hoá về trung bình 0, phương sai 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">câu hỏi duy nhất: lấy thống kê theo chiều nào</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">γ và β trả lại quyền co giãn</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">model tự chọn lại thang, không bị ép</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Đặt ở đâu trong block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN hay post-LN, trước hay sau residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cái giá: lệ thuộc batch, lệch train và eval</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm hỏng khi batch nhỏ</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CHỌN NORM NÀO</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">CNN, batch lớn</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">BatchNorm</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">CNN, batch nhỏ</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">GroupNorm</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Transformer, chuỗi</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">LayerNorm hoặc RMSNorm</text>
+</svg>
+  <figcaption>Bảng tra, quay lại khi bắt đầu một model mới.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Tình huống</th><th>Chọn</th></tr>
     <tr><td>CNN phân loại ảnh, batch từ 32 trở lên</td><td><strong>BatchNorm</strong></td></tr>

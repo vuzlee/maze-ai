@@ -299,7 +299,7 @@ window.CATALOG = [
       "title": "Python overview",
       "tag": "Overview",
       "blurb": "Python được thiết kế quanh vài quy tắc nhất quán — nắm chúng thì phần còn lại tự suy ra được.",
-      "n": 6,
+      "n": 5,
       "path": "content/02-python/01-overview/python-overview/index.html",
       "skeleton": false,
       "lc": 0
@@ -421,7 +421,7 @@ window.CATALOG = [
       "title": "Python dict & hash table",
       "tag": "Python internals",
       "blurb": "Hash function, hashable, collision, probe sequence, tombstone, load factor, resize, insertion order — đủ để trả lời mọi câu dict trong phỏng vấn.",
-      "n": 12,
+      "n": 11,
       "path": "content/02-python/03-builtin-structures/dict-hash-table/index.html",
       "skeleton": false,
       "lc": 0
@@ -466,7 +466,7 @@ window.CATALOG = [
       "title": "LeetCode toolkit",
       "tag": "Toolkit",
       "blurb": "bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.",
-      "n": 7,
+      "n": 8,
       "path": "content/02-python/05-toolkit/leetcode-toolkit/index.html",
       "skeleton": false,
       "lc": 0
@@ -558,7 +558,7 @@ window.CATALOG = [
       "title": "Operating system overview",
       "tag": "CS",
       "blurb": "Hệ điều hành chia một máy cho nhiều việc thế nào: tiến trình, bộ nhớ, và đồng bộ.",
-      "n": 2,
+      "n": 3,
       "path": "content/03-cs-fundamentals/02-os/os-overview/index.html",
       "skeleton": false,
       "lc": 0
@@ -630,7 +630,7 @@ window.CATALOG = [
       "title": "TCP & HTTP",
       "tag": "Networking",
       "blurb": "Đếm vòng khứ hồi, TCP bắt tay, HTTP/1.1 tới HTTP/3, idempotency, backoff có jitter, timeout và circuit breaker.",
-      "n": 12,
+      "n": 11,
       "path": "content/03-cs-fundamentals/03-networking/tcp-http/index.html",
       "skeleton": false,
       "lc": 0
@@ -882,7 +882,7 @@ window.CATALOG = [
       "title": "SQL — window functions",
       "tag": "PostgreSQL",
       "blurb": "Khác GROUP BY ở đâu, vì sao WHERE không lọc được, ba hàm xếp hạng, top-N mỗi nhóm, và bẫy frame mặc định.",
-      "n": 15,
+      "n": 11,
       "path": "content/04-database/04-sql-advanced/sql-window-functions/index.html",
       "skeleton": false,
       "lc": 0
@@ -893,7 +893,7 @@ window.CATALOG = [
       "title": "SQL — index & query plan",
       "tag": "PostgreSQL",
       "blurb": "Đọc EXPLAIN, vì sao planner bỏ qua index, leftmost prefix, ba thuật toán join, và bài toán N+1.",
-      "n": 14,
+      "n": 11,
       "path": "content/04-database/04-sql-advanced/sql-index-query-plan/index.html",
       "skeleton": false,
       "lc": 0
@@ -904,7 +904,7 @@ window.CATALOG = [
       "title": "Transaction & isolation level",
       "tag": "PostgreSQL",
       "blurb": "Bốn hiện tượng dị thường, mức nào chặn gì, MVCC, ba cách chữa lost update, deadlock và retry.",
-      "n": 16,
+      "n": 11,
       "path": "content/04-database/04-sql-advanced/transaction-isolation/index.html",
       "skeleton": false,
       "lc": 0
@@ -1004,7 +1004,7 @@ window.CATALOG = [
       "title": "Data quality",
       "tag": "Data systems",
       "blurb": "Pipeline chạy không lỗi không có nghĩa dữ liệu đúng — các chiều đo chất lượng và chỗ hay vỡ âm thầm nhất.",
-      "n": 7,
+      "n": 6,
       "path": "content/04-database/06-data-systems/data-quality/index.html",
       "skeleton": false,
       "lc": 0

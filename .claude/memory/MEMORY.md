@@ -23,7 +23,7 @@ Hai thư mục, phân theo tuổi thọ:
 
 ## nhat-ky/ — tiến độ
 
-- [Bản đồ ver bài toàn kho](nhat-ky/ban-do-ver-bai-toan-kho.md) — **mốc số liệu duy nhất, đọc mục ⚠ TIẾN ĐỘ THẬT ở đầu file trước**; 200 bài xếp A/B/B2/C/D/E1/E2/F theo luật 1, cộng trục hai là chín luật tối-thiểu-để-hiểu. **Hai trục độc lập — mọi báo cáo phải ghi rõ sửa theo trục nào.** Sáu việc đang mở (10 bài hình vỡ · công thức `<pre>` thay `.eq` · 51 bài ver cũ · thuật ngữ thao tác chưa tiếng Anh · tên bài ghép · nợ cũ), cập nhật 2026-09-07
+- [Bản đồ ver bài toàn kho](nhat-ky/ban-do-ver-bai-toan-kho.md) — **mốc số liệu duy nhất, đọc mục ⚠ TIẾN ĐỘ THẬT ở đầu file trước**; 200 bài xếp A/B/B2/C/D/E1/E2/F theo luật 1, cộng trục hai là chín luật tối-thiểu-để-hiểu. **Hai trục độc lập — mọi báo cáo phải ghi rõ sửa theo trục nào.** **Đóng hết 07/09 cho CẢ KHO**: 200/200 bài đã viết sạch năm trục (`soat.py` 0/8 · `svgkit/check.py` 0 · bbox thật 0 · 490px 0 · đoạn >33 từ 0). Nợ luật 1 ở kệ 06–10 đã dựng nốt 10 bản đồ. Việc còn lại chỉ là 72 khung bài chưa viết, cập nhật 2026-09-07
 - [Tiến độ nội dung](nhat-ky/tien-do-noi-dung.md) — bài đã viết / khung còn lại theo từng kệ
 - [Đợt sửa theo chuẩn bài mẫu](nhat-ky/dot-sua-theo-chuan-bai-mau.md) — kệ 01→05: bullet và đoạn văn quá 33 từ đã về 0; **83 bài còn nợ luật 1**, riêng 01→05 là **71** — **số đã cũ**, mốc hiện tại ở [[ban-do-ver-bai-toan-kho]]
 - [Soát kệ 02-python](nhat-ky/soat-ke-02-python.md) — 2026-09-02: tách bài memory, gộp mục trùng, thêm 2 bài

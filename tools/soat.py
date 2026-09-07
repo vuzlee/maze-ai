@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Soát các lỗi build.py không bắt được. Chạy từ gốc kho: python3 tools/soat.py"""
-import os,re,json,sys
+import os,re,json,sys,html as _html
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))
 cat=open('assets/catalog.js',encoding='utf-8').read()
 data=json.loads(re.search(r'=\s*(\[.*\])\s*;?\s*$',cat,re.S).group(1))
@@ -52,7 +52,7 @@ for cd,b in W:
     p=b['path']; h=open(p,encoding='utf-8').read()
     for blk in re.findall(r'<pre[^>]*>(.*?)</pre>',h,re.S):
         for line in re.sub('<[^>]+>','',blk).split('\n'):
-            L=len(line.replace('&lt;','<').replace('&gt;','>').replace('&amp;','&').rstrip())
+            L=len(_html.unescape(line).rstrip())
             if L>92: print(f"   {L} {p.replace('content/','')}"); n+=1; break
         else: continue
         break
@@ -109,19 +109,32 @@ for cd,b in B:
 print("   tổng:",n); issues+=n
 
 # ── 8. Nợ luật 1: bài dài mà chưa có bản đồ ──────────────────────────────────
-# Ngưỡng: >2500 từ HOẶC >10 mục. Đủ hình = nsvg >= nsec-2.
+# Ngưỡng: >2500 từ HOẶC >10 mục. "Đủ hình" đo theo MỤC, không theo tổng <svg>:
+# mọi mục nội dung phải có ít nhất một khối trực quan — và khối trực quan gồm
+# cả các khuôn HTML của kit.html, không riêng <svg> (bẫy đã dính 07/09).
+VIS=('class="strip','class="flow','class="cmp','class="stack','class="mtx',
+     'class="axis','class="seq','class="bars','class="eq','<table','class="probs')
+NOFIG=('lỗi hay gặp','hỏi đáp','mẫu code','lab','từ điển bỏ túi','bài leetcode',
+       'học theo thứ tự nào','đọc tiếp')
 print("\n== 8. Nợ luật 1 — bài dài chưa có figure.gist (dài trước) ==")
 no=[]
 for cd,b in W:
     p=b['path']; h=open(p,encoding='utf-8').read()
-    nsec=len(re.findall(r'<section id="',h)); nsvg=len(re.findall(r'<svg',h))
-    words=len(re.sub(r'<[^>]+>',' ',h).split())
+    secs=re.split(r'(?=<section id=)',h)[1:]
+    nsec=len(secs); words=len(re.sub(r'<[^>]+>',' ',h).split())
     gist='class="gist"' in h
-    if gist and nsvg>=nsec-2: continue
+    miss=0
+    for x in secs:
+        m=re.search(r'<h2>(.*?)</h2>',x,re.S)
+        if not m: continue
+        t=_html.unescape(re.sub('<[^>]+>','',m.group(1))).lower()
+        if any(k in t for k in NOFIG): continue
+        if '<svg' not in x and not any(v in x for v in VIS): miss+=1
+    if gist and not miss: continue
     if words>2500 or nsec>10:
-        no.append((words,nsec,nsvg,gist,p))
-for w,ns,nv,g,p in sorted(no,reverse=True):
-    print(f"   {w:5} từ · {ns:2} mục · {nv:2} hình · {'thiếu hình bóc ô' if g else 'chưa có bản đồ '} · {p.replace('content/','')}")
+        no.append((words,nsec,miss,gist,p))
+for w,ns,mi,g,p in sorted(no,reverse=True):
+    print(f"   {w:5} từ · {ns:2} mục · {mi:2} mục thiếu hình · {'thiếu hình bóc ô' if g else 'chưa có bản đồ '} · {p.replace('content/','')}")
 print("   tổng:",len(no)); issues+=len(no)
 
 print("\n=> tổng số chỗ cần sửa:",issues)

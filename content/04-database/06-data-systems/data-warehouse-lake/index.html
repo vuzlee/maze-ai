@@ -47,85 +47,12 @@
 </header>
 
 <section id="data-warehouse-lake-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Vấn đề</h2></div>
-  <p><a href="../oltp-vs-olap/index.html">Bài trước</a> kết luận: đừng chạy báo cáo trên database giao dịch, chép sang một hệ riêng. Nhưng dữ liệu công ty không chỉ đến từ một chỗ:</p>
-  <div class="stack">
-    <div class="s"><b>Database OLTP</b><span>có schema sẵn, sạch, dễ nạp</span></div>
-    <div class="s"><b>Log sự kiện · file CSV đối tác</b><span>bán cấu trúc, định dạng đổi theo nguồn</span></div>
-    <div class="s warn"><b>Ảnh · văn bản · API bên thứ ba</b><span>không có schema nào để ép vào</span></div>
-  </div>
-  <p class="key">Lưu tất cả những thứ đó ở đâu, dưới hình dạng nào? Hai câu trả lời khác nhau về triết lý: ép cấu trúc <em>trước</em> khi lưu, hay lưu nguyên trạng rồi tính cấu trúc <em>lúc</em> đọc.</p>
-</section>
-
-<section id="data-warehouse-lake-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Data warehouse — schema-on-write</h2></div>
-  <p class="key">Chỉ nhận dữ liệu đã được làm sạch và ép vào một schema định sẵn <em>trước khi</em> ghi vào.</p>
-
-  <div class="flow">
-    <div class="n"><h5>Nguồn</h5><p>database, log, CSV</p></div>
-    <div class="a act"><i>làm sạch, ép schema</i>&#8594;</div>
-    <div class="n"><h5>Dữ liệu đã chuẩn</h5><p>công đoạn tốn nhất, làm <b>trước</b> khi ghi</p></div>
-    <div class="a act"><i>ghi vào kho</i>&#8594;</div>
-    <div class="n ok"><h5>Warehouse</h5><p>đọc là chạy SQL được ngay</p></div>
-  </div>
-  <ul class="why">
-    <li>Dữ liệu có cấu trúc, thường theo <b>star schema</b>: bảng <em>fact</em> ở giữa, mỗi dòng một sự kiện, nối ra các bảng <em>dimension</em>.</li>
-    <li>Vì đã ép schema và làm sạch từ trước, truy vấn SQL trên warehouse nhanh và đáng tin cậy cho BI/dashboard/báo cáo định kỳ.</li>
-    <li>Cái giá: phải biết trước sẽ hỏi gì mới thiết kế được schema, và pipeline nạp tốn công hơn.</li>
-    <li>Ví dụ: Snowflake, BigQuery, Redshift — engine column-oriented, đúng như OLAP đã học ở bài trước.</li>
-  </ul>
-  <div class="stack">
-    <div class="s"><b>Fact table</b><span>orders: order_id, customer_id, product_id, date_id, revenue</span></div>
-    <div class="s ok"><b>Dimension tables</b><span>customers, products, dates — mỗi bảng mô tả một "trục" để cắt lát fact table</span></div>
-  </div>
-</section>
-
-<section id="data-warehouse-lake-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Data lake — schema-on-read</h2></div>
-  <p class="key">Cứ đổ nguyên trạng mọi loại dữ liệu vào một kho lưu trữ rẻ — chưa cần biết cấu trúc lúc lưu, chỉ tính khi có ai đọc.</p>
-
-  <div class="flow">
-    <div class="n"><h5>Nguồn</h5><p>thêm cả ảnh, JSON, file lạ</p></div>
-    <div class="a act"><i>đổ nguyên trạng</i>&#8594;</div>
-    <div class="n ok"><h5>Lake</h5><p>rẻ, không hỏi schema câu nào</p></div>
-    <div class="a act"><i>ép schema lúc đọc</i>&#8594;</div>
-    <div class="n"><h5>Bảng để truy vấn</h5><p>công đoạn tốn nhất, dời về <b>sau</b></p></div>
-  </div>
-  <ul class="why">
-    <li>Lưu dữ liệu thô (raw), mọi định dạng: log JSON, CSV, ảnh, Parquet — không cần làm sạch hay ép schema trước.</li>
-    <li>Điển hình: object storage rẻ (S3, GCS) chứa file Parquet, đọc bằng engine riêng (Spark, Athena, DuckDB).</li>
-    <li>Linh hoạt, rẻ, hợp khi chưa biết sẽ hỏi gì — điển hình là ML: cần dữ liệu thô để trích feature theo nhiều cách.</li>
-    <li>Cái giá: không gì đảm bảo dữ liệu sạch, thiếu kỷ luật đặt tên là thành "data swamp" — xem <a href="../data-quality/index.html">data quality</a>.</li>
-  </ul>
-</section>
-
-<section id="data-warehouse-lake-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Đối chiếu và lakehouse</h2></div>
-  <div class="cmp two">
-    <div><h5>Data warehouse</h5>
-      <p><b>Schema</b> on-write, ép trước khi lưu</p>
-      <p><b>Dữ liệu</b> có cấu trúc, đã sạch</p>
-      <p><b>Dùng cho</b> BI, báo cáo, dashboard</p>
-      <p><b>Chi phí</b> lưu trữ đắt hơn, tính toán trước tốn công</p></div>
-    <div><h5>Data lake</h5>
-      <p><b>Schema</b> on-read, tính lúc đọc</p>
-      <p><b>Dữ liệu</b> thô, mọi định dạng</p>
-      <p><b>Dùng cho</b> ML, khai phá dữ liệu, lưu trữ dài hạn</p>
-      <p><b>Chi phí</b> lưu trữ rẻ, nhưng dễ lộn xộn</p></div>
-  </div>
-  <div class="stack">
-    <div class="s ok"><b>Data lakehouse</b><span>lưu rẻ như lake + thêm lớp transaction và schema (Delta Lake, Iceberg) để tin cậy gần bằng warehouse — khỏi chép dữ liệu ra hai nơi</span></div>
-  </div>
-  <p>Ranh giới warehouse/lake đang mờ dần, nhưng hai <em>triết lý</em> schema-on-write vs schema-on-read vẫn là khung để hiểu vì sao một hệ được thiết kế như vậy.</p>
-</section>
-
-<section id="data-warehouse-lake-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Tổng kết một hình</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
   <p class="key">Cả hai đều phải làm sạch và ép schema — khác nhau ở chỗ trả công đó trước khi lưu hay sau, lúc có người đọc.</p>
 
-  <figure class="scrollx">
-  <svg viewBox="0 0 860 498" role="img" aria-label="Tổng kết data warehouse và data lake: nguồn dữ liệu nhiều dạng, hai đường schema-on-write và schema-on-read, đối chiếu bốn trục, và lakehouse">
+  <figure class="gist">
+  <svg viewBox="0 0 860 520" role="img" aria-label="Tổng kết data warehouse và data lake: nguồn dữ liệu nhiều dạng, hai đường schema-on-write và schema-on-read, đối chiếu bốn trục, và lakehouse">
     <text class="sv-h" x="0" y="12">&#9312; CÙNG MỘT ĐỐNG NGUỒN, BA MỨC CẤU TRÚC</text>
     <rect x="8" y="24" width="272" height="26" rx="4" fill="#5BCFA0" fill-opacity="0.12" stroke="#5BCFA0"/>
     <text class="sv-l" x="20" y="42" fill="#8EE0BE">database OLTP — có schema sẵn, sạch</text>
@@ -177,8 +104,9 @@
     <text class="sv-d" x="454" y="420">thiếu kỷ luật đặt tên &#8594; &quot;data swamp&quot;</text>
 
     <line x1="0" y1="456" x2="860" y2="456" stroke="#2E2822"/>
-    <text class="sv-l" x="0" y="476">&#9315; LAKEHOUSE — Delta Lake, Iceberg: thêm lớp metadata giao dịch lên chính các file Parquet, để có ACID, schema evolution và time travel</text>
-    <text class="sv-d" x="0" y="490">mà vẫn giữ chi phí lưu trữ rẻ — sinh ra để khỏi phải chép cùng một dữ liệu vào hai nơi với hai định nghĩa &quot;doanh thu&quot;</text>
+    <text class="sv-l" x="0" y="476">&#9315; LAKEHOUSE — Delta Lake, Iceberg: thêm lớp metadata giao dịch lên chính các file Parquet,</text>
+    <text class="sv-d" x="0" y="492">để có ACID, schema evolution và time travel mà vẫn giữ chi phí lưu trữ rẻ — sinh ra để khỏi phải chép</text>
+    <text class="sv-d" x="0" y="508">cùng một dữ liệu vào hai nơi với hai định nghĩa &quot;doanh thu&quot;</text>
   </svg>
   <figcaption>&#9312; nguồn xếp theo mức cấu trúc, &#9313; hai đường chỉ khác nhau ở chỗ đặt khối vàng, &#9314; hệ quả của lựa chọn đó, &#9315; và lối ghép lại.</figcaption>
   </figure>
@@ -191,13 +119,89 @@
   </ul>
 </section>
 
+<section id="data-warehouse-lake-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Vấn đề</h2></div>
+  <p><a href="../oltp-vs-olap/index.html">Bài trước</a> kết luận: đừng chạy báo cáo trên database giao dịch, chép sang một hệ riêng. Nhưng dữ liệu công ty không chỉ đến từ một chỗ:</p>
+  <div class="stack">
+    <div class="s"><b>Database OLTP</b><span>có schema sẵn, sạch, dễ nạp</span></div>
+    <div class="s"><b>Log sự kiện · file CSV đối tác</b><span>bán cấu trúc, định dạng đổi theo nguồn</span></div>
+    <div class="s warn"><b>Ảnh · văn bản · API bên thứ ba</b><span>không có schema nào để ép vào</span></div>
+  </div>
+  <p class="key">Lưu tất cả những thứ đó ở đâu, dưới hình dạng nào? Hai câu trả lời khác nhau về triết lý: ép cấu trúc <em>trước</em> khi lưu, hay lưu nguyên trạng rồi tính cấu trúc <em>lúc</em> đọc.</p>
+</section>
+
+<section id="data-warehouse-lake-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Data warehouse — schema-on-write</h2></div>
+  <p class="key">Chỉ nhận dữ liệu đã được làm sạch và ép vào một schema định sẵn <em>trước khi</em> ghi vào.</p>
+
+  <div class="flow">
+    <div class="n"><h5>Nguồn</h5><p>database, log, CSV</p></div>
+    <div class="a act"><i>làm sạch, ép schema</i>&#8594;</div>
+    <div class="n"><h5>Dữ liệu đã chuẩn</h5><p>công đoạn tốn nhất, làm <b>trước</b> khi ghi</p></div>
+    <div class="a act"><i>ghi vào kho</i>&#8594;</div>
+    <div class="n ok"><h5>Warehouse</h5><p>đọc là chạy SQL được ngay</p></div>
+  </div>
+  <ul class="why">
+    <li>Dữ liệu có cấu trúc, thường theo <b>star schema</b>: bảng <em>fact</em> ở giữa, mỗi dòng một sự kiện, nối ra các bảng <em>dimension</em>.</li>
+    <li>Vì đã ép schema và làm sạch từ trước, truy vấn SQL trên warehouse nhanh và đáng tin cậy cho BI/dashboard/báo cáo định kỳ.</li>
+    <li>Cái giá: phải biết trước sẽ hỏi gì mới thiết kế được schema, và pipeline nạp tốn công hơn.</li>
+    <li>Ví dụ: Snowflake, BigQuery, Redshift — engine column-oriented, đúng như OLAP đã học ở bài trước.</li>
+  </ul>
+  <div class="stack">
+    <div class="s"><b>Fact table</b><span>orders: order_id, customer_id, product_id, date_id, revenue</span></div>
+    <div class="s ok"><b>Dimension tables</b><span>customers, products, dates — mỗi bảng mô tả một "trục" để cắt lát fact table</span></div>
+  </div>
+</section>
+
+<section id="data-warehouse-lake-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Data lake — schema-on-read</h2></div>
+  <p class="key">Cứ đổ nguyên trạng mọi loại dữ liệu vào một kho lưu trữ rẻ — chưa cần biết cấu trúc lúc lưu, chỉ tính khi có ai đọc.</p>
+
+  <div class="flow">
+    <div class="n"><h5>Nguồn</h5><p>thêm cả ảnh, JSON, file lạ</p></div>
+    <div class="a act"><i>đổ nguyên trạng</i>&#8594;</div>
+    <div class="n ok"><h5>Lake</h5><p>rẻ, không hỏi schema câu nào</p></div>
+    <div class="a act"><i>ép schema lúc đọc</i>&#8594;</div>
+    <div class="n"><h5>Bảng để truy vấn</h5><p>công đoạn tốn nhất, dời về <b>sau</b></p></div>
+  </div>
+  <ul class="why">
+    <li>Lưu dữ liệu thô (raw), mọi định dạng: log JSON, CSV, ảnh, Parquet — không cần làm sạch hay ép schema trước.</li>
+    <li>Điển hình: object storage rẻ (S3, GCS) chứa file Parquet, đọc bằng engine riêng (Spark, Athena, DuckDB).</li>
+    <li>Linh hoạt, rẻ, hợp khi chưa biết sẽ hỏi gì — điển hình là ML: cần dữ liệu thô để trích feature theo nhiều cách.</li>
+    <li>Cái giá: không gì đảm bảo dữ liệu sạch, thiếu kỷ luật đặt tên là thành "data swamp" — xem <a href="../data-quality/index.html">data quality</a>.</li>
+  </ul>
+</section>
+
+<section id="data-warehouse-lake-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Đối chiếu và lakehouse</h2></div>
+  <div class="cmp two">
+    <div><h5>Data warehouse</h5>
+      <p><b>Schema</b> on-write, ép trước khi lưu</p>
+      <p><b>Dữ liệu</b> có cấu trúc, đã sạch</p>
+      <p><b>Dùng cho</b> BI, báo cáo, dashboard</p>
+      <p><b>Chi phí</b> lưu trữ đắt hơn, tính toán trước tốn công</p></div>
+    <div><h5>Data lake</h5>
+      <p><b>Schema</b> on-read, tính lúc đọc</p>
+      <p><b>Dữ liệu</b> thô, mọi định dạng</p>
+      <p><b>Dùng cho</b> ML, khai phá dữ liệu, lưu trữ dài hạn</p>
+      <p><b>Chi phí</b> lưu trữ rẻ, nhưng dễ lộn xộn</p></div>
+  </div>
+  <div class="stack">
+    <div class="s ok"><b>Data lakehouse</b><span>lưu rẻ như lake + thêm lớp transaction và schema (Delta Lake, Iceberg) để tin cậy gần bằng warehouse — khỏi chép dữ liệu ra hai nơi</span></div>
+  </div>
+  <p>Ranh giới warehouse/lake đang mờ dần, nhưng hai <em>triết lý</em> schema-on-write vs schema-on-read vẫn là khung để hiểu vì sao một hệ được thiết kế như vậy.</p>
+</section>
+
 <section id="data-warehouse-lake-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
   <div class="grid2">
-    <div class="card bad"><h4>Đổ vào lake rồi coi như xong</h4><p>Không ai đặt tên theo quy ước, không ai ghi metadata, không ai biết file nào còn dùng. Sáu tháng sau là "data swamp": dữ liệu vẫn đó nhưng không ai dám tin dùng cái nào.</p></div>
-    <div class="card bad"><h4>Thiết kế star schema trước khi biết sẽ hỏi gì</h4><p>Warehouse bắt trả giá trước: chọn sai chiều (dimension) thì câu hỏi mới sẽ cần dựng lại pipeline. Dữ liệu chưa rõ mục đích nên nằm ở lake cho tới khi câu hỏi ổn định.</p></div>
+    <div class="card bad"><h4>Đổ vào lake rồi coi như xong</h4><p>Không ai đặt tên theo quy ước, không ai ghi metadata, không ai biết file nào còn dùng.</p>
+  <p>Sáu tháng sau là "data swamp": dữ liệu vẫn đó nhưng không ai dám tin dùng cái nào.</p></div>
+    <div class="card bad"><h4>Thiết kế star schema trước khi biết sẽ hỏi gì</h4><p>Warehouse bắt trả giá trước: chọn sai chiều (dimension) thì câu hỏi mới sẽ cần dựng lại pipeline.</p>
+  <p>Dữ liệu chưa rõ mục đích nên nằm ở lake cho tới khi câu hỏi ổn định.</p></div>
     <div class="card bad"><h4>Chép cùng một dữ liệu vào cả warehouse lẫn lake</h4><p>Hai bản, hai pipeline, hai định nghĩa "doanh thu" — rồi hai con số khác nhau trong cùng một cuộc họp. Đây chính là bài toán lakehouse sinh ra để giải.</p></div>
-    <div class="card bad"><h4>File nhỏ vụn trong lake</h4><p>Stream ghi mỗi phút một file vài KB: sau một năm là hàng trăm nghìn file, và engine tốn nhiều thời gian liệt kê file hơn là đọc dữ liệu. Cần gộp file định kỳ (compaction).</p></div>
+    <div class="card bad"><h4>File nhỏ vụn trong lake</h4><p>Stream ghi mỗi phút một file vài KB: sau một năm là hàng trăm nghìn file, và engine tốn nhiều thời gian liệt kê file hơn là đọc dữ liệu.</p>
+  <p>Cần gộp file định kỳ (compaction).</p></div>
     <div class="card bad"><h4>Coi warehouse là bản sao của database sản phẩm</h4><p>Bê nguyên schema chuẩn hoá của OLTP sang rồi thắc mắc sao báo cáo chậm. Warehouse cần mô hình riêng cho việc đọc — xem <a href="../oltp-vs-olap/index.html">OLTP vs OLAP</a>.</p></div>
     <div class="card bad"><h4>Không đặt vòng đời cho dữ liệu</h4><p>Lưu trữ "rẻ" nhân với năm năm không xoá gì vẫn thành khoản tiền lớn. Đặt quy tắc chuyển dữ liệu cũ sang tầng lưu trữ lạnh hoặc xoá hẳn ngay từ đầu.</p></div>
   </div>

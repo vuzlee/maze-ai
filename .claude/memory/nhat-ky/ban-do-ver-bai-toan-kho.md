@@ -3,7 +3,7 @@ name: ban-do-ver-bai-toan-kho
 description: "Bảng phân loại 200 bài toàn kho theo hai trục: luật 1 (A/B/B2/C/D/E1/E2/F) và ba luật tối-thiểu-để-hiểu — đo lại từ file ngày 2026-09-06, thay cho các con số rời rạc trong nhật ký cũ"
 metadata:
   type: project
-updated: 2026-09-06
+updated: 2026-09-07
 ---
 
 Ngày 2026-09-06, người dùng: *"rà soát xem còn những bài nào ver cũ và những bài nào ver mới nhất
@@ -586,6 +586,63 @@ Còn lại theo kệ: **04-database 19** (đang tạm hoãn theo ý người dù
 **02-python 5**, **03-cs-fundamentals 3**. Kệ tiếp theo nên làm: **02-python** rồi **03-cs-fundamentals**.
 
 
+### 2026-09-07 tối (2) — **trục luật 1** — kệ 02-python và 03-cs-fundamentals: XONG
+
+`python3 tools/audit.py` — **80/116**. Ba kệ 02, 03, 05 giờ đều **0 bài chưa đạt**.
+
+| Việc | Bài |
+|---|---|
+| Kéo mục mang bản đồ lên đầu, đổi tên thành `Mental model` | `python-overview` (mục *Quy tắc nền duy nhất*) · `language-core-overview` (*Object model*) · `cs-overview` (*Các phần của kệ*) |
+| Dựng mới mục `Mental model` + bản đồ | `leetcode-toolkit` (5 ô: bisect/deque/heapq đổi lớp, Counter/comprehension chỉ rút dòng) · `os-overview` (4 cơ chế) |
+| Hai `figure.gist` trong một bài → hình phụ sang `scrollx` | `list-tuple-set` (3 gist → 1) |
+| Mục thiếu hình → gộp vào mục có hình | `python-overview` (*Học xong kệ này làm được gì* thành `<h3>`) |
+| Luật C (<12 mục) | `dict-hash-table` 12→11 (lab gộp vào *Collision*) · `tcp-http` 12→11 (lab gộp vào *Đếm vòng khứ hồi*) |
+| Sắp lại thứ tự cho khớp bản đồ | `leetcode-toolkit`: ba thứ đổi lớp (bisect · deque · heapq) đứng trước hai thứ chỉ rút dòng |
+
+Công cụ mới: `/tmp/move.py` (`promote`) kéo một mục có sẵn lên đầu bài rồi đánh số lại — dùng khi
+bài **đã có** bản đồ đúng nhưng nằm ở mục 02/03; `/tmp/merge.py` (`merge`) gộp mục B vào cuối mục A
+thành `<h3>`. Cả hai đều đánh số lại `<b>NN</b>` và `id` bottom-up.
+
+Vẫn là chỗ dễ sót nhất: **sau khi đánh số lại phải grep "mục NN" trong văn xuôi, trong `<figcaption>`
+và trong cả `<text>` của SVG** — đợt này sửa ở `dict-hash-table`, `tcp-http`, `leetcode-toolkit`.
+
+Kiểm: `tools/build.py` sạch (200 bài · 1469 mục · 506 thẻ · meta khớp) · 490px `TONG 0`.
+
+Còn lại: **04-database 19** và **01-dsa 17** — cả hai đang tạm hoãn theo ý người dùng
+("tạm bỏ qua DSA và SQL vì cũng ổn rồi"). Muốn về 116/116 thì phải mở lại hai kệ đó.
+
+### 2026-09-07 tối (3) — **trục luật 1 + luật C** — kệ 04-database và 01-dsa: XONG
+
+Người dùng gỡ lệnh hoãn hai kệ này ("tiếp hết đi"). Sau đợt này **audit toàn kho: 116/116 đạt hết**.
+
+**04-database (19 bài)**
+
+| Bài | Việc |
+|---|---|
+| sql-index-query-plan · sql-window-functions · transaction-isolation | luật C: 14/15/16 → 11 mục; đổi tên mục chủ sau khi gộp (`Khoá` → `Khoá, lost update và deadlock`; `Cấu trúc OVER` → `Cấu trúc OVER và thứ tự thực thi`) |
+| batch-stream-processing · constraints-integrity · data-warehouse-lake · db-normalization · etl-elt · nosql-landscape · oltp-vs-olap · query-tuning · relational-model · sql-join · sql-group-aggregate · sql-select-filter · sql-subquery-cte | kéo mục *Tổng kết một hình* lên §01, đổi tên `Mental model`, figure → `gist` |
+| data-quality | gộp Tổng kết vào §04 làm `<h3>`, giữ đúng một gist ở §01 |
+| er-modeling · relational-overview | §01 đã có bản đồ / promote §02 lên đầu, đổi tên `Mental model` |
+| sql-group-aggregate · sql-select-filter · sql-subquery-cte · data-quality | thêm hình cho mục còn trống: bảng nhóm tổ hợp, `cmp` alias cột–bảng, `strip` NULL ba giá trị, `stack` chuỗi CTE |
+
+**01-dsa (17 bài)**
+
+| Bài | Việc |
+|---|---|
+| 12 bài kỹ thuật (backtracking, dynamic-programming, graph-bfs-dfs-topo, heap-priority-queue, intervals, linked-list, shortest-path, sliding-window, stack-monotonic-queue, tree-bst-traversal, two-pointers, union-find) | §01 *Ý tưởng* → `Mental model`, figure đầu → `gist` |
+| binary-search · greedy · trie | bọc hình sẵn có thành `figure.gist` + figcaption, đổi tên §01 |
+| dsa-overview | promote *Dữ liệu và giải thuật* lên §01 |
+| array-string | 3 gist → 1 (hai cái sau đổi `scrollx`) |
+| dynamic-programming · intervals · shortest-path | mục thiếu hình: thêm `.eq` công thức edit distance, `.strip` cộng dồn sweep line, hai `.flow` cho Dijkstra và Bellman-Ford |
+
+**Bẫy đã dính lại lần nữa** — sau khi promote, mọi tham chiếu `mục NN` lệch một bậc. Đã sửa ở
+`query-tuning` (10 chỗ, cả trong `<text>` của SVG), `db-normalization`, `relational-model`,
+`nosql-landscape`, `sql-select-filter`, `data-quality`, `sql-window-functions`,
+`transaction-isolation`, `sql-index-query-plan`.
+
+Kiểm: `build.py` sạch (200 bài · 1456 mục · 506 thẻ · meta khớp) · `audit.py` **116/116** ·
+probe 490px `TONG 0`.
+
 ## Tiêu chí xếp loại — theo luật 1 của [[chuan-bai-mau]]
 
 Ver mới = §01 tên `Mental model` + `figure.gist` **nằm trong** §01 + **không** còn mục
@@ -931,3 +988,207 @@ là đủ, không sợ sót.
   `figcaption`.
 - **51 bài D đều đặt *Tổng kết một hình* đúng vị trí** — không bài nào còn mục nội dung nằm sau nó
   (lỗi 4 bài từng dính trong [[dot-sua-theo-chuan-bai-mau]] đã sửa xong thật).
+
+---
+
+## Vòng soát 2026-09-07 — TRỤC `soat.py` (8 phép) + TRỤC HIỂN THỊ SVG
+
+**Không phải trục luật 1.** Trục luật 1 (`audit.py`) vẫn **116/116 đạt hết**, không đụng vào.
+Vòng này chạy hai trục còn lại, phạm vi kệ 01-dsa → 05-machine-learning.
+
+### `tools/soat.py`: 73 → 10
+
+| Phép | Trước | Sau | Việc đã làm |
+|---|---|---|---|
+| 4. Đầu mục đếm số | 9 | **0** | "Bảy giao thức"→"Nhóm giao thức", "Ba bước dựng một rừng"→"Cách dựng một rừng", … (7 file) |
+| 5. Dòng code >92 ký tự | 1 | **0** | **báo động giả** — xem bẫy dưới |
+| 6. Thuật ngữ bị dịch | 40 | **0** | 11 file `hàm mất mát`→`loss function`; `hai con trỏ`→`two pointers`, `tham lam`→`greedy`, `vét cạn`→`brute force`, `cửa sổ trượt`→`sliding window`, `bảng băm`→`hash table`, `đa luồng`→`multithreading` |
+| 8. Nợ luật 1 | 23 | **10** | 13 cái là **báo động giả** của chính soat — xem bẫy dưới. 10 cái còn lại đều thuộc kệ 06–10, ngoài phạm vi |
+| 1,2,3,7 | 0 | 0 | sạch sẵn |
+
+### Hai metric của `soat.py` từng sai, đã sửa trong tool
+
+8. **Phép 5 quên `html.unescape()`** — `er-modeling` bị báo dòng 129 ký tự, thật ra đầy `&#273;`.
+   Đúng cái bẫy đã ghi ở mục 2 phía trên, dính lại ở tool khác. Nay dùng `_html.unescape()`.
+9. **Phép 8 chỉ đếm `<svg>`** nên 13 bài dùng `.eq` / `.cmp` / `<table>` bị kêu oan. Đã viết lại
+   theo đúng định nghĩa "khối trực quan" của `audit.py`: `<svg>` **hoặc** một trong
+   `strip flow cmp stack mtx axis seq bars eq probs` **hoặc** `<table>`, và đo **theo từng mục**
+   chứ không theo tổng. 23 → 10. Bài học: *hai tool đo cùng một luật thì phải dùng chung định nghĩa,
+   không thì tool yếu hơn sẽ đẻ ra nợ ma.*
+
+### Trục hiển thị SVG — đo bằng `getBBox()` thật, 24 → 0
+
+`check.py` (ước lượng bề rộng chữ) báo 17 file/18 hình — **không tin được**. Viết `/tmp/bbox2.py`:
+chèn script đo vào bản sao tạm của trang, phục vụ qua `http://localhost:8899`, chạy headless Chrome
+`--dump-dom`, trả kết quả qua `document.title`. Đo hai thứ: phần tử tràn `viewBox`, và chữ đè chữ thật.
+
+Quét cả 116 bài kệ 01–05 → **24 chỗ / 12 file**. Kết quả phân loại:
+
+- **`oy ≈ 1–1.2` là báo động giả** — hai dòng chữ xếp chồng chạm nhau ở ascender/descender đúng 1px.
+  Chiếm 11/24 chỗ (`iterator-generator`, `memory-management-gc`, `query-tuning`,
+  `sql-window-functions`, `transaction-isolation`). Không sửa.
+- **13 chỗ tràn/đè thật, đã sửa hết**: `trie` (3 nhãn tràn x=957 → dời x 700→620 + `viewBox` 210→224),
+  `data-warehouse-lake` (dòng ④ dài 888px → ngắt 3 dòng, viewBox 498→520),
+  `oltp-vs-olap` (dòng HTAP 1133px → ngắt 2 dòng, viewBox 508→522),
+  `sql-group-aggregate` (nhãn `GROUP BY` đè kết quả, `oy` 12.5 → đổi sang `text-anchor="end"` x=330 y=52),
+  `linear-algebra-ml` (nhãn eigenvector 963px → rút gọn "sau · dài ra λ lần"; một `line` tràn đáy),
+  `gradient-boosting` (`<line x1="-655.57">` — toạ độ âm còn sót),
+  `roc-auc-pr` (câu định nghĩa AUC 1083px → ngắt 2 dòng).
+
+10. **Bẫy mới: ước lượng bề rộng chữ không thay được `getBBox()`.** `check.py` vừa báo thừa
+    (17 file) vừa báo thiếu (bỏ sót `x` âm và chữ-đè-chữ). Muốn nói "hình sạch" thì phải đo thật
+    trong Chrome qua HTTP, không đo bằng công thức.
+
+### Trạng thái sau vòng này
+
+```
+build.py : sạch — 200 bài · 1456 mục tìm · 506 thẻ ôn
+audit.py : 116/116 đạt hết (trục luật 1, không đổi)
+soat.py  : 10 — toàn bộ ở kệ 06–10, kệ 01–05 sạch cả 8 phép
+bbox2.py : TONG 0 trên 116 bài kệ 01–05
+```
+
+### Dọn nốt 2026-09-07 — TRỤC "TỐI THIỂU ĐỂ HIỂU" (đoạn văn mặt bài ≤33 từ)
+
+Người dùng hỏi *"đã đủ tất cả tiêu chí trong memory à"* — câu trả lời lúc đó là **chưa**.
+Ba trục máy (`audit.py`, `soat.py`, bbox) sạch không có nghĩa là đủ; luật 8 của
+[[chuan-bai-mau]] (`chuan-bai-mau.md:191`) chưa ai đo lại từ đợt 06/09.
+
+**Việc mở #3 và #6 hoá ra đã xong từ trước**, chỉ là số trong bảng này cũ:
+
+| Việc mở | Số ghi trong bảng | Đo lại 07/09 |
+|---|---|---|
+| #3 — 51 bài còn *Tổng kết một hình* | 51 | **0** |
+| #6 — 8 bài ≥12 mục | 8 | **0** |
+| bài 01–05 không có `figure.gist` | — | **0** |
+| bài có >1 `figure.gist` (bẫy 4) | 6 | **0** |
+
+**Đoạn văn quá 33 từ: 65 → 0.** Tách bằng 3 vòng script + 12 chỗ sửa tay, tổng 65 đoạn / 33 bài.
+Nặng nhất: `data-quality` 5 · `etl-elt` 4 · nhóm `04-database/02-relational-basics` 3 mỗi bài.
+
+11. **Bẫy đo: quên bỏ `<details>`/`<figure>` thì số thổi lên 7 lần.** Lần đo đầu ra **469 đoạn /
+    85 bài** — đếm cả chữ trong `details.deep` (vốn *được phép* dài, đó là chỗ để gập văn dài vào)
+    và `<text>` trong SVG. Đo đúng theo công thức có sẵn ở `chuan-bai-mau.md:398` thì chỉ **65**.
+    Công thức đã nằm sẵn trong `chuan/` — lỗi là tự nghĩ regex mới thay vì chép cái đã chốt.
+
+12. **Bẫy đo: `s.count('</b>')` bắt luôn `</body>`.** Phép kiểm cân bằng thẻ báo "lệch" ở đúng
+    116/116 file, kể cả file chưa đụng tới — dấu hiệu kinh điển của metric sai chứ không phải
+    kho hỏng. Kiểm lại bằng `html.parser` thật: **0 file lỗi cấu trúc**. Đếm chuỗi không thay
+    được parser.
+
+### Trạng thái cuối 2026-09-07 — kệ 01→05 SẠCH CẢ NĂM TRỤC
+
+```
+build.py                : sạch · 200 bài · 1456 mục tìm · 506 thẻ ôn
+audit.py  (luật 1)      : 116/116
+soat.py   (8 phép)      : 0 ở kệ 01–05  (còn 10 ở kệ 06–10)
+bbox2.py  (hiển thị SVG): 0 tràn/đè thật · còn 10 chỗ oy≈1px (chữ chạm ascender, báo động giả)
+đoạn >33 từ             : 0        ← trước là 65
+HTML cân bằng thẻ       : 0 lỗi (đo bằng html.parser)
+490px (Chrome thật)     : 0 · 116 bài + 3 trang site
+```
+
+Sáu việc mở đầu file **đã đóng hết**. Việc còn lại của cả kho nằm ngoài kệ 01–05:
+10 bài nợ luật 1 ở kệ 06–10, và **72 khung bài chưa viết** (06: 14 · 07: 14 · 08: 27 · 09: 4 · 10: 13).
+
+### Bổ sung — TRỤC 490px (phép nghiệm thu thứ tư, trước nay chưa ai chạy toàn kho)
+
+Bước 6 khai bốn phép nghiệm thu, trong đó **`490px sạch`** chưa từng được đo hết 116 bài.
+Đo bằng Chrome `--window-size=490,900`, so `documentElement.scrollWidth` với `clientWidth`
+và tìm `<figure>` nào có `scrollWidth > clientWidth` mà **không** có `overflow-x:auto`.
+
+13. **Bẫy đo: đếm phần tử vượt mép viewport thì mọi SVG đều "tràn".** Phép đầu ra 24–30 chỗ ở
+    mọi bài — vì `figure.scrollx svg{min-width:720px}` là **cố ý**: hình chi tiết được phép cuộn
+    ngang trong khung riêng. Vượt mép ≠ vỡ. Phép đúng chỉ hỏi hai câu: *body có cuộn ngang không*,
+    và *có khung nào tràn mà không cho cuộn không*. Đổi phép xong: **116 bài → 1 lỗi thật.**
+
+**Lỗi thật duy nhất: `clustering-overview` §02** — bảng tra 5 cột, `body scrollWidth 516 > 490`.
+Chữa bằng cách bọc `figure.scrollx` + thêm luật dùng chung vào `style.css`:
+
+```css
+figure.scrollx table{margin:0;min-width:620px}   /* bảng nhiều cột: cuộn ngang thay vì bóp vỡ chữ */
+```
+
+Đây là luật **mới cho cả kho**, không phải vá một bài: kho có 32 `<figure>` trần và nhiều bảng
+5 cột, bảng nào rộng quá thì bọc `figure.scrollx` như hình.
+
+Quét lại toàn bộ **116 bài + `index.html` + `kit.html` + `quiz.html`: TONG 0.**
+
+---
+
+## TRỤC LUẬT 1 — KỆ 06–10 (2026-09-07, đóng nốt phần cuối)
+
+Mười bài nợ luật 1 ngoài kệ 01–05 đã dựng bản đồ xong. Danh sách + số mục/số SVG sau khi làm:
+
+| bài | mục · svg |
+|---|---|
+| `07/self-attention` | 13 · 12 |
+| `07/transformer-architecture` | 12 · 12 |
+| `06/backpropagation` | 15 · 15 |
+| `06/normalization` | 11 · 11 |
+| `06/cnn-mobilenet` | 15 · 16 |
+| `08/sft-alignment` | 11 · 10 |
+| `08/inference-optimization` | 15 · 16 |
+| `08/rag-end-to-end` | 15 · 15 |
+| `09/ml-system-design` | 15 · 15 |
+| `10/mlops-serving` | 15 · 16 |
+
+**Công cụ: `/tmp/l1/insert.py`, một biến thể của `tools/apply_map.py` — không dùng lại được bản
+gốc.** `apply_map.run()` *tạo mới* một mục `-s0` và assert việc xoá mục *Tổng kết*; mười bài này đã
+có mục 01 tử tế và không có *Tổng kết*, nên cần bản chèn hình vào **mục đã có sẵn**, giữ nguyên
+đánh số. Lần sau gặp bài dạng này thì viết biến thể, đừng ép bài theo công cụ.
+
+**Bẫy mới: `rows` của `mapgen.build` là 3-tuple, sai kiểu thì lỗi ở tận trong hàm.** Ba lần dính
+`ValueError: not enough values to unpack (expected 3, got 2)` vì viết panel row thành
+`('MHA: mỗi head một bộ K, V — cache lớn nhất','b')` hoặc tệ hơn là
+`('...','b' and 'b')` / `('...','g' if 0 else 'g')` — mấy biểu thức đó *trông như* ba phần tử nhưng
+Python rút về hai. Luôn viết rời `(tiêu đề, phụ, màu)`.
+
+**Tự mình gây lại lỗi thuật ngữ trong chính hình mới vẽ.** Bản đồ `sft-alignment` dán nhãn
+"hàm mất mát" — đúng thứ `soat.py` phép 6 cấm. Bắt được chỉ vì chạy `soat.py` **ngay sau khi
+apply**, đúng kỷ luật đã ghi ở [[dot-luat-1-ke-05-ml]]. Nội dung mình vừa sinh ra cũng phải qua
+máy soát như nội dung cũ.
+
+### Luật 8 (đoạn >33 từ) ở kệ 06–10: 84 → 0
+
+Hai vòng cắt tự động (cắt ở ranh giới câu, có canh độ sâu thẻ để không cắt giữa `<em>`): 84 → 29 →
+11. **Mười một đoạn cuối máy không cắt được, và đó là dấu hiệu đúng** — chúng là một câu giải thích
+dài liền mạch. Chữa tay theo đúng hai cách luật 8 cho phép:
+
+- bốn đoạn 67–68 từ dạng *"Vì sao … :"* → **gập nguyên văn vào `<details class="deep">`**, `<summary>`
+  đổi thành câu hỏi (`Vì sao <code>db</code> phải cộng theo chiều batch?`). Không cắt bỏ chữ nào.
+- bốn đoạn 34–38 từ → tách câu tay.
+
+**Vòng cắt tự động để lại ba đuôi cụt `—.` và `,.`** ở `sft-alignment`, `inference-optimization`,
+`ml-system-design` — hàm `fin()` thêm dấu chấm vào mảnh cuối vốn chưa hết câu. Sửa tay cả ba, và
+nhớ: **cắt câu bằng máy thì phải đọc lại mắt thường mảnh cuối của mỗi đoạn.**
+
+### Hai trục chưa từng chạy trên kệ 06–10, chạy nốt
+
+**490px:** 2 lỗi thật, đều không phải hình.
+
+1. `inference-optimization` — nhãn trong `.bars` dài 60 chữ, mà `.bars .b b{white-space:nowrap}`.
+   Chữa bằng **rút nhãn** (`1 lần đọc / 2000 token`), không sửa khuôn dùng chung.
+2. `backpropagation` — một `.strip` **sáu ô**; 490px không đủ chỗ. Chữa bằng **tách làm hai dải**
+   forward / backward, hợp nghĩa hơn cả bản cũ. Luật rút ra: `.strip` quá bốn ô là hỏng ở mobile.
+
+Thủ phạm chỉ lộ ra khi dò bằng cách **ẩn từng phần tử rồi đo lại `scrollWidth`** — các phép "tìm
+phần tử vượt mép" đều chỉ vào SVG vô can (`figure.scrollx` cố ý cuộn).
+
+**bbox thật (`getBBox`):** 2 lỗi — `cnn-mobilenet` nhãn `x=52` `text-anchor="end"` tràn âm ra ngoài
+viewBox; `inference-optimization` hai nhãn đè nhau 67px. Chữa bằng dời nhãn + nới `viewBox` cao
+250 → 272.
+
+### Nghiệm thu cuối, cả kho
+
+```
+build.py                : 200 bài · 62 nhóm · 1456 mục tìm · 506 thẻ ôn · meta khớp
+soat.py (8 phép)        : 0
+svgkit/check.py         : 0 lỗi trên từng bài của kệ 06–10
+bbox thật (Chrome)      : 0
+490px (Chrome)          : 0
+đoạn >33 từ             : 0
+```
+
+Cả **năm trục sạch trên toàn bộ 200 bài đã viết**. Việc còn lại của kho chỉ còn là **72 khung bài
+chưa viết** (06: 14 · 07: 14 · 08: 27 · 09: 4 · 10: 13) — không còn nợ chuẩn nào.

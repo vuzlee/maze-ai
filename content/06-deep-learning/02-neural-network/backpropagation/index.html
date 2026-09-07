@@ -43,12 +43,47 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · Deep learning · gradient</p>
   <h1><em>Backpropagation</em></h1>
-  <p class="lede">Không phải phép màu — chỉ là <b>quy tắc chuỗi</b> áp dụng theo thứ tự khôn ngoan. Bài này đi qua một mạng 2–2–1 với <b>số thật</b>, giải thích vì sao gradient của softmax cộng cross-entropy gọn thành <code>p − y</code>, vì sao gradient teo dần qua nhiều lớp, và vì sao công thức khởi tạo lại có <code>√(1/n)</code>.</p>
+  <p class="lede">Không phải phép màu — chỉ là <b>quy tắc chuỗi</b> áp dụng theo thứ tự khôn ngoan.</p>
+  <p>Bài này đi qua một mạng 2–2–1 với <b>số thật</b>, giải thích vì sao gradient của softmax cộng cross-entropy gọn thành <code>p − y</code>, vì sao gradient teo dần qua nhiều lớp,.</p>
+  <p>Và vì sao công thức khởi tạo lại có <code>√(1/n)</code>.</p>
 </header>
 
 
 <section id="backprop-s1">
-  <div class="sh"><b>01</b><h2>Backpropagation là gì</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Lượt đi ghi lại đường đã qua; <em>lượt về nhân ngược một lần là ra gradient của mọi tham số</em>.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<text class="sv-hv" x="372" y="18">MỘT LƯỢT, MỌI THAM SỐ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Không phải thuật toán học</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">chỉ tính gradient, việc cập nhật là của optimizer</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Chi phí bằng khoảng một lượt forward</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không phụ thuộc số tham số</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Đổi lại phải giữ activation</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">đó là chỗ tốn bộ nhớ khi huấn luyện</text>
+</svg>
+  <figcaption>Bốn ô đọc từ trên xuống: hai ô đầu là cơ chế, ô ba là kết quả, ô đỏ là chỗ vỡ. Mỗi mục sau tô sáng đúng một ô.</figcaption>
+  </figure>
+
 <div class="stack">
     <div class="s"><b>Forward — x → z₁ → a₁ → z₂ → a₂ → L</b><span>tính và <b>lưu lại</b> mọi giá trị trung gian</span></div>
     <div class="s ok"><b>Backward — L → ∂L/∂a₂ → ∂L/∂z₂ → ∂L/∂W₂ → … → ∂L/∂W₁</b><span>đi ngược, mỗi bước nhân thêm một đạo hàm cục bộ</span></div>
@@ -62,6 +97,41 @@
 
 <section id="backprop-s2">
   <div class="sh"><b>02</b><h2>Vì sao không tính gradient bằng số</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — VÌ SAO KHÔNG DÙNG SỐ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Sai phân hữu hạn</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi tham số một lần forward — triệu lần cho triệu tham số</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Sai số làm tròn</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">h nhỏ thì trừ hai số gần nhau, mất chữ số</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Backprop: một lượt cho tất cả</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">chính xác tới từng chữ số máy</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Vẫn dùng sai phân để kiểm</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">gradient check khi tự code layer mới</text>
+</svg>
+  <figcaption>Ba lý do bỏ cách tính bằng số, và chỗ duy nhất nó còn dùng.</figcaption>
+  </figure>
+
 <div class="eq">
     <div class="line">
       <span class="t"><span>∂L/∂w<sub>i</sub></span></span>
@@ -74,7 +144,8 @@
     <div class="b hi"><i>backprop</i><u style="width:1%"></u><b>1 forward + 1 backward</b></div>
   </div>
   <p class="stripnote"><span>Cho gradient của <em>tất cả</em> tham số, chi phí lượt backward chỉ khoảng 2 lần lượt forward.</span><span>Đó là toàn bộ giá trị của backprop: chi phí <em>không đổi theo số tham số</em>.</span></p>
-  <p>Đó là toàn bộ giá trị của backprop: nó tính gradient cho mọi tham số với chi phí <strong>không đổi theo số tham số</strong>, bằng cách tái sử dụng các kết quả trung gian thay vì tính lại.</p>
+  <p>Đó là toàn bộ giá trị của backprop: chi phí <strong>không đổi theo số tham số</strong>.</p>
+  <p>Nó đạt được điều đó bằng cách tái sử dụng các kết quả trung gian thay vì tính lại.</p>
   <div class="note">
     <h4>Gradient bằng số vẫn có ích ở một chỗ</h4>
     Để <strong>kiểm tra</strong> code backprop tự viết. Tính gradient bằng cả hai cách trên vài tham số ngẫu nhiên rồi so — chênh lệch tương đối phải nhỏ hơn khoảng <code>1e-7</code>. Đây là kỹ thuật gradient checking, và nêu ra được nó là câu trả lời tốt cho "làm sao anh biết code backprop của mình đúng".
@@ -83,6 +154,38 @@
 
 <section id="backprop-s3">
   <div class="sh"><b>03</b><h2>Quy tắc chuỗi</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — QUY TẮC CHUỖI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">dL/dx = dL/dy · dy/dx</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đạo hàm của hàm hợp là tích dọc đường</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Nhánh rẽ thì cộng lại</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">biến dùng ở hai chỗ nhận tổng hai luồng</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Mỗi node chỉ cần biết đạo hàm nội bộ</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">không cần biết cả mạng</text>
+</svg>
+  <figcaption>Ba luật đủ để chạy backward trên đồ thị bất kỳ.</figcaption>
+  </figure>
+
 <div class="cmp two">
     <div><h5>Một đường — nhân dồn</h5><p><code>L = f(g(h(x)))</code> thì <code>∂L/∂x = ∂L/∂f · ∂f/∂g · ∂g/∂h · ∂h/∂x</code>.</p></div>
     <div><h5>Nhiều đường — cộng dồn</h5><p>Biến dùng ở nhiều chỗ thì <code>∂L/∂x</code> là <b>tổng</b> gradient theo từng đường.</p></div>
@@ -110,7 +213,38 @@
 
 <section id="backprop-s4">
   <div class="sh"><b>04</b><h2>Đồ thị tính toán</h2></div>
-  <figure>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — ĐỒ THỊ TÍNH TOÁN</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Node là phép, cạnh là tensor</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Forward lưu đầu vào của từng node</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">để backward dùng lại</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Autograd dựng đồ thị lúc chạy</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">PyTorch — nên if/for trong model vẫn đúng</text>
+</svg>
+  <figcaption>Cấu trúc dữ liệu mà cả hai lượt cùng chạy trên đó.</figcaption>
+  </figure>
+
+  <figure class="scrollx">
     <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Đồ thị tính toán forward và backward">
       <rect class="sv-b" x="20" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="50" y="93" text-anchor="middle">x</text>
       <rect class="sv-b" x="120" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="150" y="93" text-anchor="middle">z₁</text>
@@ -150,6 +284,37 @@
 
 <section id="backprop-s5">
   <div class="sh"><b>05</b><h2>Lab: mạng 2–2–1 với số thật</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LAB SỐ THẬT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Mạng 2–2–1</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đủ nhỏ để tính tay từng bước</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Xem gradient chảy ngược từng node</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Đối chiếu với sai phân hữu hạn</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">hai con số phải trùng tới vài chữ số</text>
+</svg>
+  <figcaption>Lab chạy đúng ô backward, từng bước một.</figcaption>
+  </figure>
+
   <p>Hai đầu vào, hai nơ-ron ẩn dùng sigmoid, một đầu ra sigmoid, mất mát log loss. Bấm từng bước để đi hết lượt forward rồi lượt backward.</p>
   <div class="lab">
     <div class="bar">
@@ -168,14 +333,45 @@
       <u>số lần cập nhật <b id="bupdn">0</b></u>
     </div>
     <div class="steps" id="blog3"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Chạy hết một lượt rồi bấm <strong>Cập nhật trọng số</strong> nhiều lần: mất mát giảm dần. Đổi nhãn <code>y</code> sang 0 để thấy dấu của mọi gradient đảo ngược. Chú ý dòng <code>∂L/∂z₂ = a₂ − y</code> — công thức gọn đến bất ngờ, và mục 07 giải thích tại sao.
-    </p>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Chạy hết một lượt rồi bấm <strong>Cập nhật trọng số</strong> nhiều lần:</p>
+  <p>Mất mát giảm dần. Đổi nhãn <code>y</code> sang 0 để thấy dấu của mọi gradient đảo ngược.</p>
+  <p>Chú ý dòng <code>∂L/∂z₂ = a₂ − y</code> — công thức gọn đến bất ngờ, và mục 07 giải thích tại sao.</p>
   </div>
 </section>
 
 <section id="backprop-s6">
   <div class="sh"><b>06</b><h2>Đạo hàm các phép cơ bản</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — ĐẠO HÀM CƠ BẢN</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Cộng: chia đều gradient cho hai nhánh</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--filled)">Nhân: đổi chéo đầu vào cho nhau</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">ReLU: chặn gradient ở nhánh âm</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--probe)">Max: chỉ nhánh thắng nhận gradient</text>
+</svg>
+  <figcaption>Bốn phép chiếm phần lớn mọi mạng.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Phép</th><th>Forward</th><th>Backward — nhận <code>g</code> từ phía sau</th></tr>
     <tr><td>Cộng</td><td><code>c = a + b</code></td><td><code>∂a = g</code>, <code>∂b = g</code> — chỉ chuyển tiếp</td></tr>
@@ -188,13 +384,48 @@
   </table>
   <div class="note">
     <h4>Hai điều đáng để ý trong bảng</h4>
-    <p><strong>Sigmoid và tanh dùng lại đầu ra của chính chúng</strong> để tính gradient, không cần <code>z</code>. Đó là lý do framework lưu <code>a</code> chứ không lưu <code>z</code> cho các lớp này — tiết kiệm bộ nhớ.</p>
-    <p><strong>ReLU là một cái van đóng mở.</strong> Nó không làm co gradient như sigmoid, chỉ cho qua hoặc chặn hẳn. Đây là lý do chính ReLU giải quyết được vấn đề gradient teo dần.</p>
+    <p><strong>Sigmoid và tanh dùng lại đầu ra của chính chúng</strong> để tính gradient, không cần <code>z</code>.</p>
+  <p>Đó là lý do framework lưu <code>a</code> chứ không lưu <code>z</code> cho các lớp này —</p>
+  <p>Tiết kiệm bộ nhớ.</p>
+    <p><strong>ReLU là một cái van đóng mở.</strong> Nó không làm co gradient như sigmoid, chỉ cho qua hoặc chặn hẳn.</p>
+  <p>Đây là lý do chính ReLU giải quyết được vấn đề gradient teo dần.</p>
   </div>
 </section>
 
 <section id="backprop-s7">
   <div class="sh"><b>07</b><h2>Softmax + cross-entropy: vì sao gradient là <code>p − y</code></h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — SOFTMAX VỚI CROSS-ENTROPY</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Ghép hai phép làm một</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mẫu số của softmax triệt tiêu khi rút gọn</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Gradient còn đúng p − y</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">một phép trừ, không có phép chia nào</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Tách ra tính riêng thì tràn số</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">đó là lý do thư viện gộp sẵn</text>
+</svg>
+  <figcaption>Chỗ quy tắc chuỗi rút gọn đẹp nhất trong cả deep learning.</figcaption>
+  </figure>
+
 <div class="eq">
     <div class="line">
       <span class="t"><span>p<sub>i</sub></span></span>
@@ -214,7 +445,8 @@
       <span class="t g"><span>p<sub>i</sub> − y<sub>i</sub></span><em>ghép hai bước lại thì mọi thứ triệt tiêu</em></span>
     </div>
   </div>
-  <p>Cùng một kết quả với cặp sigmoid + log loss ở bài phân loại nhị phân, và với cặp identity + MSE ở bài hồi quy. Đây không phải trùng hợp — nó là tính chất của các <strong>hàm liên kết chuẩn</strong> trong họ phân phối hàm mũ.</p>
+  <p>Cùng một kết quả với cặp sigmoid + log loss ở bài phân loại nhị phân, và với cặp identity + MSE ở bài hồi quy.</p>
+  <p>Đây không phải trùng hợp — nó là tính chất của các <strong>hàm liên kết chuẩn</strong> trong họ phân phối hàm mũ.</p>
   <table>
     <tr><th>Bài toán</th><th>Hàm bọc</th><th>Loss function</th><th>Gradient theo z</th></tr>
     <tr><td>Hồi quy</td><td>không có</td><td>MSE</td><td><code>ŷ − y</code></td></tr>
@@ -223,31 +455,103 @@
   </table>
   <div class="note key">
     <h4>Hai hệ quả thực tế</h4>
-    <p><strong>1. Framework luôn gộp hai bước lại.</strong> <code>CrossEntropyLoss</code> của PyTorch nhận <em>logits</em> chứ không nhận xác suất, và tự làm softmax bên trong. Vì gộp lại thì không cần dựng Jacobian, và tránh được tràn số khi tính <code>e^z</code> với <code>z</code> lớn.</p>
+    <p><strong>1. Framework luôn gộp hai bước lại.</strong> <code>CrossEntropyLoss</code> của PyTorch nhận <em>logits</em> chứ không nhận xác suất, và tự làm softmax bên trong.</p>
+  <p>Vì gộp lại thì không cần dựng Jacobian, và tránh được tràn số khi tính <code>e^z</code> với <code>z</code> lớn.</p>
     <p><strong>2. Tự làm softmax rồi đưa vào CrossEntropyLoss là bug.</strong> Softmax bị áp hai lần, gradient sai và model học rất kém — một lỗi im lặng cực kỳ phổ biến.</p>
   </div>
 </section>
 
 <section id="backprop-s8">
   <div class="sh"><b>08</b><h2>Dạng ma trận và shape</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — SHAPE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">dL/dW cùng shape với W</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">luôn đúng, dùng để kiểm nhanh</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Ma trận thì chuyển vị khi đi ngược</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">dL/dx = dL/dy · Wᵀ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Batch: cộng dồn theo chiều batch</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">gradient của W là tổng qua mọi mẫu</text>
+</svg>
+  <figcaption>Ba luật shape đủ để tự viết một layer không sai chiều.</figcaption>
+  </figure>
+
 <div class="strip">
     <div class="c"><i>forward</i><b>X : (N, D)</b><u>batch N mẫu, vào D chiều</u></div>
     <div class="c"><i>forward</i><b>W : (D, H)</b><u>ra H chiều</u></div>
     <div class="c on"><i>forward</i><b>Z = X @ W + b</b><u>(N, H)</u></div>
-    <div class="cut"></div>
+  </div>
+  <div class="strip">
     <div class="c t"><i>backward</i><b>dW = X.T @ dZ</b><u>(D, H) — khớp shape của W</u></div>
     <div class="c t"><i>backward</i><b>dX = dZ @ W.T</b><u>(N, D) — khớp shape của X</u></div>
-    <div class="c t"><i>backward</i><b>db = dZ.sum(axis=0)</b><u>(H,) — cộng theo chiều batch</u></div>
+    <div class="c t"><i>backward</i><b>db = dZ.sum(0)</b><u>(H,) — cộng theo chiều batch</u></div>
   </div>
   <div class="note key">
     <h4>Mẹo dùng được ở mọi bài</h4>
     Không cần nhớ công thức. <strong>Gradient của một tensor luôn có shape giống chính tensor đó.</strong> Từ ràng buộc đó, chỉ có đúng một cách ghép phép nhân ma trận cho ra shape đúng — nên bạn suy ra được công thức tại chỗ. Nói mẹo này trong phỏng vấn khi bị yêu cầu viết backward của một lớp là cách an toàn nhất.
   </div>
-  <p><strong>Vì sao <code>db</code> phải cộng theo chiều batch:</strong> cùng một <code>b</code> được dùng cho cả N mẫu, tức nó tham gia vào N đường tính toán khác nhau. Theo quy tắc cộng ở mục 03, gradient là tổng đóng góp của mọi đường. Cùng lý do đó, gradient của trọng số được chia sẻ giữa các bước thời gian trong RNN cũng phải cộng dồn qua mọi bước.</p>
+  <details class="deep">
+    <summary>Vì sao <code>db</code> phải cộng theo chiều batch?</summary>
+    <div class="body">
+      <p>Cùng một <code>b</code> được dùng cho cả N mẫu, tức nó tham gia vào N đường tính toán khác nhau. Theo quy tắc cộng ở mục 03, gradient là tổng đóng góp của mọi đường. Cùng lý do đó, gradient của trọng số được chia sẻ giữa các bước thời gian trong RNN cũng phải cộng dồn qua mọi bước.</p>
+    </div>
+  </details>
 </section>
 
 <section id="backprop-s9">
   <div class="sh"><b>09</b><h2>Gradient teo và nổ</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — TEO VÀ NỔ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Tích của N số nhỏ hơn 1 về 0</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">sigmoid đạo hàm tối đa 0,25</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Tích của N số lớn hơn 1 nổ</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">loss thành NaN sau vài bước</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Residual: cộng thêm đường tích bằng 1</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--probe)">Gradient clipping: chặn trần chuẩn</text>
+</svg>
+  <figcaption>Hai hướng trôi của cùng một tích, và hai cách vá.</figcaption>
+  </figure>
+
 <p>Gradient qua <code>L</code> lớp là một <b>tích</b> của <code>L</code> số hạng — đạo hàm lớp cuối nhân đạo hàm lớp trước nữa, dồn về tới lớp đầu:</p>
   <div class="bars">
     <div class="b bad"><i>mỗi số hạng ≈ 0,9 · qua 50 lớp</i><u style="width:0.5%"></u><b>0,005 — teo</b></div>
@@ -271,6 +575,37 @@
 
 <section id="backprop-s10">
   <div class="sh"><b>10</b><h2>Khởi tạo trọng số — vì sao có <code>√(1/n)</code></h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — KHỞI TẠO</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Muốn phương sai giữ nguyên qua tầng</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Var[out] = n · Var[w] · Var[in]</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">nên Var[w] phải bằng 1/n</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Xavier cho tanh, He cho ReLU</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">He nhân 2 vì ReLU chặn nửa nhánh</text>
+</svg>
+  <figcaption>Vì sao con số √(1/n) không phải mẹo mà là hệ quả.</figcaption>
+  </figure>
+
 <div class="eq">
     <div class="line">
       <span class="t"><span>Var(z)</span></span>
@@ -293,11 +628,43 @@
     <h4>Vì sao khởi tạo bằng 0 làm mạng vô dụng</h4>
     Nếu mọi trọng số của một lớp bằng nhau, thì mọi nơ-ron trong lớp đó tính ra <em>cùng một giá trị</em>, nhận <em>cùng một gradient</em>, và được cập nhật <em>giống hệt nhau</em>. Chúng sẽ mãi mãi giống nhau — cả lớp hoạt động như một nơ-ron duy nhất. Tính ngẫu nhiên của khởi tạo tồn tại để <strong>phá vỡ tính đối xứng</strong> đó. Riêng bias thì khởi tạo 0 hoàn toàn ổn, vì tính đối xứng đã bị phá bởi trọng số.</p>
   </div>
-  <p><strong>Vì sao He có hệ số 2:</strong> ReLU đặt một nửa đầu vào về 0, nên phương sai đầu ra chỉ còn khoảng một nửa. Nhân 2 vào phương sai khởi tạo là để bù đúng phần mất đó, giữ cho độ lớn tín hiệu không teo dần qua các lớp.</p>
+  <p><strong>Vì sao He có hệ số 2:</strong> ReLU đặt một nửa đầu vào về 0, nên phương sai đầu ra chỉ còn khoảng một nửa.</p>
+  <p>Nhân 2 vào phương sai khởi tạo là để bù đúng phần mất đó, giữ cho độ lớn tín hiệu không teo dần qua các lớp.</p>
 </section>
 
 <section id="backprop-s11">
   <div class="sh"><b>11</b><h2>Normalization giúp gì cho gradient</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — NORM GIÚP GÌ</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Kéo activation về vùng có đạo hàm tốt</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Làm mặt loss trơn hơn</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">learning rate lớn hơn vẫn ổn định</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Không thay được khởi tạo đúng</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">hai thứ vá hai chỗ khác nhau</text>
+</svg>
+  <figcaption>Norm chữa cùng ô đỏ nhưng bằng đường khác.</figcaption>
+  </figure>
+
 <div class="eq">
     <div class="line">
       <span class="t"><span>y</span></span>
@@ -328,6 +695,38 @@
 
 <section id="backprop-s12">
   <div class="sh"><b>12</b><h2>Model không học — checklist theo thứ tự</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CHECKLIST KHI KHÔNG HỌC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">1. Overfit nổi một batch nhỏ chưa</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">không nổi thì lỗi ở code, không ở dữ liệu</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">2. Gradient có về 0 hay NaN không</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--filled)">3. Learning rate lệch mấy bậc</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">4. Quên zero_grad hay quên train mode</text>
+</svg>
+  <figcaption>Bốn câu hỏi theo đúng thứ tự, dừng ở câu đầu tiên trả lời sai.</figcaption>
+  </figure>
+
   <div class="stack">
     <div class="s ok"><b>1 · Học thuộc 8 mẫu</b><span>tắt regularization, huấn luyện tới khi loss gần 0. Không xuống được là bug code, không phải dữ liệu hay learning rate</span></div>
     <div class="s"><b>2 · Loss ban đầu ≈ ln(C)</b><span>10 lớp thì phải khoảng 2.30. Lệch xa: nhãn sai định dạng, hoặc softmax hai lần</span></div>
@@ -347,6 +746,35 @@
 
 <section id="backprop-s13">
   <div class="sh"><b>13</b><h2>Bảng công thức tóm tắt</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bốn ô của backpropagation: lượt forward ghi lại đầu vào của từng phép, quy tắc chuỗi cho phép nhân các đạo hàm dọc đường, lượt backward nhân ngược một lần là ra gradient của mọi tham số, và cái giá là tích của chuỗi dài dễ teo về 0 hoặc nổ tung">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — ghi lại đường đã đi</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">mỗi phép lưu đầu vào của nó</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Quy tắc chuỗi trên đồ thị</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">đạo hàm của hợp = nhân dọc đường</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — nhân ngược một lượt</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">một lần duyệt cho mọi tham số</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Chuỗi nhân dài thì tích trôi</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradient teo về 0 hoặc nổ tung</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — BẢNG CÔNG THỨC</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Mỗi phép một dòng đạo hàm nội bộ</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Dùng khi tự viết layer mới</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Kiểm lại bằng gradient check</text>
+</svg>
+  <figcaption>Bảng tra, không phải phần đọc — quay lại khi cần.</figcaption>
+  </figure>
+
 <pre><code>Mạng hai lớp, phân loại nhị phân:
 
 FORWARD

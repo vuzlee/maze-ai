@@ -43,12 +43,51 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · LLM · hệ thống truy xuất</p>
   <h1>RAG <em>end-to-end</em></h1>
-  <p class="lede">Câu trả lời "em dùng LangChain với vector DB" không nói được gì. Bài này đi hết đường ống — <b>chunking</b>, embedding, index, <b>hybrid search</b>, reranking, dựng context, sinh chữ — và quan trọng nhất: <b>decision tree để debug</b> khi hệ thống trả lời sai, cùng cách đánh giá tách hai tầng.</p>
+  <p class="lede">Câu trả lời "em dùng LangChain với vector DB" không nói được gì.</p>
+  <p>Bài này đi hết đường ống — <b>chunking</b>, embedding, index, <b>hybrid search</b>, reranking, dựng context, sinh chữ —</p>
+  <p>Và quan trọng nhất: <b>decision tree để debug</b> khi hệ thống trả lời sai, cùng cách đánh giá tách hai tầng.</p>
 </header>
 
 
 <section id="rag-s1">
-  <div class="sh"><b>01</b><h2>RAG là gì</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">RAG không dạy model kiến thức mới — nó <em>tìm đúng mảnh tài liệu rồi đặt vào câu hỏi</em> trước khi model trả lời.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<text class="sv-hv" x="372" y="18">HAI GIAI ĐOẠN, HAI THỜI ĐIỂM</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Nạp chạy trước, theo lô</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">một lần cho cả kho tài liệu</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Truy xuất và sinh chạy lúc hỏi</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">tính bằng mili giây</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Lỗi ở giai đoạn nạp thì đằng sau vô phương</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">trần chất lượng chốt ngay từ đó</text>
+</svg>
+  <figcaption>Năm ô đọc từ trên xuống theo đúng đường dữ liệu chạy. Mỗi mục sau tô sáng đúng một ô.</figcaption>
+  </figure>
+
   <p class="key">RAG là <em>hai hệ thống ghép lại</em>: một hệ tìm kiếm chạy trước, một hệ sinh chữ chạy sau.</p>
   <figure>
     <svg viewBox="0 0 900 300" role="img" aria-label="Đường ống RAG: nhánh offline dựng index, nhánh online trả lời từng câu hỏi">
@@ -112,6 +151,44 @@
 
 <section id="rag-s2">
   <div class="sh"><b>02</b><h2>RAG hay nhét hết vào context dài</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — RAG HAY CONTEXT DÀI</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Context dài: đơn giản, đắt, chậm</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">chi phí tăng theo mỗi request</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">RAG</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">rẻ khi kho lớn, cập nhật được từng phần</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Model tụt chính xác ở giữa context dài</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">lost in the middle</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Kho nhỏ và tĩnh thì đừng dựng RAG</text>
+</svg>
+  <figcaption>Bốn chiều so, và trường hợp không nên dùng RAG.</figcaption>
+  </figure>
+
   <p>Với model có context 200k token, câu hỏi hợp lý là: cần RAG làm gì nữa?</p>
   <div class="cmp two">
     <div><h5>RAG</h5>
@@ -137,6 +214,43 @@
 
 <section id="rag-s3">
   <div class="sh"><b>03</b><h2>Nạp tài liệu — bước quyết định trần chất lượng</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — NẠP TÀI LIỆU</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">PDF nhiều cột parse ra chữ lộn xộn</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đây là chỗ hỏng âm thầm nhất</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Bảng và hình cần xử lý riêng</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Giữ metadata: nguồn, ngày, mục</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">để lọc và để trích dẫn</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--probe)">Đọc tay vài chục mảnh trước khi chạy tiếp</text>
+</svg>
+  <figcaption>Bước ít hào nhoáng nhất mà quyết định trần chất lượng.</figcaption>
+  </figure>
+
   <div class="stack">
     <div class="s warn"><b>Đọc tài liệu — PDF, Word, HTML, bảng, ảnh scan</b><span>PDF nhiều cột bị đọc lộn thứ tự; bảng biến thành chuỗi số vô nghĩa</span></div>
     <div class="s warn"><b>Giữ cấu trúc — tiêu đề, mục, cấp bậc</b><span>mất tiêu đề thì đoạn văn không còn ngữ cảnh, không biết nó nói về sản phẩm nào</span></div>
@@ -148,11 +262,48 @@
     <h4>Đây là bước bị coi nhẹ nhất và tốn kém nhất</h4>
     Không kỹ thuật truy xuất nào cứu được một đoạn văn đã bị đọc sai từ PDF. <strong>Chất lượng nạp tài liệu là trần của toàn bộ hệ thống.</strong> Trong dự án thật, đây thường là phần chiếm nhiều thời gian nhất — và nói ra điều đó trong phỏng vấn là dấu hiệu rõ ràng của người đã làm RAG thật thay vì chạy demo.
   </div>
-  <p>Một kỹ thuật đáng biết: <strong>chèn tiêu đề vào từng chunk</strong>. Đoạn văn "Thời hạn bảo hành là 24 tháng" không cho biết bảo hành cho sản phẩm nào. Ghép thêm đường dẫn tiêu đề — "Sản phẩm X &gt; Chính sách &gt; Bảo hành" — vào đầu chunk thì cả embedding lẫn LLM đều có ngữ cảnh.</p>
+  <p>Một kỹ thuật đáng biết: <strong>chèn tiêu đề vào từng chunk</strong>. Đoạn văn "Thời hạn bảo hành là 24 tháng" không cho biết bảo hành cho sản phẩm nào.</p>
+  <p>Ghép thêm đường dẫn tiêu đề — "Sản phẩm X &gt; Chính sách &gt;</p>
+  <p>Bảo hành" — vào đầu chunk thì cả embedding lẫn LLM đều có ngữ cảnh.</p>
 </section>
 
 <section id="rag-s4">
   <div class="sh"><b>04</b><h2>Chunking</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CHUNKING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Quá nhỏ thì mất ngữ cảnh</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">Quá lớn thì lẫn nhiễu, embedding loãng</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Mốc khởi điểm: 300–500 token, chồng 10–20%</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--probe)">Cắt theo cấu trúc tài liệu hơn là theo số ký tự</text>
+</svg>
+  <figcaption>Hai cực đều hỏng, và mốc để bắt đầu dò.</figcaption>
+  </figure>
+
   <div class="stack">
     <div class="s"><b>Kích thước cố định — cắt mỗi N token, có overlap</b><span>văn bản không cấu trúc; đơn giản nhất</span></div>
     <div class="s"><b>Theo đoạn văn / câu — cắt ở ranh giới tự nhiên</b><span>văn bản viết tốt</span></div>
@@ -169,11 +320,46 @@
     <h4>Vì sao cần overlap</h4>
     Để câu trả lời không bị <strong>cắt ngang ranh giới chunk</strong>. Nếu thông tin cần thiết trải qua hai câu mà điểm cắt rơi đúng giữa, thì không chunk nào chứa đủ và hệ thống chắc chắn trả lời sai — dù embedding và index đều hoàn hảo. Đây là chế độ lỗi tinh vi nhất của RAG, và lab dưới đây cho bạn thấy nó xảy ra.
   </div>
-  <p>Kỹ thuật <strong>đa mức</strong> đáng biết vì nó phá được đánh đổi trên: nhúng câu hoặc đoạn nhỏ để tìm kiếm chính xác, nhưng khi một đoạn nhỏ được chọn thì trả về cả mục lớn chứa nó cho LLM đọc. Vừa chính xác khi tìm, vừa đủ ngữ cảnh khi đọc.</p>
+  <p>Kỹ thuật <strong>đa mức</strong> đáng biết vì nó phá được đánh đổi trên:</p>
+  <p>Nhúng câu hoặc đoạn nhỏ để tìm kiếm chính xác, nhưng khi một đoạn nhỏ được chọn thì trả về cả mục lớn chứa nó cho LLM đọc.</p>
+  <p>Vừa chính xác khi tìm, vừa đủ ngữ cảnh khi đọc.</p>
 </section>
 
 <section id="rag-s5">
   <div class="sh"><b>05</b><h2>Lab: chunk và truy xuất</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LAB CHUNK VÀ TRUY XUẤT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Đổi kích thước chunk rồi xem recall</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">Thấy chỗ câu trả lời bị cắt làm đôi</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">Chồng lấn vá được, nhưng tốn chỗ</text>
+</svg>
+  <figcaption>Lab xoay đúng ô nạp và cho thấy hậu quả ở ô truy xuất.</figcaption>
+  </figure>
+
   <p>Một tài liệu ngắn, một câu hỏi. Đổi kích thước chunk và overlap để xem đoạn chứa câu trả lời có <strong>còn nguyên</strong> trong một chunk nào không.</p>
   <div class="lab">
     <div class="bar">
@@ -189,14 +375,55 @@
       </div>
     </div>
     <div id="rview"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Cấu hình mặc định — <code>chunk = 180, overlap = 0</code> — đã <strong>thất bại</strong>: câu chứa đáp án bị cắt ngang giữa hai chunk nên không chunk nào chứa đủ, và hệ thống chắc chắn trả lời sai dù truy xuất hoạt động hoàn hảo. Tăng overlap lên <strong>30%</strong> để thấy nó được cứu; hoặc để overlap 20% và tăng chunk lên <strong>240</strong>. Đổi câu hỏi để thấy cùng một cấu hình cứu được câu này nhưng làm hỏng câu khác — đó là lý do phải đo recall trên một bộ câu hỏi thật thay vì thử một câu. Lab dùng độ trùng từ khoá thay cho embedding thật, nhưng chế độ lỗi thì giống hệ thống thật.
-    </p>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Cấu hình mặc định — <code>chunk = 180, overlap = 0</code> —</p>
+  <p>Đã <strong>thất bại</strong>: câu chứa đáp án bị cắt ngang giữa hai chunk nên không chunk nào chứa đủ,.</p>
+  <p>Và hệ thống chắc chắn trả lời sai dù truy xuất hoạt động hoàn hảo.</p>
+  <p>Tăng overlap lên <strong>30%</strong> để thấy nó được cứu; hoặc để overlap 20% và tăng chunk lên <strong>240</strong>.</p>
+  <p>Đổi câu hỏi để thấy cùng một cấu hình cứu được câu này nhưng làm hỏng câu khác —</p>
+  <p>Đó là lý do phải đo recall trên một bộ câu hỏi thật thay vì thử một câu.</p>
+  <p>Lab dùng độ trùng từ khoá thay cho embedding thật, nhưng chế độ lỗi thì giống hệ thống thật.</p>
   </div>
 </section>
 
 <section id="rag-s6">
   <div class="sh"><b>06</b><h2>Embedding</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — EMBEDDING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Cùng một model cho tài liệu và câu hỏi</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">khác model là toạ độ khác nhau</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Đổi model thì phải nhúng lại cả kho</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Chọn theo ngôn ngữ và độ dài tối đa</text>
+<rect x="372" y="174" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--probe)">Đo bằng recall trên tập câu hỏi của chính bạn</text>
+<text class="sv-s" x="388" y="214" fill="var(--dim)">bảng xếp hạng chung không thay được</text>
+</svg>
+  <figcaption>Bốn điều phải chốt trước khi nhúng cả kho.</figcaption>
+  </figure>
+
   <p class="key">Embedding biến đoạn văn thành vector sao cho <em>nghĩa gần nhau thì vector gần nhau</em>.</p>
   <div class="eq">
     <div class="line">
@@ -218,12 +445,48 @@
   <div class="note warn">
     <h4>Hai bẫy im lặng</h4>
     <p><strong>Quên tiền tố.</strong> Với model yêu cầu tiền tố bất đối xứng, bỏ nó không gây lỗi — chỉ làm chất lượng truy xuất tụt đáng kể mà không có dấu hiệu gì.</p>
-    <p><strong>Chunk dài hơn giới hạn model.</strong> Phần vượt bị cắt và không bao giờ được nhúng. Đoạn văn đó tồn tại trong kho nhưng nội dung cuối của nó vô hình với tìm kiếm.</p>
+    <p><strong>Chunk dài hơn giới hạn model.</strong> Phần vượt bị cắt và không bao giờ được nhúng.</p>
+  <p>Đoạn văn đó tồn tại trong kho nhưng nội dung cuối của nó vô hình với tìm kiếm.</p>
   </div>
 </section>
 
 <section id="rag-s7">
   <div class="sh"><b>07</b><h2>Vector index</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — VECTOR INDEX</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Vài chục nghìn mảnh thì quét thẳng là đủ</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--filled)">HNSW: nhanh, tốn RAM, mốc phổ biến</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">IVF-PQ: nén mạnh, hợp kho rất lớn</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--tomb)">Lọc metadata phải làm cùng lúc với tìm</text>
+</svg>
+  <figcaption>Chọn index theo cỡ kho, đừng mặc định lấy cái phức tạp.</figcaption>
+  </figure>
+
   <div class="stack">
     <div class="s ok"><b>Flat — so sánh với mọi vector</b><span>recall 100%, tốn bộ nhớ bằng toàn bộ vector · dưới ~100 nghìn vector, và thường là đủ</span></div>
     <div class="s ok"><b>HNSW — đồ thị nhiều tầng, đi theo láng giềng gần</b><span>recall rất cao, bộ nhớ cao vì lưu cả đồ thị · mặc định cho quy mô trung bình</span></div>
@@ -234,23 +497,63 @@
     <h4>Điều đáng nói nhất về việc chọn index</h4>
     <strong>Với dưới khoảng 100 nghìn chunk, hãy dùng flat.</strong> Tìm kiếm chính xác 100%, không có siêu tham số nào để dò sai, và độ trễ vẫn dưới vài chục mili giây. Rất nhiều hệ thống RAG thực tế nằm ở quy mô này. Chọn HNSW hay IVF khi chưa cần là tự thêm một nguồn lỗi — vì chúng là tìm kiếm <em>gần đúng</em>, nghĩa là đôi khi bỏ sót đúng đoạn cần thiết mà không có cách nào biết.
   </div>
-  <p>Với HNSW, hai tham số quan trọng: <code>M</code> (số kết nối mỗi nút, ảnh hưởng bộ nhớ và chất lượng) và <code>ef_search</code> (số ứng viên xét lúc tìm — <strong>đây là núm đánh đổi recall với độ trễ</strong>, điều chỉnh được lúc chạy mà không phải dựng lại index).</p>
+  <p>Với HNSW, hai tham số quan trọng: <code>M</code> (số kết nối mỗi nút, ảnh hưởng bộ nhớ và chất lượng) và <code>ef_search</code> (số ứng viên xét lúc tìm —</p>
+  <p><strong>Đây là núm đánh đổi recall với độ trễ</strong>, điều chỉnh được lúc chạy mà không phải dựng lại index).</p>
 </section>
 
 <section id="rag-s8">
   <div class="sh"><b>08</b><h2>Hybrid search</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — HYBRID SEARCH</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Vector bắt nghĩa gần</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">hỏi khác chữ vẫn tìm ra</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">BM25 bắt đúng chữ</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">mã lỗi, tên riêng, số hiệu</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Gộp bằng RRF</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">gần như luôn hơn từng cái một</text>
+</svg>
+  <figcaption>Hai cách tìm bù đúng chỗ hụt của nhau.</figcaption>
+  </figure>
+
   <div class="cmp two">
     <div><h5>Vector search — bắt ý nghĩa</h5><p>"làm sao trả lại hàng" tìm được đoạn nói về <b>quy trình đổi trả</b>, dù không trùng chữ nào.</p></div>
     <div><h5>BM25 — bắt đúng chữ</h5><p>"mã lỗi E-4021", tên riêng, số hiệu văn bản, thuật ngữ hiếm — vector search có thể bỏ sót hoàn toàn.</p></div>
   </div>
-  <p>Hai phương pháp <strong>bổ sung cho nhau</strong>, và điểm yếu của vector search là chỗ hay bị bỏ qua: nó nén cả đoạn văn vào một vector, nên một mã lỗi cụ thể chỉ là một chi tiết nhỏ bị làm loãng. BM25 thì khớp chính xác chuỗi đó.</p>
+  <p>Hai phương pháp <strong>bổ sung cho nhau</strong>, và điểm yếu của vector search là chỗ hay bị bỏ qua:</p>
+  <p>Nó nén cả đoạn văn vào một vector, nên một mã lỗi cụ thể chỉ là một chi tiết nhỏ bị làm loãng.</p>
+  <p>BM25 thì khớp chính xác chuỗi đó.</p>
   <div class="eq">
     <div class="line">
       <span class="t g"><span>score(d)</span><em>điểm hợp nhất</em></span>
       <span class="op">=</span>
       <span class="t b"><span>Σ<sub>i</sub> 1 / (k + rank<sub>i</sub>(d))</span><em>cộng qua từng bảng xếp hạng · k thường là 60</em></span>
     </div>
-    <p class="read">Một đoạn xếp <b>thứ 2</b> theo vector và <b>thứ 5</b> theo BM25 được 1/62 + 1/65 = 0,0315. RRF chỉ dùng <b>thứ hạng</b>, không dùng điểm thô — nên không phải chuẩn hoá hai loại điểm về cùng thang.</p>
+    <p class="read">Một đoạn xếp <b>thứ 2</b> theo vector và <b>thứ 5</b> theo BM25 được 1/62 + 1/65 = 0,0315.</p>
+  <p>RRF chỉ dùng <b>thứ hạng</b>, không dùng điểm thô — nên không phải chuẩn hoá hai loại điểm về cùng thang.</p>
   </div>
   <div class="note">
     <h4>Vì sao RRF được ưa dùng</h4>
@@ -260,6 +563,42 @@
 
 <section id="rag-s9">
   <div class="sh"><b>09</b><h2>Reranking</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — RERANKING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Lấy rộng 50–100 rồi xếp lại còn 5</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--ok)">Cross-encoder đọc cả cặp câu hỏi và mảnh</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">chính xác hơn hẳn embedding</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Đắt nên chỉ chạy trên danh sách ngắn</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--ok)">Đây là chỗ lãi nhiều nhất trên công bỏ ra</text>
+</svg>
+  <figcaption>Bước rẻ tiền nhất để nâng chất lượng truy xuất.</figcaption>
+  </figure>
+
   <div class="cmp two">
     <div><h5>Bi-encoder — dùng để truy xuất</h5><p>Nhúng câu hỏi và đoạn văn <b>riêng rẽ</b>, so bằng cosine. Nhúng trước được nên tìm nổi trong hàng triệu đoạn — nhưng hai bên không nhìn thấy nhau.</p></div>
     <div><h5>Cross-encoder — dùng để rerank</h5><p>Đưa <b>cả hai vào cùng lúc</b>: [câu hỏi] [SEP] [đoạn văn], attention chạy giữa mọi từ. Chính xác hơn hẳn — nhưng phải chạy model cho từng cặp.</p></div>
@@ -277,6 +616,42 @@
 
 <section id="rag-s10">
   <div class="sh"><b>10</b><h2>Dựng context</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — DỰNG CONTEXT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Đánh số mảnh để model trích dẫn được</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Mảnh quan trọng đặt đầu hoặc cuối</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">giữa context là chỗ dễ bị bỏ qua</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Nói rõ: không có trong tài liệu thì trả lời không biết</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Nhồi quá nhiều mảnh làm loãng, không làm tốt hơn</text>
+</svg>
+  <figcaption>Bốn luật xếp context, ảnh hưởng trực tiếp tới câu trả lời.</figcaption>
+  </figure>
+
   <div class="stack">
     <div class="s"><b>Số đoạn — 3–10 sau rerank</b><span>nhiều hơn thường làm loãng chứ không giúp thêm</span></div>
     <div class="s ok"><b>Thứ tự</b><span>đặt đoạn liên quan nhất ở <b>đầu hoặc cuối</b>, không để giữa</span></div>
@@ -288,11 +663,48 @@
     <h4>Lost in the middle</h4>
     Thực nghiệm cho thấy LLM chú ý <strong>kém nhất tới phần giữa</strong> của một context dài — thông tin ở đầu và cuối được dùng tốt hơn rõ rệt. Hệ quả trực tiếp: sau khi rerank, đừng xếp các đoạn theo thứ tự điểm giảm dần một cách máy móc. Đặt đoạn tốt nhất ở đầu <em>và</em> đoạn tốt thứ hai ở cuối là một mẹo đơn giản có hiệu quả đo được.
   </div>
-  <p>Về việc <strong>xử lý câu hỏi</strong> trước khi truy xuất, hai kỹ thuật đáng biết: <em>viết lại truy vấn</em> cho hội thoại nhiều lượt — câu "còn cái kia thì sao?" không truy xuất được gì nếu không được viết lại thành câu hỏi đầy đủ; và <em>sinh nhiều truy vấn</em> từ một câu hỏi rồi hợp nhất kết quả, hữu ích khi câu hỏi có nhiều khía cạnh.</p>
+  <p>Về việc <strong>xử lý câu hỏi</strong> trước khi truy xuất, hai kỹ thuật đáng biết:</p>
+  <p><em>Viết lại truy vấn</em> cho hội thoại nhiều lượt — câu "còn cái kia thì sao?" không truy xuất được gì nếu không được viết lại thành câu hỏi đầy đủ;</p>
+  <p>Và <em>sinh nhiều truy vấn</em> từ một câu hỏi rồi hợp nhất kết quả, hữu ích khi câu hỏi có nhiều khía cạnh.</p>
 </section>
 
 <section id="rag-s11">
   <div class="sh"><b>11</b><h2>Sinh chữ và trích dẫn</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — SINH VÀ TRÍCH DẪN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Buộc trích dẫn theo số mảnh</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">người đọc kiểm được, đó là điểm chính</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Nhiệt độ thấp cho tác vụ tra cứu</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Vẫn bịa được dù có tài liệu</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">nên phải kiểm chéo câu trả lời với nguồn</text>
+</svg>
+  <figcaption>Ô sinh chữ, và lý do trích dẫn không phải trang trí.</figcaption>
+  </figure>
+
 <pre><code>Bạn là trợ lý trả lời dựa trên tài liệu được cung cấp.
 
 QUY TẮC:
@@ -319,6 +731,42 @@ CÂU HỎI: ...</code></pre>
 
 <section id="rag-s12">
   <div class="sh"><b>12</b><h2>Đánh giá — bắt buộc tách hai tầng</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — ĐÁNH GIÁ HAI TẦNG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Tầng truy xuất: recall và precision@k</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">đo riêng, không dính tới model sinh</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Tầng sinh: bám nguồn và trả lời đúng câu hỏi</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Gộp một điểm thì không biết sửa chỗ nào</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--ok)">Cần một tập câu hỏi vàng của chính miền bạn</text>
+</svg>
+  <figcaption>Vì sao một con số tổng là vô dụng khi đi sửa.</figcaption>
+  </figure>
+
   <p class="key">Không tách hai tầng thì <em>không debug được</em> — vì cách chữa hoàn toàn khác nhau.</p>
   <div class="cmp two">
     <div><h5>Tầng truy xuất — có lấy được đoạn đúng không?</h5><p><b>recall@k</b> đoạn chứa đáp án có nằm trong top-k · <b>MRR</b> nó xếp thứ mấy. Cần một bộ dữ liệu vàng: câu hỏi kèm đoạn nào chứa đáp án.</p></div>
@@ -338,6 +786,44 @@ CÂU HỎI: ...</code></pre>
 
 <section id="rag-s13">
   <div class="sh"><b>13</b><h2>Cây debug — khi RAG trả lời sai</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của RAG: model không biết dữ liệu riêng nên bịa, giai đoạn nạp cắt tài liệu thành mảnh và dựng index, giai đoạn truy xuất tìm mảnh liên quan bằng vector và từ khoá rồi xếp lại, giai đoạn sinh trả lời chỉ dựa trên mảnh lấy được kèm trích dẫn, và việc đánh giá phải tách hai tầng thì mới biết lỗi nằm ở đâu">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model không biết dữ liệu riêng của bạn</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">và bịa rất trôi chảy khi bị hỏi</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Nạp — cắt tài liệu thành mảnh tra được</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · dựng index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Truy xuất — tìm mảnh liên quan</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + từ khoá · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Sinh — trả lời chỉ dựa trên mảnh lấy được</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">dựng context · buộc trích dẫn</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Sai ở đâu thì phải đo được ở đó</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">tách hai tầng: truy xuất và sinh</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CÂY DEBUG</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">1. Mảnh đúng có nằm trong kho không</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">không thì lỗi ở bước nạp</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">2. Truy xuất có lấy được nó không</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không thì lỗi ở chunk hoặc embedding</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">3. Nó có nằm trong context gửi đi không</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">không thì lỗi ở rerank hoặc cắt bớt</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">4. Có mà vẫn sai thì mới là lỗi model sinh</text>
+</svg>
+  <figcaption>Bốn câu hỏi theo thứ tự, dừng ở câu đầu tiên trả lời không.</figcaption>
+  </figure>
+
   <p class="key">Đi từ trên xuống, dừng ở câu <em>đầu tiên</em> trả lời "không" — đó chính là chỗ hỏng.</p>
   <div class="stack">
     <div class="s"><b>1 · Thông tin đó có trong kho không?</b><span>không → vấn đề dữ liệu, không phải vấn đề RAG. Bổ sung tài liệu.</span></div>

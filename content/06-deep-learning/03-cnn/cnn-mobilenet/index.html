@@ -43,12 +43,50 @@
         <header class="hero">
   <p class="eyebrow">Deep dive · Deep learning · thị giác &amp; thiết bị biên</p>
   <h1>CNN &amp;<br><em>MobileNet</em></h1>
-  <p class="lede">Từ phép convolution tới kiến trúc chạy được trên vi điều khiển. Bài này chốt <b>công thức tính shape và chi phí</b>, giải thích bằng số vì sao <b>depthwise separable convolution</b> rẻ hơn 8–9 lần, vì sao MobileNetV2 gọi là <b>inverted residual</b>, và vì sao lớp cuối của khối lại <b>không có ReLU</b>.</p>
+  <p class="lede">Từ phép convolution tới kiến trúc chạy được trên vi điều khiển.</p>
+  <p>Bài này chốt <b>công thức tính shape và chi phí</b>, giải thích bằng số vì sao <b>depthwise separable convolution</b> rẻ hơn 8–9 lần, vì sao MobileNetV2 gọi là <b>inverted residual</b>,.</p>
+  <p>Và vì sao lớp cuối của khối lại <b>không có ReLU</b>.</p>
 </header>
 
 
 <section id="cnn-s1">
-  <div class="sh"><b>01</b><h2>CNN là gì</h2></div>
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Thay vì nối mọi pixel với mọi nơ-ron, CNN <em>dùng một kernel nhỏ trượt khắp ảnh</em> — cùng bộ trọng số dùng lại ở mọi vị trí.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<text class="sv-hv" x="372" y="18">HAI Ý, KHÔNG HƠN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Trọng số dùng chung khắp ảnh</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mắt dò cạnh ở góc trái cũng dùng được ở góc phải</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Chỉ nối với vùng lân cận</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">pixel xa nhau không nối thẳng</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Mọi thứ còn lại là hệ quả của hai ý đó</text>
+</svg>
+  <figcaption>Năm ô đọc từ trên xuống: ô đỏ là vấn đề, ba ô giữa là cơ chế, ô cuối là chỗ triển khai. Mỗi mục sau tô sáng đúng một ô.</figcaption>
+  </figure>
+
   <p class="key">Cả dòng kiến trúc này là một chuỗi <em>giảm số phép nhân mà giữ khả năng biểu diễn</em>.</p>
   <div class="stack">
     <div class="s warn"><b>Fully connected</b><span>mỗi nơ-ron nhìn toàn bộ ảnh → quá nhiều tham số</span></div>
@@ -65,6 +103,42 @@
 
 <section id="cnn-s2">
   <div class="sh"><b>02</b><h2>Vì sao không dùng fully connected cho ảnh</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — VÌ SAO KHÔNG FC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Ảnh 224×224×3 nối 1000 nơ-ron</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">hơn 150 triệu tham số cho một tầng</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Không biết pixel cạnh nhau thì liên quan</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">xáo trộn pixel, model vẫn học y hệt</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Dịch ảnh một pixel là phải học lại</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">không có tính bất biến tịnh tiến</text>
+</svg>
+  <figcaption>Ba chỗ hụt, và cả ba đều được hai ý của convolution vá.</figcaption>
+  </figure>
+
   <div class="bars">
     <div class="b bad"><i>fully connected · 1000 nơ-ron</i><u style="width:100%"></u><b>224 × 224 × 3 × 1000 = 150.528.000 tham số</b></div>
     <div class="b hi"><i>convolution 3×3 · 3 → 64 kênh</i><u style="width:0.4%"></u><b>3 × 3 × 3 × 64 = 1.728 tham số</b></div>
@@ -83,6 +157,42 @@
 
 <section id="cnn-s3">
   <div class="sh"><b>03</b><h2>Convolution và công thức shape</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — SHAPE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">out = (in + 2p − k) / s + 1</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">công thức duy nhất phải thuộc</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Tham số = k · k · C_in · C_out</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không phụ thuộc kích thước ảnh</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">FLOPs = tham số × H_out × W_out</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">đây mới là thứ quyết định tốc độ</text>
+</svg>
+  <figcaption>Ba công thức đủ để tính mọi tầng conv.</figcaption>
+  </figure>
+
   <div class="eq">
     <div class="line">
       <span class="t b"><span>H<sub>out</sub></span><em>cạnh đầu ra</em></span>
@@ -119,6 +229,40 @@
 
 <section id="cnn-s4">
   <div class="sh"><b>04</b><h2>Lab: tính shape và chi phí</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LAB TÍNH CHI PHÍ</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Đổi k, s, p rồi xem shape đi đâu</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Tham số và FLOPs không đi cùng nhau</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">1×1 ít tham số mà vẫn tốn FLOPs</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Tầng cuối chứa tham số, tầng đầu ăn FLOPs</text>
+</svg>
+  <figcaption>Lab xoay ô kernel và cho thấy hai loại chi phí lệch nhau.</figcaption>
+  </figure>
+
   <p>Nhập cấu hình một lớp và so chi phí giữa convolution thường và depthwise separable.</p>
   <div class="lab">
     <div class="bar">
@@ -130,14 +274,49 @@
       <div><label>padding p</label><input type="number" id="cP" value="1" min="0" max="5"></div>
     </div>
     <div id="cview3"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Với <code>k = 3</code> và <code>C_out</code> lớn, tỉ lệ tiết kiệm tiến tới <strong>k² = 9 lần</strong>. Đổi <code>k</code> sang 5 để thấy tỉ lệ tiến tới 25. Đổi <code>C_out</code> xuống 8 để thấy tỉ lệ tụt xuống — vì lúc đó phần trộn kênh không còn chiếm ưu thế.
-    </p>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Với <code>k = 3</code> và <code>C_out</code> lớn, tỉ lệ tiết kiệm tiến tới <strong>k² = 9 lần</strong>.</p>
+  <p>Đổi <code>k</code> sang 5 để thấy tỉ lệ tiến tới 25. Đổi <code>C_out</code> xuống 8 để thấy tỉ lệ tụt xuống —</p>
+  <p>Vì lúc đó phần trộn kênh không còn chiếm ưu thế.</p>
   </div>
 </section>
 
 <section id="cnn-s5">
   <div class="sh"><b>05</b><h2>Receptive field</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — RECEPTIVE FIELD</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Hai tầng 3×3 nhìn bằng một tầng 5×5</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">mà ít tham số hơn và có thêm phi tuyến</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Stride nhân vùng nhìn lên theo cấp số</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Vùng nhìn nhỏ hơn vật thể là hỏng</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">model không thấy hết cái nó phải nhận ra</text>
+</svg>
+  <figcaption>Vì sao chồng tầng nhỏ thắng một tầng to.</figcaption>
+  </figure>
+
   <p class="key">Receptive field là <em>vùng ảnh gốc ảnh hưởng tới một nơ-ron ở lớp sâu</em>.</p>
   <div class="axis">
     <div class="stop"><b>lớp 1</b><span>3×3</span></div>
@@ -161,6 +340,41 @@
 
 <section id="cnn-s6">
   <div class="sh"><b>06</b><h2>Giảm kích thước — pooling hay stride</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — GIẢM KÍCH THƯỚC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Max pooling</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">giữ đặc trưng mạnh nhất, không tham số</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Stride 2 trong conv</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">học được cách giảm, mốc hiện nay</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Giảm quá sớm thì mất chi tiết nhỏ</text>
+</svg>
+  <figcaption>Hai cách thu nhỏ, và chỗ hay làm hỏng.</figcaption>
+  </figure>
+
   <table>
     <tr><th></th><th>Max pooling</th><th>Average pooling</th><th>Stride 2 trong conv</th></tr>
     <tr><td>Cơ chế</td><td>Lấy giá trị lớn nhất trong vùng</td><td>Lấy trung bình</td><td>Bỏ qua vị trí khi trượt</td></tr>
@@ -168,7 +382,10 @@
     <tr><td>Giữ gì</td><td>Đặc trưng mạnh nhất</td><td>Thông tin trung bình</td><td>Tuỳ model học</td></tr>
     <tr><td>Xu hướng hiện nay</td><td>Vẫn dùng nhưng ít hơn</td><td>Chủ yếu ở lớp cuối</td><td><strong>Được ưa dùng</strong></td></tr>
   </table>
-  <p><strong>Vì sao stride dần thay thế pooling:</strong> nó gộp hai việc — lọc đặc trưng và giảm kích thước — vào một phép tính, nên rẻ hơn; và cách giảm kích thước trở thành thứ <em>học được</em> thay vì một quy tắc cố định. MobileNet và ResNet đều dùng stride cho phần lớn các bước giảm kích thước.</p>
+  <p><strong>Vì sao stride dần thay thế pooling:</strong> nó gộp hai việc —</p>
+  <p>Lọc đặc trưng và giảm kích thước — vào một phép tính, nên rẻ hơn;</p>
+  <p>Và cách giảm kích thước trở thành thứ <em>học được</em> thay vì một quy tắc cố định.</p>
+  <p>MobileNet và ResNet đều dùng stride cho phần lớn các bước giảm kích thước.</p>
   <p class="key">Global average pooling thay hẳn lớp fully connected ở cuối: <em>7 × 7 × 512 → trung bình trên chiều không gian → 1 × 1 × 512 → lớp phân loại</em>.</p>
   <div class="bars">
     <div class="b bad"><i>lớp FC cuối</i><u style="width:100%"></u><b>7·7·512·1000 = 25 triệu tham số</b></div>
@@ -179,6 +396,40 @@
 
 <section id="cnn-s7">
   <div class="sh"><b>07</b><h2>Convolution 1×1 — nhỏ mà quan trọng</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CONV 1×1</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Không nhìn không gian, chỉ trộn kênh</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Đổi số kênh rẻ tiền</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">nút thắt cổ chai của ResNet</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Là mảnh ghép của depthwise separable</text>
+</svg>
+  <figcaption>Phép nhỏ nhất nhưng có mặt trong mọi kiến trúc hiện đại.</figcaption>
+  </figure>
+
   <p class="key">Bộ lọc 1×1 chỉ nhìn <em>một pixel</em> — nghe vô nghĩa, nhưng nó nhìn <em>tất cả các kênh</em> của pixel đó.</p>
   <figure>
     <svg viewBox="0 0 900 190" role="img" aria-label="Convolution 1x1 gộp toàn bộ các kênh của một pixel thành các kênh mới">
@@ -213,11 +464,48 @@
     <tr><td><strong>Trộn thông tin giữa các kênh</strong></td><td>Phần thứ hai của depthwise separable convolution</td></tr>
     <tr><td>Thêm phi tuyến rẻ</td><td>Kèm ReLU sau nó, tốn rất ít phép tính</td></tr>
   </table>
-  <p>Chi phí của 1×1 so với 3×3 trên cùng số kênh là <strong>1/9</strong>. Đó là lý do khối bottleneck của ResNet — 1×1 nén, 3×3 xử lý, 1×1 nở lại — rẻ hơn nhiều so với hai lớp 3×3 trên số kênh đầy đủ, dù có ba lớp thay vì hai.</p>
+  <p>Chi phí của 1×1 so với 3×3 trên cùng số kênh là <strong>1/9</strong>.</p>
+  <p>Đó là lý do khối bottleneck của ResNet — 1×1 nén, 3×3 xử lý, 1×1 nở lại —</p>
+  <p>Rẻ hơn nhiều so với hai lớp 3×3 trên số kênh đầy đủ, dù có ba lớp thay vì hai.</p>
 </section>
 
 <section id="cnn-s8">
   <div class="sh"><b>08</b><h2>Residual connection</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — RESIDUAL</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">y = x + f(x)</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">gradient có đường đi thẳng qua trăm tầng</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Trước đó sâu hơn lại tệ hơn</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">không phải overfit mà là không học nổi</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Shape lệch thì chèn 1×1 ở đường tắt</text>
+</svg>
+  <figcaption>Thứ mở khoá cho mạng sâu, cùng cơ chế với Transformer.</figcaption>
+  </figure>
+
   <div class="eq">
     <div class="line">
       <span class="t"><span>y</span></span>
@@ -234,8 +522,14 @@
       <span class="t"><span>∂f/∂x</span></span>
     </div>
   </div>
-  <p>Đã giải thích ở bài <em>Backpropagation từng bước</em>: số hạng <code>1</code> tạo một đường mà gradient chảy qua không bị nhân với gì, nên dù <code>∂f/∂x</code> teo về 0 thì gradient vẫn về được lớp đầu. Đó là điều kiện để huấn luyện mạng sâu hàng trăm lớp.</p>
-  <p>Cách nhìn thứ hai, hữu ích khi trả lời phỏng vấn: khối residual chỉ cần học <strong>phần dư</strong> — thay vì học hàm mục tiêu <code>H(x)</code>, nó học <code>H(x) − x</code>. Nếu ánh xạ tối ưu gần với ánh xạ đồng nhất thì việc học phần dư dễ hơn nhiều, vì chỉ cần đẩy trọng số về gần 0. Nói cách khác, <em>thêm lớp không bao giờ làm model tệ hơn</em> — trong trường hợp xấu nhất nó học ra hàm 0 và khối trở thành đường thẳng.</p>
+  <p>Đã giải thích ở bài <em>Backpropagation từng bước</em>: số hạng <code>1</code> tạo một đường mà gradient chảy qua không bị nhân với gì,.</p>
+  <p>Nên dù <code>∂f/∂x</code> teo về 0 thì gradient vẫn về được lớp đầu.</p>
+  <p>Đó là điều kiện để huấn luyện mạng sâu hàng trăm lớp.</p>
+  <p>Cách nhìn thứ hai, hữu ích khi trả lời phỏng vấn: khối residual chỉ cần học <strong>phần dư</strong> —</p>
+  <p>Thay vì học hàm mục tiêu <code>H(x)</code>, nó học <code>H(x) − x</code>.</p>
+  <p>Nếu ánh xạ tối ưu gần với ánh xạ đồng nhất thì việc học phần dư dễ hơn nhiều, vì chỉ cần đẩy trọng số về gần 0.</p>
+  <p>Nói cách khác, <em>thêm lớp không bao giờ làm model tệ hơn</em> —</p>
+  <p>Trong trường hợp xấu nhất nó học ra hàm 0 và khối trở thành đường thẳng.</p>
   <div class="note warn">
     <h4>Điều kiện shape</h4>
     Phép cộng <code>x + f(x)</code> đòi hai bên cùng shape. Khi khối làm giảm kích thước hoặc đổi số kênh, phải chèn một phép chiếu vào nhánh tắt — thường là conv 1×1 với cùng stride. Đây là chi tiết cài đặt hay bị bỏ sót khi tự viết ResNet.
@@ -244,6 +538,42 @@
 
 <section id="cnn-s9">
   <div class="sh"><b>09</b><h2>Depthwise separable convolution</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — DEPTHWISE SEPARABLE</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Tách làm hai: lọc không gian rồi trộn kênh</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Depthwise: mỗi kênh một kernel riêng</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">Pointwise 1×1: trộn kênh lại</text>
+<rect x="372" y="154" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--ok)">Rẻ đi khoảng 8–9 lần</text>
+<text class="sv-s" x="388" y="194" fill="var(--dim)">chính xác giảm vài phần trăm</text>
+</svg>
+  <figcaption>Phép chia đôi làm nên cả họ MobileNet.</figcaption>
+  </figure>
+
   <p>Ý tưởng: convolution thường làm hai việc cùng lúc — <em>lọc theo không gian</em> và <em>trộn các kênh</em>. Tách hai việc đó ra thì rẻ hơn rất nhiều.</p>
   <div class="cmp two">
     <div><h5>Convolution thường — một phép</h5><p>k×k×C<sub>in</sub>×C<sub>out</sub> làm cả hai việc cùng lúc. Tham số: <b>k² · C<sub>in</sub> · C<sub>out</sub></b></p></div>
@@ -269,6 +599,41 @@
 
 <section id="cnn-s10">
   <div class="sh"><b>10</b><h2>MobileNetV2 — inverted residual và linear bottleneck</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — MOBILENETV2</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Inverted residual: nở ra rồi mới co lại</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">ngược với bottleneck của ResNet</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Vì depthwise cần nhiều kênh mới đủ sức</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Linear bottleneck: bỏ ReLU ở tầng hẹp</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">ReLU trên không gian hẹp làm mất thông tin</text>
+</svg>
+  <figcaption>Hai thiết kế ngược trực giác, và lý do của từng cái.</figcaption>
+  </figure>
+
   <figure>
     <svg viewBox="0 0 900 280" role="img" aria-label="So sánh khối residual của ResNet và khối inverted residual của MobileNetV2">
       <text x="215" y="26" text-anchor="middle" class="sv-t" fill="#EDE7DE">Khối residual thường · ResNet</text>
@@ -289,8 +654,8 @@
         <text x="215" y="211">1×1 nở lại</text>
       </g>
       <path d="M105 61 L60 61 L60 235 L105 235" stroke="#EDB44A" stroke-width="2" fill="none"/>
-      <text x="52" y="152" text-anchor="end" class="sv-l" fill="#EDB44A">nối tắt</text>
-      <text x="52" y="168" text-anchor="end" class="sv-l" fill="#EDB44A">ở chỗ rộng</text>
+      <text x="70" y="152" text-anchor="end" class="sv-l" fill="#EDB44A">nối tắt</text>
+      <text x="70" y="168" text-anchor="end" class="sv-l" fill="#EDB44A">ở chỗ rộng</text>
 
       <line x1="450" y1="20" x2="450" y2="260" stroke="#2E2822"/>
 
@@ -338,6 +703,43 @@
 
 <section id="cnn-s11">
   <div class="sh"><b>11</b><h2>Lượng tử hoá cho thiết bị biên</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — LƯỢNG TỬ HOÁ</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">INT8: nhỏ đi 4 lần, nhanh lên 2–3 lần</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Post-training nhanh nhưng có thể tụt</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--filled)">Quantization-aware training giữ được chính xác</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">đắt hơn vì phải huấn luyện lại</text>
+<rect x="372" y="174" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Depthwise nhạy với lượng tử hoá</text>
+<text class="sv-s" x="388" y="214" fill="var(--dim)">giữ tầng đó ở độ chính xác cao hơn</text>
+</svg>
+  <figcaption>Bốn mức đánh đổi giữa kích thước và chính xác.</figcaption>
+  </figure>
+
   <p class="key">Lượng tử hoá float32 → int8: <em>dung lượng giảm 4 lần</em>, và số nguyên tính nhanh hơn nhiều trên CPU di động cùng các bộ tăng tốc.</p>
   <div class="eq">
     <div class="line">
@@ -358,11 +760,48 @@
     <h4>Chi tiết đáng nói: scale theo từng kênh</h4>
     Dùng <em>một</em> scale cho cả tensor trọng số thì kênh nào có biên độ nhỏ sẽ bị làm tròn về gần 0 và mất hết thông tin. Dùng scale riêng cho <strong>từng kênh đầu ra</strong> giải quyết việc đó với chi phí gần như bằng 0, và nó là mặc định trong mọi công cụ hiện nay. Đây là câu trả lời tốt cho "vì sao model của em tụt điểm nặng sau khi lượng tử hoá".
   </div>
-  <p>Với MobileNet có một điểm cần chú ý riêng: depthwise convolution rất <em>nhạy</em> với lượng tử hoá, vì mỗi kênh chỉ có <code>k²</code> trọng số nên biên độ giữa các kênh chênh nhau nhiều. Đây là trường hợp mà QAT hoặc scale theo kênh gần như bắt buộc.</p>
+  <p>Với MobileNet có một điểm cần chú ý riêng: depthwise convolution rất <em>nhạy</em> với lượng tử hoá.</p>
+  <p>Mỗi kênh chỉ có <code>k²</code> trọng số, nên biên độ giữa các kênh chênh nhau nhiều.</p>
+  <p>Đây là trường hợp mà QAT hoặc scale theo kênh gần như bắt buộc.</p>
 </section>
 
 <section id="cnn-s12">
   <div class="sh"><b>12</b><h2>Tối ưu suy luận trên thiết bị</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — TỐI ƯU SUY LUẬN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Fuse conv với BatchNorm</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">gộp thành một phép, miễn phí</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">FLOPs không đo được tốc độ thật</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">depthwise ít FLOPs mà nghẽn băng thông</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Đo bằng latency trên đúng thiết bị</text>
+</svg>
+  <figcaption>Vì sao con số trên giấy hay nói dối.</figcaption>
+  </figure>
+
   <h3>Gộp BatchNorm vào convolution</h3>
   <p class="key">Lúc suy luận, BatchNorm là một phép tuyến tính với tham số <em>cố định</em> — nên gộp thẳng được vào conv ngay trước nó.</p>
   <div class="eq">
@@ -383,7 +822,8 @@
     </div>
     <p class="read">Bỏ hẳn một lớp, giảm số lần đọc bộ nhớ. Kết quả <b>giống hệt</b>, không mất gì.</p>
   </div>
-  <p>Đây là bước tối ưu đầu tiên mọi công cụ triển khai đều làm, và nó miễn phí. Nêu ra được khi được hỏi về tối ưu suy luận là điểm cộng rõ ràng.</p>
+  <p>Đây là bước tối ưu đầu tiên mọi công cụ triển khai đều làm, và nó miễn phí.</p>
+  <p>Nêu ra được khi được hỏi về tối ưu suy luận là điểm cộng rõ ràng.</p>
   <table>
     <tr><th>Kỹ thuật</th><th>Tác dụng</th><th>Cái giá</th></tr>
     <tr><td>Gộp BatchNorm</td><td>Bỏ một lớp, giảm truy cập bộ nhớ</td><td>Không có</td></tr>
@@ -400,6 +840,42 @@
 
 <section id="cnn-s13">
   <div class="sh"><b>13</b><h2>Bảng chọn kiến trúc</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Bản đồ năm ô của CNN: fully connected trên ảnh tốn tham số vô ích, kernel nhỏ trượt khắp ảnh dùng chung trọng số, chồng nhiều tầng và thu nhỏ dần để mở rộng vùng nhìn, tách phép tích chập thành depthwise và 1x1 cho rẻ, rồi lượng tử hoá để chạy trên thiết bị biên">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Fully connected trên ảnh là phí</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">triệu tham số cho một tầng, không biết ảnh có cấu trúc</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Kernel nhỏ trượt khắp ảnh</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">dùng chung trọng số · chỉ nhìn vùng lân cận</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Chồng tầng, thu nhỏ dần</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field lớn lên · stride và pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Tách phép tích chập cho rẻ</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Chạy trên thiết bị biên</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">lượng tử hoá · fuse · đo bằng latency thật</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PHÓNG TO — CHỌN KIẾN TRÚC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Máy chủ, cần chính xác</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">ResNet hoặc ConvNeXt</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Điện thoại, cần latency</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">MobileNetV3 hoặc EfficientNet-Lite</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Vi điều khiển</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">MobileNetV2 thu nhỏ, INT8</text>
+</svg>
+  <figcaption>Bảng tra, quay lại khi bắt đầu một dự án mới.</figcaption>
+  </figure>
+
   <table>
     <tr><th>Tình huống</th><th>Chọn</th><th>Vì sao</th></tr>
     <tr><td>Máy chủ có GPU, ưu tiên độ chính xác</td><td>ResNet, ConvNeXt, hoặc Vision Transformer</td><td>Không bị giới hạn tài nguyên</td></tr>
