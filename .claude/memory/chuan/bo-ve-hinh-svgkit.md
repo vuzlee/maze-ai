@@ -3,7 +3,7 @@ name: bo-ve-hinh-svgkit
 description: tools/svgkit là bộ vẽ hình dùng chung cho luật 1 — dùng nó, đừng chép sang /tmp; và bảy chỗ máy soát KHÔNG bắt được
 metadata:
   type: reference
-updated: 2026-09-05
+updated: 2026-09-07
 ---
 
 # Bộ vẽ hình luật 1 nằm ở `tools/svgkit/`, không ở `/tmp`
@@ -72,3 +72,27 @@ chỉ dành cho kiểu hỏng mà mỗi lớp mua thêm.
 
 Xem thêm [[chuan-bai-mau]] (luật 1 là gì), [[it-chu-nhieu-hinh]] (đo bằng chữ/hình),
 [[sua-nhanh-it-vong-kiem]] (khi nào cần chụp ảnh).
+
+## `check.py` là SÀNG, `getBBox` là TRỌNG TÀI (07/09)
+
+Ba lỗi chồng nhau, tìm ra khi soát `svm` sau đợt sửa `hard margin`:
+
+1. **`__main__` đưa cả file HTML vào `check()`** — mà `check()` nhận đúng MỘT `<svg>`. `parse()`
+   vớ phải `viewBox` đầu tiên là **icon kính lúp 24×24** trong thanh tìm kiếm, rồi đo mọi hình
+   bằng khung 24×24 → `svm` báo **190 lỗi**, toàn bộ là ma. Đã sửa: lặp từng `<svg>` có `<text>`,
+   và in kèm `[svg i]` để biết hình nào.
+2. **Bảng bề rộng lấy theo chữ RỘNG NHẤT**, phồng ~10%. Đo thật bằng `getBBox` trên vài trăm nhãn:
+   `sv-s` thật tối đa 5,58/ký tự chứ không phải 6,33. Đã hiệu chỉnh cả bảng theo trần đo thật + 3%.
+3. **Phép 3 đoán ô bao bằng ô nhỏ nhất phủ điểm neo** — chữ `text-anchor="end"/"middle"` neo ở mép
+   nên rơi vào ô hàng xóm rồi bị kết là "thò ra". Không chữa được bằng nới `TOL`; đã ghi rõ trong
+   header của `check.py`.
+
+Kết cục: `check.py` kêu 21 chỗ ở 9 bài, **`getBBox` thật đo 0 ở cả 9**. `TOL` nâng 0,5 → 12px cho
+đúng biên sai số của phép ước theo ký tự.
+
+> **Luật:** `check.py` chỉ khoanh vùng nghi. **Chỉ sửa bài khi bbox thật cũng kêu.** Sửa theo mình
+> `check.py` là đi dời chữ trong những hình vốn không sao.
+
+Ngược lại, cả hai thước cùng chỉ một chỗ thì đó là thật: 5 cặp nhãn ở `iterator-generator` và
+`memory-management-gc` xếp cách nhau 14px (chuẩn của kho là 18px) — nới ra 17–18px là hết.
+Xem thêm [[kiem-lai-chinh-cai-thuoc]].

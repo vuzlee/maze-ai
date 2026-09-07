@@ -17,7 +17,7 @@ Hai thư mục, phân theo tuổi thọ:
 - [Quy ước viết bài overview](chuan/quy-uoc-viet-overview.md) — macro→micro, không ép khuôn, không nhồi timeline
 - [Khuôn .eq cho công thức](chuan/khuon-eq-cong-thuc.md) — chọn HTML thay KaTeX; ranh giới .eq vs `<pre>`; vẽ đường cong bằng SVG
 - [Cách trả lời: thật ngắn](chuan/cach-tra-loi-ngan-gon.md) — phần giao diện nói kết quả nhìn thấy, đừng kể tên class
-- [Kiểm lại chính cái thước](chuan/kiem-lai-chinh-cai-thuoc.md) — bảng nghiệm thu toàn số 0 không chứng minh gì nếu chưa kiểm thước; thước phải in số file đã đọc, regex thì chép chứ đừng viết lại
+- [Kiểm lại chính cái thước](chuan/kiem-lai-chinh-cai-thuoc.md) — bảng nghiệm thu toàn số 0 không chứng minh gì nếu chưa kiểm thước; thước phải in số file đã đọc, regex thì chép chứ đừng viết lại; **`svgkit/check.py` chỉ là sàng — chỉ sửa hình khi `getBBox` thật cũng kêu**
 - [Soát tự động: 8 phép](chuan/soat-tu-dong-8-phep.md) — luật kiểm được bằng máy thì nằm ở `tools/soat.py`; thuật ngữ sống trên 5 bề mặt; cách quyết định một chữ có phải thuật ngữ
 - [Bộ vẽ hình svgkit](chuan/bo-ve-hinh-svgkit.md) — `tools/svgkit` dùng chung, đừng chép sang `/tmp`; bảy chỗ máy soát KHÔNG bắt: hình đúng hình học mà sai ý, số bịa, hình nói ngược đoạn văn bên cạnh, một màu hai nghĩa
 - [Sửa nhanh, ít vòng kiểm](chuan/sua-nhanh-it-vong-kiem.md) — chụp ảnh xác minh chỉ khi đổi hình học, không phải mọi lần sửa chữ

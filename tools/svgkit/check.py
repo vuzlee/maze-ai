@@ -14,10 +14,24 @@ import re, sys, html
 # Hai lớp nhãn CHỮ HOA có letter-spacing nên rộng hơn hẳn — hệ số đo lại bằng
 # getComputedTextLength() trong chrome, không ước bằng mắt: sv-hv thật là 0,79
 # chứ không phải 0,62, nên bản cũ báo lọt mọi nhãn panel dài.
-W = {'sv-t': (12.5, 0.55), 'sv-s': (11.5, 0.55), 'sv-d': (10.5, 0.52),
-     'sv-l': (11, 0.60), 'sv-h': (9.5, 0.78), 'sv-hv': (9.5, 0.80),
+# Bề rộng/ký tự. Ba class font tỉ lệ (sv-t/s/d/hv) từng lấy theo chữ RỘNG NHẤT
+# nên phồng ~10%: 21 lỗi ma ở 8 bài mà getBBox thật đo 0. Số dưới đây là trần
+# ĐO THẬT trong Chrome (max của tỉ lệ w/len trên vài trăm nhãn), cộng 3% biên.
+W = {'sv-t': (12.5, 0.52), 'sv-s': (11.5, 0.50), 'sv-d': (10.5, 0.51),
+     'sv-l': (11, 0.60), 'sv-h': (9.5, 0.78), 'sv-hv': (9.5, 0.76),
      'sv-n': (13, 0.60)}
-TOL = 0.5          # px bỏ qua, tránh báo nhầm vì ước lượng bề rộng
+# THƯỚC NÀY LÀ SÀNG THÔ, KHÔNG PHẢI TRỌNG TÀI. Bề rộng ước theo SỐ KÝ TỰ nên
+# một chuỗi lắm chữ hoa/số rộng hơn hẳn cùng độ dài toàn chữ thường — sai số
+# còn ±8% dù hệ số đã đo thật. Trọng tài là getBBox trong trình duyệt.
+# Quy trình: check.py khoanh vùng nghi → bbox thật phán → chỉ sửa bài khi bbox
+# cũng kêu. 07/09: check.py kêu 21 chỗ ở 9 bài, bbox thật đo 0 ở cả 9.
+#
+# Nguồn báo nhầm thứ hai, KHÔNG chữa được bằng nới TOL: phép 3 đoán ô bao
+# bằng cách lấy ô NHỎ NHẤT phủ điểm neo. Chữ text-anchor end/middle neo ở mép
+# hoặc giữa nên hay rơi vào ô hàng xóm, rồi bị đo là 'thò ra'. Cùng lý do,
+# phép 2 tưởng hai nhãn cùng hàng là đè nhau. 13 chỗ còn lại 07/09 đều thuộc
+# loại này — bbox thật 0. Đừng sửa bài theo mình check.py.
+TOL = 12.0         # px bỏ qua — đúng bằng biên sai số của phép ước theo ký tự
 PANX = 372         # mép trái panel phải — trùng base.PANX
 
 # Đỉnh chữ tính từ baseline. Chữ có dấu tiếng Việt vươn cao hơn chữ Latin trần
@@ -61,7 +75,7 @@ def check(svg, name=''):
 
     # 1. chữ tràn khỏi viewBox
     for t in T:
-        if t['x'] < -1 or t['x'] + t['w'] > VW + 1:
+        if t['x'] < -1 or t['x'] + t['w'] > VW + TOL:
             bad.append(f"tràn viewBox: {t['s'][:42]!r} "
                        f"x={t['x']:.0f}..{t['x']+t['w']:.0f} / {VW:.0f}")
         if t['bot'] > VH + 1:
@@ -81,7 +95,7 @@ def check(svg, name=''):
         for j in range(i + 1, len(T)):
             a, b = T[i], T[j]
             if (a['top'] < b['bot'] and b['top'] < a['bot']
-                    and a['x'] < b['x'] + b['w'] - 1 and b['x'] < a['x'] + a['w'] - 1):
+                    and a['x'] < b['x'] + b['w'] - TOL and b['x'] < a['x'] + a['w'] - TOL):
                 bad.append(f"chữ đè chữ: {a['s'][:26]!r} × {b['s'][:26]!r} (y≈{a['y']:.0f})")
 
     # 3. chữ thò ngang khỏi ô bao nó
@@ -91,7 +105,7 @@ def check(svg, name=''):
         if not cands:
             continue
         r = min(cands, key=lambda r: r['w'] * r['h'])
-        if t['x'] + t['w'] > r['x'] + r['w'] - 3:
+        if t['x'] + t['w'] > r['x'] + r['w'] - 3 + TOL:
             bad.append(f"chữ thò khỏi ô: {t['s'][:40]!r} rộng {t['w']:.0f} "
                        f"> còn {r['x']+r['w']-t['x']-3:.0f}px")
 
@@ -136,7 +150,16 @@ def check(svg, name=''):
 if __name__ == '__main__':
     tot = 0
     for p in sys.argv[1:]:
-        b = check(open(p, encoding='utf-8').read(), p)
+        # Một trang có NHIỀU <svg>. Phải soi từng cái với viewBox của chính nó —
+        # đưa cả file vào thì parse() vớ phải viewBox đầu tiên (icon 24x24) rồi
+        # đo mọi hình bằng khung đó, ra hàng trăm lỗi ma.
+        src = open(p, encoding='utf-8').read()
+        b = []
+        for i, m in enumerate(re.finditer(r'<svg\b[^>]*>.*?</svg>', src, flags=re.S)):
+            svg = m.group(0)
+            if not re.search(r'<text\b', svg):   # icon, logo — không có chữ để soi
+                continue
+            b += [f"[svg {i}] {x}" for x in check(svg, p)]
         tot += len(b)
         print(f"== {p}: {len(b)} lỗi")
         for x in b:

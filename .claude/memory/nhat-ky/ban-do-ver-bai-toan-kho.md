@@ -1276,3 +1276,43 @@ bbox thật (Chrome)      : 0
 
 Sao lưu `/tmp/l1/backup-content` **đã cũ** (trước 8 chỗ tách tay, 15 câu cụt, và đợt SVM) —
 đừng khôi phục từ nó.
+
+### Bổ sung cuối 07/09 — `hard margin` và ba lỗi của `check.py`
+
+Người đọc hỏi *"có hard margin chưa svm ý"*. **Chưa** — bài nhảy thẳng vào soft margin mà không
+đặt tên cho bản gốc nó chữa. Đã bù ở §03: hard margin là gì, hỏng theo hai kiểu (chồng lấn dù một
+điểm → **vô nghiệm**; một nhiễu kéo cả đường vì ràng buộc tuyệt đối), và thêm dòng `C → ∞` vào
+bảng để khép vòng về hard margin.
+
+> Luật rút ra: **soft/hard là một cặp — nói cái sau thì phải đặt tên cái trước.** Cùng loại với
+> "câu định nghĩa không chứa thuật ngữ chưa giải thích": ở đây là ngược lại, giải thích bản chữa
+> mà không nói bản bị chữa.
+
+Soát lại bài thì `check.py` báo **190 lỗi** — hoá ra là ba lỗi của chính thước, không phải của bài.
+Chi tiết ở [[bo-ve-hinh-svgkit]]. Tóm: đưa cả file vào hàm chỉ nhận một `<svg>` (vớ phải icon
+24×24), bảng bề rộng phồng 10%, và phép đoán ô bao sai với `text-anchor` end/middle.
+`check.py` kêu 21 chỗ ở 9 bài, **bbox thật đo 0 ở cả 9**.
+
+Thu hoạch thật từ đợt này: 5 cặp nhãn xếp cách 14px (chuẩn kho 18px) ở `iterator-generator` và
+`memory-management-gc` — cả hai thước cùng chỉ, nới ra là hết.
+
+Lần thứ hai trong một ngày, chỗ hỏng nằm ở **thước**, không ở bài.
+
+### Nghiệm thu chốt 07/09
+
+```
+bài đã viết             : 128 (in ra số bài, không chỉ TONG)
+build.py                : 200 bài · 62 nhóm · 1456 mục tìm · 506 thẻ ôn · meta khớp
+soat.py (8 phép)        : 0
+đoạn >33 từ (m33c)      : 0
+câu cắt cụt             : 0
+bbox thật (Chrome)      : 0
+490px (Chrome)          : 0
+svgkit/check.py         : còn 13 chỗ — ĐÃ ĐỐI CHIẾU, toàn bộ là báo nhầm do phép
+                          đoán ô bao với text-anchor end/middle; bbox thật 0.
+```
+
+Tổng thu hoạch hình trong ngày: **10 cặp nhãn** xếp 13–14px được nới về 17–18px
+(`iterator-generator` 3 · `memory-management-gc` 2 · `query-tuning` 2 ·
+`sql-window-functions` 1 · `transaction-isolation` 2), cộng nhãn `x=0` ở `sliding-window`.
+**Chuẩn giãn dòng trong SVG của kho: 17–18px. Dưới 15px là hai dòng chạm mép font.**
