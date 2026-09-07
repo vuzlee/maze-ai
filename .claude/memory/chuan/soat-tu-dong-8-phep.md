@@ -3,7 +3,7 @@ name: soat-tu-dong-8-phep
 description: "tools/soat.py giữ 8 phép soát tự động — luật viết bài nào kiểm được bằng máy thì nằm ở đó, đừng viết script tạm nữa"
 metadata:
   type: feedback
-updated: 2026-09-05
+updated: 2026-09-07
 ---
 
 Luật nào **kiểm được bằng máy** thì phải nằm trong `tools/soat.py`, không viết script tạm rồi vứt.
@@ -45,3 +45,8 @@ có nghĩa cố định và tụt dần thấy được.
 5. **Số của `soat.py` không thay được mắt.** Ở `sql-window-functions`, `check.py` báo 0 lỗi hình
    học nhưng ảnh chụp cho thấy hai chú thích cột nằm dưới **sai cột**, và khung nét đứt đè lên
    hàng nhãn. Đổi hình học là phải chụp ([[sua-nhanh-it-vong-kiem]]).
+
+**07/09 — thêm vào từ điển phép 6:** `lề mềm`→`soft margin`, `lề cứng`→`hard margin`. Chỉ thêm
+**cụm hai chữ**, không thêm `lề` trần: `lề` một mình còn nghĩa thường (lề trang, lề trái) nên sẽ
+kêu oan hàng loạt. Luật chung cho từ điển này: **từ nào có nghĩa thường song song thì chỉ bắt
+dạng đủ cụm.** Gốc chuyện ở [[thuat-ngu-chuan-va-nguon-tham-khao]].

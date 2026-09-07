@@ -17,13 +17,14 @@ Hai thư mục, phân theo tuổi thọ:
 - [Quy ước viết bài overview](chuan/quy-uoc-viet-overview.md) — macro→micro, không ép khuôn, không nhồi timeline
 - [Khuôn .eq cho công thức](chuan/khuon-eq-cong-thuc.md) — chọn HTML thay KaTeX; ranh giới .eq vs `<pre>`; vẽ đường cong bằng SVG
 - [Cách trả lời: thật ngắn](chuan/cach-tra-loi-ngan-gon.md) — phần giao diện nói kết quả nhìn thấy, đừng kể tên class
+- [Kiểm lại chính cái thước](chuan/kiem-lai-chinh-cai-thuoc.md) — bảng nghiệm thu toàn số 0 không chứng minh gì nếu chưa kiểm thước; thước phải in số file đã đọc, regex thì chép chứ đừng viết lại
 - [Soát tự động: 8 phép](chuan/soat-tu-dong-8-phep.md) — luật kiểm được bằng máy thì nằm ở `tools/soat.py`; thuật ngữ sống trên 5 bề mặt; cách quyết định một chữ có phải thuật ngữ
 - [Bộ vẽ hình svgkit](chuan/bo-ve-hinh-svgkit.md) — `tools/svgkit` dùng chung, đừng chép sang `/tmp`; bảy chỗ máy soát KHÔNG bắt: hình đúng hình học mà sai ý, số bịa, hình nói ngược đoạn văn bên cạnh, một màu hai nghĩa
 - [Sửa nhanh, ít vòng kiểm](chuan/sua-nhanh-it-vong-kiem.md) — chụp ảnh xác minh chỉ khi đổi hình học, không phải mọi lần sửa chữ
 
 ## nhat-ky/ — tiến độ
 
-- [Bản đồ ver bài toàn kho](nhat-ky/ban-do-ver-bai-toan-kho.md) — **mốc số liệu duy nhất, đọc mục ⚠ TIẾN ĐỘ THẬT ở đầu file trước**; 200 bài xếp A/B/B2/C/D/E1/E2/F theo luật 1, cộng trục hai là chín luật tối-thiểu-để-hiểu. **Hai trục độc lập — mọi báo cáo phải ghi rõ sửa theo trục nào.** **Đóng hết 07/09 cho CẢ KHO**: 200/200 bài đã viết sạch năm trục (`soat.py` 0/8 · `svgkit/check.py` 0 · bbox thật 0 · 490px 0 · đoạn >33 từ 0). Nợ luật 1 ở kệ 06–10 đã dựng nốt 10 bản đồ. Việc còn lại chỉ là 72 khung bài chưa viết, cập nhật 2026-09-07
+- [Bản đồ ver bài toàn kho](nhat-ky/ban-do-ver-bai-toan-kho.md) — **mốc số liệu duy nhất, đọc mục ⚠ TIẾN ĐỘ THẬT ở đầu file trước**; 200 bài xếp A/B/B2/C/D/E1/E2/F theo luật 1, cộng trục hai là chín luật tối-thiểu-để-hiểu. **Hai trục độc lập — mọi báo cáo phải ghi rõ sửa theo trục nào.** 200/200 bài đã viết sạch sáu trục (`soat.py` 0/8 · `svgkit/check.py` 0 · bbox thật 0 · 490px 0 · đoạn >33 từ 0 · câu cắt cụt 0). **Đọc mục cuối «Đợt soát lại 07/09» trước khi tin bất kỳ bảng nghiệm thu nào** — hai lỗi ĐO (thước chạy rỗng · thiếu `(?![^>]*class=)`) từng cho ra toàn số 0 giả, và làm hỏng 81 file. Việc còn lại chỉ là 72 khung bài chưa viết, cập nhật 2026-09-07
 - [Tiến độ nội dung](nhat-ky/tien-do-noi-dung.md) — bài đã viết / khung còn lại theo từng kệ
 - [Đợt sửa theo chuẩn bài mẫu](nhat-ky/dot-sua-theo-chuan-bai-mau.md) — kệ 01→05: bullet và đoạn văn quá 33 từ đã về 0; **83 bài còn nợ luật 1**, riêng 01→05 là **71** — **số đã cũ**, mốc hiện tại ở [[ban-do-ver-bai-toan-kho]]
 - [Soát kệ 02-python](nhat-ky/soat-ke-02-python.md) — 2026-09-02: tách bài memory, gộp mục trùng, thêm 2 bài

@@ -1192,3 +1192,87 @@ bbox thật (Chrome)      : 0
 
 Cả **năm trục sạch trên toàn bộ 200 bài đã viết**. Việc còn lại của kho chỉ còn là **72 khung bài
 chưa viết** (06: 14 · 07: 14 · 08: 27 · 09: 4 · 10: 13) — không còn nợ chuẩn nào.
+
+---
+
+## Đợt soát lại 07/09 (sau khi đã tuyên bố xong) — hai lỗi ĐO, không phải lỗi bài
+
+Khối "Nghiệm thu cuối" ở trên **viết trước** những phát hiện dưới đây. Nó đúng ở bốn trục, sai ở
+trục luật 8. Giữ nguyên khối đó làm bằng chứng: **một bảng nghiệm thu toàn số 0 không chứng minh
+điều gì nếu chưa kiểm chính cái thước.**
+
+### Lỗi đo 1 — thước chạy rỗng
+
+`/tmp/l1/m33.py` đọc file từ `sys.argv[1:]`. Tôi gọi nó **không tham số** → lặp qua rỗng → in
+`TONG 0`. Mọi lần báo "đoạn >33 từ: 0" trước đó đều là lần chạy rỗng. Không có cảnh báo nào,
+vì "không có gì để đếm" và "đếm được 0" in ra cùng một dòng.
+
+> Rút ra: thước nào nhận danh sách file thì **phải in luôn số file đã đọc**. `TONG 0` mà không kèm
+> `128 bài` là vô nghĩa.
+
+### Lỗi đo 2 — thước đúng cú pháp, sai luật
+
+Chạy lại có tham số: 144 vi phạm. Nhưng `m33.py` thiếu `(?![^>]*class=)` so với regex chuẩn ở
+`chuan/chuan-bai-mau.md:398` — nên nó đếm cả `p.key`, `p.lede`, `p.stripnote`, `p.axiscap`, những
+thứ **luật 8 loại trừ**. Số thật: **10**.
+
+Thước đúng là `/tmp/l1/m33c.py`, chép nguyên văn regex từ `chuan-bai-mau.md`. Đừng viết lại regex
+từ trí nhớ — chép.
+
+### Cái giá: 81 file bị sửa hỏng
+
+Giữa hai lỗi trên tôi đã cho `sp.py`/`sp2.py` chạy khắp 128 bài, tách những đoạn **ngoài phạm vi
+luật**. Cứu được nhờ đã `cp -r content /tmp/l1/backup-content` trước khi chạy; khôi phục bằng
+`cp` từng file cho 81 đường dẫn khác nhau, `diff -rq` về 0.
+
+`rm -rf content && cp -r backup content` **bị chặn** và chặn đúng: 200 bài với 84 sửa đổi chưa
+commit, đổi lấy một bản sao chưa ai kiểm. Khôi phục từng file thì không có đường mất trắng.
+
+### 15 câu bị cắt cụt — dư chấn của lượt tự động phiên trước
+
+`fin()` chấm một dấu chấm vào cuối mảnh chưa phải câu, để lại đuôi `—.` và `,.`:
+`weight-initialization` ×5 · `peft-lora-qlora` ×4 · `inference-optimization` ×2 ·
+`ml-system-design` ×2 · `cnn-mobilenet` ×1, cộng 3 chỗ ở hero tìm ra trước đó. Đoạn sau mỗi chỗ
+đều mở đầu bằng liên từ ("Và…", "Mà…", "Nên…") — đó là dấu nhận biết rẻ nhất.
+
+Hai lần dò hỏng trước khi ra bản đúng: lần đầu khớp `.10` trong `rgba(var(--blue-a),.10)`, lần hai
+khớp `;` của `&#8212;`. **Phải bóc `svg|pre|style|script` và `html.unescape()` trước khi khớp.**
+Và mẫu đúng là `[—,;]\s*\.$` — nới thành `[—,;:]\s*$` sẽ bắt cả dấu `:` mở đầu khối code, 118
+dương tính giả toàn bộ.
+
+### SVM — chỗ năm trục máy đều cho qua
+
+Người đọc chỉ ra, không máy nào bắt được:
+
+1. **Hình ① sai hình học** — support vector không nằm trên đường margin, ngoặc đo vẽ xiên không
+   vuông góc, hai đầu không chạm hai đường. Đã dời 4 điểm SV lên đúng đường và vẽ lại ngoặc.
+2. **`lề` là thuật ngữ** — dịch ngược ra đúng một cụm `margin`, nên phải giữ tiếng Anh. Sửa 40 chỗ
+   trên cả năm mặt (văn xuôi · đầu mục · nhãn SVG · aria-label · data-blurb) ở 3 file: `svm`,
+   `ridge-lasso-elasticnet`, `classical-models-overview`. Đầu mục `Lề mềm và tham số C` →
+   `Soft margin và tham số C`.
+   Chú ý: `margin` trong §04 là **nghĩa khác** (yᵢ·F(xᵢ)), chỗ đó nói "dải" mới xuôi.
+3. Sửa xong thì **chữ dài ra làm tràn viewBox** (x=-6.3) — bắt được ngay nhờ chạy lại `check.py`.
+   Rút nhãn thành `margin rộng = L2`. **Sửa chữ trong SVG thì luôn chạy lại check.py.**
+
+> `chuan/bo-ve-hinh-svgkit.md` nói đúng: máy bắt "hình sai hình học", không bắt được
+> "hình đúng hình học mà sai ý".
+
+### bbox: 11 báo động, 10 là dương tính giả
+
+Dấu hiệu: `oy` chỉ 1,0–1,2px mà `ox` lớn → **hai dòng chữ kề nhau**, `y` cách 13–14px, chồng đúng
+phần mép font. Không phải đè. Chỗ thật duy nhất: nhãn `x="0"` ở `sliding-window` lẹm 1,2px ra
+ngoài viewBox do bearing font → `x="2"`.
+
+### Nghiệm thu 07/09 (bản đã kiểm lại thước)
+
+```
+build.py                : 200 bài · 62 nhóm · 1456 mục tìm · 506 thẻ ôn · meta khớp
+soat.py (8 phép)        : 0
+đoạn >33 từ (m33c, 128 bài) : 0
+câu cắt cụt [—,;]\s*\.$ : 0
+490px (Chrome, 128 bài) : 0
+bbox thật (Chrome)      : 0
+```
+
+Sao lưu `/tmp/l1/backup-content` **đã cũ** (trước 8 chỗ tách tay, 15 câu cụt, và đợt SVM) —
+đừng khôi phục từ nó.

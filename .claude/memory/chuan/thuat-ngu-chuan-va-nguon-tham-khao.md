@@ -3,7 +3,7 @@ name: thuat-ngu-chuan-va-nguon-tham-khao
 description: "Bài phải chứa phần kiến thức phổ biến nhất của chủ đề, và hình phải dán đúng thuật ngữ chuẩn lên từng bộ phận"
 metadata:
   type: feedback
-updated: 2026-09-05
+updated: 2026-09-07
 ---
 
 Ngày 2026-09-03, sau khi tôi vẽ lại hình cho `random-forest` mà chỉ chú thích bằng tiếng Việt
@@ -25,6 +25,13 @@ thử — ra được đúng một cụm tiếng Anh có tên riêng thì đó l
 "Chuyển ngữ cảnh" → `context switching`, "khoá chết" → `deadlock`, "điều kiện tranh" →
 `race condition`. Còn *sắp xếp, ràng buộc, khởi tạo, suy luận* dịch ngược ra nhiều cụm khác nhau —
 đó là từ thông thường, để nguyên tiếng Việt.
+
+Ngày 07/09 dính lại đúng bẫy đó với một từ ngắn hơn nhiều: **`lề` → `margin`** trong `svm`.
+Từ càng thường thì càng khó thấy là thuật ngữ — `lề` đọc như tiếng Việt phổ thông, nhưng dịch
+ngược ra đúng một cụm có tên riêng nên phải giữ tiếng Anh, kể cả trong đầu mục
+(`Lề mềm và tham số C` → `Soft margin và tham số C`). Người đọc chỉ ra, không trục máy nào bắt.
+Kèm một cái bẫy con: cùng chữ `margin` nhưng §04 của `svm` dùng theo **nghĩa khác** (yᵢ·F(xᵢ)) —
+chỗ đó gọi là "dải" mới xuôi. Giữ tiếng Anh không có nghĩa là thay máy móc mọi lần xuất hiện.
 
 Quét cả kho khi sửa, đừng sửa mỗi chỗ nhìn thấy: nhãn trong SVG, đầu mục, `data-blurb`, meta trong
 `<head>`, câu hỏi trong `details.qa`. Một chỗ sót là `search-index.js` vẫn còn từ sai.

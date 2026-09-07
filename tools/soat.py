@@ -75,6 +75,7 @@ DICH = {
  'khoá chết':'deadlock', 'điều kiện tranh':'race condition',
  'đa luồng':'multithreading', 'đa tiến trình':'multiprocessing',
  'vòng lặp sự kiện':'event loop', 'thu gom rác':'garbage collection',
+ 'lề mềm':'soft margin', 'lề cứng':'hard margin',
 }
 # Chỗ cố ý giữ: nêu tên tiếng Anh rồi chú nghĩa MỘT lần thì được.
 MIEN = {('memory-management-gc','thu gom rác'), ('sql-subquery-cte','duyệt cây')}

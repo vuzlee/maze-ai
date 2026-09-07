@@ -1271,7 +1271,7 @@ window.CATALOG = [
       "slug": "svm",
       "title": "SVM",
       "tag": "ML",
-      "blurb": "Lề lớn nhất, support vector, tham số C và gamma, kernel trick — và vì sao nó từng thắng trước khi deep learning tới.",
+      "blurb": "Margin lớn nhất, support vector, tham số C và gamma, kernel trick — và vì sao nó từng thắng trước khi deep learning tới.",
       "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/svm/index.html",
       "skeleton": false,
