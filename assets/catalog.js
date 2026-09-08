@@ -652,9 +652,21 @@ window.CATALOG = [
       "slug": "netov",
       "title": "Networking overview",
       "tag": "CS",
-      "blurb": "Một request đi qua những bước nào, và năm bài của nhóm rút ngắn khúc nào.",
-      "n": 2,
+      "blurb": "Một request đi qua những bước nào, và sáu bài của nhóm rút ngắn khúc nào.",
+      "n": 3,
       "path": "content/03-cs-fundamentals/03-networking/networking-overview/index.html",
+      "skeleton": false,
+      "reviewed": false,
+      "lc": 0
+     },
+     {
+      "dir": "osi-model",
+      "slug": "osi",
+      "title": "OSI model",
+      "tag": "CS",
+      "blurb": "Bảy tầng của mạng, bốn tầng thật sự chạy, và vì sao đời thực gọi nhau bằng số tầng.",
+      "n": 9,
+      "path": "content/03-cs-fundamentals/03-networking/osi-model/index.html",
       "skeleton": false,
       "reviewed": false,
       "lc": 0
@@ -1333,10 +1345,10 @@ window.CATALOG = [
       "title": "Linear regression",
       "tag": "ML",
       "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
-      "n": 11,
+      "n": 12,
       "path": "content/05-machine-learning/05-classical-ml/linear-regression/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -1360,7 +1372,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
