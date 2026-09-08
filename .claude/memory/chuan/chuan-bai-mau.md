@@ -1,9 +1,9 @@
 ---
 name: chuan-bai-mau
-description: "Chín luật viết một bài đạt chất lượng — rút ra từ Random forest, luật 1 rút ra từ Memory management & GC; dùng để viết mới và sửa bài cũ"
+description: "Mười luật viết một bài đạt chất lượng — rút ra từ Random forest, luật 1 rút ra từ Memory management & GC; dùng để viết mới và sửa bài cũ"
 metadata:
   type: feedback
-updated: 2026-09-05
+updated: 2026-09-08
 ---
 
 Ngày 2026-09-03, sau khoảng mười lượt review liên tiếp riêng bài
@@ -22,7 +22,7 @@ dài nhất 24 · 13 mục · **0 khối `<pre>`**.
 độ dài bullet, độ sâu**; mẫu cho luật 1 là
 [Memory management & GC](../../../content/02-python/02-language-core/memory-management-gc/index.html).
 
-## Chín luật
+## Mười luật
 
 ### 1. Mục 01 = bài này là gì + mental model, trong đúng một mục
 
@@ -113,7 +113,7 @@ mỗi `gist` thì lọt bài mới làm được nửa (`logistic-regression`: c
 
 Hai loại này vẫn giữ **một hình ở mục 01**, chỉ bỏ phần "vẽ lại bản đồ ở mọi mục".
 
-#### Bốn điều kiểm chứng được ở bài 16 mục — [[thi-diem-transaction-isolation]]
+#### Bốn điều kiểm chứng được ở bài 16 mục — [[bai-hoc-soan-noi-dung]]
 
 Làm thí điểm `transaction-isolation` (16 mục, bài khó nhất kệ 01→05) rút ra, áp cho mọi bài sau:
 
@@ -127,7 +127,7 @@ Làm thí điểm `transaction-isolation` (16 mục, bài khó nhất kệ 01→
   mục. Đọc chữ không thấy lỗi này.
 
 Bộ công cụ `frame.py` / `check.py` / `apply.py` chép lại được — mô tả ở
-[[thi-diem-transaction-isolation]]. `check.py` (đo bề rộng chữ, bắt tràn khung) bắt được lỗi mà
+[[bai-hoc-soan-noi-dung]]. `check.py` (đo bề rộng chữ, bắt tràn khung) bắt được lỗi mà
 ảnh chụp không lộ; chạy nó trước khi chụp.
 
 #### Bài không có cấu trúc phân cấp tự nhiên — chưa kiểm chứng
@@ -183,12 +183,14 @@ bảng quá nhiều cột hàng, hay không cần tạo cây quá nhiều level"
 - **Một lab, một ý.** Lab có ba phần thì hai phần sau thường là bài nghiên cứu, không phải chỗ để
   học. Mấy dòng dưới lab nói người học **nên tự thử gì**, đừng kết luận hộ họ.
 
-### 8. Mặt bài là cheatsheet, chiều sâu nằm trong `details.deep`
+### 8. Mặt bài là cheatsheet — không đoạn văn nào quá 33 từ
 
-*"tôi muốn phong cách như cheatsheet nhưng chi tiết hơn để học kĩ hơn"*. Đoạn văn dài **không cắt
-bỏ** — gập nguyên văn vào một `<details class="deep">` với `<summary>` là một câu hỏi; mặt bài chỉ
-còn `p.key` + hình + bullet ngắn. Không mất kiến thức nào, mà quét mắt vẫn nhanh.
-Mốc: **không đoạn văn mặt bài nào quá 33 từ**.
+*"tôi muốn phong cách như cheatsheet nhưng chi tiết hơn để học kĩ hơn"*. Mặt bài chỉ có
+`p.key` + hình + bullet ngắn. Mốc: **không đoạn văn nào quá 33 từ** (toàn kho hiện là 0).
+
+> ⚠ **`details.deep` là quy ước ĐÃ CHẾT** (TAXONOMY §A4) — cả kho đã dọn sạch, đừng dựng lại.
+> Đoạn văn dài giờ xử lý bằng cách **cắt** theo [[toi-thieu-de-hieu]] hoặc **đổi thành hình**,
+> không phải gập vào `<details>`.
 
 ### 9. Trình bày theo vai trò, không theo cảm tính
 
@@ -205,6 +207,34 @@ dùng khi có thứ bậc thật; hai thứ ngang vai thì trình bày y hệt n
   dưới mốc AA 4,5:1. `--faint` để dành cho chữ **cố tình phải mờ** — ô đã bị xám hoá.
 - Tìm lỗi này **bằng máy**, đừng soi từng bài: dò cặp *nhãn `sv-t` + dòng ngay dưới nó* (cùng `x`
   ±3, cách 8–26px, dài > 26 ký tự) rồi nâng dòng dưới lên `sv-s`.
+
+### 10. `Ưu và nhược` rồi `Chọn khi nào` — cặp mục đóng phần thân bài
+
+Chốt 2026-09-08 khi sửa `ridge-lasso-elasticnet`. Người dùng đối chiếu với `svm`: *"so với svm thì
+chưa có mục ưu nhược, tôi cần bảng ưu nhược để so sánh"*, và *"Chọn khi nào thay vì Chọn cái nào
+cho các bài vì có những bài 1 cái nên không nên để Chọn cái nào, và sẽ ở dưới ưu nhược"*.
+
+**Hai mục, đúng thứ tự này, ngay sau phần cơ chế:**
+
+| Mục | Nội dung | Khuôn |
+|---|---|---|
+| `Ưu và nhược` | mỗi mặt một hàng, mỗi phương án một cột | `<table>` |
+| `Chọn khi nào` | mỗi tình huống một ô, nói **điều kiện dữ liệu** | `.stack` |
+
+**Vì sao thứ tự này.** Đọc bảng xong mới biết cái giá của từng phương án; lúc đó câu *"khi nào
+dùng"* mới có nghĩa. Ngược lại thì người đọc phải tin lời khuyên mà chưa thấy lý do.
+
+**Tên là `Chọn khi nào`, không phải `Chọn cái nào`.** Bài chỉ nói về **một** thứ vẫn cần mục này
+(khi nào nên dùng SVM), nhưng không có "cái nào" để chọn. Một tên dùng được cho cả hai loại bài.
+
+**Thuật ngữ đắt phải nằm trong bảng.** *sparse* là ví dụ: nó là **nhược điểm** của Lasso, nên chỗ
+đúng của nó là một hàng ở cột nhược, kèm một câu định nghĩa ngay dưới bảng — không phải một đoạn
+văn rải giữa bài. Đừng né thuật ngữ bằng từ tiếng Việt tự chế (*"model thưa"*); gọi thẳng tên
+tiếng Anh rồi giải nghĩa một câu.
+
+**Nhược điểm phải nói được cái giá thật**, không phải liệt kê "chậm hơn". Ba câu đáng có sau bảng:
+sparse tốt khi nào · sparse hại khi nào · và **hiểu sai hay gặp** (biến bị Lasso bỏ không phải
+biến vô dụng, chỉ là biến trùng thông tin).
 
 ## Ngữ pháp của một hình: ô là kết quả, mũi tên là hành động
 
@@ -309,7 +339,7 @@ dùng** — gọi slot là "ô" thì lúc đọc hiểu được, gặp lại t�
 
 Danh từ chuyên ngành giữ tiếng Anh **xuyên suốt**: nhãn trong hình, chữ trong lab, văn xuôi, tiêu
 đề mục. `CLAUDE.md` đã có luật này cho tên bài — nó áp cho cả bên trong bài. Chi tiết ở
-[[thuat-ngu-chuan-va-nguon-tham-khao]].
+[[thuat-ngu]].
 
 Và khi hình mental model cũng có "ô" theo nghĩa hình học thì càng phải tách hai từ ra, không dùng
 chung một chữ cho hai nghĩa.
@@ -380,7 +410,7 @@ tràn ngang).
 
 ## Áp dụng thế nào
 
-Trước khi sửa một bài, đo bằng script ở [[it-chu-nhieu-hinh]] và script dưới đây; sửa xong đo lại.
+Trước khi sửa một bài, đo bằng script ở [[trinh-bay-bai]] và script dưới đây; sửa xong đo lại.
 **Đo lại sau mỗi lô, đừng chỉ đo một lần ở cuối đợt** — bản vừa viết lại cũng hay vượt ngưỡng.
 
 Thứ tự việc: (1) bullet dài → cắt; (2) `<pre>` khái niệm → bỏ hoặc đổi thành hình; (3) hình lạ →
@@ -399,5 +429,5 @@ ps = re.findall(r'<p(?!re\b)(?![^>]*class=)[^>]*>((?:(?!</?p[ >]).)*?)</p>', b, 
 # đo theo từng dòng <br>, không đo cả khối: nhãn lab ngắt dòng bằng <br> là hợp lệ
 ```
 
-Số vòng kiểm tuỳ loại sửa — xem [[sua-nhanh-it-vong-kiem]]. Báo cáo kết quả theo
-[[cach-tra-loi-ngan-gon]].
+Số vòng kiểm tuỳ loại sửa — xem [[cong-cu-va-cach-kiem]]. Báo cáo kết quả theo
+[[trinh-bay-bai]].

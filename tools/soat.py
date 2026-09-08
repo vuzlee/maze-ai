@@ -76,9 +76,14 @@ DICH = {
  'đa luồng':'multithreading', 'đa tiến trình':'multiprocessing',
  'vòng lặp sự kiện':'event loop', 'thu gom rác':'garbage collection',
  'lề mềm':'soft margin', 'lề cứng':'hard margin',
+ 'siêu phẳng':'hyperplane',
+ 'hàng xóm gần nhất':'nearest neighbor', 'hàng xóm':'neighbor',
 }
 # Chỗ cố ý giữ: nêu tên tiếng Anh rồi chú nghĩa MỘT lần thì được.
 MIEN = {('memory-management-gc','thu gom rác'), ('sql-subquery-cte','duyệt cây')}
+# Chữ là thuật ngữ ở kệ này nhưng là từ thường ở kệ khác — chỉ soát trong kệ ghi ở đây.
+# «hàng xóm»: thuật ngữ của KNN/DBSCAN, nhưng ở DSA và OS nó là từ thường (ô kề, khối liền kề).
+KE_RIENG = {'hàng xóm': '05-machine-learning'}
 print("\n== 6. Thuật ngữ bị dịch ra tiếng Việt ==")
 n=0
 for cd,b in B:
@@ -90,6 +95,7 @@ for cd,b in B:
            'data-blurb': ' '.join(re.findall(r'data-(?:blurb|title)="([^"]*)"',h))}
     for vi,en in DICH.items():
         if (slug,vi) in MIEN: continue
+        if vi in KE_RIENG and KE_RIENG[vi] not in p: continue
         for mat_ten,txt in mat.items():
             if vi in txt.lower():
                 print(f"   {p.replace('content/','')} [{mat_ten}] «{vi}» -> {en}"); n+=1

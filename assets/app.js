@@ -35,11 +35,12 @@
 
   /* ---------------- trang chủ: dựng kệ ---------------- */
   function card(b, n) {
-    return '<a class="bk' + (b.skeleton ? " wip" : "") + '" data-slug="' + esc(b.slug) +
+    return '<a class="bk' + (b.skeleton ? " wip" : "") + (b.reviewed ? " reviewed" : "") + '" data-slug="' + esc(b.slug) +
       '" href="' + BASE + b.path + '">' +
       '<span class="ix">' + String(n).padStart(2, "0") + "</span>" +
       '<span class="tt"><b>' + esc(b.title) + "</b><i>" + esc(b.blurb) + "</i></span>" +
-      '<span class="tag">' + (b.skeleton ? "khung · " + b.n + " mục" : esc(b.tag) + " · " + b.n + " mục") + "</span>" +
+      '<span class="tag">' + (b.skeleton ? "khung · " + b.n + " mục" : esc(b.tag) + " · " + b.n + " mục") +
+        (b.reviewed ? '<i class="rv">reviewed</i>' : "") + "</span>" +
       '<span class="go">→</span></a>';
   }
 

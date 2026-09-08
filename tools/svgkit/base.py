@@ -35,7 +35,7 @@ def txt(x, y, s, cls='sv-t', fill=None, anchor=None):
 
 # Bề rộng trung bình một ký tự, khớp bảng W của check.py — dùng để ngắt dòng.
 CW = {'sv-t': 12.5*0.55, 'sv-s': 11.5*0.55, 'sv-d': 10.5*0.52,
-      'sv-l': 11*0.60, 'sv-h': 9.5*0.72, 'sv-hv': 9.5*0.62}
+      'sv-l': 11*0.60, 'sv-h': 9.5*0.72, 'sv-hv': 9.5*0.62, 'sv-m': 14*0.50}
 
 def wrap(s, px, cls='sv-d'):
     """Ngắt chuỗi theo BỀ RỘNG px, cắt ở khoảng trắng.

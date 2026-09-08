@@ -19,7 +19,7 @@ import re, sys, html
 # ĐO THẬT trong Chrome (max của tỉ lệ w/len trên vài trăm nhãn), cộng 3% biên.
 W = {'sv-t': (12.5, 0.52), 'sv-s': (11.5, 0.50), 'sv-d': (10.5, 0.51),
      'sv-l': (11, 0.60), 'sv-h': (9.5, 0.78), 'sv-hv': (9.5, 0.76),
-     'sv-n': (13, 0.60)}
+     'sv-n': (13, 0.60), 'sv-m': (14, 0.50)}
 # THƯỚC NÀY LÀ SÀNG THÔ, KHÔNG PHẢI TRỌNG TÀI. Bề rộng ước theo SỐ KÝ TỰ nên
 # một chuỗi lắm chữ hoa/số rộng hơn hẳn cùng độ dài toàn chữ thường — sai số
 # còn ±8% dù hệ số đã đo thật. Trọng tài là getBBox trong trình duyệt.

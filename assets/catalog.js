@@ -18,6 +18,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/01-dsa/01-overview/dsa-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -35,6 +36,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/01-dsa/02-foundations/big-o-complexity/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -52,6 +54,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/01-dsa/03-data-structures/data-structures-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -63,6 +66,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/03-data-structures/array-string/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 6
      },
      {
@@ -74,6 +78,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/03-data-structures/linked-list/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 8
      },
      {
@@ -85,6 +90,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/03-data-structures/hash-map/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 8
      },
      {
@@ -96,6 +102,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/stack-monotonic-queue/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 17
      },
      {
@@ -107,6 +114,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/heap-priority-queue/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 14
      },
      {
@@ -118,6 +126,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/tree-bst-traversal/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 19
      },
      {
@@ -129,6 +138,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/03-data-structures/trie/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 5
      },
      {
@@ -140,6 +150,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/union-find/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 12
      }
     ]
@@ -157,6 +168,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/01-dsa/04-algorithms/algorithms-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -168,6 +180,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/01-dsa/04-algorithms/sorting/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 6
      },
      {
@@ -179,6 +192,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/04-algorithms/two-pointers/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 9
      },
      {
@@ -190,6 +204,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/01-dsa/04-algorithms/sliding-window/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 12
      },
      {
@@ -201,6 +216,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/04-algorithms/prefix-sum/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 8
      },
      {
@@ -212,6 +228,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/04-algorithms/binary-search/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 19
      },
      {
@@ -223,6 +240,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/04-algorithms/greedy/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 8
      },
      {
@@ -234,6 +252,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/04-algorithms/intervals/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 7
      },
      {
@@ -245,6 +264,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/04-algorithms/backtracking/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 16
      },
      {
@@ -256,6 +276,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/04-algorithms/graph-bfs-dfs-topo/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 20
      },
      {
@@ -267,6 +288,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/04-algorithms/shortest-path/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 6
      },
      {
@@ -278,6 +300,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/01-dsa/04-algorithms/dynamic-programming/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 21
      }
     ]
@@ -302,6 +325,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/02-python/01-overview/python-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -319,6 +343,7 @@ window.CATALOG = [
       "n": 4,
       "path": "content/02-python/02-language-core/language-core-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -330,6 +355,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/02-python/02-language-core/memory-model-mutability/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -341,6 +367,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/02-python/02-language-core/memory-management-gc/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -352,6 +379,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/02-python/02-language-core/scope-legb/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -363,6 +391,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/02-python/02-language-core/data-model-dunder/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -374,6 +403,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/02-python/02-language-core/iterator-generator/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -385,6 +415,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/02-python/02-language-core/decorator-context-manager/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -396,6 +427,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/02-python/02-language-core/exception-handling/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -413,6 +445,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/02-python/03-builtin-structures/list-tuple-set/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -424,6 +457,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/02-python/03-builtin-structures/dict-hash-table/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -441,6 +475,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/02-python/04-concurrency/thread-process-gil/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -452,6 +487,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/02-python/04-concurrency/asyncio/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -469,6 +505,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/02-python/05-toolkit/leetcode-toolkit/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -486,6 +523,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/02-python/06-oop/oop-python/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -503,6 +541,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/02-python/07-typing/typing-dataclass/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -520,6 +559,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/02-python/08-performance/performance-profiling/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -544,6 +584,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/03-cs-fundamentals/01-overview/cs-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -561,6 +602,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/03-cs-fundamentals/02-os/os-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -572,6 +614,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/03-cs-fundamentals/02-os/process-thread-scheduling/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -583,6 +626,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/03-cs-fundamentals/02-os/memory-virtual-paging/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -594,6 +638,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/03-cs-fundamentals/02-os/lock-deadlock-race/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -611,6 +656,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/03-cs-fundamentals/03-networking/networking-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -622,6 +668,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/03-cs-fundamentals/03-networking/dns-tls/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -633,6 +680,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/03-cs-fundamentals/03-networking/tcp-http/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -644,6 +692,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/caching/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -655,6 +704,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/rest-api-design/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -666,6 +716,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/03-cs-fundamentals/03-networking/load-balancing/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -683,6 +734,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/03-cs-fundamentals/04-distributed/cap-theorem-consistency/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -694,6 +746,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/03-cs-fundamentals/04-distributed/consensus-leader-election/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -711,6 +764,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/03-cs-fundamentals/05-messaging/messaging-queue-pubsub/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -735,6 +789,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/04-database/01-overview/db-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -752,6 +807,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/04-database/02-relational-basics/relational-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -763,6 +819,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/04-database/02-relational-basics/relational-model/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -774,6 +831,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/02-relational-basics/constraints-integrity/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -785,6 +843,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/02-relational-basics/db-normalization/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -796,6 +855,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/02-relational-basics/er-modeling/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -813,6 +873,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/04-database/03-sql-basics/sql-basics-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -824,6 +885,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/03-sql-basics/sql-select-filter/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -835,6 +897,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/03-sql-basics/sql-join/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -846,6 +909,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/03-sql-basics/sql-group-aggregate/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -857,6 +921,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/04-database/03-sql-basics/sql-subquery-cte/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -874,6 +939,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/04-database/04-sql-advanced/sql-advanced-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -885,6 +951,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/04-database/04-sql-advanced/sql-window-functions/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -896,6 +963,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/04-database/04-sql-advanced/sql-index-query-plan/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -907,6 +975,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/04-database/04-sql-advanced/transaction-isolation/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -918,6 +987,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/04-database/04-sql-advanced/query-tuning/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -935,6 +1005,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/05-beyond-sql/nosql-landscape/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -946,6 +1017,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/04-database/05-beyond-sql/sharding-replication/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -963,6 +1035,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/06-data-systems/oltp-vs-olap/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -974,6 +1047,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/06-data-systems/data-warehouse-lake/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -985,6 +1059,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/06-data-systems/etl-elt/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -996,6 +1071,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/04-database/06-data-systems/batch-stream-processing/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1007,6 +1083,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/04-database/06-data-systems/data-quality/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1031,6 +1108,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/05-machine-learning/01-overview/ml-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1048,6 +1126,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/05-machine-learning/02-math-foundations/math-foundations-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1059,6 +1138,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/probability-basics/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1070,6 +1150,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/expectation-variance/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1081,6 +1162,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/05-machine-learning/02-math-foundations/bayes-theorem/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1092,6 +1174,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/linear-algebra-ml/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1103,6 +1186,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/05-machine-learning/02-math-foundations/gradient-optimization/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1114,6 +1198,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/05-machine-learning/02-math-foundations/mle-map/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1131,6 +1216,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/05-machine-learning/03-statistics/statistics/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1142,6 +1228,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/05-machine-learning/03-statistics/ab-testing/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1159,6 +1246,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/05-machine-learning/04-core-concepts/core-concepts-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1170,6 +1258,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/05-machine-learning/04-core-concepts/supervised-unsupervised/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1181,6 +1270,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/05-machine-learning/04-core-concepts/bias-variance-tradeoff/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1192,6 +1282,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/05-machine-learning/04-core-concepts/train-val-test-cv/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1203,6 +1294,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/05-machine-learning/04-core-concepts/overfitting-regularization/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1214,6 +1306,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/05-machine-learning/04-core-concepts/feature-engineering/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1231,6 +1324,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/05-machine-learning/05-classical-ml/classical-models-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1239,9 +1333,10 @@ window.CATALOG = [
       "title": "Linear regression",
       "tag": "ML",
       "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
-      "n": 10,
+      "n": 11,
       "path": "content/05-machine-learning/05-classical-ml/linear-regression/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1253,6 +1348,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/05-machine-learning/05-classical-ml/logistic-regression/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1261,9 +1357,10 @@ window.CATALOG = [
       "title": "Ridge, Lasso & Elastic Net",
       "tag": "ML",
       "blurb": "Ba cách regularize model tuyến tính: L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở hình dạng vùng phạt.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1275,6 +1372,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/svm/index.html",
       "skeleton": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -1283,9 +1381,10 @@ window.CATALOG = [
       "title": "KNN",
       "tag": "ML",
       "blurb": "Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/knn/index.html",
       "skeleton": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -1294,9 +1393,10 @@ window.CATALOG = [
       "title": "Naive Bayes",
       "tag": "ML",
       "blurb": "Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.",
-      "n": 7,
+      "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/naive-bayes/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1314,6 +1414,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/05-machine-learning/06-tree-models/tree-family-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1325,6 +1426,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/05-machine-learning/06-tree-models/decision-tree/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1336,6 +1438,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/05-machine-learning/06-tree-models/random-forest/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1344,9 +1447,10 @@ window.CATALOG = [
       "title": "AdaBoost",
       "tag": "Ensemble",
       "blurb": "Boosting đầu tiên: đội trọng số vào điểm đang sai, chấm điểm alpha cho từng stump, rồi bỏ phiếu có trọng số.",
-      "n": 10,
+      "n": 11,
       "path": "content/05-machine-learning/06-tree-models/adaboost/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1355,9 +1459,10 @@ window.CATALOG = [
       "title": "Gradient boosting",
       "tag": "Ensemble",
       "blurb": "Cộng cây nông theo phần dư, vì sao gọi là gradient, learning_rate bù trừ với n_estimators, và vì sao dữ liệu bảng vẫn thuộc về boosting.",
-      "n": 10,
+      "n": 11,
       "path": "content/05-machine-learning/06-tree-models/gradient-boosting/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1369,6 +1474,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/05-machine-learning/06-tree-models/xgboost/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1380,6 +1486,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/05-machine-learning/06-tree-models/lightgbm/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1397,6 +1504,7 @@ window.CATALOG = [
       "n": 4,
       "path": "content/05-machine-learning/07-clustering/clustering-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1405,9 +1513,10 @@ window.CATALOG = [
       "title": "K-means & clustering",
       "tag": "ML",
       "blurb": "Lặp hai bước quanh k tâm, chọn k bằng elbow và silhouette, và bốn giả định ngầm khiến nó chia sai khi cụm không tròn.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/07-clustering/kmeans-clustering/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1419,6 +1528,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/05-machine-learning/07-clustering/dbscan/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1430,6 +1540,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/05-machine-learning/07-clustering/hdbscan/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1444,9 +1555,10 @@ window.CATALOG = [
       "title": "PCA & dimensionality reduction",
       "tag": "ML",
       "blurb": "Xoay trục về hướng dữ liệu trải rộng nhất rồi bỏ bớt hướng: chọn số thành phần, vì sao phải chuẩn hoá, và vì sao nó không phải chọn đặc trưng.",
-      "n": 8,
+      "n": 9,
       "path": "content/05-machine-learning/08-dimensionality/pca-dimensionality/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1464,6 +1576,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/05-machine-learning/09-evaluation/evaluation-overview/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1472,9 +1585,10 @@ window.CATALOG = [
       "title": "Metric & confusion matrix",
       "tag": "Evaluation",
       "blurb": "Bốn ô sinh ra mọi chỉ số: precision với recall chọn theo chi phí lỗi, vì sao accuracy nói dối khi dữ liệu lệch, và chốt ngưỡng bằng tiền thay vì bằng F1.",
-      "n": 11,
+      "n": 9,
       "path": "content/05-machine-learning/09-evaluation/metrics-confusion-matrix/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1486,6 +1600,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/05-machine-learning/09-evaluation/roc-auc-pr/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1497,6 +1612,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/05-machine-learning/09-evaluation/calibration/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1521,6 +1637,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/06-deep-learning/01-overview/dl-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1538,6 +1655,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/06-deep-learning/02-neural-network/neural-network-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1549,6 +1667,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/02-neural-network/perceptron-mlp/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1560,6 +1679,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/02-neural-network/activation-functions/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1571,6 +1691,7 @@ window.CATALOG = [
       "n": 15,
       "path": "content/06-deep-learning/02-neural-network/backpropagation/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1582,6 +1703,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/06-deep-learning/02-neural-network/weight-initialization/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1593,6 +1715,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/06-deep-learning/02-neural-network/normalization/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1604,6 +1727,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/06-deep-learning/02-neural-network/optimizer-sgd-adam/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1615,6 +1739,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/02-neural-network/dropout-regularization/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1632,6 +1757,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/03-cnn/convolution-basics/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1643,6 +1769,7 @@ window.CATALOG = [
       "n": 15,
       "path": "content/06-deep-learning/03-cnn/cnn-mobilenet/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1660,6 +1787,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/06-deep-learning/04-sequence/rnn/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1671,6 +1799,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/06-deep-learning/04-sequence/lstm-gru/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1688,6 +1817,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/05-training/training-recipe/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1699,6 +1829,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/05-training/debug-training/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1716,6 +1847,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/06-deep-learning/06-generative/autoencoder/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1727,6 +1859,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/06-deep-learning/06-generative/vae/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1738,6 +1871,7 @@ window.CATALOG = [
       "n": 4,
       "path": "content/06-deep-learning/06-generative/gan/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1762,6 +1896,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/01-overview/architecture-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1779,6 +1914,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/02-transformer-core/transformer-core-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1790,6 +1926,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/07-transformer/02-transformer-core/tokenization/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1801,6 +1938,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/07-transformer/02-transformer-core/embedding/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1812,6 +1950,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/07-transformer/02-transformer-core/positional-encoding/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1823,6 +1962,7 @@ window.CATALOG = [
       "n": 13,
       "path": "content/07-transformer/02-transformer-core/self-attention/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1834,6 +1974,7 @@ window.CATALOG = [
       "n": 12,
       "path": "content/07-transformer/02-transformer-core/transformer-architecture/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1851,6 +1992,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/03-model-families/families-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1862,6 +2004,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/03-model-families/bert/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1873,6 +2016,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/03-model-families/gpt/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1884,6 +2028,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/03-model-families/encoder-decoder/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1901,6 +2046,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/beyond-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1912,6 +2058,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/ssm/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1923,6 +2070,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/mamba/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -1934,6 +2082,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/07-transformer/04-beyond-transformer/hybrid-hymba/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1951,6 +2100,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/07-transformer/05-efficient/efficient-attention/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1975,6 +2125,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/01-overview/llm-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -1992,6 +2143,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/02-training/training-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2003,6 +2155,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/02-training/pretraining/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2014,6 +2167,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/02-training/scaling-law/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2025,6 +2179,7 @@ window.CATALOG = [
       "n": 11,
       "path": "content/08-llm/02-training/sft-alignment/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2036,6 +2191,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/08-llm/02-training/peft-lora-qlora/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2053,6 +2209,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/03-techniques/techniques-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2064,6 +2221,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/03-techniques/moe/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2075,6 +2233,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/03-techniques/long-context/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2086,6 +2245,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/03-techniques/chain-of-thought/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2103,6 +2263,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/04-inference/inference-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2114,6 +2275,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/08-llm/04-inference/decoding-strategies/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2125,6 +2287,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/04-inference/quantization/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2136,6 +2299,7 @@ window.CATALOG = [
       "n": 15,
       "path": "content/08-llm/04-inference/inference-optimization/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2153,6 +2317,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/05-rag/rag-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2164,6 +2329,7 @@ window.CATALOG = [
       "n": 15,
       "path": "content/08-llm/05-rag/rag-end-to-end/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2175,6 +2341,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/05-rag/chunking-strategy/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2186,6 +2353,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/08-llm/05-rag/vector-database/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2197,6 +2365,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/05-rag/reranking/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2214,6 +2383,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/06-agents/agent-tool-use/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2231,6 +2401,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/08-llm/07-model-labs/model-labs-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2242,6 +2413,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/08-llm/07-model-labs/llama/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2253,6 +2425,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/08-llm/07-model-labs/qwen/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2264,6 +2437,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/08-llm/07-model-labs/deepseek/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2275,6 +2449,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/08-llm/07-model-labs/mixtral/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2286,6 +2461,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/08-llm/07-model-labs/closed-models/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2303,6 +2479,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/08-llm/08-rag-evaluation/rag-evaluation/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2320,6 +2497,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/09-multimodal/clip/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2331,6 +2509,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/09-multimodal/vlm/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2342,6 +2521,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/08-llm/09-multimodal/diffusion-models/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2353,6 +2533,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/08-llm/09-multimodal/audio-models/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2377,6 +2558,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/09-ml-system-design/01-overview/mlsd-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2394,6 +2576,7 @@ window.CATALOG = [
       "n": 15,
       "path": "content/09-ml-system-design/02-frameworks/ml-system-design/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2411,6 +2594,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/09-ml-system-design/03-case-studies/recommendation-system/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2422,6 +2606,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/09-ml-system-design/03-case-studies/search-ranking/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2433,6 +2618,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/09-ml-system-design/03-case-studies/llm-rag-system/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2457,6 +2643,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/10-mlops/01-overview/mlops-overview/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2474,6 +2661,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/02-engineering/git-workflow/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2485,6 +2673,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/02-engineering/docker-container/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2496,6 +2685,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/02-engineering/linux-shell/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2507,6 +2697,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/02-engineering/fastapi-service/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2524,6 +2715,7 @@ window.CATALOG = [
       "n": 4,
       "path": "content/10-mlops/03-lifecycle/experiment-tracking/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2535,6 +2727,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/03-lifecycle/ci-cd-ml/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2546,6 +2739,7 @@ window.CATALOG = [
       "n": 15,
       "path": "content/10-mlops/03-lifecycle/mlops-serving/index.html",
       "skeleton": false,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2563,6 +2757,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/04-infra/gpu-inference/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2580,6 +2775,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/10-mlops/05-serving-engines/serving-engines-comparison/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2597,6 +2793,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/06-ai-reliability/hallucination/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2608,6 +2805,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/10-mlops/06-ai-reliability/guardrails-reliability/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]
@@ -2625,6 +2823,7 @@ window.CATALOG = [
       "n": 5,
       "path": "content/10-mlops/07-ai-security/prompt-injection/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      },
      {
@@ -2636,6 +2835,7 @@ window.CATALOG = [
       "n": 4,
       "path": "content/10-mlops/07-ai-security/ai-security-threats/index.html",
       "skeleton": true,
+      "reviewed": false,
       "lc": 0
      }
     ]

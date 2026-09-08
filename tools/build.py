@@ -169,6 +169,7 @@ def read_book(page: pathlib.Path, rel: str, index: list, problems: list,
         "n": len(secs),
         "path": rel,
         "skeleton": bool(attr(tag, "data-skeleton")),
+        "reviewed": bool(attr(tag, "data-reviewed")),
         "lc": len(set(LC.findall(src))),      # số bài LeetCode bài này trỏ tới, quiz dùng để mời thực hành
     }
 

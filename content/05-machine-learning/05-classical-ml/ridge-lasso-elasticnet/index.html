@@ -43,282 +43,416 @@
         <header class="hero">
   <p class="eyebrow">Machine learning · Classical models</p>
   <h1>Ridge, Lasso &amp; Elastic <em>Net</em></h1>
-  <p class="lede">Ba cái tên này là <b>ba cách regularize</b> một model tuyến tính — cùng một model, chỉ thêm một số hạng phạt vào loss, mà đổi hẳn hành vi. Bài này trả lời câu hay bị hỏi nhất: <b>vì sao L1 đưa hệ số về đúng 0 còn L2 thì không</b>, và chọn cái nào khi nào.</p>
+  <p class="lede">Ba cách <b>regularize</b> một model tuyến tính: giữ nguyên loss cũ, cộng thêm một số hạng phạt độ lớn hệ số. Ba tên gọi khác nhau đúng ở dạng của số hạng đó.</p>
+  <ul class="ledelist">
+    <li><b>Ridge · L2</b> <em>co hệ số về gần 0</em></li>
+    <li><b>Lasso · L1</b> <em>đưa một số hệ số về đúng 0</em></li>
+    <li><b>Elastic Net</b> <em>gộp cả hai</em></li>
+  </ul>
 </header>
 
 <section id="ridge-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-  <p class="key">Hồi quy tuyến tính thường tìm hệ số làm lỗi trên tập train nhỏ nhất — <em>và khi có nhiều đặc trưng, cách nhanh nhất để đạt điều đó là học thuộc nhiễu</em>.</p>
+  <p class="key">Hồi quy tuyến tính tìm hệ số làm lỗi train nhỏ nhất — <em>và khi có nhiều đặc trưng, cách nhanh nhất để đạt điều đó là học thuộc nhiễu</em>.</p>
 
-  <p>Hai triệu chứng đi kèm nhau.</p>
-
-  <ul class="why">
-    <li><a href="../../04-core-concepts/overfitting-regularization/index.html">Overfit</a> — với p đặc trưng và n mẫu mà p tiến gần n, model có đủ bậc tự do để đi qua gần hết các điểm train, và variance nổ.</li>
-    <li><b>Đa cộng tuyến</b> — hai đặc trưng gần như trùng nhau thì có vô số cặp hệ số cho cùng một dự đoán: hệ số này rất lớn dương, hệ số kia rất lớn âm, cộng lại triệt tiêu.</li>
-    <li>Nghiệm vẫn "đúng" nhưng <b>từng hệ số thì vô nghĩa</b>, và đổi vài mẫu dữ liệu là chúng nhảy sang giá trị khác hẳn.</li>
-  </ul>
+  <p>Regularization thu hẹp chỗ hệ số được phép đứng.</p>
 
   <figure class="gist">
-<svg viewBox="0 0 860 352" role="img" aria-label="Bốn ô: bệnh đa cộng tuyến, Ridge chia đều hệ số, Lasso đưa hệ số về 0, Elastic Net giữ cả nhóm tương quan">
-<text class="sv-hv" x="0" y="18">CÙNG MỘT MODEL — CHỈ CỘNG THÊM MỘT SỐ HẠNG VÀO LOSS</text>
-<text class="sv-hv" x="0" y="42" fill="var(--tomb)">① Bệnh</text>
-<rect x="0" y="62" width="190" height="176" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
-<text class="sv-hv" x="218" y="42" fill="var(--filled)">② Ridge · L2</text>
-<rect x="218" y="62" width="190" height="176" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
-<text class="sv-hv" x="436" y="42" fill="var(--probe)">③ Lasso · L1</text>
-<rect x="436" y="62" width="190" height="176" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
-<text class="sv-hv" x="654" y="42" fill="var(--ok)">④ Elastic Net</text>
-<rect x="654" y="62" width="190" height="176" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
-<text class="sv-d" x="12" y="84" fill="var(--text)">x₁ và x₂ gần trùng nhau</text>
-<text class="sv-l" x="12" y="110" fill="var(--tomb)">w₁ = +10,7</text>
-<text class="sv-l" x="12" y="130" fill="var(--tomb)">w₂ = −7,8</text>
-<text class="sv-d" x="12" y="152" fill="var(--muted)">(giá trị thật: 1,5 và 1,5)</text>
-<line x1="10" y1="166" x2="180" y2="166" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-d" x="12" y="186" fill="var(--muted)">bỏ 5 mẫu, giải lại:</text>
-<text class="sv-l" x="12" y="208" fill="var(--tomb)">11,4 · 13,4 · 29,0 · 23,9</text>
-<text class="sv-d" x="0" y="256" fill="var(--muted)">dự đoán vẫn ổn, từng hệ số</text>
-<text class="sv-d" x="0" y="272" fill="var(--muted)">thì vô nghĩa và không ổn định</text>
-<text class="sv-h" x="230" y="86" fill="var(--filled)">L + λ Σ wⱼ²</text>
-<text class="sv-d" x="230" y="114" fill="var(--muted)">λ = 0,01 đã đủ:</text>
-<text class="sv-l" x="230" y="136" fill="var(--filled)">w₁ = 1,5</text>
-<text class="sv-l" x="230" y="156" fill="var(--filled)">w₂ = 1,5</text>
-<text class="sv-d" x="230" y="178" fill="var(--muted)">RMSE không đổi: 0,502</text>
-<line x1="228" y1="192" x2="398" y2="192" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-d" x="230" y="212" fill="var(--filled)">chia đều cho cả nhóm</text>
-<text class="sv-d" x="230" y="230" fill="var(--muted)">không hệ số nào về 0</text>
-<text class="sv-d" x="218" y="256" fill="var(--muted)">mặc định — ổn định nhất khi</text>
-<text class="sv-d" x="218" y="272" fill="var(--muted)">có đa cộng tuyến</text>
-<text class="sv-h" x="448" y="86" fill="var(--probe)">L + λ Σ |wⱼ|</text>
-<text class="sv-d" x="448" y="114" fill="var(--muted)">40 đặc trưng, 5 có ích:</text>
-<text class="sv-l" x="448" y="138" fill="var(--probe)">λ = 1</text>
-<text class="sv-d" x="508" y="138" fill="var(--muted)">37 hệ số ≠ 0</text>
-<text class="sv-l" x="448" y="160" fill="var(--probe)">λ = 15</text>
-<text class="sv-d" x="508" y="160" fill="var(--muted)">7 hệ số ≠ 0</text>
-<text class="sv-l" x="448" y="182" fill="var(--probe)">λ = 40</text>
-<text class="sv-d" x="508" y="182" fill="var(--muted)">2 hệ số ≠ 0</text>
-<line x1="446" y1="212" x2="616" y2="212" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-d" x="448" y="232" fill="var(--probe)">tự chọn đặc trưng</text>
-<text class="sv-d" x="436" y="256" fill="var(--muted)">nhưng trong nhóm tương quan</text>
-<text class="sv-d" x="436" y="272" fill="var(--muted)">nó chọn tuỳ ý một cái</text>
-<text class="sv-d" x="666" y="86" fill="var(--ok)">L + λ₁Σ|wⱼ| + λ₂Σwⱼ²</text>
-<text class="sv-d" x="666" y="114" fill="var(--muted)">8 lần chạy lại, nhóm {x₁,x₂,x₃}:</text>
-<text class="sv-d" x="666" y="138" fill="var(--probe)">Lasso</text>
-<text class="sv-d" x="726" y="138" fill="var(--tomb)">chọn khác nhau</text>
-<text class="sv-d" x="666" y="158" fill="var(--muted)">giữ x₂ ở 3/8 lần</text>
-<text class="sv-d" x="666" y="186" fill="var(--ok)">Elastic</text>
-<text class="sv-d" x="726" y="186" fill="var(--ok)">giữ cả ba</text>
-<text class="sv-d" x="666" y="206" fill="var(--muted)">8/8 lần như nhau</text>
-<text class="sv-d" x="666" y="230" fill="var(--ok)">grouping effect</text>
-<text class="sv-d" x="654" y="256" fill="var(--muted)">cái giá: hai siêu tham số</text>
-<text class="sv-d" x="654" y="272" fill="var(--muted)">phải chỉnh thay vì một</text>
-<line x1="0" y1="294" x2="860" y2="294" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-s" x="0" y="318" fill="var(--dim)">Ba tên, một khuôn: giữ nguyên loss cũ rồi cộng một số hạng phạt độ lớn hệ số — khác nhau đúng ở dạng của số hạng đó</text>
-<text class="sv-s" x="0" y="336" fill="var(--dim)">Bắt buộc: chuẩn hoá đặc trưng trước khi phạt, và không phạt hệ số chặn</text>
+<svg viewBox="0 0 860 340" role="img" aria-label="Bốn hệ trục w1-w2 giống nhau, chỉ đổi vùng phạt: không phạt thì nghiệm nằm xa gốc; Ridge là vòng tròn nên nghiệm chạm ngoài trục; Lasso là hình thoi nên nghiệm chạm góc trên trục và một hệ số bằng 0; Elastic Net là hình thoi bo góc">
+<defs>
+<clipPath id="g0"><rect x="0" y="60" width="200" height="196" rx="6"/></clipPath>
+<clipPath id="g1"><rect x="220" y="60" width="200" height="196" rx="6"/></clipPath>
+<clipPath id="g2"><rect x="440" y="60" width="200" height="196" rx="6"/></clipPath>
+<clipPath id="g3"><rect x="660" y="60" width="200" height="196" rx="6"/></clipPath>
+</defs>
+<text class="sv-hv" x="0" y="16">CÙNG MỘT LOSS — CHỈ ĐỔI HÌNH DẠNG VÙNG PHẠT</text>
+<text class="sv-hv" x="0" y="42" fill="var(--tomb)">① Không phạt</text>
+<rect x="0" y="60" width="200" height="196" rx="6" fill="rgba(var(--red-a),.05)" stroke="var(--tomb)" stroke-width="1.4"/>
+<line x1="56" y1="200" x2="176" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="184,200 176,195.8 176,204.2" fill="var(--rule-hi)"/>
+<line x1="82" y1="226" x2="82" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="82,114 77.8,122 86.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="182" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="73" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<g clip-path="url(#g0)">
+<ellipse cx="118" cy="168" rx="27.0" ry="9.0" transform="rotate(24 118 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="118" cy="168" rx="42.0" ry="14.0" transform="rotate(24 118 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="118" cy="168" rx="57.0" ry="19.0" transform="rotate(24 118 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="118" cy="168" r="5" fill="var(--probe)"/>
+<text class="sv-hv" x="12" y="86" fill="var(--tomb)">loss gốc</text>
+<text class="sv-d" x="0" y="278" fill="var(--muted)">nghiệm xa gốc, hệ số lớn</text>
+<text class="sv-hv" x="220" y="42" fill="var(--filled)">② Ridge · L2</text>
+<rect x="220" y="60" width="200" height="196" rx="6" fill="rgba(var(--blue-a),.05)" stroke="var(--filled)" stroke-width="1.4"/>
+<line x1="276" y1="200" x2="396" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="404,200 396,195.8 396,204.2" fill="var(--rule-hi)"/>
+<line x1="302" y1="226" x2="302" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="302,114 297.8,122 306.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="402" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="293" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<circle cx="302" cy="200" r="36" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.6"/>
+<g clip-path="url(#g1)">
+<ellipse cx="338" cy="168" rx="39.9" ry="13.3" transform="rotate(24 338 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="338" cy="168" rx="56.7" ry="18.9" transform="rotate(24 338 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="338" cy="168" rx="74.3" ry="24.8" transform="rotate(24 338 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="331.88" cy="179.84" r="5" fill="var(--probe)"/>
+<text class="sv-m" x="232" y="88" fill="var(--filled)"><tspan class="v">λ</tspan> Σ <tspan class="v">w</tspan>²</text>
+<text class="sv-d" x="220" y="278" fill="var(--muted)">tròn — không có góc để chạm</text>
+<text class="sv-hv" x="440" y="42" fill="var(--probe)">③ Lasso · L1</text>
+<rect x="440" y="60" width="200" height="196" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
+<line x1="496" y1="200" x2="616" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="624,200 616,195.8 616,204.2" fill="var(--rule-hi)"/>
+<line x1="522" y1="226" x2="522" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="522,114 517.8,122 526.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="622" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="513" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<path d="M522 164 L558 200 L522 236 L486 200 Z" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/>
+<g clip-path="url(#g2)">
+<ellipse cx="558" cy="168" rx="47.7" ry="15.9" transform="rotate(24 558 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="558" cy="168" rx="67.8" ry="22.6" transform="rotate(24 558 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="558" cy="168" rx="88.8" ry="29.6" transform="rotate(24 558 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="522" cy="164" r="5" fill="var(--probe)"/>
+<text class="sv-m" x="452" y="88" fill="var(--probe)"><tspan class="v">λ</tspan> Σ |<tspan class="v">w</tspan>|</text>
+<text class="sv-d" x="440" y="278" fill="var(--muted)">chạm góc — w₁ bằng đúng 0</text>
+<text class="sv-hv" x="660" y="42" fill="var(--ok)">④ Elastic Net</text>
+<rect x="660" y="60" width="200" height="196" rx="6" fill="rgba(var(--green-a),.05)" stroke="var(--ok)" stroke-width="1.4"/>
+<line x1="716" y1="200" x2="836" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="844,200 836,195.8 836,204.2" fill="var(--rule-hi)"/>
+<line x1="742" y1="226" x2="742" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="742,114 737.8,122 746.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="842" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="733" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<path d="M778.0 200.0 L777.3 198.2 L776.5 196.4 L775.7 194.7 L774.8 193.0 L774.0 191.4 L773.1 189.9 L772.2 188.4 L771.2 187.0 L770.2 185.6 L769.2 184.3 L768.2 183.0 L767.2 181.7 L766.1 180.5 L765.0 179.3 L763.9 178.1 L762.7 177.0 L761.5 175.9 L760.3 174.8 L759.0 173.8 L757.7 172.8 L756.4 171.8 L755.0 170.8 L753.6 169.8 L752.1 168.9 L750.6 168.0 L749.0 167.2 L747.3 166.3 L745.6 165.5 L743.8 164.7 L742.0 164.0 L740.2 164.7 L738.4 165.5 L736.7 166.3 L735.0 167.2 L733.4 168.0 L731.9 168.9 L730.4 169.8 L729.0 170.8 L727.6 171.8 L726.3 172.8 L725.0 173.8 L723.7 174.8 L722.5 175.9 L721.3 177.0 L720.1 178.1 L719.0 179.3 L717.9 180.5 L716.8 181.7 L715.8 183.0 L714.8 184.3 L713.8 185.6 L712.8 187.0 L711.8 188.4 L710.9 189.9 L710.0 191.4 L709.2 193.0 L708.3 194.7 L707.5 196.4 L706.7 198.2 L706.0 200.0 L706.7 201.8 L707.5 203.6 L708.3 205.3 L709.2 207.0 L710.0 208.6 L710.9 210.1 L711.8 211.6 L712.8 213.0 L713.8 214.4 L714.8 215.7 L715.8 217.0 L716.8 218.3 L717.9 219.5 L719.0 220.7 L720.1 221.9 L721.3 223.0 L722.5 224.1 L723.7 225.2 L725.0 226.2 L726.3 227.2 L727.6 228.2 L729.0 229.2 L730.4 230.2 L731.9 231.1 L733.4 232.0 L735.0 232.8 L736.7 233.7 L738.4 234.5 L740.2 235.3 L742.0 236.0 L743.8 235.3 L745.6 234.5 L747.3 233.7 L749.0 232.8 L750.6 232.0 L752.1 231.1 L753.6 230.2 L755.0 229.2 L756.4 228.2 L757.7 227.2 L759.0 226.2 L760.3 225.2 L761.5 224.1 L762.7 223.0 L763.9 221.9 L765.0 220.7 L766.1 219.5 L767.2 218.3 L768.2 217.0 L769.2 215.7 L770.2 214.4 L771.2 213.0 L772.2 211.6 L773.1 210.1 L774.0 208.6 L774.8 207.0 L775.7 205.3 L776.5 203.6 L777.3 201.8 Z" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/>
+<g clip-path="url(#g3)">
+<ellipse cx="778" cy="168" rx="47.7" ry="15.9" transform="rotate(24 778 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="778" cy="168" rx="67.8" ry="22.6" transform="rotate(24 778 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="778" cy="168" rx="88.8" ry="29.6" transform="rotate(24 778 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="742" cy="164" r="5" fill="var(--probe)"/>
+<text class="sv-m" x="672" y="88" fill="var(--ok)"><tspan class="v">λ</tspan>₁ Σ |<tspan class="v">w</tspan>| + <tspan class="v">λ</tspan>₂ Σ <tspan class="v">w</tspan>²</text>
+<text class="sv-d" x="660" y="278" fill="var(--muted)">vẫn có góc — vẫn về 0 được</text>
+<line x1="0" y1="304" x2="860" y2="304" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-s" x="0" y="328" fill="var(--dim)">Nghiệm luôn nằm TRÊN viền vùng phạt. Chỉ khi chạm đúng GÓC mới có hệ số bằng 0.</text>
 </svg>
-    <figcaption>Đo trên 40 đặc trưng, 120 mẫu, trong đó x₁ x₂ x₃ gần như trùng nhau. Ba cột phải là <strong>ba dạng của cùng một số hạng phạt</strong>, không phải ba model khác nhau.</figcaption>
+    <figcaption>Bốn ô cùng một hệ trục, chỉ đổi hình dạng vùng phạt. Mỗi mục sau bóc ra một ô.</figcaption>
   </figure>
 
   <ul class="why">
-    <li>Cả hai chung một biểu hiện: <b>hệ số có độ lớn phi lý</b>. Cách chữa cũng chung: bắt model trả giá cho nó.</li>
-    <li>Đây là lý do <code>LogisticRegression</code> của scikit-learn <b>bật sẵn L2</b>: thiếu nó, một đặc trưng tách hoàn hảo đẩy hệ số ra vô cực.</li>
+    <li>Không phạt thì nghiệm rơi vào chỗ hệ số lớn.</li>
+    <li>Đổi vài mẫu dữ liệu là hệ số nhảy sang giá trị khác hẳn.</li>
+    <li>Phạt kéo nghiệm về gần gốc, nơi hệ số nhỏ và ổn định.</li>
   </ul>
 </section>
 
 <section id="ridge-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Loss function</h2></div>
 
-  <p class="key">Giữ nguyên loss cũ, cộng thêm một số hạng phạt độ lớn hệ số. <em>Toàn bộ khác biệt giữa ba model nằm ở dạng của số hạng đó.</em></p>
-
-  <p>Cộng một số hạng vào loss để hãm model lại chính là <b>regularization</b>.</p>
-
-  <ul class="why">
-    <li>Ba model dưới đây là ba dạng cụ thể nhất của nó — hai dòng <code>L1</code> và <code>L2</code> trong bảng ở <a href="../../04-core-concepts/overfitting-regularization/index.html">Overfitting &amp; regularization</a> được viết đầy đủ ra ở đây.</li>
-    <li>Các cách khác — dropout, early stopping, thêm dữ liệu — không cộng gì vào loss nhưng đổi lại đúng một thứ: <b>chút bias lấy nhiều variance</b>.</li>
-  </ul>
+  <p class="key">Cộng một số hạng phạt độ lớn hệ số vào loss — <em>đó chính là regularization</em>.</p>
 
 <div class="eq">
     <div class="line">
       <span class="t"><span>Ridge (L2):</span></span>
       <span class="op">&nbsp;</span>
-      <span class="t"><span>L</span></span>
+      <span class="t"><span><var>L</var></span></span>
       <span class="op">+</span>
-      <span class="t b"><span>λ Σ w<sub>j</sub><sup>2</sup></span><em>hệ số nhỏ đều, KHÔNG về 0</em></span>
+      <span class="t b"><span><var>λ</var> Σ <var>w</var><sub><var>j</var></sub><sup>2</sup></span><em>hệ số nhỏ đều, không về 0</em></span>
     </div>
     <div class="line">
       <span class="t"><span>Lasso (L1):</span></span>
       <span class="op">&nbsp;</span>
-      <span class="t"><span>L</span></span>
+      <span class="t"><span><var>L</var></span></span>
       <span class="op">+</span>
-      <span class="t p"><span>λ Σ |w<sub>j</sub>|</span><em>một số hệ số về ĐÚNG 0 → tự chọn đặc trưng</em></span>
+      <span class="t p"><span><var>λ</var> Σ |<var>w</var><sub><var>j</var></sub>|</span><em>một số hệ số về đúng 0</em></span>
     </div>
     <div class="line">
       <span class="t"><span>Elastic Net:</span></span>
       <span class="op">&nbsp;</span>
-      <span class="t"><span>L</span></span>
+      <span class="t"><span><var>L</var></span></span>
       <span class="op">+</span>
-      <span class="t p"><span>λ<sub>1</sub> Σ |w<sub>j</sub>|</span><em>phần L1</em></span>
+      <span class="t p"><span><var>λ</var><sub>1</sub> Σ |<var>w</var><sub><var>j</var></sub>|</span><em>phần L1</em></span>
       <span class="op">+</span>
-      <span class="t b"><span>λ<sub>2</sub> Σ w<sub>j</sub><sup>2</sup></span><em>phần L2</em></span>
+      <span class="t b"><span><var>λ</var><sub>2</sub> Σ <var>w</var><sub><var>j</var></sub><sup>2</sup></span><em>phần L2</em></span>
     </div>
   </div>
 
-  <p><code>λ</code> là cường độ phạt và là siêu tham số duy nhất đáng chỉnh.</p>
+  <dl class="defs">
+    <dt>L</dt><dd>loss gốc, thường là sai số bình phương</dd>
+    <dt>w<sub>j</sub></dt><dd>hệ số của đặc trưng thứ j</dd>
+    <dt>λ</dt><dd>cường độ phạt, chọn bằng cross-validation</dd>
+  </dl>
+
+  <p class="key">Phạt <span class="mth">Σ|<var>w</var>|</span> hay <span class="mth">Σ<var>w</var>²</span> chỉ khác nhau ở <em>hình dạng vùng nó cho hệ số đứng</em> — và hình dạng đó quyết định hệ số có về đúng 0 hay không.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 342" role="img" aria-label="Đường đồng mức của loss chạm vòng tròn ở điểm có cả hai hệ số khác 0, chạm hình thoi đúng ở góc nên một hệ số bằng 0; bên phải là hai công thức đạo hàm của L2 và L1">
+<defs>
+<clipPath id="w0"><rect x="0" y="40" width="258" height="226" rx="6"/></clipPath>
+<clipPath id="w1"><rect x="280" y="40" width="258" height="226" rx="6"/></clipPath>
+</defs>
+<text class="sv-hv" x="0" y="16">CHẠM TRÒN, HAY CHẠM GÓC</text>
+<rect x="0" y="40" width="258" height="226" rx="6" fill="rgba(var(--blue-a),.05)" stroke="var(--filled)" stroke-width="1.4"/>
+<text class="sv-hv" x="14" y="64" fill="var(--filled)">L2 · vòng tròn</text>
+<line x1="74" y1="190" x2="210" y2="190" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="218,190 210,185.8 210,194.2" fill="var(--rule-hi)"/>
+<line x1="100" y1="216" x2="100" y2="104" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="100,96 95.8,104 104.2,104" fill="var(--rule-hi)"/>
+<text class="sv-d" x="216" y="207" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="91" y="95" fill="var(--dim)" text-anchor="end">w₂</text>
+<circle cx="100" cy="190" r="58" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.6"/>
+<g clip-path="url(#w0)">
+<ellipse cx="154" cy="142" rx="49.7" ry="16.6" transform="rotate(24 154 142)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="154" cy="142" rx="70.6" ry="23.5" transform="rotate(24 154 142)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="154" cy="142" rx="92.4" ry="30.8" transform="rotate(24 154 142)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="148.14" cy="157.51999999999998" r="5.5" fill="var(--probe)"/>
+<text class="sv-m" x="160" y="154" fill="var(--probe)"><tspan class="v">w</tspan>₁ ≠ 0</text>
+<text class="sv-m" x="160" y="172" fill="var(--probe)"><tspan class="v">w</tspan>₂ ≠ 0</text>
+<rect x="280" y="40" width="258" height="226" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-hv" x="294" y="64" fill="var(--probe)">L1 · hình thoi</text>
+<line x1="354" y1="190" x2="490" y2="190" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="498,190 490,185.8 490,194.2" fill="var(--rule-hi)"/>
+<line x1="380" y1="216" x2="380" y2="104" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="380,96 375.8,104 384.2,104" fill="var(--rule-hi)"/>
+<text class="sv-d" x="496" y="207" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="371" y="95" fill="var(--dim)" text-anchor="end">w₂</text>
+<path d="M380 132 L438 190 L380 248 L322 190 Z" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/>
+<g clip-path="url(#w1)">
+<ellipse cx="434" cy="142" rx="65.8" ry="21.9" transform="rotate(24 434 142)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="434" cy="142" rx="93.5" ry="31.2" transform="rotate(24 434 142)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="434" cy="142" rx="122.4" ry="40.8" transform="rotate(24 434 142)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="380" cy="132" r="5.5" fill="var(--probe)"/>
+<text class="sv-m" x="392" y="128" fill="var(--probe)"><tspan class="v">w</tspan>₁ = 0</text>
+<text class="sv-m" x="392" y="146" fill="var(--probe)"><tspan class="v">w</tspan>₂ ≠ 0</text>
+<text class="sv-d" x="0" y="290" fill="var(--muted)">Vòng tròn không có góc nên nghiệm chạm ở chỗ hai hệ số đều khác 0. Hình thoi có góc, mà góc nằm trên trục.</text>
+<text class="sv-hv" x="560" y="16">NHÌN THEO ĐẠO HÀM</text>
+<rect x="560" y="40" width="300" height="96" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
+<text class="sv-m" x="574" y="70" fill="var(--filled)">d(<tspan class="v">w</tspan>²) / d<tspan class="v">w</tspan> = 2<tspan class="v">λw</tspan></text>
+<text class="sv-d" x="574" y="94" fill="var(--muted)">đạo hàm nhỏ dần khi w gần 0</text>
+<text class="sv-d" x="574" y="113" fill="var(--muted)">hệ số không bao giờ bằng đúng 0</text>
+<rect x="560" y="158" width="300" height="96" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-m" x="574" y="188" fill="var(--probe)">d|<tspan class="v">w</tspan>| / d<tspan class="v">w</tspan> = ±<tspan class="v">λ</tspan></text>
+<text class="sv-d" x="574" y="212" fill="var(--muted)">đạo hàm giữ nguyên độ lớn λ</text>
+<text class="sv-d" x="574" y="231" fill="var(--muted)">hệ số về đúng 0 rồi đứng yên</text>
+<line x1="0" y1="300" x2="860" y2="300" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-s" x="0" y="324" fill="var(--dim)">Lasso vừa regularize vừa chọn đặc trưng trong một bước.</text>
+</svg>
+    <figcaption>Hình thoi có góc vì <span class="mth">|<var>w</var>|</span> không khả vi tại 0. Cùng một sự thật, nhìn theo hình hay theo đạo hàm đều ra thế.</figcaption>
+  </figure>
 
   <ul class="why">
-    <li><code>λ = 0</code> quay về hồi quy thường.</li>
-    <li><code>λ → ∞</code> ép mọi hệ số về 0, model chỉ còn dự đoán trung bình.</li>
-    <li>Ở giữa là một trục đánh đổi trơn.</li>
-  </ul>
-
-  <div class="axis">
-    <div class="stop"><b>λ = 0</b><span>bias thấp · variance cao · overfit</span></div>
-    <div class="stop on"><b>λ vừa</b><span>chọn bằng cross-validation</span></div>
-    <div class="stop"><b>λ lớn</b><span>hệ số co mạnh · bắt đầu underfit</span></div>
-    <div class="stop"><b>λ → ∞</b><span>mọi hệ số = 0 · chỉ còn hệ số chặn</span></div>
-  </div>
-  <p class="axiscap"><span>học thuộc nhiễu</span><span><em>đổi chút bias lấy nhiều variance</em></span><span>bỏ sót quy luật</span></p>
-
-  <ul class="why">
-    <li>Đây chính là <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">bias–variance tradeoff</a> ở dạng có một núm vặn được. Hiếm model nào cho thấy nó rõ như ở đây.</li>
-    <li>Chọn <code>λ</code> bằng cross-validation, và <b>lấy mẫu theo thang logarithm</b> — nó trải qua nhiều bậc độ lớn.</li>
-    <li><b>Núm vặn nhạy đến mức nào.</b> Trên bộ ba đặc trưng gần trùng nhau ở &#9312;, <code>λ = 0,01</code> — nhỏ tới mức gần như không phạt gì — đã kéo hệ số từ <code>+10,7 / −7,8</code> về <code>1,5 / 1,5</code> mà RMSE test <b>không đổi</b> (0,502). Cái nó chữa không phải sai số, mà là <b>độ tin của từng hệ số</b>.</li>
-    <li><b>Vặn quá tay thì mất thật.</b> Cũng bộ dữ liệu đó, <code>λ = 10</code> đẩy RMSE 0,502 → 0,640. Còn với Lasso trên 40 đặc trưng: <code>λ = 1</code> giữ 37 hệ số và RMSE 1,166; <code>λ = 15</code> giữ 7 hệ số và RMSE 0,976; <code>λ = 100</code> giữ 2 hệ số và RMSE vọt lên 1,194.</li>
-    <li><b>Cực tiểu nằm ở giữa</b>, và nó nằm ở đó vì hai lý do trái chiều nhau — đúng nghĩa đen của bias–variance tradeoff, không phải một phép ẩn dụ.</li>
+    <li>Nhìn qua <a href="../../02-math-foundations/mle-map/index.html">MAP</a>: L2 là prior Gauss, L1 là prior Laplace.</li>
+    <li>Laplace nhọn tại 0 — chính cái góc đó, viết bằng ngôn ngữ xác suất.</li>
   </ul>
 </section>
 
 <section id="ridge-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Vì sao L1 tạo ra hệ số bằng 0 mà L2 thì không</h2></div>
+  <div class="sh"><b>03</b><h2>λ — cường độ phạt</h2></div>
 
-  <p class="key">Câu trả lời nằm ở <em>hình dạng vùng phạt</em>: hình thoi có góc, hình tròn thì không.</p>
+  <p class="key">λ là siêu tham số duy nhất đáng chỉnh — <em>tăng λ là đổi bias lấy variance</em>.</p>
 
   <figure class="scrollx">
-<svg viewBox="0 0 860 376" role="img" aria-label="Vùng phạt L2 là hình tròn nên nghiệm chạm ở điểm có cả hai hệ số khác 0; vùng phạt L1 là hình thoi có góc nằm trên trục nên nghiệm hay rơi vào đó, cho một hệ số bằng đúng 0">
-<text class="sv-hv" x="0" y="18">VÌ SAO L1 CHO HỆ SỐ BẰNG ĐÚNG 0 — HAI CÁCH NÓI, MỘT SỰ THẬT</text>
-<rect x="0" y="42" width="272" height="196" rx="6" fill="rgba(var(--blue-a),.05)" stroke="var(--filled)" stroke-width="1.4"/>
-<line x1="24" y1="160" x2="248" y2="160" stroke="var(--rule-hi)" stroke-width="1"/><polygon points="256,160 248,155.8 248,164.2" fill="var(--rule-hi)"/>
-<line x1="108" y1="92" x2="108" y2="218" stroke="var(--rule-hi)" stroke-width="1"/><polygon points="108,226 103.8,218 112.2,218" fill="var(--rule-hi)"/>
-<text class="sv-d" x="258" y="174" fill="var(--dim)" text-anchor="end">w₁</text>
-<text class="sv-d" x="100" y="88" fill="var(--dim)" text-anchor="end">w₂</text>
-<circle cx="108" cy="160" r="54" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.6"/>
-<ellipse cx="180" cy="104" rx="70" ry="34" transform="rotate(28 180 104)" fill="none" stroke="var(--rule-hi)" stroke-dasharray="3 3"/>
-<ellipse cx="180" cy="104" rx="52" ry="25" transform="rotate(28 180 104)" fill="none" stroke="var(--rule-hi)" stroke-dasharray="3 3"/>
-<ellipse cx="180" cy="104" rx="36" ry="17" transform="rotate(28 180 104)" fill="none" stroke="var(--rule-hi)" stroke-dasharray="3 3"/>
-<circle cx="146" cy="122" r="5" fill="var(--probe)"/>
-<text class="sv-hv" x="14" y="68" fill="var(--filled)">L2 · hình tròn</text>
-<text class="sv-d" x="0" y="258" fill="var(--muted)">đường đứt = đồng mức của loss, tụt dần</text>
-<text class="sv-d" x="0" y="274" fill="var(--muted)">cho tới khi chạm vùng phạt</text>
-<text class="sv-d" x="0" y="296" fill="var(--probe)">chạm ở đâu cũng được — cả hai ≠ 0</text>
-<rect x="294" y="42" width="272" height="196" rx="6" fill="rgba(var(--green-a),.05)" stroke="var(--ok)" stroke-width="1.4"/>
-<line x1="318" y1="160" x2="542" y2="160" stroke="var(--rule-hi)" stroke-width="1"/><polygon points="550,160 542,155.8 542,164.2" fill="var(--rule-hi)"/>
-<line x1="402" y1="92" x2="402" y2="218" stroke="var(--rule-hi)" stroke-width="1"/><polygon points="402,226 397.8,218 406.2,218" fill="var(--rule-hi)"/>
-<text class="sv-d" x="552" y="174" fill="var(--dim)" text-anchor="end">w₁</text>
-<text class="sv-d" x="394" y="88" fill="var(--dim)" text-anchor="end">w₂</text>
-<path d="M402 106 L456 160 L402 214 L348 160 Z" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/>
-<ellipse cx="474" cy="104" rx="70" ry="34" transform="rotate(28 474 104)" fill="none" stroke="var(--rule-hi)" stroke-dasharray="3 3"/>
-<ellipse cx="474" cy="104" rx="52" ry="25" transform="rotate(28 474 104)" fill="none" stroke="var(--rule-hi)" stroke-dasharray="3 3"/>
-<ellipse cx="474" cy="104" rx="36" ry="17" transform="rotate(28 474 104)" fill="none" stroke="var(--rule-hi)" stroke-dasharray="3 3"/>
-<circle cx="402" cy="106" r="5" fill="var(--probe)"/>
-<text class="sv-hv" x="308" y="68" fill="var(--ok)">L1 · hình thoi</text>
-<text class="sv-d" x="294" y="258" fill="var(--muted)">đường đứt = đồng mức của loss, tụt dần</text>
-<text class="sv-d" x="294" y="274" fill="var(--muted)">cho tới khi chạm vùng phạt</text>
-<text class="sv-d" x="294" y="296" fill="var(--probe)">rất dễ chạm GÓC — góc trên trục, w₁ = 0</text>
-<text class="sv-hv" x="588" y="34">CÁCH NÓI THỨ HAI — LỰC ĐẨY VỀ 0</text>
-<rect x="588" y="50" width="272" height="104" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
-<text class="sv-h" x="600" y="72" fill="var(--probe)">d|w|/dw = ±λ</text>
-<text class="sv-d" x="600" y="92" fill="var(--muted)">hằng số — đẩy đều tay cho tới</text>
-<text class="sv-d" x="600" y="108" fill="var(--muted)">khi w chạm ĐÚNG 0 rồi dừng</text>
-<text class="sv-d" x="600" y="134" fill="var(--probe)">|w| không khả vi tại 0 = có góc</text>
-<rect x="588" y="166" width="272" height="104" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
-<text class="sv-h" x="600" y="188" fill="var(--filled)">d(w²)/dw = 2λw</text>
-<text class="sv-d" x="600" y="208" fill="var(--muted)">càng gần 0 lực càng yếu — chỉ</text>
-<text class="sv-d" x="600" y="224" fill="var(--muted)">tiến tới 0, không bao giờ tới</text>
-<text class="sv-d" x="600" y="250" fill="var(--filled)">w² trơn khắp nơi = không góc</text>
-<line x1="0" y1="318" x2="860" y2="318" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-s" x="0" y="342" fill="var(--dim)">Hệ quả dùng được: Lasso vừa regularize vừa chọn đặc trưng trong một bước — model ra thưa, dễ triển khai, dễ đọc</text>
-<text class="sv-s" x="0" y="360" fill="var(--dim)">Nhìn qua MAP: L2 là prior Gauss, L1 là prior Laplace — Laplace nhọn tại 0, cùng cái góc đó viết bằng ngôn ngữ xác suất</text>
+<svg viewBox="0 0 860 362" role="img" aria-label="Bốn ô cùng một hệ trục w1-w2 và cùng ba đường đồng mức của loss, chỉ đổi độ lớn vùng phạt. Lambda bằng 0 thì không có vùng, nghiệm nằm đúng đáy loss. Lambda nhỏ thì vùng rộng, nghiệm co nhẹ. Lambda lớn thì vùng hẹp, nghiệm co mạnh. Lambda tiến vô cực thì vùng co về gốc, mọi hệ số bằng 0.">
+<defs>
+<clipPath id="k0"><rect x="0" y="60" width="200" height="196" rx="6"/></clipPath>
+<clipPath id="k1"><rect x="220" y="60" width="200" height="196" rx="6"/></clipPath>
+<clipPath id="k2"><rect x="440" y="60" width="200" height="196" rx="6"/></clipPath>
+<clipPath id="k3"><rect x="660" y="60" width="200" height="196" rx="6"/></clipPath>
+</defs>
+<text class="sv-hv" x="0" y="16">CÙNG MỘT LOSS — CHỈ ĐỔI ĐỘ LỚN VÙNG PHẠT</text>
+<text class="sv-hv" x="0" y="42" fill="var(--tomb)">① λ = 0</text>
+<rect x="0" y="60" width="200" height="196" rx="6" fill="rgba(var(--red-a),.05)" stroke="var(--tomb)" stroke-width="1.4"/>
+<line x1="56" y1="200" x2="168" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="176,200 168,195.8 168,204.2" fill="var(--rule-hi)"/>
+<line x1="82" y1="226" x2="82" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="82,114 77.8,122 86.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="174" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="73" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<g clip-path="url(#k0)">
+<ellipse cx="118" cy="168" rx="8.7" ry="2.9" transform="rotate(24 118 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="118" cy="168" rx="68.3" ry="22.8" transform="rotate(24 118 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="118" cy="168" rx="133.1" ry="44.4" transform="rotate(24 118 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="118.00" cy="168.00" r="5" fill="var(--probe)"/>
+<text class="sv-d" x="0" y="278" fill="var(--muted)">không có vùng phạt</text>
+<text class="sv-d" x="0" y="295" fill="var(--muted)">hệ số lớn — overfit</text>
+<text class="sv-hv" x="220" y="42" fill="var(--filled)">② λ nhỏ</text>
+<rect x="220" y="60" width="200" height="196" rx="6" fill="rgba(var(--blue-a),.05)" stroke="var(--filled)" stroke-width="1.4"/>
+<line x1="276" y1="200" x2="388" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="396,200 388,195.8 388,204.2" fill="var(--rule-hi)"/>
+<line x1="302" y1="226" x2="302" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="302,114 297.8,122 306.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="394" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="293" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<g clip-path="url(#k1)">
+<ellipse cx="338" cy="168" rx="8.7" ry="2.9" transform="rotate(24 338 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="338" cy="168" rx="68.3" ry="22.8" transform="rotate(24 338 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="338" cy="168" rx="133.1" ry="44.4" transform="rotate(24 338 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="302" cy="200" r="44" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.6"/>
+<circle cx="331.55" cy="167.40" r="5" fill="var(--probe)"/>
+<text class="sv-d" x="220" y="278" fill="var(--muted)">vùng rộng</text>
+<text class="sv-d" x="220" y="295" fill="var(--muted)">hệ số co nhẹ</text>
+<text class="sv-hv" x="440" y="42" fill="var(--probe)">③ λ lớn</text>
+<rect x="440" y="60" width="200" height="196" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
+<line x1="496" y1="200" x2="608" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="616,200 608,195.8 608,204.2" fill="var(--rule-hi)"/>
+<line x1="522" y1="226" x2="522" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="522,114 517.8,122 526.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="614" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="513" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<g clip-path="url(#k2)">
+<ellipse cx="558" cy="168" rx="8.7" ry="2.9" transform="rotate(24 558 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="558" cy="168" rx="68.3" ry="22.8" transform="rotate(24 558 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="558" cy="168" rx="133.1" ry="44.4" transform="rotate(24 558 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="522" cy="200" r="22" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/>
+<circle cx="532.73" cy="180.79" r="5" fill="var(--probe)"/>
+<text class="sv-d" x="440" y="278" fill="var(--muted)">vùng hẹp</text>
+<text class="sv-d" x="440" y="295" fill="var(--muted)">hệ số co mạnh — bắt đầu underfit</text>
+<text class="sv-hv" x="660" y="42" fill="var(--ok)">④ λ → ∞</text>
+<rect x="660" y="60" width="200" height="196" rx="6" fill="rgba(var(--green-a),.05)" stroke="var(--ok)" stroke-width="1.4"/>
+<line x1="716" y1="200" x2="828" y2="200" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="836,200 828,195.8 828,204.2" fill="var(--rule-hi)"/>
+<line x1="742" y1="226" x2="742" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+<polygon points="742,114 737.8,122 746.2,122" fill="var(--rule-hi)"/>
+<text class="sv-d" x="834" y="217" fill="var(--dim)" text-anchor="end">w₁</text>
+<text class="sv-d" x="733" y="113" fill="var(--dim)" text-anchor="end">w₂</text>
+<g clip-path="url(#k3)">
+<ellipse cx="778" cy="168" rx="8.7" ry="2.9" transform="rotate(24 778 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="778" cy="168" rx="68.3" ry="22.8" transform="rotate(24 778 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+<ellipse cx="778" cy="168" rx="133.1" ry="44.4" transform="rotate(24 778 168)" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="742" cy="200" r="3.4" fill="none" stroke="var(--ok)" stroke-width="1.6"/>
+<circle cx="742.00" cy="200.00" r="5" fill="var(--probe)"/>
+<text class="sv-d" x="660" y="278" fill="var(--muted)">vùng co về gốc</text>
+<text class="sv-d" x="660" y="295" fill="var(--muted)">mọi hệ số = 0</text>
+<line x1="0" y1="320" x2="860" y2="320" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-s" x="0" y="344" fill="var(--dim)">Bốn ô cùng một bộ đồng mức. Vùng càng hẹp, nghiệm càng xa đáy loss — lỗi train tăng dần.</text>
 </svg>
-    <figcaption>Hai ô trái là cùng một bài toán, chỉ đổi hình dạng vùng phạt. Ô phải là cùng sự thật đó nói bằng gradient — <strong>hình thoi có góc chính vì <code>|w|</code> không khả vi tại 0</strong>.</figcaption>
+    <figcaption>Bốn ô cùng một hệ trục và cùng bộ đồng mức, chỉ đổi bán kính vùng phạt.</figcaption>
   </figure>
 
   <ul class="why">
-    <li>Hệ quả thực dụng: Lasso <b>vừa regularize vừa chọn đặc trưng</b> trong một bước. Model kết quả thưa, dễ triển khai và dễ đọc.</li>
-    <li>Nhìn qua lăng kính <a href="../../02-math-foundations/mle-map/index.html">MAP</a>: L2 là prior Gauss, L1 là prior Laplace — Laplace nhọn tại 0 nên kéo nghiệm về 0.</li>
+    <li>Đây là <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">bias–variance tradeoff</a> ở dạng một tham số chỉnh được.</li>
+    <li>Quét λ theo <b>thang logarithm</b> — nó trải qua nhiều bậc độ lớn.</li>
+    <li>λ rất nhạy: λ = 0,01 đã kéo hệ số từ +10,7 / −7,8 về 1,5 / 1,5.</li>
+    <li>Mà RMSE không đổi. Nó chữa <b>độ tin của hệ số</b>, không phải sai số.</li>
+    <li>λ quá lớn thì mất thật: λ = 10 đẩy RMSE 0,502 lên 0,640.</li>
   </ul>
 </section>
 
 <section id="ridge-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Chọn cái nào</h2></div>
+  <div class="sh"><b>04</b><h2>Ưu và nhược</h2></div>
 
-<div class="stack">
-    <div class="s ok"><b>Ridge (L2) — mặc định</b><span>nhiều đặc trưng đều có ích một chút, muốn hệ số ổn định khi có đa cộng tuyến · cái giá: giữ hết đặc trưng, model không thưa</span></div>
-    <div class="s"><b>Lasso (L1) — muốn model thưa</b><span>nghi phần lớn đặc trưng vô dụng · cái giá: trong nhóm tương quan, nó chọn tuỳ ý một cái rồi bỏ hết phần còn lại</span></div>
-    <div class="s"><b>Elastic Net — trộn cả hai</b><span>nhiều đặc trưng tương quan theo nhóm, p lớn hơn n · cái giá: hai siêu tham số phải chỉnh thay vì một</span></div>
-  </div>
+  <p class="key">Cả ba đều chống overfitting — <em>khác nhau ở nhược điểm đi kèm</em>.</p>
 
-  <p>Elastic Net tồn tại đúng để chữa dòng giữa.</p>
+  <table>
+    <tr><th>Mặt</th><th>Ridge · L2</th><th>Lasso · L1</th><th>Elastic Net</th></tr>
+    <tr><td>Đưa hệ số về đúng 0</td><td>Không &#8212; giữ hết đặc trưng</td><td><b>Có</b></td><td><b>Có</b></td></tr>
+    <tr><td>Nhóm đặc trưng tương quan</td><td>Cả nhóm co cùng nhau</td><td>Chọn tuỳ ý một cái, bỏ phần còn lại</td><td>Cả nhóm co cùng nhau</td></tr>
+    <tr><td>Số đặc trưng &gt; số mẫu</td><td>Chạy được</td><td>Chọn được tối đa n đặc trưng</td><td>Không giới hạn n</td></tr>
+    <tr><td>Nghiệm</td><td>Có công thức đóng</td><td>Phải giải lặp</td><td>Phải giải lặp</td></tr>
+    <tr><td>Siêu tham số</td><td>Một &#8212; <span class="mth"><var>λ</var></span></td><td>Một &#8212; <span class="mth"><var>λ</var></span></td><td><b>Hai</b> &#8212; cường độ và tỉ lệ trộn</td></tr>
+    <tr><td>Danh sách đặc trưng giữ lại</td><td>Không sinh danh sách</td><td>Đổi chút dữ liệu là ra danh sách khác</td><td>Ổn định hơn Lasso</td></tr>
+  </table>
 
-  <ul class="why">
-    <li>Phần <b>L2</b> làm các hệ số trong một nhóm tương quan co lại cùng nhau thay vì tranh nhau.</li>
-    <li>Phần <b>L1</b> vẫn loại được cả nhóm nếu nhóm đó vô dụng.</li>
-    <li>Hiệu ứng này gọi là <em>grouping effect</em>.</li>
-  </ul>
-
-  <div class="note warn">
-    <h4>Chi tiết bắt buộc khi dùng</h4>
-    <p><strong>Chuẩn hoá đặc trưng trước khi regularize.</strong> Hình phạt tính trên độ lớn hệ số, mà hệ số phụ thuộc thang đo.</p>
-  <p>Không chuẩn hoá thì biến có đơn vị nhỏ bị phạt nặng một cách vô lý — xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</p>
-    <p><strong>Không phạt hệ số chặn.</strong> Nó chỉ dịch chuyển đường, không liên quan tới độ phức tạp của model. Các thư viện đều đã xử lý đúng việc này.</p>
-  </div>
+  <dl class="defs">
+    <dt>sparse</dt><dd>phần lớn hệ số bằng đúng 0, model chỉ còn dùng vài đặc trưng</dd>
+    <dt>công thức đóng</dt><dd>giải một lần ra nghiệm, không phải lặp</dd>
+    <dt>tỉ lệ trộn</dt><dd>bao nhiêu phần L1, bao nhiêu phần L2</dd>
+  </dl>
 </section>
 
 <section id="ridge-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Cùng ý tưởng đó ở chỗ khác</h2></div>
-
-  <p class="key">Hình phạt độ lớn trọng số không dừng ở hồi quy tuyến tính — <em>nó là một trong vài ý tưởng đi xuyên cả ngành</em>.</p>
+  <div class="sh"><b>05</b><h2>Chọn khi nào</h2></div>
 
 <div class="stack">
-    <div class="s"><b><a href="../logistic-regression/index.html">Logistic regression</a> — tham số <code>C</code></b><span>scikit-learn bật sẵn L2; <code>C</code> là <b>nghịch đảo</b> của λ, C nhỏ nghĩa là phạt mạnh</span></div>
-    <div class="s"><b>Mạng nơ-ron — <b>weight decay</b></b><span>đúng là L2, chỉ khác tên · siêu tham số mặc định của mọi optimizer hiện đại</span></div>
-    <div class="s"><b><a href="../../06-tree-models/gradient-boosting/index.html">Gradient boosting</a> — <code>reg_lambda</code>, <code>reg_alpha</code></b><span>phạt trên giá trị lá của cây, không phải trên hệ số tuyến tính</span></div>
-    <div class="s ok"><b><a href="../svm/index.html">SVM</a> — margin lớn nhất</b><span>tối đa hoá margin tương đương tối thiểu hoá <code>‖w‖²</code> — chính là L2, phát biểu theo ngôn ngữ hình học</span></div>
+    <div class="s ok"><b>Ridge &#183; L2 &#8212; mặc định</b><span>nhiều đặc trưng đều có ích một chút, không cần bỏ bớt biến nào</span></div>
+    <div class="s"><b>Lasso &#183; L1</b><span>nghi phần lớn đặc trưng vô dụng, và chúng ít tương quan với nhau</span></div>
+    <div class="s"><b>Elastic Net</b><span>đặc trưng tương quan theo nhóm, hoặc số đặc trưng lớn hơn số mẫu</span></div>
   </div>
 
-  <p>Dòng cuối đáng dừng lại: SVM không được giới thiệu như một model có regularization, nhưng hàm mục tiêu của nó <em>là</em> L2 cộng một loss khác.</p>
-  <p>Nhận ra chỗ này thì hai model tưởng xa nhau hoá ra cùng một khuôn.</p>
+  <ul class="why">
+    <li><b>Chuẩn hoá đặc trưng trước khi phạt</b> &#8212; xem <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</li>
+    <li>Không thì biến có đơn vị nhỏ bị phạt nặng vô lý.</li>
+    <li><b>Không phạt hệ số chặn</b>: nó chỉ dịch đường, không làm model phức tạp hơn.</li>
+  </ul>
 </section>
 
 <section id="ridge-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+  <div class="sh"><b>06</b><h2>Cùng ý tưởng đó ở chỗ khác</h2></div>
 
-  <div class="grid2">
-    <div class="card bad"><h4>Không chuẩn hoá trước khi phạt</h4><p>Biến đơn vị nhỏ bị phạt nặng vô lý. Kết quả phụ thuộc vào việc bạn đo bằng mét hay kilômét.</p></div>
-    <div class="card bad"><h4>Đọc ngược tham số <code>C</code></h4><p>Trong scikit-learn, <code>C</code> nghịch đảo với <code>λ</code>. Tăng <code>C</code> là <em>giảm</em> regularization.</p></div>
-    <div class="card bad"><h4>Tin danh sách đặc trưng Lasso chọn</h4><p>Với nhóm tương quan, nó chọn tuỳ ý một cái. Chạy lại trên dữ liệu khác chút là ra danh sách khác.</p></div>
-    <div class="card bad"><h4>Quét <code>λ</code> theo thang đều</h4><p>Bỏ sót hoàn toàn vùng giá trị nhỏ. Dùng thang logarithm.</p></div>
-    <div class="card bad"><h4>Chọn <code>λ</code> trên tập test</h4><p>Con số báo cáo thành lạc quan. Chọn trên validation hoặc bằng cross-validation.</p></div>
-    <div class="card bad"><h4>Dùng Lasso để kết luận nhân quả</h4><p>Hệ số bằng 0 chỉ nghĩa là "không cần cho dự đoán khi đã có các biến kia", không nghĩa là biến đó không ảnh hưởng.</p></div>
+  <p class="key">Phạt độ lớn trọng số <em>xuất hiện ở nhiều model khác, chỉ đổi tên</em>.</p>
+
+<div class="stack">
+    <div class="s"><b><a href="../logistic-regression/index.html">Logistic regression</a> — <code>C</code></b><span>bật sẵn L2; <code>C</code> là nghịch đảo của λ</span></div>
+    <div class="s"><b>Mạng nơ-ron — weight decay</b><span>đúng là L2, chỉ khác tên</span></div>
+    <div class="s"><b><a href="../../06-tree-models/gradient-boosting/index.html">Gradient boosting</a> — <code>reg_lambda</code>, <code>reg_alpha</code></b><span>phạt trên giá trị lá của cây</span></div>
+    <div class="s ok"><b><a href="../svm/index.html">SVM</a> — margin lớn nhất</b><span>tối đa hoá margin chính là tối thiểu hoá <span class="mth">‖<var>w</var>‖²</span></span></div>
   </div>
+
+  <p>SVM ít khi được giới thiệu như một model có regularization.</p>
+  <p>Nhưng hàm mục tiêu của nó <em>là</em> L2 cộng một loss khác.</p>
 </section>
 
 <section id="ridge-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Không chuẩn hoá trước khi phạt</h4><p>Biến đơn vị nhỏ bị phạt nặng vô lý. Kết quả đổi theo việc bạn đo bằng mét hay kilômét.</p></div>
+    <div class="card bad"><h4>Đọc ngược tham số <code>C</code></h4><p>Trong scikit-learn, <code>C</code> nghịch đảo với <span class="mth"><var>λ</var></span>. Tăng <code>C</code> là <em>giảm</em> regularization.</p></div>
+    <div class="card bad"><h4>Tin danh sách đặc trưng Lasso chọn</h4><p>Với nhóm tương quan, nó chọn tuỳ ý một cái. Đổi chút dữ liệu là ra danh sách khác.</p></div>
+    <div class="card bad"><h4>Quét <span class="mth"><var>λ</var></span> theo thang đều</h4><p>Bỏ sót hoàn toàn vùng giá trị nhỏ. Dùng thang logarithm.</p></div>
+    <div class="card bad"><h4>Chọn <span class="mth"><var>λ</var></span> trên tập test</h4><p>Con số báo cáo thành lạc quan. Chọn trên validation hoặc bằng cross-validation.</p></div>
+    <div class="card bad"><h4>Dùng Lasso để kết luận nhân quả</h4><p>Hệ số 0 chỉ nghĩa là không cần cho dự đoán khi đã có các biến kia.</p></div>
+  </div>
+</section>
+
+<section id="ridge-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
 
   <details class="qa"><summary>Vì sao L1 đưa hệ số về đúng 0 mà L2 thì không?</summary>
-  <p>Nhìn theo hình học: vùng ràng buộc của L2 là hình tròn, của L1 là hình thoi có góc nằm đúng trên các trục. Đường đồng mức của loss chạm hình tròn thì gần như luôn ở điểm có cả hai toạ độ khác 0, còn chạm hình thoi thì rất dễ trúng góc — mà góc nằm trên trục nghĩa là một hệ số bằng 0. Nhìn theo gradient thì cùng một chuyện: đạo hàm của trị tuyệt đối là hằng số nên đẩy về 0 với lực không đổi cho tới khi tới nơi, còn đạo hàm của bình phương tỉ lệ với chính hệ số nên càng gần 0 lực càng yếu, chỉ tiệm cận chứ không tới.</p></details>
+  <p>Nhìn theo hình học: vùng phạt của L2 là hình tròn, của L1 là hình thoi.</p>
+  <p>Góc của hình thoi nằm đúng trên các trục.</p>
+  <p>Đường đồng mức của loss chạm hình tròn thì gần như luôn ở chỗ cả hai hệ số khác 0.</p>
+  <p>Chạm hình thoi thì rất dễ trúng góc — mà góc trên trục nghĩa là một hệ số bằng 0.</p>
+  <p>Nhìn theo đạo hàm thì cùng một chuyện.</p>
+  <p>Đạo hàm của <span class="mth">|<var>w</var>|</span> luôn bằng λ, không nhỏ đi khi hệ số gần 0.</p>
+  <p>Đạo hàm của <span class="mth"><var>w</var>²</span> bằng 2λw nên nhỏ dần khi hệ số gần 0.</p>
+  <p>Vì vậy L2 chỉ đưa hệ số tới gần 0, không tới đúng 0.</p></details>
 
   <details class="qa"><summary>Khi nào chọn Ridge, khi nào Lasso, khi nào Elastic Net?</summary>
-  <p>Ridge là mặc định, dùng khi tin rằng nhiều đặc trưng đều đóng góp một chút và khi cần hệ số ổn định trước đa cộng tuyến. Lasso khi nghi phần lớn đặc trưng vô dụng và muốn model thưa để dễ triển khai. Elastic Net khi có các nhóm đặc trưng tương quan hoặc khi số đặc trưng lớn hơn số mẫu — vì Lasso thuần trong nhóm tương quan sẽ chọn tuỳ ý một biến rồi bỏ hết phần còn lại, còn phần L2 của Elastic Net làm cả nhóm co lại cùng nhau.</p></details>
+  <p>Ridge là mặc định, dùng khi tin rằng nhiều đặc trưng đều đóng góp một chút.</p>
+  <p>Nó cũng là lựa chọn khi cần hệ số ổn định trước đa cộng tuyến.</p>
+  <p>Lasso khi nghi phần lớn đặc trưng vô dụng và muốn model gọn để dễ triển khai.</p>
+  <p>Elastic Net khi có các nhóm đặc trưng tương quan, hoặc khi số đặc trưng lớn hơn số mẫu.</p>
+  <p>Lý do: Lasso thuần trong nhóm tương quan chọn tuỳ ý một biến rồi bỏ hết phần còn lại.</p>
+  <p>Đó là mặt trái của sparse — biến bị bỏ chỉ trùng thông tin, không phải vô dụng.</p>
+  <p>Phần L2 của Elastic Net làm cả nhóm co lại cùng nhau.</p></details>
 
-  <details class="qa"><summary>Chọn <code>λ</code> thế nào?</summary>
-  <p>Bằng cross-validation trên một lưới lấy mẫu theo thang logarithm, chẳng hạn từ 1e-4 tới 1e2. Lấy đều là sai vì λ trải qua nhiều bậc độ lớn và gần hết mẫu sẽ rơi vào vùng lớn. Có thư viện cho sẵn <code>RidgeCV</code> hay <code>LassoCV</code> tìm cả đường λ trong một lần chạy. Điều phải giữ là chọn λ trên tập validation hoặc trong từng fold, không bao giờ trên tập test.</p></details>
+  <details class="qa"><summary>Chọn <span class="mth"><var>λ</var></span> thế nào?</summary>
+  <p>Bằng cross-validation trên một lưới lấy mẫu theo thang logarithm, chẳng hạn từ 1e-4 tới 1e2.</p>
+  <p>Lấy đều là sai vì λ trải qua nhiều bậc độ lớn, gần hết mẫu sẽ rơi vào vùng lớn.</p>
+  <p><code>RidgeCV</code> và <code>LassoCV</code> tìm cả đường λ trong một lần chạy.</p>
+  <p>Điều phải giữ: chọn λ trên validation hoặc trong từng fold, không bao giờ trên tập test.</p></details>
 
   <details class="qa"><summary>Regularization liên quan gì tới bias–variance?</summary>
-  <p>Nó là giao dịch đổi bias lấy variance ở dạng có một núm vặn được. Tăng λ là ép model đơn giản hơn: variance giảm, bias tăng. Mục tiêu không phải bias nhỏ nhất cũng không phải variance nhỏ nhất, mà là tổng nhỏ nhất — và λ tốt nhất chính là điểm cân bằng đó, tìm bằng cross-validation. Nhìn từ góc Bayes thì tăng λ là đặt tiên nghiệm chặt hơn quanh 0: L2 ứng với tiên nghiệm Gauss, L1 ứng với Laplace.</p></details>
+  <p>Nó là bias–variance tradeoff ở dạng một tham số chỉnh được.</p>
+  <p>Tăng λ là ép model đơn giản hơn: variance giảm, bias tăng.</p>
+  <p>Mục tiêu không phải bias nhỏ nhất, cũng không phải variance nhỏ nhất, mà là tổng nhỏ nhất.</p>
+  <p>λ tốt nhất chính là điểm cân bằng đó, tìm bằng cross-validation.</p>
+  <p>Nhìn từ góc Bayes, tăng λ là đặt prior chặt hơn quanh 0.</p></details>
 
   <details class="qa"><summary>Ý tưởng này còn xuất hiện ở đâu ngoài hồi quy tuyến tính?</summary>
-  <p>Ở khắp nơi, chỉ đổi tên. Weight decay trong mạng nơ-ron chính là L2. <code>reg_lambda</code> và <code>reg_alpha</code> của XGBoost là L2 và L1 áp lên giá trị lá. Và SVM tối đa hoá margin thực chất là tối thiểu hoá chuẩn bình phương của vector trọng số — cũng là L2, chỉ phát biểu bằng ngôn ngữ hình học.</p></details>
+  <p>Ở khắp nơi, chỉ đổi tên.</p>
+  <p>Weight decay trong mạng nơ-ron chính là L2.</p>
+  <p><code>reg_lambda</code> và <code>reg_alpha</code> của XGBoost là L2 và L1 áp lên giá trị lá.</p>
+  <p>SVM tối đa hoá margin thực chất là tối thiểu hoá chuẩn bình phương của vector trọng số.</p>
+  <p>Cũng là L2, chỉ phát biểu bằng ngôn ngữ hình học.</p></details>
 </section>
 
 <footer>Machine learning · Classical models · nối tiếp <a href="../linear-regression/index.html">Linear regression</a> và <a href="../logistic-regression/index.html">Logistic regression</a>; cùng ý tưởng phạt độ lớn xuất hiện lại ở <a href="../svm/index.html">SVM</a>.</footer>

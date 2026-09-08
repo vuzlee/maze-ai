@@ -6,8 +6,8 @@ metadata:
 updated: 2026-09-06
 ---
 
-Ngày 2026-09-06, sau khi xem bản đồ ver bài ([[ban-do-ver-bai-toan-kho]]), người dùng bổ sung ba
-luật — đều về **cái gì được phép nằm trong bài**. Đọc cùng [[chuan-bai-mau]] và [[it-chu-nhieu-hinh]].
+Ngày 2026-09-06, sau khi xem bản đồ ver bài ([[trang-thai-kho]]), người dùng bổ sung ba
+luật — đều về **cái gì được phép nằm trong bài**. Đọc cùng [[chuan-bai-mau]] và [[trinh-bay-bai]].
 
 ## Luật A — chữ meta thuộc về memory, không thuộc về bài
 
@@ -57,7 +57,7 @@ số thật.
 | `adaboost` | 5 |
 
 **16 bài này đều nằm trong danh sách bài "đã lên ver mới"** (nhóm A + B của
-[[ban-do-ver-bai-toan-kho]]). Nhãn meta là **sản phẩm phụ của chính đợt áp luật 1** — càng sửa
+[[trang-thai-kho]]). Nhãn meta là **sản phẩm phụ của chính đợt áp luật 1** — càng sửa
 theo chuẩn mới càng dính. Nên: **bài nào sắp áp luật 1 thì dọn nhãn ngay trong lượt đó**, đừng để
 thành đợt riêng, và **đừng đẻ thêm** khi viết bài mới.
 
@@ -66,7 +66,7 @@ thành đợt riêng, và **đừng đẻ thêm** khi viết bài mới.
 Người dùng: *"những bài có đề cập tới cấu trúc dữ liệu bất kỳ như XGBoost hay các bài cây hoặc cấu
 trúc dữ liệu khác thì phải có hình chi tiết về đúng cấu trúc đó để dễ nhớ, ví dụ xgboost phải có
 mấy cái cây nối đuôi nhau"*, kèm hình tham khảo: **N cột nối tiếp**, mỗi cột là
-`(X, r_{n-1})` → `Tree n` → `Predict` → `r_n = r_{n-1} − r̂_{n-1}`, mũi tên xanh vòng phần dư sang
+`(X, r_{n-1})` → `Tree n` → `Predict` → `r_n = r_{n-1} − r̂_{n-1}`, mũi tên xanh vòng residual sang
 cột sau, cột cuối `Tree N` với dấu `………` ở giữa.
 
 **Vì sao.** Hình vẽ **quan hệ trừu tượng** (ô chữ nhật, mũi tên, band màu) thì nhớ được luồng
@@ -74,11 +74,11 @@ nhưng không nhớ được **vật**. Học cây mà chưa từng nhìn thấy
 chính chỗ tên bài nói tới.
 
 **Áp dụng thế nào.** Bài nào có một cấu trúc dữ liệu đứng tên — cây, list liên kết, heap, trie,
-hash table, đồ thị, ma trận, chuỗi cột — thì trong bài **phải có ít nhất một hình vẽ đúng hình
+hash table, đồ thị, matrix, chuỗi cột — thì trong bài **phải có ít nhất một hình vẽ đúng hình
 dạng vật lý của nó**, không thay bằng ô chữ nhật:
 
 - cây → node tròn + cạnh nối, thấy được tầng và nhánh trái/phải;
-- chuỗi model nối tiếp (boosting) → N khối nối đuôi nhau, có mũi tên hồi tiếp mang phần dư;
+- chuỗi model nối tiếp (boosting) → N khối nối đuôi nhau, có mũi tên feedback mang residual;
 - hash table → dãy bucket + chain/probe thật;
 - đồ thị → đỉnh và cạnh, không phải bảng kề.
 
@@ -103,7 +103,7 @@ nhật**, tức vẽ quan hệ chứ chưa vẽ vật.
 | 07-tf | `self-attention` | 32 | 2 |
 
 `heap-priority-queue` là ca nặng nhất: **55 ô chữ nhật, 1 hình tròn** cho một bài mà tên nó là một
-cây. `self-attention` cũng vậy — 32 rect, không hình nào vẽ ma trận Q·Kᵀ thật.
+cây. `self-attention` cũng vậy — 32 rect, không hình nào vẽ matrix Q·Kᵀ thật.
 
 **Bài đã làm đúng, dùng làm mẫu:** `trie` (8 circle, 8 line, 0 rect), `tree-bst-traversal` (8/6),
 `graph-bfs-dfs-topo` (6/6), `decision-tree` (20 circle), `tree-family-overview` (38 circle),
@@ -112,7 +112,7 @@ cây. `self-attention` cũng vậy — 32 rect, không hình nào vẽ ma trận
 Nhánh tree-based chỉ là chỗ người dùng phát hiện ra đầu tiên. **Luật áp cho mọi kệ**: DSA (7 bài),
 Python, CS, ML, Transformer đều đang dính.
 
-Hình nối tiếp của một họ phải **dùng chung khung** (luật đã có trong [[dot-sua-theo-chuan-bai-mau]]):
+Hình nối tiếp của một họ phải **dùng chung khung** (luật đã có trong [[trang-thai-kho]]):
 gradient-boosting · xgboost · lightgbm · adaboost cùng một bố cục cột, đặt cạnh nhau là so được.
 
 ## Luật C — chỉ giữ thứ tối thiểu để hiểu
@@ -283,7 +283,7 @@ chỗ không tồn tại. Quy trình: cắt mục xong → mở lại `figure.gi
 (cột trái tóm tắt, cột phải giảng lại chính ba ô đó) — gộp còn một dải 232px.
 
 **F2 — "sáng lên phần đang học" không có nghĩa là chép cả bản đồ vào mỗi mục.** Luật cũ (mỗi mục
-tô sáng một ô của bản đồ) đẻ ra 7 hình đều mở đầu bằng cả bản đồ mờ — xem [[ban-do-ver-bai-toan-kho]].
+tô sáng một ô của bản đồ) đẻ ra 7 hình đều mở đầu bằng cả bản đồ mờ — xem [[trang-thai-kho]].
 Cách đúng: bản đồ **chỉ vẽ một lần ở §01**, `figcaption` của nó nói mục nào ứng với ô nào
 ("① Loss function · ② giá trị lá · ③ gain"); mục thân bài chỉ vẽ nội dung của riêng nó và mở đầu
 bằng một dòng chữ nhắc lại mình đang ở ô nào. Chữ rẻ hơn hình vẽ lại.
@@ -329,7 +329,8 @@ mật mã.
 | Đếm trừu tượng ("hai tiêu chí, không phải một") | nói thẳng hai thứ đó là gì | "cây mọc theo một thước đo, boosting lại chấm điểm bằng thước đo khác" |
 | Ẩn dụ tự chế ("viết lại ba lần", "nhìn từ ba phía") | nói việc nó làm | "MỘT CÔNG THỨC, DÙNG CHO BA VIỆC" |
 | Thuật ngữ toán làm đầu mục ("Xấp xỉ bằng parabol", "Giải đỉnh parabol", "So hai đỉnh") | đầu mục là **việc**, thuật ngữ xuống dòng phụ | "① Chấm điểm một cây" · "② Tìm số mỗi lá trả về" · "③ Quyết có tách nút không" |
-| Thuật ngữ chuyên ngành xuất hiện trước khi được giải thích | dùng lời thường trước, tên tiếng Anh trong ngoặc **sau** | "công thức chấm điểm cây (hàm mục tiêu)" |
+| Thuật ngữ chuyên ngành xuất hiện trước khi được giải thích | dùng lời thường trước, tên tiếng Anh trong ngoặc **sau** | "công thức chấm điểm cây (objective function)" |
+| Ẩn dụ kinh tế ("trả phí", "giá phải trả", "đắt/rẻ") | nói thẳng cái xảy ra: **bị phạt**, phạt nặng/nhẹ | `svm`: "cho lấn và bắt trả phí" → "cho lấn nhưng bị phạt" |
 
 **Vẫn giữ nguyên:** công thức mà bài đang dạy (`w* = − G/(H+λ)`) và tên tiếng Anh của bài. Diễn
 giải chúng ra lời là mất chỗ neo — luật này áp cho **chữ giảng**, không áp cho ký hiệu.
