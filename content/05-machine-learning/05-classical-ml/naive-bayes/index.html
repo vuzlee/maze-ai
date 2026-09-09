@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Naive Bayes — MazeAI</title>
-<meta name="description" content="Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.">
+<meta name="description" content="Bốn bước từ thư tới nhãn: đếm tần suất, cộng alpha, cộng log, argmax — và cái giá của giả định độc lập.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/05-classical-ml/naive-bayes/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Naive Bayes">
-<meta property="og:description" content="Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.">
+<meta property="og:description" content="Bốn bước từ thư tới nhãn: đếm tần suất, cộng alpha, cộng log, argmax — và cái giá của giả định độc lập.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,274 +39,540 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-nb" data-title="Naive Bayes" data-tag="ML" data-blurb="Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.">
+      <article class="doc" id="art-nb" data-title="Naive Bayes" data-tag="ML" data-reviewed="1" data-blurb="Bốn bước từ thư tới nhãn: đếm tần suất, cộng alpha, cộng log, argmax — và cái giá của giả định độc lập.">
         <header class="hero">
   <p class="eyebrow">Machine learning · Classical models</p>
   <h1>Naive Bayes — <em>ngây thơ mà hiệu quả</em></h1>
-  <p class="lede">Model duy nhất trong kệ đi thẳng từ một công thức xác suất ra bộ phân loại, không cần tối ưu gì. Giả định của nó <b>gần như luôn sai</b> — và nó vẫn là baseline mạnh cho văn bản.</p>
+  <p class="lede">Bộ phân loại đi thẳng từ một công thức xác suất, không tối ưu gì. Giả định của nó <b>gần như luôn sai</b>, mà vẫn là baseline mạnh cho văn bản.</p>
 </header>
 
 <section id="nb-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
 
-  <p class="key">Câu hỏi phân loại viết lại bằng xác suất: <em>cho các đặc trưng đã thấy, lớp nào có khả năng cao nhất</em>.</p>
+  <p class="key">Naive Bayes trả lời một câu hỏi duy nhất: <em>cho các từ đã thấy, lớp nào có khả năng cao nhất</em>.</p>
 
-  <p><a href="../../02-math-foundations/bayes-theorem/index.html">Định lý Bayes</a> cho phép lật ngược câu hỏi đó thành một câu dễ ước lượng hơn từ dữ liệu:</p>
+  <p><a href="../../02-math-foundations/bayes-theorem/index.html">Định lý Bayes</a> lật câu hỏi đó thành thứ đếm được.</p>
 
   <div class="eq">
     <div class="line">
-      <span class="t"><span><var>P</var>(lớp | đặc trưng)</span><em>cái cần biết</em></span>
+      <span class="t"><span><var>P</var>(<var>c</var> | <var>x</var>)</span><em>cái cần biết</em></span>
       <span class="op">=</span>
-      <span class="t b"><span><var>P</var>(đặc trưng | lớp)</span><em>đếm từ dữ liệu của từng lớp</em></span>
-      <span class="op">·</span>
-      <span class="t p"><span><var>P</var>(lớp)</span><em>tỉ lệ mỗi lớp</em></span>
-      <span class="op">/</span>
-      <span class="t r"><span><var>P</var>(đặc trưng)</span><em>giống nhau mọi lớp → bỏ</em></span>
+      <span class="t b"><span><span class="frac"><i><var>P</var>(<var>x</var> | <var>c</var>) · <var>P</var>(<var>c</var>)</i><i><var>P</var>(<var>x</var>)</i></span></span><em>tử: đếm được · mẫu: giống nhau mọi lớp</em></span>
     </div>
-    <p class="read">Đọc: xác suất của một lớp khi đã thấy đặc trưng, bằng khả năng lớp đó sinh ra đặc trưng nhân tỉ lệ lớp, chia cho mẫu số chung.</p>
+    <dl class="defs">
+      <dt>c</dt><dd>một lớp, ví dụ spam hay ham</dd>
+      <dt>x</dt><dd>các từ trong thư cần phân loại</dd>
+      <dt>P(x | c)</dt><dd>lớp này hay sinh ra các từ đó tới mức nào</dd>
+      <dt>P(c)</dt><dd>lớp này vốn chiếm bao nhiêu phần dữ liệu</dd>
+    </dl>
   </div>
 
-  <p>Mẫu số không phụ thuộc lớp nên khi chỉ cần <em>so sánh</em> giữa các lớp thì bỏ được. Còn lại đúng hai thứ phải đếm từ dữ liệu huấn luyện.</p>
-
-  <ul class="why">
-    <li><b>Tỉ lệ mỗi lớp.</b></li>
-    <li><b>Khả năng thấy từng đặc trưng</b> bên trong mỗi lớp.</li>
-  </ul>
+  <p>Mẫu số giống nhau ở mọi lớp nên so sánh thì bỏ được.</p>
+  <p>Còn lại đúng hai thứ phải đếm, và bốn bước để đi từ thư tới nhãn.</p>
 
   <figure class="gist">
-<svg viewBox="0 0 860 352" role="img" aria-label="Bốn ô của Naive Bayes: đếm tần suất, làm mượt Laplace, cộng log xác suất, so điểm giữa hai lớp">
-<text class="sv-hv" x="0" y="18">HUẤN LUYỆN CHỈ LÀ ĐẾM — BA VIỆC, KHÔNG VIỆC NÀO LÀ TỐI ƯU</text>
-<text class="sv-hv" x="0" y="42" fill="var(--filled)">① Đếm</text>
-<rect x="0" y="62" width="190" height="176" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
-<text class="sv-hv" x="218" y="42" fill="var(--probe)">② Làm mượt</text>
-<rect x="218" y="62" width="190" height="176" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
-<text class="sv-hv" x="436" y="42" fill="var(--ok)">③ Cộng log</text>
-<rect x="436" y="62" width="190" height="176" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
-<text class="sv-hv" x="654" y="42" fill="var(--tomb)">④ So hai lớp</text>
-<rect x="654" y="62" width="190" height="176" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
-<text class="sv-d" x="12" y="84" fill="var(--dim)">từ</text>
-<text class="sv-d" x="84" y="84" fill="var(--dim)">spam</text>
-<text class="sv-d" x="140" y="84" fill="var(--dim)">ham</text>
-<text class="sv-d" x="12" y="108" fill="var(--text)">trúng</text>
-<text class="sv-l" x="84" y="108" fill="var(--filled)">41</text>
-<text class="sv-l" x="140" y="108" fill="var(--filled)">2</text>
-<text class="sv-d" x="12" y="132" fill="var(--text)">thưởng</text>
-<text class="sv-l" x="84" y="132" fill="var(--filled)">38</text>
-<text class="sv-l" x="140" y="132" fill="var(--filled)">1</text>
-<text class="sv-d" x="12" y="156" fill="var(--text)">họp</text>
-<text class="sv-l" x="84" y="156" fill="var(--filled)">3</text>
-<text class="sv-l" x="140" y="156" fill="var(--filled)">52</text>
-<text class="sv-d" x="12" y="180" fill="var(--text)">lịch</text>
-<text class="sv-l" x="84" y="180" fill="var(--filled)">0</text>
-<text class="sv-l" x="140" y="180" fill="var(--filled)">29</text>
-<text class="sv-d" x="12" y="218" fill="var(--muted)">một lượt qua dữ liệu là xong</text>
-<text class="sv-d" x="0" y="256" fill="var(--muted)">không gradient, không learning</text>
-<text class="sv-d" x="0" y="272" fill="var(--muted)">rate — chỉ là bảng tần suất</text>
-<text class="sv-d" x="230" y="86" fill="var(--text)">P(từ|lớp) =</text>
-<text class="sv-d" x="230" y="112" fill="var(--probe)">đếm + α</text>
-<line x1="228" y1="120" x2="330" y2="120" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-d" x="230" y="138" fill="var(--probe)">tổng + α·V</text>
-<rect x="228" y="156" width="170" height="34" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
-<text class="sv-d" x="238" y="170" fill="var(--tomb)">α = 0: từ mới → 0</text>
-<text class="sv-d" x="238" y="184" fill="var(--tomb)">0 nhân vào là xoá sạch</text>
-<text class="sv-d" x="230" y="212" fill="var(--muted)">5,9% văn bản test cho</text>
-<text class="sv-d" x="230" y="228" fill="var(--muted)">điểm 0 ở CẢ HAI lớp</text>
-<text class="sv-d" x="218" y="256" fill="var(--muted)">α là prior: "giả vờ đã thấy</text>
-<text class="sv-d" x="218" y="272" fill="var(--muted)">mỗi từ α lần trước khi đếm"</text>
-<text class="sv-d" x="448" y="88" fill="var(--tomb)">nhân 0,003 ×</text>
-<text class="sv-d" x="448" y="104" fill="var(--tomb)">0,001 × … 40 lần</text>
-<text class="sv-d" x="448" y="120" fill="var(--tomb)">→ tràn về 0,0</text>
-<line x1="446" y1="134" x2="616" y2="134" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-d" x="448" y="156" fill="var(--text)">điểm(lớp) =</text>
-<text class="sv-d" x="448" y="178" fill="var(--ok)">log P(lớp)</text>
-<text class="sv-d" x="448" y="200" fill="var(--ok)">+ Σ log P(tᵢ|lớp)</text>
-<text class="sv-d" x="448" y="226" fill="var(--muted)">cộng thì không tràn</text>
-<text class="sv-d" x="436" y="256" fill="var(--muted)">log biến tích thành tổng —</text>
-<text class="sv-d" x="436" y="272" fill="var(--muted)">thứ tự giữa các lớp không đổi</text>
-<text class="sv-d" x="666" y="88" fill="var(--tomb)">spam</text>
-<rect x="720" y="78" width="104" height="14" rx="3" fill="rgba(var(--red-a),.40)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-l" x="666" y="106" fill="var(--tomb)">−18,4</text>
-<text class="sv-d" x="666" y="142" fill="var(--ok)">ham</text>
-<rect x="720" y="132" width="58" height="14" rx="3" fill="rgba(var(--green-a),.40)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-l" x="666" y="160" fill="var(--ok)">−26,1</text>
-<line x1="664" y1="178" x2="834" y2="178" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-t" x="666" y="200" fill="var(--tomb)">chọn spam</text>
-<text class="sv-d" x="666" y="224" fill="var(--muted)">chỉ cần đúng THỨ TỰ</text>
-<text class="sv-d" x="654" y="256" fill="var(--muted)">không cần đúng giá trị — nên</text>
-<text class="sv-d" x="654" y="272" fill="var(--muted)">giả định sai vẫn đoán đúng</text>
-<line x1="0" y1="294" x2="860" y2="294" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-s" x="0" y="318" fill="var(--dim)">"Naive" nằm ở ③: cộng log của từng từ tức là coi các từ độc lập với nhau khi đã biết lớp — sai rõ ràng, mà vẫn dùng được</text>
-<text class="sv-s" x="0" y="336" fill="var(--dim)">Cái giá trả ở ④: khoảng cách giữa hai cột bị thổi phồng, nên xác suất đầu ra hay dính sát 0 hoặc 1</text>
+<svg viewBox="0 0 860 390" role="img" aria-label="Ban do nam o: thu can phan loai, bang tan suat, xac suat khac 0, diem moi lop, nhan tra ve; ben phai la hai thu phai dem">
+<text class="sv-hv" x="8" y="18" fill="var(--muted)">VÍ DỤ CHẠY SUỐT BÀI — LỌC THƯ RÁC</text>
+<rect x="8" y="30" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="52" fill="var(--text)">Thư cần phân loại</text>
+<text class="sv-d" x="24" y="68" fill="var(--muted)">"trúng thưởng họp"</text>
+<line x1="168.0" y1="80" x2="168.0" y2="94" stroke="var(--filled)" stroke-width="1.2"/><polygon points="168.0,102 163.8,94 172.2,94" fill="var(--filled)"/>
+<text class="sv-d" x="180.0" y="95" fill="var(--filled)">đếm</text>
+<text class="sv-h" x="8" y="95" fill="var(--filled)">02</text>
+<rect x="8" y="106" width="320" height="48" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="128" fill="var(--filled)">Bảng tần suất</text>
+<text class="sv-d" x="24" y="144" fill="var(--muted)">P(từ | lớp) thô</text>
+<line x1="168.0" y1="156" x2="168.0" y2="170" stroke="var(--probe)" stroke-width="1.2"/><polygon points="168.0,178 163.8,170 172.2,170" fill="var(--probe)"/>
+<text class="sv-d" x="180.0" y="171" fill="var(--probe)">cộng α</text>
+<text class="sv-h" x="8" y="171" fill="var(--probe)">03</text>
+<rect x="8" y="182" width="320" height="48" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="204" fill="var(--probe)">Xác suất khác 0</text>
+<text class="sv-d" x="24" y="220" fill="var(--muted)">không ô nào còn bằng 0</text>
+<line x1="168.0" y1="232" x2="168.0" y2="246" stroke="var(--filled)" stroke-width="1.2"/><polygon points="168.0,254 163.8,246 172.2,246" fill="var(--filled)"/>
+<text class="sv-d" x="180.0" y="247" fill="var(--filled)">log rồi cộng</text>
+<text class="sv-h" x="8" y="247" fill="var(--filled)">04</text>
+<rect x="8" y="258" width="320" height="48" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="280" fill="var(--filled)">Điểm của mỗi lớp</text>
+<text class="sv-d" x="24" y="296" fill="var(--muted)">spam −5,27 · ham −8,36</text>
+<line x1="168.0" y1="308" x2="168.0" y2="322" stroke="var(--ok)" stroke-width="1.2"/><polygon points="168.0,330 163.8,322 172.2,322" fill="var(--ok)"/>
+<text class="sv-l" x="180.0" y="323" fill="var(--ok)">argmax</text>
+<text class="sv-h" x="8" y="323" fill="var(--ok)">05</text>
+<rect x="8" y="334" width="320" height="48" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="356" fill="var(--ok)">Nhãn trả về</text>
+<text class="sv-d" x="24" y="372" fill="var(--muted)">spam</text>
+<text class="sv-hv" x="372" y="18" fill="var(--muted)">HAI THỨ PHẢI ĐẾM — HẾT, KHÔNG CÓ VÒNG LẶP TỐI ƯU</text>
+<rect x="372" y="34" width="488" height="52" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="56" fill="var(--filled)">P(c) — mỗi lớp chiếm bao nhiêu phần</text>
+<text class="sv-s" x="388" y="74" fill="var(--dim)">đếm số thư của từng lớp, chia cho tổng</text>
+<rect x="372" y="98" width="488" height="52" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="120" fill="var(--probe)">P(từ | c) — lớp này hay sinh ra từng từ tới mức nào</text>
+<text class="sv-s" x="388" y="138" fill="var(--dim)">đếm số lần từng từ xuất hiện trong từng lớp</text>
+<line x1="372" y1="172" x2="860" y2="172" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-s" x="372" y="194" fill="var(--dim)">Một lượt qua dữ liệu là xong — không gradient, không learning rate.</text>
+<text class="sv-s" x="372" y="214" fill="var(--dim)">Dữ liệu mới thì cộng thêm vào bộ đếm, không phải huấn luyện lại.</text>
 </svg>
-    <figcaption>Đếm &#8594; làm mượt &#8594; cộng log &#8594; so. Không vòng lặp tối ưu, không learning rate — <strong>toàn bộ việc học là bảng đếm ở &#9312;</strong>.</figcaption>
+    <figcaption>Cột trái là toàn bộ model, đọc từ trên xuống. <strong>Bốn mũi tên chính là bốn mục tiếp theo</strong> &#8212; mỗi mục phóng to đúng một ô.</figcaption>
   </figure>
 
   <ul class="why">
-    <li>Không vòng lặp tối ưu, không gradient, không learning rate — <b>huấn luyện chỉ là đếm</b>, một lượt qua dữ liệu là xong.</li>
-    <li>Cũng vì thế nó cập nhật được <b>tăng dần</b>: dữ liệu mới thì cộng vào bộ đếm, không huấn luyện lại từ đầu.</li>
-    <li><b>Giả định độc lập</b> ở &#9314; là thứ khiến &#9312; chỉ phải đếm từng đặc trưng rời: 2¹⁰⁰⁰ tổ hợp rút xuống 1.000 phép đếm. Đó là toàn bộ chữ <em>naive</em>.</li>
-    <li><b>Ba biến thể</b> (Multinomial · Bernoulli · Gaussian) chỉ đổi cách tính ô &#9312; — ba ô còn lại giữ nguyên ở cả ba.</li>
+    <li><b>Huấn luyện chỉ là đếm.</b> Một lượt qua dữ liệu là xong.</li>
+    <li><b>Cập nhật tăng dần được.</b> Dữ liệu mới thì cộng vào bộ đếm.</li>
+    <li><b>Cả bài dùng đúng một ví dụ.</b> Thư <span class="mth">"trúng thưởng họp"</span>, bảng đếm bốn từ, hai lớp spam và ham.</li>
   </ul>
 </section>
 
 <section id="nb-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Giả định ngây thơ</h2></div>
+  <div class="sh"><b>02</b><h2>Bảng tần suất</h2></div>
 
-  <p class="key">Chữ <em>naive</em> nằm ở một dòng: coi các đặc trưng <b>độc lập với nhau khi đã biết lớp</b>.</p>
+  <p class="key">Bước đếm chỉ chạy được nhờ một giả định: <em>các từ độc lập với nhau khi đã biết lớp</em>.</p>
 
-  <p>Không có giả định đó thì phải ước lượng xác suất của mọi <em>tổ hợp</em> đặc trưng.</p>
-  <p>Với 1000 từ và mỗi từ có/không thì đó là 2¹⁰⁰⁰ tổ hợp — không bộ dữ liệu nào đủ.</p>
-  <p>Giả định độc lập biến bài toán đó thành 1000 phép đếm rời rạc.</p>
+  <p>Không có giả định đó thì phải đếm mọi tổ hợp từ.</p>
+  <p>Bốn từ là 16 ô, còn đếm được.</p>
+  <p>Một nghìn từ là 2¹⁰⁰⁰ ô. Không bộ dữ liệu nào đủ.</p>
 
-  <div class="cmp two">
-    <div>
-      <h5>Giả định nói gì</h5>
-      <p>Trong thư rác, thấy chữ <em>trúng</em> không nói gì thêm về khả năng thấy chữ <em>thưởng</em>.</p>
-      <p>Rõ ràng <b>sai</b> — hai từ đó đi cùng nhau.</p>
-    </div>
-    <div>
-      <h5>Vì sao vẫn chạy được</h5>
-      <p>Xác suất ước lượng ra sai lệch nhiều.</p>
-      <p>Nhưng phân loại chỉ cần <b>đúng thứ tự</b> giữa các lớp, không cần đúng giá trị.</p>
-    </div>
-  </div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 390" role="img" aria-label="Hai cach lap bang tren bon tu: dem moi to hop ra 16 o, dem rieng tung tu ra 4 o">
+<text class="sv-hv" x="8" y="18" fill="var(--muted)">VÍ DỤ CHẠY SUỐT BÀI — LỌC THƯ RÁC</text>
+<rect x="8" y="30" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="52" fill="var(--faint)">Thư cần phân loại</text>
+<text class="sv-d" x="24" y="68" fill="var(--faint)">"trúng thưởng họp"</text>
+<line x1="168.0" y1="80" x2="168.0" y2="94" stroke="var(--filled)" stroke-width="1.2"/><polygon points="168.0,102 163.8,94 172.2,94" fill="var(--filled)"/>
+<text class="sv-d" x="180.0" y="95" fill="var(--filled)">đếm</text>
+<text class="sv-h" x="8" y="95" fill="var(--filled)">02</text>
+<rect x="8" y="106" width="320" height="48" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="128" fill="var(--filled)">Bảng tần suất</text>
+<text class="sv-d" x="24" y="144" fill="var(--muted)">P(từ | lớp) thô</text>
+<line x1="168.0" y1="156" x2="168.0" y2="170" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,178 163.8,170 172.2,170" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="171" fill="var(--rule-hi)">cộng α</text>
+<text class="sv-h" x="8" y="171" fill="var(--rule-hi)">03</text>
+<rect x="8" y="182" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="204" fill="var(--faint)">Xác suất khác 0</text>
+<text class="sv-d" x="24" y="220" fill="var(--faint)">không ô nào còn bằng 0</text>
+<line x1="168.0" y1="232" x2="168.0" y2="246" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,254 163.8,246 172.2,246" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="247" fill="var(--rule-hi)">log rồi cộng</text>
+<text class="sv-h" x="8" y="247" fill="var(--rule-hi)">04</text>
+<rect x="8" y="258" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="280" fill="var(--faint)">Điểm của mỗi lớp</text>
+<text class="sv-d" x="24" y="296" fill="var(--faint)">spam −5,27 · ham −8,36</text>
+<line x1="168.0" y1="308" x2="168.0" y2="322" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,330 163.8,322 172.2,322" fill="var(--rule-hi)"/>
+<text class="sv-l" x="180.0" y="323" fill="var(--rule-hi)">argmax</text>
+<text class="sv-h" x="8" y="323" fill="var(--rule-hi)">05</text>
+<rect x="8" y="334" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="356" fill="var(--faint)">Nhãn trả về</text>
+<text class="sv-d" x="24" y="372" fill="var(--faint)">spam</text>
+<path d="M342 130.0 C 356 130.0, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-hv" x="372" y="18" fill="var(--muted)">VÍ DỤ — BỐN TỪ, HAI CÁCH LẬP BẢNG</text>
+<rect x="372" y="40" width="488" height="96" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-t" x="386" y="62" fill="var(--tomb)">Không giả định gì</text>
+<text class="sv-d" x="386" y="80" fill="var(--muted)">phải đếm MỌI TỔ HỢP từ</text>
+<rect x="386" y="92" width="54" height="24" rx="3" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="413" y="109" fill="var(--tomb)" text-anchor="middle">0000</text>
+<rect x="448" y="92" width="54" height="24" rx="3" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="475" y="109" fill="var(--tomb)" text-anchor="middle">0001</text>
+<rect x="510" y="92" width="54" height="24" rx="3" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="537" y="109" fill="var(--tomb)" text-anchor="middle">0010</text>
+<rect x="572" y="92" width="54" height="24" rx="3" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="599" y="109" fill="var(--tomb)" text-anchor="middle">…</text>
+<rect x="634" y="92" width="54" height="24" rx="3" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.1"/>
+<text class="sv-l" x="661" y="109" fill="var(--tomb)" text-anchor="middle">1111</text>
+<text class="sv-d" x="708" y="109" fill="var(--tomb)">2⁴ = 16 ô</text>
+<text class="sv-s" x="372" y="150" fill="var(--dim)">4 từ thì 16 ô còn đếm được. 1.000 từ thì 2¹⁰⁰⁰ — không bộ dữ liệu nào đủ.</text>
+<rect x="372" y="172" width="488" height="96" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-t" x="386" y="194" fill="var(--ok)">Giả định độc lập</text>
+<text class="sv-d" x="386" y="212" fill="var(--muted)">đếm RIÊNG từng từ</text>
+<rect x="386" y="224" width="70" height="24" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="421" y="241" fill="var(--ok)" text-anchor="middle">trúng</text>
+<rect x="464" y="224" width="70" height="24" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="499" y="241" fill="var(--ok)" text-anchor="middle">thưởng</text>
+<rect x="542" y="224" width="70" height="24" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="577" y="241" fill="var(--ok)" text-anchor="middle">họp</text>
+<rect x="620" y="224" width="70" height="24" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-d" x="655" y="241" fill="var(--ok)" text-anchor="middle">lịch</text>
+<text class="sv-d" x="708" y="241" fill="var(--ok)">4 ô</text>
+<text class="sv-s" x="372" y="282" fill="var(--dim)">Đó là toàn bộ chữ naive: từ này xuất hiện không nói gì về từ kia.</text>
+<text class="sv-s" x="372" y="302" fill="var(--dim)">Sai rõ ràng — trúng và thưởng đi cùng nhau. Cái giá trả ở mục 05.</text>
+</svg>
+    <figcaption>Hai cách lập bảng trên cùng bốn từ. Bên phải là cách Naive Bayes chọn &#8212; <strong>mỗi từ một ô, không có ô cho tổ hợp</strong>.</figcaption>
+  </figure>
 
   <ul class="why">
-    <li>Ví dụ rõ nhất cho <b>giả định sai vẫn ra quyết định đúng</b>: sai lệch đẩy điểm mọi lớp cùng hướng.</li>
-    <li>Cái giá thật: <b>xác suất đầu ra không đáng tin</b>, hay sát 0 hoặc 1. Cần xác suất đúng thì dùng <a href="../logistic-regression/index.html">logistic regression</a>.</li>
-    <li>Giả định vỡ nặng nhất khi đặc trưng bị lặp: cùng một thông tin ở ba cột tương quan thì được tính ba lần.</li>
+    <li><b>Giả định sai rõ ràng.</b> Chữ <em>trúng</em> và chữ <em>thưởng</em> đi cùng nhau trong thư rác.</li>
+    <li><b>Bảng đếm là toàn bộ tham số.</b> Mỗi ô là một phép chia, không có gì để tối ưu.</li>
+    <li><b>Cái giá của giả định đo được ở mục 05.</b></li>
   </ul>
 </section>
 
 <section id="nb-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Làm mượt Laplace</h2></div>
 
-  <p class="key">Một đặc trưng chưa từng xuất hiện trong một lớp cho xác suất bằng 0 — <em>và số 0 nhân vào thì xoá sạch mọi bằng chứng khác</em>.</p>
+  <p class="key">Chữ <em>lịch</em> chưa từng xuất hiện trong lớp spam nên ô đó bằng 0 &#8212; <em>và số 0 nhân vào thì xoá sạch bằng chứng của các từ khác</em>.</p>
 
   <div class="eq">
     <div class="line">
       <span class="t"><span><var>P</var>(từ | lớp)</span><em>không làm mượt</em></span>
       <span class="op">=</span>
-      <span class="t r"><span><span class="frac"><i>đếm(từ, lớp)</i><i>đếm(lớp)</i></span></span><em>từ mới → 0 / N = 0 → tích cả câu = 0</em></span>
+      <span class="t r"><span><span class="frac"><i>đếm(từ, lớp)</i><i>đếm(lớp)</i></span></span><em>từ chưa gặp cho 0</em></span>
     </div>
     <div class="line">
-      <span class="t"><span><var>P</var>(từ | lớp)</span><em>làm mượt, α = 1</em></span>
+      <span class="t"><span><var>P</var>(từ | lớp)</span><em>làm mượt</em></span>
       <span class="op">=</span>
-      <span class="t g"><span><span class="frac"><i>đếm(từ, lớp) + <var>α</var></i><i>đếm(lớp) + <var>α</var>·<var>V</var></i></span></span><em>mọi từ có xác suất khác 0</em></span>
+      <span class="t g"><span><span class="frac"><i>đếm(từ, lớp) + <var>&#945;</var></i><i>đếm(lớp) + <var>&#945;</var>·<var>V</var></i></span></span><em>mọi từ có xác suất khác 0</em></span>
     </div>
-    <dl>
-      <dt>α</dt><dd>lượng cộng thêm cho mọi từ, kể cả từ chưa gặp</dd>
-      <dt>V</dt><dd>kích thước từ điển — cộng vào mẫu số cho tổng xác suất vẫn bằng 1</dd>
+    <dl class="defs">
+      <dt>&#945;</dt><dd>cộng thêm bấy nhiêu cho mọi từ, kể cả từ chưa gặp</dd>
+      <dt>V</dt><dd>số từ trong từ điển, ở đây bằng 4</dd>
     </dl>
   </div>
 
-  <div class="strip">
-    <div class="c f"><i>không mượt</i><b>0</b><u>từ mới → tích cả câu về 0</u></div>
-    <div class="cut"></div>
-    <div class="c t"><i>α = 0,1</i><b>bám dữ liệu</b><u>hợp khi từ điển rất lớn</u></div>
-    <div class="c on"><i>α = 1</i><b>mặc định</b><u>Laplace smoothing</u></div>
-    <div class="c dim"><i>α lớn</i><b>gần đều nhau</b><u>bằng chứng bị pha loãng</u></div>
-  </div>
-  <p class="stripnote"><span>bám dữ liệu</span><span><em>α càng lớn càng kéo mọi xác suất về gần đều nhau</em></span><span>bỏ qua dữ liệu</span></p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 452" role="img" aria-label="Ba muc alpha tren cung mot bang dem: alpha 0 cot lich bang 0, alpha 1 moi cot khac 0, alpha 50 bon cot gan bang nhau">
+<text class="sv-hv" x="8" y="18" fill="var(--muted)">VÍ DỤ CHẠY SUỐT BÀI — LỌC THƯ RÁC</text>
+<rect x="8" y="30" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="52" fill="var(--faint)">Thư cần phân loại</text>
+<text class="sv-d" x="24" y="68" fill="var(--faint)">"trúng thưởng họp"</text>
+<line x1="168.0" y1="80" x2="168.0" y2="94" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,102 163.8,94 172.2,94" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="95" fill="var(--rule-hi)">đếm</text>
+<text class="sv-h" x="8" y="95" fill="var(--rule-hi)">02</text>
+<rect x="8" y="106" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="128" fill="var(--faint)">Bảng tần suất</text>
+<text class="sv-d" x="24" y="144" fill="var(--faint)">P(từ | lớp) thô</text>
+<line x1="168.0" y1="156" x2="168.0" y2="170" stroke="var(--probe)" stroke-width="1.2"/><polygon points="168.0,178 163.8,170 172.2,170" fill="var(--probe)"/>
+<text class="sv-d" x="180.0" y="171" fill="var(--probe)">cộng α</text>
+<text class="sv-h" x="8" y="171" fill="var(--probe)">03</text>
+<rect x="8" y="182" width="320" height="48" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="204" fill="var(--probe)">Xác suất khác 0</text>
+<text class="sv-d" x="24" y="220" fill="var(--muted)">không ô nào còn bằng 0</text>
+<line x1="168.0" y1="232" x2="168.0" y2="246" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,254 163.8,246 172.2,246" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="247" fill="var(--rule-hi)">log rồi cộng</text>
+<text class="sv-h" x="8" y="247" fill="var(--rule-hi)">04</text>
+<rect x="8" y="258" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="280" fill="var(--faint)">Điểm của mỗi lớp</text>
+<text class="sv-d" x="24" y="296" fill="var(--faint)">spam −5,27 · ham −8,36</text>
+<line x1="168.0" y1="308" x2="168.0" y2="322" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,330 163.8,322 172.2,322" fill="var(--rule-hi)"/>
+<text class="sv-l" x="180.0" y="323" fill="var(--rule-hi)">argmax</text>
+<text class="sv-h" x="8" y="323" fill="var(--rule-hi)">05</text>
+<rect x="8" y="334" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="356" fill="var(--faint)">Nhãn trả về</text>
+<text class="sv-d" x="24" y="372" fill="var(--faint)">spam</text>
+<path d="M342 206.0 C 356 206.0, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-hv" x="372" y="18" fill="var(--muted)">VÍ DỤ — BẢNG ĐẾM LỚP SPAM: trúng 41 · thưởng 38 · họp 3 · lịch 0</text>
+<rect x="372" y="34" width="488" height="118" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-hv" x="386" y="56" fill="var(--tomb)">α = 0</text>
+<text class="sv-d" x="492" y="56" fill="var(--muted)">lịch → 0 · một cột bằng 0 là xoá cả câu</text>
+<rect x="394" y="74.0" width="56" height="56.0" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="460" y="128" fill="var(--filled)">0,500</text>
+<text class="sv-d" x="422" y="74" fill="var(--muted)" text-anchor="middle">trúng</text>
+<rect x="510" y="78.09756097560975" width="56" height="51.90243902439025" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="576" y="128" fill="var(--filled)">0,463</text>
+<text class="sv-d" x="538" y="74" fill="var(--muted)" text-anchor="middle">thưởng</text>
+<rect x="626" y="125.90243902439025" width="56" height="4.097560975609756" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="692" y="128" fill="var(--filled)">0,037</text>
+<text class="sv-d" x="654" y="74" fill="var(--muted)" text-anchor="middle">họp</text>
+<line x1="742" y1="130" x2="798" y2="130" stroke="var(--tomb)" stroke-width="2.4"/>
+<text class="sv-l" x="808" y="128" fill="var(--tomb)">0,000</text>
+<text class="sv-d" x="770" y="74" fill="var(--muted)" text-anchor="middle">lịch</text>
+<rect x="372" y="162" width="488" height="118" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-hv" x="386" y="184" fill="var(--ok)">α = 1</text>
+<text class="sv-d" x="492" y="184" fill="var(--muted)">mọi từ khác 0 · thứ tự ba cột kia giữ nguyên</text>
+<rect x="394" y="203.30232558139534" width="56" height="54.69767441860465" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="460" y="256" fill="var(--filled)">0,488</text>
+<rect x="510" y="207.2093023255814" width="56" height="50.7906976744186" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="576" y="256" fill="var(--filled)">0,453</text>
+<rect x="626" y="252.7906976744186" width="56" height="5.209302325581396" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="692" y="256" fill="var(--filled)">0,047</text>
+<rect x="742" y="256.69767441860466" width="56" height="1.302325581395349" rx="3" fill="rgba(var(--green-a),.28)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="808" y="256" fill="var(--ok)">0,012</text>
+<rect x="372" y="290" width="488" height="118" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-hv" x="386" y="312" fill="var(--probe)">α = 50</text>
+<text class="sv-d" x="492" y="312" fill="var(--muted)">bốn cột gần bằng nhau · bảng đếm hết tác dụng</text>
+<rect x="394" y="349.8581560283688" width="56" height="36.14184397163121" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="460" y="384" fill="var(--filled)">0,323</text>
+<rect x="510" y="351.0496453900709" width="56" height="34.95035460992908" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="576" y="384" fill="var(--filled)">0,312</text>
+<rect x="626" y="364.9503546099291" width="56" height="21.04964539007092" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="692" y="384" fill="var(--filled)">0,188</text>
+<rect x="742" y="366.1418439716312" width="56" height="19.858156028368796" rx="3" fill="rgba(var(--amber-a),.28)" stroke="var(--probe)" stroke-width="1.2"/>
+<text class="sv-l" x="808" y="384" fill="var(--probe)">0,177</text>
+<text class="sv-s" x="372" y="424" fill="var(--dim)">Cộng α vào mọi bộ đếm = giả vờ đã thấy mỗi từ α lần trước khi nhìn dữ liệu.</text>
+</svg>
+    <figcaption>Ba mức <span class="mth"><var>&#945;</var></span> trên cùng bảng đếm lớp spam. Hàng trên: một cột bằng 0. Hàng dưới: <strong>bốn cột gần bằng nhau thì bảng đếm hết tác dụng</strong>.</figcaption>
+  </figure>
 
-  <p>Cộng thêm <code>α</code> vào mọi bộ đếm là cách nói "trước khi nhìn dữ liệu, tôi giả vờ đã thấy mỗi từ α lần".</p>
-  <p>Đó chính là một <b>prior</b> theo nghĩa Bayes, và <code>α</code> đóng vai trò regularization.</p>
+  <p>Cộng <span class="mth"><var>&#945;</var></span> vào mọi bộ đếm là một <b>prior</b> theo nghĩa Bayes.</p>
+  <p>Nó đóng vai trò regularization: <span class="mth"><var>&#945;</var></span> càng lớn thì bảng đếm càng bị kéo về phân phối đều.</p>
 
   <ul class="why">
-    <li>Chọn <code>α</code> bằng cross-validation, đừng để mặc định rồi thôi.</li>
-    <li>Thực tế người ta cộng <b>log</b> các xác suất thay vì nhân, vì nhân hàng nghìn số nhỏ sẽ tràn xuống 0.</li>
+    <li><b>Chọn <span class="mth"><var>&#945;</var></span> bằng cross-validation.</b> Đừng để mặc định rồi thôi.</li>
+    <li><b><span class="mth"><var>&#945;</var></span> = 1 là Laplace, mặc định của sklearn.</b> Với từ điển lớn thì <span class="mth"><var>&#945;</var></span> nhỏ hơn thường tốt hơn.</li>
   </ul>
 </section>
 
 <section id="nb-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Loss function</h2></div>
+  <div class="sh"><b>04</b><h2>Thang log</h2></div>
 
-  <p class="key">Naive Bayes không lặp để giảm loss, nhưng nó vẫn có một loss: <em>negative log-likelihood</em>. Điểm khác là nghiệm có công thức đóng — và công thức đó chính là bảng đếm.</p>
+  <p class="key">Nhân xác suất của từng từ thì đúng về toán, nhưng <em>tích tụt xuống dưới tầm số thực của máy</em>.</p>
 
   <figure class="scrollx">
-<svg viewBox="0 0 860 392" role="img" aria-label="Chú thích từng khối công thức điểm Naive Bayes và bảng đo cho thấy lặp đặc trưng làm log loss nổ trong khi sai số gần như không đổi">
-<text class="sv-hv" x="0" y="18">LOSS FUNCTION — TỪNG KHỐI MỘT</text>
-<rect x="0" y="50" width="118" height="38" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-hv" x="59.0" y="76" fill="var(--probe)" text-anchor="middle">log P(lớp)</text>
-<line x1="59.0" y1="90" x2="59.0" y2="91" stroke="var(--probe)" stroke-width="1"/><polygon points="59.0,99 54.8,91 63.2,91" fill="var(--probe)"/>
-<text class="sv-d" x="59.0" y="110" fill="var(--probe)" text-anchor="middle">lớp nào vốn hay gặp</text>
-<text class="sv-h" x="141.0" y="76" fill="var(--muted)" text-anchor="middle">+</text>
-<text class="sv-h" x="175.0" y="76" fill="var(--muted)" text-anchor="middle">Σᵢ</text>
-<rect x="198" y="50" width="172" height="38" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.3"/>
-<text class="sv-hv" x="284.0" y="76" fill="var(--ok)" text-anchor="middle">log P(tᵢ|lớp)</text>
-<line x1="284.0" y1="90" x2="284.0" y2="111" stroke="var(--ok)" stroke-width="1"/><polygon points="284.0,119 279.8,111 288.2,111" fill="var(--ok)"/>
-<text class="sv-d" x="284.0" y="130" fill="var(--ok)" text-anchor="middle">từ này hay gặp ở lớp nào</text>
-<text class="sv-d" x="0" y="36" fill="var(--text)">điểm(lớp | văn bản) =</text>
-<rect x="430" y="44" width="430" height="116" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
-<text class="sv-t" x="444" y="64" fill="var(--filled)">Vậy huấn luyện tối thiểu hoá cái gì?</text>
-<text class="sv-d" x="444" y="86" fill="var(--muted)">Tối thiểu hoá −Σ log P(văn bản, lớp) trên tập train —</text>
-<text class="sv-d" x="444" y="104" fill="var(--muted)">negative log-likelihood, cùng họ với log loss.</text>
-<text class="sv-d" x="444" y="122" fill="var(--muted)">Khác biệt: nghiệm có công thức đóng, chính là bảng đếm.</text>
-<text class="sv-d" x="444" y="140" fill="var(--muted)">Không lặp, không learning rate — đếm xong là tối ưu.</text>
-<line x1="0" y1="184" x2="860" y2="184" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="0" y="208">ĐO THẬT · 400 văn bản train · 3.000 test · lặp mỗi từ k lần để cố tình phá giả định độc lập</text>
-<text class="sv-s" x="0" y="232" fill="var(--dim)">lặp mỗi từ</text>
-<text class="sv-s" x="150" y="232" fill="var(--dim)">sai số test</text>
-<text class="sv-s" x="300" y="232" fill="var(--dim)">log loss</text>
-<text class="sv-s" x="450" y="232" fill="var(--dim)">văn bản &gt; 99%</text>
-<rect x="0" y="242" width="132" height="22" rx="3" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.1"/>
-<text class="sv-hv" x="8" y="258" fill="var(--ok)">1 lần</text>
-<text class="sv-l" x="150" y="258" fill="var(--muted)">14,5%</text>
-<text class="sv-l" x="300" y="258" fill="var(--ok)">0,345</text>
-<text class="sv-l" x="450" y="258" fill="var(--ok)">39,1%</text>
-<rect x="0" y="270" width="132" height="22" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.1"/>
-<text class="sv-hv" x="8" y="286" fill="var(--probe)">3 lần</text>
-<text class="sv-l" x="150" y="286" fill="var(--muted)">14,9%</text>
-<text class="sv-l" x="300" y="286" fill="var(--probe)">0,825</text>
-<text class="sv-l" x="450" y="286" fill="var(--probe)">79,3%</text>
-<rect x="0" y="298" width="132" height="22" rx="3" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.1"/>
-<text class="sv-hv" x="8" y="314" fill="var(--tomb)">10 lần</text>
-<text class="sv-l" x="150" y="314" fill="var(--muted)">15,4%</text>
-<text class="sv-l" x="300" y="314" fill="var(--tomb)">2,385</text>
-<text class="sv-l" x="450" y="314" fill="var(--tomb)">93,9%</text>
-<text class="sv-s" x="0" y="358" fill="var(--dim)">Sai số gần như đứng yên, log loss gấp bảy — quyết định vẫn đúng, xác suất thì thành rác.</text>
-<text class="sv-s" x="0" y="376" fill="var(--dim)">Vì mỗi từ lặp lại được tính như một bằng chứng mới, tổng log bị cộng thừa và đẩy sát 0 hoặc 1.</text>
-<rect x="600" y="212" width="260" height="74" rx="6" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.4"/>
-<text class="sv-t" x="612" y="232" fill="var(--ok)">Dùng để xếp hạng thì được</text>
-<text class="sv-d" x="612" y="252" fill="var(--muted)">Lấy 0,99 làm ngưỡng thì không —</text>
-<text class="sv-d" x="612" y="270" fill="var(--muted)">phải calibrate lại trước.</text>
-<rect x="600" y="296" width="260" height="56" rx="6" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.4"/>
-<text class="sv-t" x="612" y="316" fill="var(--probe)">α tốt nhất đo được: 0,1</text>
-<text class="sv-d" x="612" y="336" fill="var(--muted)">α = 10 đẩy sai số lên 22,2%</text>
+<svg viewBox="0 0 860 390" role="img" aria-label="Cung mot thu: nhan ba xac suat thi tich nho dan va tran ve 0, cong ba log thi so nam trong tam float">
+<text class="sv-hv" x="8" y="18" fill="var(--muted)">VÍ DỤ CHẠY SUỐT BÀI — LỌC THƯ RÁC</text>
+<rect x="8" y="30" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="52" fill="var(--faint)">Thư cần phân loại</text>
+<text class="sv-d" x="24" y="68" fill="var(--faint)">"trúng thưởng họp"</text>
+<line x1="168.0" y1="80" x2="168.0" y2="94" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,102 163.8,94 172.2,94" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="95" fill="var(--rule-hi)">đếm</text>
+<text class="sv-h" x="8" y="95" fill="var(--rule-hi)">02</text>
+<rect x="8" y="106" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="128" fill="var(--faint)">Bảng tần suất</text>
+<text class="sv-d" x="24" y="144" fill="var(--faint)">P(từ | lớp) thô</text>
+<line x1="168.0" y1="156" x2="168.0" y2="170" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,178 163.8,170 172.2,170" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="171" fill="var(--rule-hi)">cộng α</text>
+<text class="sv-h" x="8" y="171" fill="var(--rule-hi)">03</text>
+<rect x="8" y="182" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="204" fill="var(--faint)">Xác suất khác 0</text>
+<text class="sv-d" x="24" y="220" fill="var(--faint)">không ô nào còn bằng 0</text>
+<line x1="168.0" y1="232" x2="168.0" y2="246" stroke="var(--filled)" stroke-width="1.2"/><polygon points="168.0,254 163.8,246 172.2,246" fill="var(--filled)"/>
+<text class="sv-d" x="180.0" y="247" fill="var(--filled)">log rồi cộng</text>
+<text class="sv-h" x="8" y="247" fill="var(--filled)">04</text>
+<rect x="8" y="258" width="320" height="48" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="280" fill="var(--filled)">Điểm của mỗi lớp</text>
+<text class="sv-d" x="24" y="296" fill="var(--muted)">spam −5,27 · ham −8,36</text>
+<line x1="168.0" y1="308" x2="168.0" y2="322" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,330 163.8,322 172.2,322" fill="var(--rule-hi)"/>
+<text class="sv-l" x="180.0" y="323" fill="var(--rule-hi)">argmax</text>
+<text class="sv-h" x="8" y="323" fill="var(--rule-hi)">05</text>
+<rect x="8" y="334" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="356" fill="var(--faint)">Nhãn trả về</text>
+<text class="sv-d" x="24" y="372" fill="var(--faint)">spam</text>
+<path d="M342 282.0 C 356 282.0, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-hv" x="372" y="18" fill="var(--muted)">VÍ DỤ — THƯ "trúng thưởng họp": MỘT PHÉP TÍNH, HAI THANG ĐO</text>
+<rect x="372" y="36" width="488" height="112" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-t" x="386" y="58" fill="var(--tomb)">Nhân xác suất</text>
+<rect x="386" y="70" width="96" height="26" rx="3" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-l" x="448" y="88" fill="var(--filled)" text-anchor="middle">0,4884</text>
+<text class="sv-l" x="486" y="88" fill="var(--dim)">×</text>
+<rect x="494" y="70" width="96" height="26" rx="3" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-l" x="556" y="88" fill="var(--filled)" text-anchor="middle">0,4535</text>
+<text class="sv-l" x="594" y="88" fill="var(--dim)">×</text>
+<rect x="602" y="70" width="96" height="26" rx="3" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-l" x="664" y="88" fill="var(--filled)" text-anchor="middle">0,0465</text>
+<text class="sv-d" x="386" y="116" fill="var(--muted)">= 0,0103 — 3 từ thì còn đếm được</text>
+<text class="sv-d" x="386" y="134" fill="var(--tomb)">40 từ thì tích xuống dưới mức float — mọi lớp đều ra 0,0</text>
+<rect x="372" y="162" width="488" height="112" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-t" x="386" y="184" fill="var(--ok)">Cộng log xác suất</text>
+<rect x="386" y="196" width="96" height="26" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-l" x="448" y="214" fill="var(--ok)" text-anchor="middle">-0,717</text>
+<text class="sv-l" x="486" y="214" fill="var(--dim)">+</text>
+<rect x="494" y="196" width="96" height="26" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-l" x="556" y="214" fill="var(--ok)" text-anchor="middle">-0,791</text>
+<text class="sv-l" x="594" y="214" fill="var(--dim)">+</text>
+<rect x="602" y="196" width="96" height="26" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-l" x="664" y="214" fill="var(--ok)" text-anchor="middle">-3,068</text>
+<text class="sv-d" x="386" y="242" fill="var(--muted)">+ log P(spam) = -5,269</text>
+<text class="sv-d" x="386" y="260" fill="var(--ok)">số nào cũng nằm trong tầm float, và thứ tự giữa các lớp không đổi</text>
+<text class="sv-s" x="372" y="288" fill="var(--dim)">log biến tích thành tổng. Nó không đổi kết quả, chỉ đổi thang đo.</text>
 </svg>
-    <figcaption>Cùng một tập dữ liệu, chỉ lặp mỗi đặc trưng thêm vài lần: sai số gần như đứng yên, <strong>log loss gấp bảy</strong>.</figcaption>
+    <figcaption>Cùng một thư, hai cách tính. Hàng dưới cho <strong>số nào cũng nằm trong tầm float</strong> và giữ nguyên thứ tự giữa các lớp.</figcaption>
   </figure>
 
+  <p>Log là hàm tăng, nên lớp nào có tích lớn hơn thì cũng có tổng log lớn hơn.</p>
+  <p>Đổi thang không đổi lớp thắng.</p>
+
   <ul class="why">
-    <li><b>Hai khối, hai câu hỏi.</b> <code>log P(lớp)</code> hỏi lớp nào vốn hay gặp; <code>Σ log P(tᵢ|lớp)</code> hỏi các từ trong văn bản này nghiêng về lớp nào. Cộng lại là điểm của lớp đó.</li>
-    <li><b>Vì sao là log chứ không phải tích.</b> Nhân bốn mươi số cỡ 0,001 thì số thực dấu chấm động tràn về 0,0 và mọi lớp đều bằng nhau. Log biến tích thành tổng mà không đổi thứ tự giữa các lớp — thứ tự mới là thứ duy nhất cần đúng.</li>
-    <li><b>Tối thiểu hoá gì.</b> Bảng đếm chính là nghiệm tối thiểu hoá <code>−Σ log P(văn bản, lớp)</code> trên tập train, cùng họ với <a href="../logistic-regression/index.html">log loss</a> của logistic regression. Chỉ khác: bên kia phải chạy gradient descent, bên này giải ra bằng công thức nên đếm xong là tối ưu.</li>
-    <li><b>Giá của giả định ngây thơ đo được.</b> Lặp mỗi từ ba lần rồi mười lần — cố tình phá giả định độc lập — sai số chỉ nhích 14,5% → 14,9% → 15,4%, nhưng log loss nổ 0,345 → 0,825 → 2,385 và tỉ lệ văn bản được gán xác suất trên 99% leo từ 39,1% lên 93,9%.</li>
-    <li><b>Kết luận dùng được.</b> Mỗi từ lặp lại bị tính như một bằng chứng độc lập mới, nên tổng log cộng thừa và đẩy xác suất sát 0 hoặc 1. Xếp hạng thì vẫn tin được; lấy 0,99 làm ngưỡng thì phải <a href="../../09-evaluation/calibration/index.html">calibrate</a> trước.</li>
+    <li><b>Ba từ thì tích bằng 0,0103.</b> Bốn mươi từ thì tích về 0,0 và mọi lớp bằng nhau.</li>
+    <li><b>Điểm ra là số âm.</b> Càng gần 0 càng mạnh &#8212; spam &#8722;5,27 thắng ham &#8722;8,36.</li>
   </ul>
 </section>
 
 <section id="nb-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Các biến thể</h2></div>
+  <div class="sh"><b>05</b><h2>Loss function</h2></div>
 
-  <p class="key">Cùng một khung Bayes, khác nhau ở <em>giả định về phân phối của đặc trưng</em>.</p>
+  <p class="key">Naive Bayes không lặp để giảm loss, nhưng vẫn có một loss: <em>negative log-likelihood</em>.</p>
 
-<div class="stack">
-    <div class="s ok"><b>Multinomial — đặc trưng là số đếm</b><span>từ này xuất hiện mấy lần · bag-of-words, TF-IDF · mặc định cho văn bản</span></div>
-    <div class="s"><b>Bernoulli — đặc trưng nhị phân</b><span>từ này có hoặc không · văn bản ngắn, nơi việc <b>vắng mặt</b> một từ cũng là bằng chứng</span></div>
-    <div class="s warn"><b>Gaussian — đặc trưng là số liên tục</b><span>giả định phân phối chuẩn trong mỗi lớp · dữ liệu bảng · yếu hơn hẳn, ít khi là lựa chọn tốt nhất</span></div>
+  <p>Nghiệm của nó có công thức đóng, và công thức đó chính là bảng đếm ở mục 02.</p>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>điểm(<var>c</var>)</span><em>điểm của một lớp</em></span>
+      <span class="op">=</span>
+      <span class="t p"><span><b class="fn">log</b> <var>P</var>(<var>c</var>)</span><em>lớp nào vốn hay gặp</em></span>
+      <span class="op">+</span>
+      <span class="t g"><span>&#931;<sub><var>i</var></sub> <b class="fn">log</b> <var>P</var>(<var>t</var><sub><var>i</var></sub> | <var>c</var>)</span><em>các từ nghiêng về lớp nào</em></span>
+    </div>
+    <p class="read">Trả về lớp có điểm cao nhất. Chỉ thứ tự giữa các lớp cần đúng, giá trị thì không.</p>
   </div>
 
-  <p>Chỗ Naive Bayes còn giá trị thật hôm nay: <b>baseline đầu tiên cho phân loại văn bản</b>.</p>
+  <p>Chỗ đó là nơi giả định độc lập đòi tiền.</p>
+  <p>Lặp mỗi từ trong thư k lần thì bằng chứng bị đếm k lần, đúng thứ xảy ra khi các đặc trưng tương quan.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 390" role="img" aria-label="Lap moi tu mot, ba, muoi lan: ca ba lan deu chon spam nhung xac suat tang tu 95,67 phan tram len 100 phan tram">
+<text class="sv-hv" x="8" y="18" fill="var(--muted)">VÍ DỤ CHẠY SUỐT BÀI — LỌC THƯ RÁC</text>
+<rect x="8" y="30" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="52" fill="var(--faint)">Thư cần phân loại</text>
+<text class="sv-d" x="24" y="68" fill="var(--faint)">"trúng thưởng họp"</text>
+<line x1="168.0" y1="80" x2="168.0" y2="94" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,102 163.8,94 172.2,94" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="95" fill="var(--rule-hi)">đếm</text>
+<text class="sv-h" x="8" y="95" fill="var(--rule-hi)">02</text>
+<rect x="8" y="106" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="128" fill="var(--faint)">Bảng tần suất</text>
+<text class="sv-d" x="24" y="144" fill="var(--faint)">P(từ | lớp) thô</text>
+<line x1="168.0" y1="156" x2="168.0" y2="170" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,178 163.8,170 172.2,170" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="171" fill="var(--rule-hi)">cộng α</text>
+<text class="sv-h" x="8" y="171" fill="var(--rule-hi)">03</text>
+<rect x="8" y="182" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="204" fill="var(--faint)">Xác suất khác 0</text>
+<text class="sv-d" x="24" y="220" fill="var(--faint)">không ô nào còn bằng 0</text>
+<line x1="168.0" y1="232" x2="168.0" y2="246" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,254 163.8,246 172.2,246" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="247" fill="var(--rule-hi)">log rồi cộng</text>
+<text class="sv-h" x="8" y="247" fill="var(--rule-hi)">04</text>
+<rect x="8" y="258" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="280" fill="var(--faint)">Điểm của mỗi lớp</text>
+<text class="sv-d" x="24" y="296" fill="var(--faint)">spam −5,27 · ham −8,36</text>
+<line x1="168.0" y1="308" x2="168.0" y2="322" stroke="var(--ok)" stroke-width="1.2"/><polygon points="168.0,330 163.8,322 172.2,322" fill="var(--ok)"/>
+<text class="sv-l" x="180.0" y="323" fill="var(--ok)">argmax</text>
+<text class="sv-h" x="8" y="323" fill="var(--ok)">05</text>
+<rect x="8" y="334" width="320" height="48" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="356" fill="var(--ok)">Nhãn trả về</text>
+<text class="sv-d" x="24" y="372" fill="var(--muted)">spam</text>
+<path d="M342 358.0 C 356 358.0, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-hv" x="372" y="18" fill="var(--muted)">VÍ DỤ — LẶP MỖI TỪ k LẦN: GIẢ ĐỊNH ĐỘC LẬP VỠ NẶNG DẦN</text>
+<rect x="372" y="34" width="152" height="216" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-hv" x="384" y="52" fill="var(--ok)">mỗi từ × 1</text>
+<line x1="384" y1="92" x2="512" y2="92" stroke="var(--rule-hi)" stroke-width="1"/>
+<rect x="394" y="92" width="46" height="5.673945247155837" rx="3" fill="rgba(var(--green-a),.28)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="417" y="112.67394524715584" fill="var(--ok)" text-anchor="middle">-5,3</text>
+<text class="sv-d" x="417" y="70" fill="var(--muted)" text-anchor="middle">spam</text>
+<rect x="462" y="92" width="46" height="9.006422105923185" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="485" y="116.00642210592318" fill="var(--filled)" text-anchor="middle">-8,4</text>
+<text class="sv-d" x="485" y="70" fill="var(--muted)" text-anchor="middle">ham</text>
+<text class="sv-t" x="384" y="218" fill="var(--ok)">chọn spam</text>
+<text class="sv-l" x="384" y="238" fill="var(--ok)">P(spam) = 95,67%</text>
+<rect x="538" y="34" width="152" height="216" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-hv" x="550" y="52" fill="var(--probe)">mỗi từ × 3</text>
+<line x1="550" y1="92" x2="678" y2="92" stroke="var(--rule-hi)" stroke-width="1"/>
+<rect x="560" y="92" width="46" height="15.528903352569168" rx="3" fill="rgba(var(--green-a),.28)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="583" y="122.52890335256917" fill="var(--ok)" text-anchor="middle">-14,4</text>
+<text class="sv-d" x="583" y="70" fill="var(--muted)" text-anchor="middle">spam</text>
+<rect x="628" y="92" width="46" height="25.526333928871217" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="651" y="132.52633392887122" fill="var(--filled)" text-anchor="middle">-23,7</text>
+<text class="sv-d" x="651" y="70" fill="var(--muted)" text-anchor="middle">ham</text>
+<text class="sv-t" x="550" y="218" fill="var(--ok)">chọn spam</text>
+<text class="sv-l" x="550" y="238" fill="var(--probe)">P(spam) = 99,99%</text>
+<rect x="704" y="34" width="152" height="216" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-hv" x="716" y="52" fill="var(--tomb)">mỗi từ × 10</text>
+<line x1="716" y1="92" x2="844" y2="92" stroke="var(--rule-hi)" stroke-width="1"/>
+<rect x="726" y="92" width="46" height="50.021256721515826" rx="3" fill="rgba(var(--green-a),.28)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="749" y="157.02125672151584" fill="var(--ok)" text-anchor="middle">-46,4</text>
+<text class="sv-d" x="749" y="70" fill="var(--muted)" text-anchor="middle">spam</text>
+<rect x="794" y="92" width="46" height="83.34602530918934" rx="3" fill="rgba(var(--blue-a),.28)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-l" x="817" y="190.34602530918934" fill="var(--filled)" text-anchor="middle">-77,4</text>
+<text class="sv-d" x="817" y="70" fill="var(--muted)" text-anchor="middle">ham</text>
+<text class="sv-t" x="716" y="218" fill="var(--ok)">chọn spam</text>
+<text class="sv-l" x="716" y="238" fill="var(--tomb)">P(spam) = 100,00%</text>
+<text class="sv-s" x="372" y="278" fill="var(--ok)">Cột treo xuống từ mốc điểm 0 — càng ngắn càng thắng. Cột nào cũng chọn spam.</text>
+<text class="sv-s" x="372" y="298" fill="var(--tomb)">Nhưng xác suất bò từ 95,67% lên 100,00% — nó bám sát 1 chứ không đúng hơn.</text>
+<text class="sv-s" x="372" y="318" fill="var(--dim)">Xếp hạng thì tin được. Lấy 0,99 làm ngưỡng thì không.</text>
+</svg>
+    <figcaption>Cùng một thư, lặp mỗi từ 1, 3 rồi 10 lần. Nhãn không đổi, nhưng <strong>xác suất bò từ 95,67% lên 100,00%</strong>.</figcaption>
+  </figure>
 
   <ul class="why">
-    <li>Ba biến thể chỉ khác nhau ở <b>một dòng công thức</b> tính <var>P</var>(đặc trưng | lớp); phần còn lại của model y hệt.</li>
-    <li>Chọn nhầm biến thể là lỗi im lặng: dùng Gaussian cho số đếm thì vẫn chạy, chỉ kém đi.</li>
+    <li><b>Sai lệch đẩy điểm mọi lớp cùng một hướng.</b> Lớp thắng vẫn thắng, nên nhãn vẫn dùng được.</li>
+    <li><b>Xác suất thì không.</b> Cần con số đáng tin thì <a href="../../09-evaluation/calibration/index.html">calibrate</a>, hoặc đổi sang <a href="../logistic-regression/index.html">logistic regression</a>.</li>
+    <li><b>Cùng họ với log loss.</b> Bên kia chạy gradient descent, bên này đếm xong là tối ưu.</li>
   </ul>
 </section>
 
 <section id="nb-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Ưu và nhược</h2></div>
+  <div class="sh"><b>06</b><h2>Các biến thể</h2></div>
+
+  <p class="key">Ba biến thể chỉ khác nhau ở ô đầu tiên: <em>đọc đặc trưng thành số gì</em>.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 390" role="img" aria-label="Ba bien the tren cung mot van ban: Multinomial dem so lan, Bernoulli co hoac khong, Gaussian duong chuong cho so lien tuc">
+<text class="sv-hv" x="8" y="18" fill="var(--muted)">VÍ DỤ CHẠY SUỐT BÀI — LỌC THƯ RÁC</text>
+<rect x="8" y="30" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="52" fill="var(--faint)">Thư cần phân loại</text>
+<text class="sv-d" x="24" y="68" fill="var(--faint)">"trúng thưởng họp"</text>
+<line x1="168.0" y1="80" x2="168.0" y2="94" stroke="var(--filled)" stroke-width="1.2"/><polygon points="168.0,102 163.8,94 172.2,94" fill="var(--filled)"/>
+<text class="sv-d" x="180.0" y="95" fill="var(--filled)">đếm</text>
+<text class="sv-h" x="8" y="95" fill="var(--filled)">02</text>
+<rect x="8" y="106" width="320" height="48" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="24" y="128" fill="var(--filled)">Bảng tần suất</text>
+<text class="sv-d" x="24" y="144" fill="var(--muted)">P(từ | lớp) thô</text>
+<line x1="168.0" y1="156" x2="168.0" y2="170" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,178 163.8,170 172.2,170" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="171" fill="var(--rule-hi)">cộng α</text>
+<text class="sv-h" x="8" y="171" fill="var(--rule-hi)">03</text>
+<rect x="8" y="182" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="204" fill="var(--faint)">Xác suất khác 0</text>
+<text class="sv-d" x="24" y="220" fill="var(--faint)">không ô nào còn bằng 0</text>
+<line x1="168.0" y1="232" x2="168.0" y2="246" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,254 163.8,246 172.2,246" fill="var(--rule-hi)"/>
+<text class="sv-d" x="180.0" y="247" fill="var(--rule-hi)">log rồi cộng</text>
+<text class="sv-h" x="8" y="247" fill="var(--rule-hi)">04</text>
+<rect x="8" y="258" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="280" fill="var(--faint)">Điểm của mỗi lớp</text>
+<text class="sv-d" x="24" y="296" fill="var(--faint)">spam −5,27 · ham −8,36</text>
+<line x1="168.0" y1="308" x2="168.0" y2="322" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="168.0,330 163.8,322 172.2,322" fill="var(--rule-hi)"/>
+<text class="sv-l" x="180.0" y="323" fill="var(--rule-hi)">argmax</text>
+<text class="sv-h" x="8" y="323" fill="var(--rule-hi)">05</text>
+<rect x="8" y="334" width="320" height="48" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-t" x="24" y="356" fill="var(--faint)">Nhãn trả về</text>
+<text class="sv-d" x="24" y="372" fill="var(--faint)">spam</text>
+<path d="M342 130.0 C 356 130.0, 352 46, 366 46" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 4"/><circle cx="366" cy="46" r="2.4" fill="var(--rule-hi)"/>
+<text class="sv-hv" x="372" y="18" fill="var(--muted)">VÍ DỤ RIÊNG — VĂN BẢN "họp họp lịch" ĐỌC THEO BA CÁCH</text>
+<rect x="372" y="34" width="152" height="208" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+<text class="sv-hv" x="384" y="54" fill="var(--ok)">Multinomial</text>
+<text class="sv-d" x="384" y="72" fill="var(--dim)">đặc trưng là SỐ ĐẾM</text>
+<text class="sv-d" x="384" y="108" fill="var(--text)">họp</text>
+<rect x="438" y="96" width="52" height="15" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-l" x="512" y="108" fill="var(--ok)" text-anchor="end">2</text>
+<text class="sv-d" x="384" y="136" fill="var(--text)">lịch</text>
+<rect x="438" y="124" width="26" height="15" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.1"/>
+<text class="sv-l" x="512" y="136" fill="var(--ok)" text-anchor="end">1</text>
+<text class="sv-d" x="384" y="164" fill="var(--text)">trúng</text>
+<text class="sv-l" x="512" y="164" fill="var(--tomb)" text-anchor="end">0</text>
+<text class="sv-d" x="384" y="196" fill="var(--muted)">đếm 2 lần thì tính 2 lần</text>
+<text class="sv-d" x="384" y="214" fill="var(--muted)">vắng mặt không được tính</text>
+<text class="sv-t" x="384" y="234" fill="var(--ok)">Mặc định cho văn bản</text>
+<rect x="538" y="34" width="152" height="208" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
+<text class="sv-hv" x="550" y="54" fill="var(--filled)">Bernoulli</text>
+<text class="sv-d" x="550" y="72" fill="var(--dim)">đặc trưng là CÓ / KHÔNG</text>
+<text class="sv-d" x="550" y="108" fill="var(--text)">họp</text>
+<rect x="604" y="96" width="14" height="15" rx="3" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-l" x="678" y="108" fill="var(--filled)" text-anchor="end">1</text>
+<text class="sv-d" x="550" y="136" fill="var(--text)">lịch</text>
+<rect x="604" y="124" width="14" height="15" rx="3" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.1"/>
+<text class="sv-l" x="678" y="136" fill="var(--filled)" text-anchor="end">1</text>
+<text class="sv-d" x="550" y="164" fill="var(--text)">trúng</text>
+<text class="sv-l" x="678" y="164" fill="var(--tomb)" text-anchor="end">0</text>
+<text class="sv-d" x="550" y="196" fill="var(--muted)">đếm 2 lần cũng chỉ là 1</text>
+<text class="sv-d" x="550" y="214" fill="var(--muted)">vắng mặt cũng tính</text>
+<text class="sv-t" x="550" y="234" fill="var(--filled)">Hợp với văn bản ngắn</text>
+<rect x="704" y="34" width="152" height="208" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-hv" x="716" y="54" fill="var(--probe)">Gaussian</text>
+<text class="sv-d" x="716" y="72" fill="var(--dim)">đặc trưng là SỐ THỰC</text>
+<line x1="716" y1="178" x2="844" y2="178" stroke="var(--rule-hi)" stroke-width="1"/>
+<polyline points="716.0,177.9 719.2,177.7 722.4,177.5 725.6,177.0 728.8,176.2 732.0,174.9 735.2,172.8 738.4,169.9 741.6,165.9 744.8,161.0 748.0,155.1 751.2,148.8 754.4,142.7 757.6,137.4 760.8,133.7 764.0,132.0 767.2,132.8 770.4,135.7 773.6,140.4 776.8,146.3 780.0,152.6 783.2,158.7 786.4,164.1 789.6,168.4 792.8,171.8 796.0,174.1 799.2,175.7 802.4,176.7 805.6,177.3 808.8,177.7 812.0,177.8 815.2,177.9 818.4,178.0 821.6,178.0 824.8,178.0 828.0,178.0 831.2,178.0 834.4,178.0 837.6,178.0 840.8,178.0 844.0,178.0" fill="none" stroke="var(--probe)" stroke-width="1.6"/>
+<polyline points="716.0,178.0 719.2,178.0 722.4,178.0 725.6,178.0 728.8,178.0 732.0,178.0 735.2,178.0 738.4,178.0 741.6,178.0 744.8,178.0 748.0,178.0 751.2,177.9 754.4,177.8 757.6,177.6 760.8,177.1 764.0,176.4 767.2,175.2 770.4,173.3 773.6,170.6 776.8,166.8 780.0,162.0 783.2,156.3 786.4,150.1 789.6,143.9 792.8,138.4 796.0,134.3 799.2,132.2 802.4,132.4 805.6,134.9 808.8,139.4 812.0,145.1 815.2,151.4 818.4,157.5 821.6,163.1 824.8,167.7 828.0,171.2 831.2,173.7 834.4,175.5 837.6,176.6 840.8,177.2 844.0,177.6" fill="none" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-d" x="764.64" y="194" fill="var(--probe)" text-anchor="middle">lớp A</text>
+<text class="sv-d" x="800.48" y="194" fill="var(--tomb)" text-anchor="middle">lớp B</text>
+<text class="sv-d" x="716" y="100" fill="var(--muted)">mỗi lớp một đường chuông</text>
+<text class="sv-d" x="716" y="118" fill="var(--muted)">lấy trung bình và độ lệch</text>
+<text class="sv-t" x="716" y="214" fill="var(--probe)">Dữ liệu bảng — yếu</text>
+<text class="sv-d" x="716" y="234" fill="var(--muted)">gần như luôn thua boosting</text>
+<text class="sv-s" x="372" y="266" fill="var(--dim)">Ba cột chỉ đổi ô Bảng tần suất. Cộng α, cộng log, argmax giữ nguyên ở cả ba.</text>
+</svg>
+    <figcaption>Cùng một văn bản, ba cách đọc đặc trưng. <strong>Ba ô còn lại của model y hệt nhau</strong>.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Multinomial là mặc định cho văn bản.</b> Bag-of-words hoặc TF-IDF đưa thẳng vào.</li>
+    <li><b>Chọn nhầm biến thể là lỗi im lặng.</b> Gaussian cho số đếm vẫn chạy, chỉ kém đi.</li>
+    <li><b>Chỗ Naive Bayes còn giá trị thật:</b> baseline đầu tiên cho phân loại văn bản.</li>
+  </ul>
+</section>
+
+<section id="nb-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Ưu và nhược</h2></div>
 
   <p class="key">Mọi ưu điểm của Naive Bayes đến từ <em>giả định các đặc trưng độc lập</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
 
@@ -322,39 +588,60 @@
   </table>
 
   <ul class="why">
-    <li>Chọn Naive Bayes làm <b>baseline đầu tiên cho phân loại văn bản</b>: nó cho một con số để biết model phức tạp có đáng công không.</li>
-    <li>Cần xác suất đúng nghĩa thì phải hiệu chỉnh thêm &#8212; xem <a href="../../09-evaluation/calibration/index.html">Probability calibration</a>.</li>
-    <li>Trên dữ liệu bảng thì <a href="../../06-tree-models/gradient-boosting/index.html">Gradient boosting</a> gần như luôn tốt hơn.</li>
+    <li><b>Dùng làm baseline cho phân loại văn bản.</b> Nó cho một con số để biết model phức tạp có đáng công không.</li>
+    <li><b>Trên dữ liệu bảng thì bỏ qua nó.</b> <a href="../../06-tree-models/gradient-boosting/index.html">Gradient boosting</a> gần như luôn tốt hơn.</li>
   </ul>
 </section>
 
-<section id="nb-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+<section id="nb-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Lỗi hay gặp</h2></div>
 
   <div class="grid2">
     <div class="card bad"><h4>Quên làm mượt</h4><p>Một từ chưa gặp cho xác suất 0 và xoá sạch mọi bằng chứng khác trong câu.</p></div>
     <div class="card bad"><h4>Nhân xác suất thay vì cộng log</h4><p>Nhân hàng nghìn số nhỏ tràn xuống 0. Luôn làm việc trên thang log.</p></div>
-    <div class="card bad"><h4>Tin xác suất đầu ra</h4><p>Chúng thường cực đoan sát 0 hoặc 1. Xếp hạng thì được, nhưng đừng dùng làm ngưỡng quyết định nếu chưa hiệu chỉnh.</p></div>
+    <div class="card bad"><h4>Tin xác suất đầu ra</h4><p>Chúng thường sát 0 hoặc 1. Xếp hạng thì được, lấy làm ngưỡng thì phải hiệu chỉnh trước.</p></div>
     <div class="card bad"><h4>Đưa vào nhiều cột tương quan</h4><p>Cùng một thông tin bị tính nhiều lần, giả định độc lập vỡ nặng nhất ở đây.</p></div>
     <div class="card bad"><h4>Chọn nhầm biến thể</h4><p>Gaussian cho dữ liệu đếm hoặc Multinomial cho dữ liệu liên tục đều làm model tệ hẳn.</p></div>
     <div class="card bad"><h4>Dùng làm model cuối cùng</h4><p>Nó là baseline. Nếu nó thắng model phức tạp, thường là dấu hiệu model kia đang có lỗi.</p></div>
   </div>
 </section>
 
-<section id="nb-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+<section id="nb-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Hỏi đáp</h2></div>
 
   <details class="qa"><summary>Giả định "naive" là gì và vì sao cần nó?</summary>
-  <p>Là giả định các đặc trưng độc lập với nhau khi đã biết lớp. Cần nó vì không có nó thì phải ước lượng xác suất của mọi tổ hợp đặc trưng — với 1000 từ nhị phân là 2¹⁰⁰⁰ tổ hợp, không bộ dữ liệu nào đủ. Giả định độc lập biến bài toán đó thành 1000 phép đếm rời rạc, và đó là toàn bộ lý do model này chạy được.</p></details>
+  <p>Là giả định các từ độc lập với nhau khi đã biết lớp.</p>
+  <p>Không có nó thì phải đếm mọi tổ hợp từ.</p>
+  <p>Bốn từ là 16 ô.</p>
+  <p>Một nghìn từ là 2¹⁰⁰⁰ ô, không bộ dữ liệu nào đủ.</p>
+  <p>Giả định độc lập rút xuống một nghìn phép đếm rời.</p></details>
 
   <details class="qa"><summary>Giả định đó sai rõ ràng, sao model vẫn dùng được?</summary>
-  <p>Vì phân loại chỉ cần đúng <em>thứ tự</em> giữa các lớp, không cần đúng giá trị xác suất. Sai lệch do bỏ qua phụ thuộc thường đẩy điểm của mọi lớp cùng một hướng nên thứ tự giữ nguyên, và lớp thắng vẫn là lớp thắng. Cái giá là xác suất đầu ra không đáng tin — hay cực đoan sát 0 hoặc 1 — nên nếu bài toán cần xác suất chứ không chỉ cần nhãn thì phải hiệu chỉnh hoặc đổi sang logistic regression.</p></details>
+  <p>Vì phân loại chỉ cần đúng thứ tự giữa các lớp.</p>
+  <p>Sai lệch đẩy điểm mọi lớp cùng một hướng.</p>
+  <p>Lớp thắng vẫn là lớp thắng.</p>
+  <p>Cái giá là xác suất đầu ra sát 0 hoặc 1.</p>
+  <p>Cần xác suất thật thì hiệu chỉnh, hoặc đổi sang logistic regression.</p></details>
 
   <details class="qa"><summary>Vì sao phải làm mượt Laplace?</summary>
-  <p>Vì một đặc trưng chưa từng xuất hiện trong một lớp sẽ cho xác suất bằng 0, mà 0 nhân vào tích thì xoá sạch mọi bằng chứng khác của câu — chỉ một từ lạ là phán quyết bị lật. Cộng thêm α vào mọi bộ đếm khiến không xác suất nào bằng 0. Về bản chất đó là gắn một prior: giả vờ đã thấy mỗi từ α lần trước khi nhìn dữ liệu, và α đóng vai trò regularization — lớn thì kéo mọi xác suất về gần đều, nhỏ thì bám sát dữ liệu.</p></details>
+  <p>Một từ chưa gặp trong một lớp cho xác suất bằng 0.</p>
+  <p>Số 0 nhân vào thì xoá sạch bằng chứng của các từ khác.</p>
+  <p>Chỉ một từ lạ là phán quyết bị lật.</p>
+  <p>Cộng α vào mọi bộ đếm khiến không xác suất nào bằng 0.</p>
+  <p>α lớn kéo mọi xác suất về gần đều, α nhỏ bám sát dữ liệu.</p></details>
+
+  <details class="qa"><summary>Vì sao cộng log chứ không nhân xác suất?</summary>
+  <p>Ba từ thì tích bằng 0,0103, còn tính được.</p>
+  <p>Bốn mươi từ thì tích tụt dưới tầm số thực và về 0,0.</p>
+  <p>Lúc đó mọi lớp bằng nhau, không so được nữa.</p>
+  <p>Log biến tích thành tổng, số nào cũng nằm trong tầm float.</p>
+  <p>Log là hàm tăng nên thứ tự giữa các lớp không đổi.</p></details>
 
   <details class="qa"><summary>Khi nào Naive Bayes vẫn là lựa chọn đúng?</summary>
-  <p>Ba trường hợp. Một, làm baseline cho phân loại văn bản — nó chạy vài giây trên dữ liệu mà model khác cần vài phút tới vài giờ, nên cho mốc để biết model phức tạp có đáng công không. Hai, khi dữ liệu rất ít: chỉ đếm nên ổn định sớm, trong khi model nhiều tham số thì lảo đảo. Ba, khi cần cập nhật tăng dần liên tục, vì thêm dữ liệu chỉ là cộng vào bộ đếm chứ không phải huấn luyện lại. Ngoài ba chỗ đó, trên dữ liệu bảng nói chung nó thua gradient boosting rõ rệt.</p></details>
+  <p>Làm baseline cho phân loại văn bản.</p>
+  <p>Khi dữ liệu rất ít, vì chỉ đếm nên ổn định sớm.</p>
+  <p>Khi cần cập nhật tăng dần, vì thêm dữ liệu chỉ là cộng vào bộ đếm.</p>
+  <p>Ngoài ba chỗ đó, trên dữ liệu bảng nó thua gradient boosting rõ rệt.</p></details>
 </section>
 
 <footer>Machine learning · Classical models · nền toán ở <a href="../../02-math-foundations/bayes-theorem/index.html">Bayes theorem</a>; model cho xác suất đáng tin hơn là <a href="../logistic-regression/index.html">Logistic regression</a>.</footer>

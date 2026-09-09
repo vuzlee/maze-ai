@@ -3,7 +3,7 @@ name: trang-thai-kho
 description: "Trạng thái toàn kho — mốc số liệu duy nhất, sáu trục nghiệm thu, chất lượng trình bày từng kệ, việc còn lại"
 metadata:
   type: project
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 **Đây là mốc duy nhất.** Mọi con số rời rạc trong các phiên trước đã lệch; đo lại từ file bằng
@@ -74,6 +74,10 @@ DSA 13 bài, nặng nhất `tree-bst-traversal` 566 · `union-find` 499 · `link
 — công thức ở đó vẫn là chữ trơn. Viết bài mới ở 06→10 thì đây là việc phải làm ngay từ đầu, đừng
 để thành đợt sửa sau.
 
+**Còn 6 bài dùng `<span class="op">/</span>` thay `.frac`** (2026-09-09): `bayes-theorem` ·
+`random-forest` · `statistics` · `normalization` · `rag-end-to-end` · `inference-optimization`.
+Chạm bài nào thì đổi bài đó.
+
 ### Hai khuôn mới còn là bản thử, chưa thành chuẩn kho
 
 `dl.defs` (bảng tra ký hiệu) chỉ có ở `svm` — 3 chỗ. `.hl` (in đậm cam thay `<b>`) chỉ có ở `knn`
@@ -82,8 +86,9 @@ DSA 13 bài, nặng nhất `tree-bst-traversal` 566 · `union-find` 499 · `link
 ### Câu đơn trong `details.qa` — chỗ hổng lớn nhất còn lại
 
 Mặt bài đã sạch (0 đoạn >33 từ). **Bên trong `details.qa` thì chưa**: cả kho chỉ `svm` (0 đoạn
-dài) và `decision-tree` (1) là đạt. Riêng kệ ML còn **30 bài** trả lời bằng một khối liền —
+dài) và `decision-tree` (1) là đạt. Riêng kệ ML còn **29 bài** trả lời bằng một khối liền —
 `train-val-test-cv` 126 từ · `statistics` 122 · `ab-testing` 108 · `knn` 118.
+(`naive-bayes` đã sửa 2026-09-09: 5 câu, 24 đoạn, dài nhất 16 từ — cùng lần dựng lại theo luật 1.)
 
 Đây không phải chuyện đẹp xấu: `tools/build.py` bóc `details.qa` thành **505 thẻ ôn**, nên mỗi
 khối 118 từ là một mặt sau thẻ không đọc nổi. Sửa chỗ này là sửa luôn bộ thẻ ôn.

@@ -1357,10 +1357,10 @@ window.CATALOG = [
       "title": "Logistic regression",
       "tag": "ML",
       "blurb": "Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.",
-      "n": 10,
+      "n": 12,
       "path": "content/05-machine-learning/05-classical-ml/logistic-regression/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -1404,11 +1404,11 @@ window.CATALOG = [
       "slug": "nb",
       "title": "Naive Bayes",
       "tag": "ML",
-      "blurb": "Từ định lý Bayes ra bộ phân loại: giả định độc lập sai rõ ràng nhưng vẫn chạy tốt, làm mượt Laplace, và ba biến thể.",
-      "n": 8,
+      "blurb": "Bốn bước từ thư tới nhãn: đếm tần suất, cộng alpha, cộng log, argmax — và cái giá của giả định độc lập.",
+      "n": 9,
       "path": "content/05-machine-learning/05-classical-ml/naive-bayes/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]

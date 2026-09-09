@@ -3,7 +3,7 @@ name: trinh-bay-bai
 description: "Luật TRÌNH BÀY cho mọi kệ — ít chữ nhiều hình, rất ít note, câu đơn (cả trong Hỏi đáp), công thức dáng LaTeX, bảng tra ký hiệu, mỗi trường hợp một ô hình; kèm khuôn overview và cách báo cáo"
 metadata:
   type: feedback
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 Gộp từ bốn ghi chú cũ (ít-chữ-nhiều-hình · câu-đơn-và-bảng-tra · quy-ước-overview · cách-trả-lời).
@@ -33,6 +33,7 @@ lần thấy một vế bị phạm** — nên đọc lại đủ tám vế trư
 | câu đơn, xuống dòng thì bullet | mục A dưới đây |
 | không ví von đánh đố | luật F dưới đây (ba họ ẩn dụ, **soát cả chữ trong `<svg>`**) · [[toi-thieu-de-hieu]] luật H |
 | **công thức latex** | mọi công thức đứng riêng là `.eq` mang `<var>`/`.fn`/`.frac`/`.ov` — [[khuon-eq-cong-thuc]] |
+| **phân số xuống dòng** | tử/mẫu là `.frac` hai `<i>` — vạch ngang thật, **không viết `a / b` một dòng** |
 
 **`.note` phải hiếm.** Nó là khối tô nền, mắt nhảy vào trước — dùng nhiều thì hết tác dụng nhấn.
 Cách chữa: hoà tan thành `ul.why` (điều kiện, cảnh báo, hệ quả) hoặc thành hình. Chỉ giữ khi nó
@@ -82,6 +83,13 @@ tách hình như svm chưa?"* — bài `ridge` lúc đó đã có hình bốn ô
 
 `svm` là thước: **ba mục khác nhau, ba hình nhiều ô** (bốn ý ở §01 · đủ điểm vs chỉ support
 vector ở §02 · hard vs soft ở §03 · ba mức ξ ở §03). Không phải một hình tổng ở đầu rồi hết.
+
+**Nhắc lại 2026-09-09 ở `naive-bayes`**, kèm đúng câu *"các trường hợp khác nhau tách hình như svm
+chưa?"* — lần này chỗ phạm là §03 (ba mức `α` còn là `.strip`) và §05 (ba biến thể còn là `.stack`).
+Cùng một loại lỗi với `ridge`: **`.strip`/`.stack` liệt kê ra 3 mức thì đó là 3 trường hợp, phải vẽ.**
+Cách sửa cho cả hai: một `<svg>` ba panel, **cùng một bộ ví dụ** (cùng bảng đếm · cùng một văn bản),
+chỉ đổi đúng một thứ. Vẽ được vì mỗi mức có hình thù thật: cột cao thấp khác nhau, ô đếm và ô nhị
+phân và đường chuông khác nhau.
 
 `.axis`/`.strip`/`.flow` là khuôn **chữ xếp hàng**, không phải hình. Chúng hợp khi các chặng
 thật sự chỉ là nhãn (mức cô lập, các bước một quy trình). Khi mỗi chặng có **hình thù khác nhau

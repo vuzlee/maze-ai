@@ -39,461 +39,527 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-logreg" data-title="Logistic regression" data-tag="ML" data-blurb="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
+      <article class="doc" id="art-logreg" data-title="Logistic regression" data-tag="ML" data-reviewed="1" data-blurb="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
         <header class="hero">
   <p class="eyebrow">Machine learning · Classical models</p>
   <h1>Logistic <em>regression</em></h1>
-  <p class="lede">Không phải "linear regression cho phân loại" — nó đổi cả <b>hàm bọc</b> lẫn <b>loss function</b>, và mỗi thay đổi đều có lý do bị hỏi tới cùng. Bài này giải thích vì sao <b>không dùng MSE cho phân loại</b>, cách đọc hệ số thành câu tiếng Việt, và vì sao ngưỡng 0.5 gần như luôn sai.</p>
+  <p class="lede">Model phân loại nhị phân trả về <b>xác suất</b>, không trả về nhãn. Nó lấy đường thẳng của linear regression rồi đổi hai thứ:</p>
+  <ul class="ledelist">
+    <li><b>Hàm bọc</b> <em>— sigmoid ép điểm số về khoảng 0–1.</em></li>
+    <li><b>Loss function</b> <em>— log loss thay cho MSE.</em></li>
+  </ul>
 </header>
 <section id="logreg-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-  <p class="key">C&#7843; b&#224;i l&#224; <em>s&#225;u &#253;</em> d&#432;&#7899;i &#273;&#226;y. M&#7895;i m&#7909;c sau v&#7869; l&#7841;i b&#7843;n &#273;&#7891; n&#224;y v&#224; t&#244; s&#225;ng &#244; &#273;ang h&#7885;c.</p>
+  <p class="key">Logistic regression tính <span class="mth"><var>z</var> = <var>w</var>·<var>x</var> + <var>b</var></span> rồi bọc qua sigmoid, <em>ra một xác suất trong khoảng 0–1</em>.</p>
 
   <figure class="gist">
-<svg viewBox="0 0 860 386" role="img" aria-label="bản đồ sáu ý của logistic regression: vì sao không dùng linear, sigmoid và log loss, vì sao không phải MSE, odds ratio, ngưỡng quyết định, và regularization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">① VÌ SAO KHÔNG DÙNG LINEAR</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">đầu ra phải là xác suất</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">② SIGMOID + LOG LOSS</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">ép về (0,1) và phạt đúng cách</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VÌ SAO KHÔNG PHẢI MSE</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">MSE ở đây không lồi, gradient tắt</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">④ ODDS RATIO</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cách đọc hệ số cho đúng</text>
-<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
-<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NGƯỠNG QUYẾT ĐỊNH</text>
-<text class="sv-d" x="13" y="316" fill="var(--dim)">model cho xác suất, ta chọn ngưỡng</text>
-<line x1="170.0" y1="319" x2="170.0" y2="329" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,337 165.8,329 174.2,329" fill="var(--rule-hi)"/>
-<rect x="0" y="341" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="361" fill="var(--dim)">⑥ REGULARIZATION Ở ĐÂY</text>
-<text class="sv-d" x="13" y="379" fill="var(--dim)">và vì sao vẫn là baseline</text>
-<text class="sv-hv" x="372" y="18">CẢ BÀI LÀ SÁU Ý DƯỚI ĐÂY</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--probe)">Ba ý đầu dựng nên model</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">vì sao cần nó, nó là gì, và vì sao loss phải là log loss</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--filled)">Ba ý sau là dùng nó cho đúng</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">đọc hệ số, chọn ngưỡng, và chống overfit</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">Nó cho xác suất chứ không cho nhãn</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">hiểu được câu này là hiểu được nửa bài</text>
-</svg>
-  <figcaption>B&#7843;n &#273;&#7891; c&#7843; b&#224;i. M&#7895;i m&#7909;c sau v&#7869; l&#7841;i h&#236;nh n&#224;y v&#224; <strong>t&#244; s&#225;ng &#244; &#273;ang h&#7885;c</strong>.</figcaption>
-  </figure>
+  <svg viewBox="0 0 860 288" role="img" aria-label="Năm ý của logistic regression: đường thẳng vượt khỏi 0 và 1, sigmoid ép về khoảng 0 tới 1, log loss phạt vọt lên còn MSE thì không, odds là cách đọc thứ hai của cùng một xác suất, và ngưỡng quyết định trượt trên trục xác suất">
+  <text class="sv-hv" x="0" y="18">NĂM Ý — ĐỌC TRÁI SANG PHẢI</text>
+  <text class="sv-hv" x="0" y="42" fill="var(--tomb)">① Đường thẳng</text>
+  <rect x="0" y="62" width="156" height="176" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
+  <text class="sv-d" x="0" y="258" fill="var(--muted)">đường thẳng không dừng</text>
+  <text class="sv-d" x="0" y="274" fill="var(--muted)">ở 0 và ở 1</text>
+  <text class="sv-hv" x="176" y="42" fill="var(--ok)">② Sigmoid</text>
+  <rect x="176" y="62" width="156" height="176" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
+  <text class="sv-d" x="176" y="258" fill="var(--muted)">sigmoid ép mọi z</text>
+  <text class="sv-d" x="176" y="274" fill="var(--muted)">về khoảng (0, 1)</text>
+  <text class="sv-hv" x="352" y="42" fill="var(--probe)">③ Log loss</text>
+  <rect x="352" y="62" width="156" height="176" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
+  <text class="sv-d" x="352" y="258" fill="var(--muted)">sai mà chắc thì phạt vọt</text>
+  <text class="sv-d" x="352" y="274" fill="var(--muted)">MSE gần như không phạt</text>
+  <text class="sv-hv" x="528" y="42" fill="var(--filled)">④ Odds</text>
+  <rect x="528" y="62" width="156" height="176" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
+  <text class="sv-d" x="528" y="258" fill="var(--muted)">cùng một điều, hai thang</text>
+  <text class="sv-d" x="528" y="274" fill="var(--muted)">hệ số cộng vào log odds</text>
+  <text class="sv-hv" x="704" y="42" fill="var(--probe)">⑤ Ngưỡng</text>
+  <rect x="704" y="62" width="156" height="176" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
+  <text class="sv-d" x="704" y="258" fill="var(--muted)">model cho xác suất</text>
+  <text class="sv-d" x="704" y="274" fill="var(--muted)">ngưỡng là ta chọn</text>
+  <line x1="8" y1="100" x2="148" y2="100" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="8" y1="210" x2="148" y2="210" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 3"/>
+  <text class="sv-d" x="8" y="95" fill="var(--faint)">1</text>
+  <text class="sv-d" x="8" y="226" fill="var(--faint)">0</text>
+  <line x1="14" y1="232" x2="146" y2="74" stroke="var(--tomb)" stroke-width="2"/>
+  <circle cx="24" cy="210" r="3.6" fill="var(--filled)"/>
+  <circle cx="40" cy="210" r="3.6" fill="var(--filled)"/>
+  <circle cx="58" cy="210" r="3.6" fill="var(--filled)"/>
+  <circle cx="106" cy="100" r="3.6" fill="var(--filled)"/>
+  <circle cx="124" cy="100" r="3.6" fill="var(--filled)"/>
+  <circle cx="142" cy="100" r="3.6" fill="var(--filled)"/>
+  <line x1="184" y1="100" x2="324" y2="100" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 3"/>
+  <line x1="184" y1="210" x2="324" y2="210" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="4 3"/>
+  <text class="sv-d" x="184" y="95" fill="var(--faint)">1</text>
+  <text class="sv-d" x="184" y="226" fill="var(--faint)">0</text>
+  <path d="M 186 209 C 224 209 238 202 254 155 C 270 108 284 101 322 101" fill="none" stroke="var(--ok)" stroke-width="2"/>
+  <circle cx="200" cy="210" r="3.6" fill="var(--filled)"/>
+  <circle cx="216" cy="210" r="3.6" fill="var(--filled)"/>
+  <circle cx="234" cy="210" r="3.6" fill="var(--filled)"/>
+  <circle cx="282" cy="100" r="3.6" fill="var(--filled)"/>
+  <circle cx="300" cy="100" r="3.6" fill="var(--filled)"/>
+  <circle cx="318" cy="100" r="3.6" fill="var(--filled)"/>
+  <line x1="366" y1="222" x2="500" y2="222" stroke="var(--rule-hi)" stroke-width="1"/>
+  <line x1="366" y1="78" x2="366" y2="222" stroke="var(--rule-hi)" stroke-width="1"/>
+  <path d="M 370 80 C 386 168 408 212 498 219" fill="none" stroke="var(--probe)" stroke-width="2"/>
+  <path d="M 370 186 C 408 204 448 215 498 219" fill="none" stroke="var(--rule-hi)" stroke-width="2"/>
+  <text class="sv-d" x="406" y="104" fill="var(--probe)">log loss</text>
+  <text class="sv-d" x="406" y="178" fill="var(--muted)">MSE</text>
+  <line x1="540" y1="122" x2="676" y2="122" stroke="var(--rule-hi)" stroke-width="1"/>
+  <line x1="540" y1="192" x2="676" y2="192" stroke="var(--rule-hi)" stroke-width="1"/>
+  <text class="sv-d" x="540" y="112" fill="var(--filled)">p</text>
+  <text class="sv-d" x="540" y="182" fill="var(--filled)">odds</text>
+  <circle cx="649" cy="122" r="4.4" fill="var(--filled)"/>
+  <circle cx="658" cy="192" r="4.4" fill="var(--filled)"/>
+  <text class="sv-d" x="649" y="112" text-anchor="middle" fill="var(--filled)">0,8</text>
+  <text class="sv-d" x="658" y="210" text-anchor="middle" fill="var(--filled)">4</text>
+  <line x1="649" y1="130" x2="658" y2="180" stroke="var(--filled)" stroke-width="1.2"/>
+  <polygon points="658,188 654,180 662,180" fill="var(--filled)"/>
+  <line x1="716" y1="176" x2="852" y2="176" stroke="var(--rule-hi)" stroke-width="1"/>
+  <text class="sv-d" x="716" y="196" fill="var(--faint)">0</text>
+  <text class="sv-d" x="848" y="196" text-anchor="end" fill="var(--faint)">1</text>
+  <line x1="782" y1="96" x2="782" y2="184" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <text class="sv-d" x="782" y="210" text-anchor="middle" fill="var(--probe)">0,5</text>
+  <line x1="760" y1="88" x2="804" y2="88" stroke="var(--probe)" stroke-width="1.2"/>
+  <polygon points="754,88 762,84 762,92" fill="var(--probe)"/>
+  <polygon points="810,88 802,84 802,92" fill="var(--probe)"/>
+  <circle cx="728" cy="152" r="3.6" fill="var(--tomb)"/>
+  <circle cx="744" cy="130" r="3.6" fill="var(--tomb)"/>
+  <circle cx="762" cy="150" r="3.6" fill="var(--tomb)"/>
+  <circle cx="772" cy="128" r="3.6" fill="var(--ok)"/>
+  <circle cx="798" cy="152" r="3.6" fill="var(--tomb)"/>
+  <circle cx="808" cy="130" r="3.6" fill="var(--ok)"/>
+  <circle cx="826" cy="150" r="3.6" fill="var(--ok)"/>
+  <circle cx="844" cy="128" r="3.6" fill="var(--ok)"/>
+  </svg>
+    <figcaption>Ba ô đầu dựng nên model. Hai ô sau là cách đọc con số nó trả về.</figcaption>
+    </figure>
+
+  <ul class="why">
+    <li>Mỗi mục sau bóc một ô, theo đúng thứ tự trên hình.</li>
+    <li>Đường thẳng và gradient là thứ đã có ở <a href="../linear-regression/index.html">Linear regression</a>. Sigmoid và log loss là thứ mới.</li>
+  </ul>
 </section>
 
 <section id="logreg-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Vì sao không dùng linear regression để phân loại</h2></div>
-<p class="key">Gán nhãn 0 và 1 rồi kẻ một đường thẳng qua chúng — <em>đường thẳng không biết dừng ở đâu</em>.</p>
+  <div class="sh"><b>02</b><h2>Đường thẳng không dừng ở 0 và 1</h2></div>
+  <p class="key">Gán nhãn 0 và 1 rồi kẻ một đường thẳng qua chúng — <em>đường thẳng không biết dừng ở đâu</em>.</p>
 
   <figure>
-    <svg viewBox="0 0 900 240" role="img" aria-label="Đường thẳng vượt khỏi khoảng 0 tới 1, và bị một điểm xa kéo lệch">
-      <g>
-        <line x1="60" y1="40" x2="60" y2="180" stroke="var(--rule-hi)"></line>
-        <line x1="60" y1="180" x2="400" y2="180" stroke="var(--rule-hi)"></line>
-        <line x1="56" y1="60" x2="400" y2="60" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-        <text class="sv-l" x="46" y="64" text-anchor="end">1</text>
-        <text class="sv-l" x="46" y="184" text-anchor="end">0</text>
-        <line x1="80" y1="212" x2="392" y2="30" stroke="var(--filled)" stroke-width="2"></line>
-        <circle cx="110" cy="180" r="4" fill="var(--filled)"></circle><circle cx="150" cy="180" r="4" fill="var(--filled)"></circle>
-        <circle cx="190" cy="180" r="4" fill="var(--filled)"></circle>
-        <circle cx="270" cy="60" r="4" fill="var(--filled)"></circle><circle cx="320" cy="60" r="4" fill="var(--filled)"></circle>
-        <circle cx="360" cy="60" r="4" fill="var(--filled)"></circle>
-        <text class="sv-l" x="392" y="26" fill="var(--tomb)">ŷ = 1,7 — xác suất 170%?</text>
-        <text class="sv-l" x="84" y="226" fill="var(--tomb)">ŷ = −0,4 — xác suất âm?</text>
-      </g>
-      <g>
-        <line x1="530" y1="40" x2="530" y2="180" stroke="var(--rule-hi)"></line>
-        <line x1="530" y1="180" x2="870" y2="180" stroke="var(--rule-hi)"></line>
-        <line x1="526" y1="60" x2="870" y2="60" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-        <text class="sv-l" x="516" y="64" text-anchor="end">1</text>
-        <text class="sv-l" x="516" y="184" text-anchor="end">0</text>
-        <line x1="546" y1="176" x2="800" y2="52" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 4"></line>
-        <line x1="546" y1="188" x2="860" y2="86" stroke="var(--probe)" stroke-width="2"></line>
-        <circle cx="570" cy="180" r="4" fill="var(--filled)"></circle><circle cx="610" cy="180" r="4" fill="var(--filled)"></circle>
-        <circle cx="700" cy="60" r="4" fill="var(--filled)"></circle><circle cx="740" cy="60" r="4" fill="var(--filled)"></circle>
-        <circle cx="856" cy="60" r="6" fill="var(--probe)"></circle>
-        <text class="sv-l" x="850" y="42" text-anchor="end" fill="var(--probe)">thêm một điểm ở rất xa</text>
-        <text class="sv-l" x="700" y="212" text-anchor="middle" fill="var(--probe)">cả đường bị kéo nghiêng → ranh giới ở giữa đổi theo</text>
-      </g>
-    </svg>
-    <figcaption>Điểm bên phải ngoài cùng là điểm <strong>dễ phân loại nhất</strong>, vậy mà nó lại lay chuyển ranh giới nhiều nhất.</figcaption>
-  </figure>
+      <svg viewBox="0 0 900 240" role="img" aria-label="Đường thẳng vượt khỏi khoảng 0 tới 1, và bị một điểm xa kéo lệch">
+        <g>
+          <line x1="60" y1="40" x2="60" y2="180" stroke="var(--rule-hi)"></line>
+          <line x1="60" y1="180" x2="400" y2="180" stroke="var(--rule-hi)"></line>
+          <line x1="56" y1="60" x2="400" y2="60" stroke="var(--rule)" stroke-dasharray="4 4"></line>
+          <text class="sv-l" x="46" y="64" text-anchor="end">1</text>
+          <text class="sv-l" x="46" y="184" text-anchor="end">0</text>
+          <line x1="80" y1="212" x2="392" y2="30" stroke="var(--filled)" stroke-width="2"></line>
+          <circle cx="110" cy="180" r="4" fill="var(--filled)"></circle><circle cx="150" cy="180" r="4" fill="var(--filled)"></circle>
+          <circle cx="190" cy="180" r="4" fill="var(--filled)"></circle>
+          <circle cx="270" cy="60" r="4" fill="var(--filled)"></circle><circle cx="320" cy="60" r="4" fill="var(--filled)"></circle>
+          <circle cx="360" cy="60" r="4" fill="var(--filled)"></circle>
+          <text class="sv-m" x="392" y="26" fill="var(--tomb)"><tspan class="v">ŷ</tspan> = 1,7 — xác suất 170%?</text>
+          <text class="sv-m" x="84" y="226" fill="var(--tomb)"><tspan class="v">ŷ</tspan> = −0,4 — xác suất âm?</text>
+        </g>
+        <g>
+          <line x1="530" y1="40" x2="530" y2="180" stroke="var(--rule-hi)"></line>
+          <line x1="530" y1="180" x2="870" y2="180" stroke="var(--rule-hi)"></line>
+          <line x1="526" y1="60" x2="870" y2="60" stroke="var(--rule)" stroke-dasharray="4 4"></line>
+          <text class="sv-l" x="516" y="64" text-anchor="end">1</text>
+          <text class="sv-l" x="516" y="184" text-anchor="end">0</text>
+          <line x1="546" y1="176" x2="800" y2="52" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 4"></line>
+          <line x1="546" y1="188" x2="860" y2="86" stroke="var(--probe)" stroke-width="2"></line>
+          <circle cx="570" cy="180" r="4" fill="var(--filled)"></circle><circle cx="610" cy="180" r="4" fill="var(--filled)"></circle>
+          <circle cx="700" cy="60" r="4" fill="var(--filled)"></circle><circle cx="740" cy="60" r="4" fill="var(--filled)"></circle>
+          <circle cx="856" cy="60" r="6" fill="var(--probe)"></circle>
+          <text class="sv-d" x="850" y="42" text-anchor="end" fill="var(--probe)">thêm một điểm ở rất xa</text>
+          <text class="sv-d" x="700" y="212" text-anchor="middle" fill="var(--probe)">cả đường bị kéo nghiêng → ranh giới ở giữa đổi theo</text>
+        </g>
+      </svg>
+      <figcaption>Điểm bên phải ngoài cùng là điểm <strong>dễ phân loại nhất</strong>, vậy mà nó lại lay chuyển ranh giới nhiều nhất.</figcaption>
+    </figure>
 
   <ul class="why">
     <li><b>Đầu ra không bị chặn trong [0, 1]</b> nên không đọc thành xác suất được.</li>
-    <li><b>MSE giả định phần dư phân phối chuẩn</b>, nhãn nhị phân lại theo Bernoulli — sai giả định ngay từ gốc.</li>
-    <li>Logistic regression sửa cả ba: bọc <code>sigmoid</code> để ép đầu ra vào (0, 1), và đổi sang log loss cho khớp Bernoulli.</li>
+    <li><b>MSE giả định phần dư phân phối chuẩn</b>. Nhãn nhị phân lại theo Bernoulli.</li>
+    <li>Nên phải đổi hai thứ: <b>hàm bọc</b> ở mục sau, rồi <b>loss</b> ở mục kế tiếp.</li>
   </ul>
 </section>
 
 <section id="logreg-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Loss function — sigmoid và log loss</h2></div>
-<p class="key">Sigmoid là cái phễu: <em>nhận một số bất kỳ, trả về một số trong khoảng 0–1</em>.</p>
+  <div class="sh"><b>03</b><h2>Sigmoid ép mọi điểm số về (0, 1)</h2></div>
+  <p class="key">Sigmoid <em>nhận một số bất kỳ, trả về một số trong khoảng 0–1</em>.</p>
 
   <figure>
-    <svg viewBox="0 0 900 210" role="img" aria-label="Đường cong sigmoid, bằng 0,5 tại z bằng 0 và bão hoà ở hai đầu">
-      <line x1="90" y1="30" x2="90" y2="170" stroke="var(--rule-hi)"></line>
-      <line x1="90" y1="170" x2="780" y2="170" stroke="var(--rule-hi)"></line>
-      <line x1="86" y1="40" x2="780" y2="40" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-      <line x1="86" y1="105" x2="780" y2="105" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-      <text class="sv-l" x="76" y="44" text-anchor="end">p = 1</text>
-      <text class="sv-l" x="76" y="109" text-anchor="end">p = 0,5</text>
-      <text class="sv-l" x="76" y="174" text-anchor="end">p = 0</text>
-      <path d="M100 166 C260 164 340 150 435 105 C530 60 610 46 770 44" fill="none" stroke="var(--filled)" stroke-width="2.5"></path>
-      <line x1="435" y1="30" x2="435" y2="182" stroke="var(--probe)" stroke-dasharray="4 4"></line>
-      <circle cx="435" cy="105" r="5.5" fill="var(--probe)"></circle>
-      <text class="sv-l" x="435" y="198" text-anchor="middle" fill="var(--probe)">z = 0 · ranh giới quyết định</text>
-      <text class="sv-l" x="160" y="146" fill="var(--filled)">z = −2 → p ≈ 0,12</text>
-      <text class="sv-l" x="620" y="70" fill="var(--filled)">z = 2 → p ≈ 0,88</text>
-      <text class="sv-l" x="760" y="188" text-anchor="end">z = w·x + b  →</text>
-    </svg>
-    <figcaption>Hai đầu <strong>bẹt ra</strong> — chi tiết đó quay lại ở mục 03 và là lý do không dùng được MSE.</figcaption>
-  </figure>
+      <svg viewBox="0 0 900 210" role="img" aria-label="Đường cong sigmoid, bằng 0,5 tại z bằng 0 và bão hoà ở hai đầu">
+        <line x1="90" y1="30" x2="90" y2="170" stroke="var(--rule-hi)"></line>
+        <line x1="90" y1="170" x2="780" y2="170" stroke="var(--rule-hi)"></line>
+        <line x1="86" y1="40" x2="780" y2="40" stroke="var(--rule)" stroke-dasharray="4 4"></line>
+        <line x1="86" y1="105" x2="780" y2="105" stroke="var(--rule)" stroke-dasharray="4 4"></line>
+        <text class="sv-m" x="76" y="44" text-anchor="end"><tspan class="v">p</tspan> = 1</text>
+        <text class="sv-m" x="76" y="109" text-anchor="end"><tspan class="v">p</tspan> = 0,5</text>
+        <text class="sv-m" x="76" y="174" text-anchor="end"><tspan class="v">p</tspan> = 0</text>
+        <path d="M100 166 C260 164 340 150 435 105 C530 60 610 46 770 44" fill="none" stroke="var(--filled)" stroke-width="2.5"></path>
+        <line x1="435" y1="30" x2="435" y2="182" stroke="var(--probe)" stroke-dasharray="4 4"></line>
+        <circle cx="435" cy="105" r="5.5" fill="var(--probe)"></circle>
+        <text class="sv-m" x="435" y="198" text-anchor="middle" fill="var(--probe)"><tspan class="v">z</tspan> = 0 · ranh giới quyết định</text>
+        <text class="sv-m" x="160" y="146" fill="var(--filled)"><tspan class="v">z</tspan> = −2 → <tspan class="v">p</tspan> ≈ 0,12</text>
+        <text class="sv-m" x="620" y="70" fill="var(--filled)"><tspan class="v">z</tspan> = 2 → <tspan class="v">p</tspan> ≈ 0,88</text>
+        <text class="sv-m" x="760" y="188" text-anchor="end"><tspan class="v">z</tspan> = <tspan class="v">w</tspan>·<tspan class="v">x</tspan> + <tspan class="v">b</tspan>  →</text>
+      </svg>
+      <figcaption>Hai đầu <strong>bẹt ra</strong>: <span class="mth"><var>z</var></span> đổi nhiều mà <span class="mth"><var>p</var></span> gần như đứng yên.</figcaption>
+    </figure>
+
+  <div class="eq">
+      <p class="read"><b>Sigmoid</b> đổi <span class="mth"><var>z</var></span> thành <span class="mth"><var>p</var></span>:</p>
+      <div class="line">
+        <span class="t"><span><var>p</var></span></span>
+        <span class="op">=</span>
+        <span class="t b"><span><span class="frac"><i>1</i><i>1 + <b class="fn">e</b><sup>−<var>z</var></sup></i></span></span><em>z càng lớn, mẫu số càng gần 1, nên p càng gần 1</em></span>
+      </div>
+    </div>
+
+  <dl class="defs">
+    <dt>z</dt><dd>điểm số tuyến tính, chưa phải xác suất</dd>
+    <dt>p</dt><dd>xác suất model đoán, sau khi bọc sigmoid</dd>
+  </dl>
 
   <ul class="why">
-    <li><b>Ranh giới quyết định vẫn là một mặt phẳng</b>. Sigmoid chỉ đổi thang đo của điểm số, nó không làm model phi tuyến.</li>
+    <li><b>Ranh giới quyết định vẫn là một mặt phẳng.</b> Sigmoid chỉ đổi thang đo của điểm số.</li>
+    <li>Nó không làm model phi tuyến.</li>
     <li>Muốn ranh giới cong thì phải tự thêm đặc trưng bậc cao hoặc đặc trưng tương tác.</li>
-  </ul>
-<div class="eq">
-    <p class="read">Loss function — <b>log loss</b> (còn gọi binary cross-entropy):</p>
-    <div class="line">
-      <span class="t"><span><var>L</var></span></span>
-      <span class="op">=</span>
-      <span class="t p"><span>−(1/<var>n</var>) Σ [ <var>y</var><sub><var>i</var></sub>·<b class="fn">log</b>(<var>p</var><sub><var>i</var></sub>) + (1−<var>y</var><sub><var>i</var></sub>)·<b class="fn">log</b>(1−<var>p</var><sub><var>i</var></sub>) ]</span><em>chỉ một trong hai số hạng sống, tuỳ nhãn 0 hay 1</em></span>
-    </div>
-    <p class="read">Gradient — kết quả rất gọn:</p>
-    <div class="line">
-      <span class="t"><span><span class="frac"><i>∂<var>L</var></i><i>∂<var>w</var><sub><var>j</var></sub></i></span></span></span>
-      <span class="op">=</span>
-      <span class="t g"><span>(1/<var>n</var>) Σ (<var>p</var><sub><var>i</var></sub> − <var>y</var><sub><var>i</var></sub>) · <var>x</var><sub><var>ij</var></sub></span><em>giống hệt dạng của linear regression</em></span>
-    </div>
-  </div>
-  <ul class="why">
-    <li>Gradient có dạng <code>(p − y)·x</code>, <b>giống hệt</b> gradient của linear regression với MSE — chỉ thay <code>ŷ</code> bằng <code>p</code>.</li>
-    <li>Không phải trùng hợp: đó là tính chất chung của mọi model thuộc họ hàm mũ khi dùng hàm liên kết chuẩn.</li>
   </ul>
 </section>
 
 <section id="logreg-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Vì sao log loss chứ không phải MSE</h2></div>
-  <p>Câu hỏi phỏng vấn kinh điển, và có <strong>hai</strong> lý do — nói được cả hai mới là câu trả lời đầy đủ.</p>
-  <div class="cmp two">
-    <div>
-      <h5>Lý do 1 — mặt mất mát</h5>
-      <p>MSE bọc sigmoid cho mặt mất mát <b>không lồi</b>: nhiều hố cạn, gradient descent mắc kẹt ở hố nào cũng được.</p>
-      <p>Log loss thì <b>lồi</b> — chỉ có một đáy, chắc chắn tới được.</p>
-    </div>
-    <div>
-      <h5>Lý do 2 — tín hiệu học</h5>
-      <p>Đạo hàm của sigmoid <b>bẹt ở hai đầu</b>. MSE nhân nó vào gradient nên bóp chết tín hiệu ở đúng mẫu sai nặng nhất.</p>
-      <p>Log loss được dựng để <b>khử đúng cái nhân tử đó</b>.</p>
-    </div>
-  </div>
+  <div class="sh"><b>04</b><h2>Log loss — phạt nặng khi sai mà chắc</h2></div>
+  <p class="key">Đã có xác suất thì đo sai bằng <em>mức chắc chắn đặt nhầm chỗ</em>, không đo bằng khoảng cách.</p>
 
-  <figure>
-<svg viewBox="0 0 860 450" role="img" aria-label="Bảng đo thật so log loss với MSE khi huấn luyện logistic regression: khởi tạo từ 0 thì hai loss ngang nhau, khởi tạo xa thì log loss vẫn hội tụ về 0,2738 còn MSE mắc kẹt ở 1,0357">
-<text class="sv-hv" x="0" y="18">ĐO THẬT — CÙNG MODEL, CÙNG DỮ LIỆU, CHỈ ĐỔI LOSS</text>
-<text class="sv-s" x="0" y="40" fill="var(--dim)">800 mẫu huấn luyện · 4.000 mẫu kiểm tra · cùng gradient descent, cùng learning rate 0,5 · chỉ khác công thức loss. Chấm bằng log loss</text>
-<text class="sv-s" x="0" y="58" fill="var(--dim)">trên tập kiểm tra (càng nhỏ càng tốt) và tỉ lệ đoán đúng.</text>
-<text class="sv-s" x="0" y="88" fill="var(--dim)">khởi tạo</text>
-<text class="sv-s" x="150" y="88" fill="var(--dim)">loss</text>
-<text class="sv-s" x="300" y="88" fill="var(--dim)">50 vòng</text>
-<text class="sv-s" x="470" y="88" fill="var(--dim)">300 vòng</text>
-<text class="sv-s" x="640" y="88" fill="var(--dim)">2.000 vòng</text>
-<text class="sv-d" x="0" y="116" fill="var(--muted)">w = 0</text>
-<text class="sv-d" x="150" y="116" fill="var(--muted)">log loss</text>
-<text class="sv-n" x="300" y="116" fill="var(--muted)">0,2752</text>
-<text class="sv-n" x="470" y="116" fill="var(--muted)">0,2737</text>
-<text class="sv-n" x="640" y="116" fill="var(--muted)">0,2738</text>
-<text class="sv-d" x="0" y="144" fill="var(--muted)">w = 0</text>
-<text class="sv-d" x="150" y="144" fill="var(--muted)">MSE</text>
-<text class="sv-n" x="300" y="144" fill="var(--muted)">0,3007</text>
-<text class="sv-n" x="470" y="144" fill="var(--muted)">0,2748</text>
-<text class="sv-n" x="640" y="144" fill="var(--muted)">0,2747</text>
-<rect x="0" y="156" width="780" height="23" rx="3" fill="none" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-d" x="0" y="172" fill="var(--ok)">w = ±8 · xa</text>
-<text class="sv-d" x="150" y="172" fill="var(--ok)">log loss</text>
-<text class="sv-n" x="300" y="172" fill="var(--ok)">0,9557</text>
-<text class="sv-n" x="470" y="172" fill="var(--ok)">0,4541</text>
-<text class="sv-n" x="640" y="172" fill="var(--ok)">0,2738</text>
-<rect x="0" y="184" width="780" height="23" rx="3" fill="none" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-d" x="0" y="200" fill="var(--tomb)">w = ±8 · xa</text>
-<text class="sv-d" x="150" y="200" fill="var(--tomb)">MSE</text>
-<text class="sv-n" x="300" y="200" fill="var(--tomb)">2,2897</text>
-<text class="sv-n" x="470" y="200" fill="var(--tomb)">1,8244</text>
-<text class="sv-n" x="640" y="200" fill="var(--tomb)">1,0357</text>
-<line x1="0" y1="234" x2="860" y2="234" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="0" y="256" fill="var(--faint)">HAI DÒNG TRÊN: KHỞI TẠO ĐẸP THÌ KHÔNG THẤY GÌ</text>
-<text class="sv-s" x="0" y="276" fill="var(--dim)">Bắt đầu từ w = 0, mọi mẫu có p ≈ 0,5, sigmoid chưa bẹt, nên MSE chỉ chậm hơn một chút rồi về đúng chỗ. Chạy thử kiểu này là lý do nhiều</text>
-<text class="sv-s" x="0" y="294" fill="var(--dim)">người tưởng MSE dùng được.</text>
-<text class="sv-hv" x="0" y="322" fill="var(--tomb)">HAI DÒNG DƯỚI: KHỞI TẠO XA THÌ LỘ RA</text>
-<text class="sv-s" x="0" y="342" fill="var(--dim)">Đặt w = ±8 thì nhiều mẫu bị đẩy ra vùng p ≈ 0,001 hoặc p ≈ 0,999 — chỗ sigmoid bẹt. Log loss vẫn bò về 0,2738 sau 2.000 vòng, đúng bằng</text>
-<text class="sv-s" x="0" y="360" fill="var(--dim)">lần khởi tạo đẹp. MSE thì sau 2.000 vòng vẫn còn 1,0357, tức tệ hơn gần bốn lần, vì gradient của nó bị nhân với σ′(z) ≈ 0,001 ở đúng</text>
-<text class="sv-s" x="0" y="378" fill="var(--dim)">những mẫu sai nặng nhất.</text>
-<text class="sv-s" x="0" y="402" fill="var(--dim)">Đó là lý do 2 nói bằng số: MSE không sai về nguyên tắc, nó chỉ tắt mất tín hiệu học ở chỗ cần học nhất, nên chỉ cần rơi vào vùng bẹt là</text>
-<text class="sv-s" x="0" y="420" fill="var(--dim)">không ra nổi.</text>
-</svg>
-    <figcaption>Cùng model, cùng dữ liệu, chỉ đổi loss — chỉ khi khởi tạo rơi vào vùng bẹt thì khác biệt mới lộ ra.</figcaption>
-  </figure>
+  <figure class="scrollx">
+  <svg viewBox="0 0 900 340" role="img" aria-label="Hai trường hợp của log loss trên một mẫu: khi nhãn thật là 1 thì p càng gần 1 loss càng nhỏ, khi nhãn thật là 0 thì p càng gần 0 loss càng nhỏ; ở cả hai, đoán sai mà rất chắc thì loss vọt lên">
+  <text class="sv-hv" x="0" y="18">MỘT MẪU — LOSS PHỤ THUỘC p VÀ NHÃN THẬT</text>
+  <text class="sv-hv" x="40" y="44" fill="var(--ok)">① Nhãn thật y = 1</text>
+  <rect x="40" y="60" width="380" height="210" rx="6" fill="rgba(var(--green-a),.05)" stroke="var(--ok)" stroke-width="1.4"/>
+  <line x1="48" y1="236" x2="390" y2="236" stroke="var(--rule-hi)" stroke-width="1"/>
+  <text class="sv-d" x="48" y="82" fill="var(--muted)">L cao</text>
+  <text class="sv-hv" x="480" y="44" fill="var(--tomb)">② Nhãn thật y = 0</text>
+  <rect x="480" y="60" width="380" height="210" rx="6" fill="rgba(var(--red-a),.05)" stroke="var(--tomb)" stroke-width="1.4"/>
+  <line x1="488" y1="236" x2="830" y2="236" stroke="var(--rule-hi)" stroke-width="1"/>
+  <text class="sv-d" x="488" y="82" fill="var(--muted)">L cao</text>
+  <polyline points="61.4,110.0 63.0,113.3 64.7,116.8 66.4,119.9 68.0,122.8 69.7,125.5 71.4,127.9 73.0,130.2 74.7,132.3 76.4,134.3 78.1,136.2 79.7,138.0 81.4,139.7 83.1,141.3 84.7,142.9 86.4,144.4 88.1,145.8 89.8,147.1 91.4,148.4 93.1,149.7 94.8,150.9 96.4,152.0 98.1,153.2 99.8,154.2 101.4,155.3 103.1,156.3 104.8,157.3 106.4,158.3 108.1,159.2 109.8,160.1 111.5,161.0 113.1,161.8 114.8,162.7 116.5,163.5 118.1,164.3 119.8,165.1 121.5,165.8 123.2,166.6 124.8,167.3 126.5,168.0 128.2,168.7 129.8,169.4 131.5,170.1 133.2,170.7 134.8,171.4 136.5,172.0 138.2,172.6 139.9,173.2 141.5,173.8 143.2,174.4 144.9,175.0 146.5,175.6 148.2,176.1 149.9,176.7 151.5,177.2 153.2,177.7 154.9,178.3 156.6,178.8 158.2,179.3 159.9,179.8 161.6,180.3 163.2,180.7 164.9,181.2 166.6,181.7 168.2,182.2 169.9,182.6 171.6,183.1 173.2,183.5 174.9,183.9 176.6,184.4 178.3,184.8 179.9,185.2 181.6,185.6 183.3,186.1 184.9,186.5 186.6,186.9 188.3,187.3 189.9,187.7 191.6,188.0 193.3,188.4 195.0,188.8 196.6,189.2 198.3,189.5 200.0,189.9 201.6,190.3 203.3,190.6 205.0,191.0 206.7,191.3 208.3,191.7 210.0,192.0 211.7,192.4 213.3,192.7 215.0,193.0 216.7,193.4 218.3,193.7 220.0,194.0 221.7,194.3 223.3,194.7 225.0,195.0 226.7,195.3 228.4,195.6 230.0,195.9 231.7,196.2 233.4,196.5 235.0,196.8 236.7,197.1 238.4,197.4 240.0,197.7 241.7,198.0 243.4,198.2 245.1,198.5 246.7,198.8 248.4,199.1 250.1,199.4 251.7,199.6 253.4,199.9 255.1,200.2 256.8,200.4 258.4,200.7 260.1,201.0 261.8,201.2 263.4,201.5 265.1,201.7 266.8,202.0 268.4,202.2 270.1,202.5 271.8,202.7 273.5,203.0 275.1,203.2 276.8,203.5 278.5,203.7 280.1,203.9 281.8,204.2 283.5,204.4 285.1,204.7 286.8,204.9 288.5,205.1 290.1,205.3 291.8,205.6 293.5,205.8 295.2,206.0 296.8,206.2 298.5,206.5 300.2,206.7 301.8,206.9 303.5,207.1 305.2,207.3 306.9,207.6 308.5,207.8 310.2,208.0 311.9,208.2 313.5,208.4 315.2,208.6 316.9,208.8 318.5,209.0 320.2,209.2 321.9,209.4 323.6,209.6 325.2,209.8 326.9,210.0 328.6,210.2 330.2,210.4 331.9,210.6 333.6,210.8 335.2,211.0 336.9,211.2 338.6,211.4 340.2,211.6 341.9,211.8 343.6,212.0 345.3,212.1 346.9,212.3 348.6,212.5 350.3,212.7 351.9,212.9 353.6,213.1 355.3,213.2 356.9,213.4 358.6,213.6 360.3,213.8 362.0,214.0 363.6,214.1 365.3,214.3 367.0,214.5 368.6,214.6 370.3,214.8 372.0,215.0 373.6,215.2 375.3,215.3 377.0,215.5 378.7,215.7 380.3,215.8" fill="none" stroke="var(--ok)" stroke-width="2.2"/>
+  <polyline points="489.7,215.8 491.3,215.7 493.0,215.5 494.7,215.3 496.4,215.2 498.0,215.0 499.7,214.8 501.4,214.6 503.0,214.5 504.7,214.3 506.4,214.1 508.0,214.0 509.7,213.8 511.4,213.6 513.0,213.4 514.7,213.2 516.4,213.1 518.1,212.9 519.7,212.7 521.4,212.5 523.1,212.3 524.7,212.1 526.4,212.0 528.1,211.8 529.8,211.6 531.4,211.4 533.1,211.2 534.8,211.0 536.4,210.8 538.1,210.6 539.8,210.4 541.4,210.2 543.1,210.0 544.8,209.8 546.5,209.6 548.1,209.4 549.8,209.2 551.5,209.0 553.1,208.8 554.8,208.6 556.5,208.4 558.1,208.2 559.8,208.0 561.5,207.8 563.1,207.6 564.8,207.3 566.5,207.1 568.2,206.9 569.8,206.7 571.5,206.5 573.2,206.2 574.8,206.0 576.5,205.8 578.2,205.6 579.9,205.3 581.5,205.1 583.2,204.9 584.9,204.7 586.5,204.4 588.2,204.2 589.9,203.9 591.5,203.7 593.2,203.5 594.9,203.2 596.5,203.0 598.2,202.7 599.9,202.5 601.6,202.2 603.2,202.0 604.9,201.7 606.6,201.5 608.2,201.2 609.9,201.0 611.6,200.7 613.2,200.4 614.9,200.2 616.6,199.9 618.3,199.6 619.9,199.4 621.6,199.1 623.3,198.8 624.9,198.5 626.6,198.2 628.3,198.0 630.0,197.7 631.6,197.4 633.3,197.1 635.0,196.8 636.6,196.5 638.3,196.2 640.0,195.9 641.6,195.6 643.3,195.3 645.0,195.0 646.6,194.7 648.3,194.3 650.0,194.0 651.7,193.7 653.3,193.4 655.0,193.0 656.7,192.7 658.3,192.4 660.0,192.0 661.7,191.7 663.4,191.3 665.0,191.0 666.7,190.6 668.4,190.3 670.0,189.9 671.7,189.5 673.4,189.2 675.0,188.8 676.7,188.4 678.4,188.0 680.0,187.7 681.7,187.3 683.4,186.9 685.1,186.5 686.7,186.1 688.4,185.6 690.1,185.2 691.7,184.8 693.4,184.4 695.1,183.9 696.8,183.5 698.4,183.1 700.1,182.6 701.8,182.2 703.4,181.7 705.1,181.2 706.8,180.7 708.4,180.3 710.1,179.8 711.8,179.3 713.5,178.8 715.1,178.3 716.8,177.7 718.5,177.2 720.1,176.7 721.8,176.1 723.5,175.6 725.1,175.0 726.8,174.4 728.5,173.8 730.1,173.2 731.8,172.6 733.5,172.0 735.2,171.4 736.8,170.7 738.5,170.1 740.2,169.4 741.8,168.7 743.5,168.0 745.2,167.3 746.9,166.6 748.5,165.8 750.2,165.1 751.9,164.3 753.5,163.5 755.2,162.7 756.9,161.8 758.5,161.0 760.2,160.1 761.9,159.2 763.5,158.3 765.2,157.3 766.9,156.3 768.6,155.3 770.2,154.2 771.9,153.2 773.6,152.0 775.2,150.9 776.9,149.7 778.6,148.4 780.2,147.1 781.9,145.8 783.6,144.4 785.3,142.9 786.9,141.3 788.6,139.7 790.3,138.0 791.9,136.2 793.6,134.3 795.3,132.3 797.0,130.2 798.6,127.9 800.3,125.5 802.0,122.8 803.6,119.9 805.3,116.8 807.0,113.3 808.6,110.0" fill="none" stroke="var(--tomb)" stroke-width="2.2"/>
+  <line x1="348.6" y1="219.5" x2="348.6" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="348.6" cy="212.5" r="4.6" fill="var(--probe)"/>
+  <text class="sv-m" x="348.6" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,9</text>
+  <text class="sv-m" x="335.6" y="203.5" text-anchor="end" fill="var(--probe)"><tspan class="v">L</tspan> = 0,11</text>
+  <line x1="215.0" y1="200.0" x2="215.0" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="215.0" cy="193.0" r="4.6" fill="var(--probe)"/>
+  <text class="sv-m" x="215.0" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,5</text>
+  <text class="sv-m" x="228.0" y="184.0" text-anchor="start" fill="var(--probe)"><tspan class="v">L</tspan> = 0,69</text>
+  <line x1="81.4" y1="146.7" x2="81.4" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="81.4" cy="139.7" r="4.6" fill="var(--probe)"/>
+  <text class="sv-m" x="81.4" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,1</text>
+  <text class="sv-m" x="94.4" y="130.7" text-anchor="start" fill="var(--probe)"><tspan class="v">L</tspan> = 2,30</text>
+  <line x1="521.4" y1="219.5" x2="521.4" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="521.4" cy="212.5" r="4.6" fill="var(--probe)"/>
+  <text class="sv-m" x="521.4" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,1</text>
+  <text class="sv-m" x="534.4" y="203.5" text-anchor="start" fill="var(--probe)"><tspan class="v">L</tspan> = 0,11</text>
+  <line x1="655.0" y1="200.0" x2="655.0" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="655.0" cy="193.0" r="4.6" fill="var(--probe)"/>
+  <text class="sv-m" x="655.0" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,5</text>
+  <text class="sv-m" x="642.0" y="184.0" text-anchor="end" fill="var(--probe)"><tspan class="v">L</tspan> = 0,69</text>
+  <line x1="788.6" y1="146.7" x2="788.6" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle cx="788.6" cy="139.7" r="4.6" fill="var(--probe)"/>
+  <text class="sv-m" x="788.6" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,9</text>
+  <text class="sv-m" x="775.6" y="130.7" text-anchor="end" fill="var(--probe)"><tspan class="v">L</tspan> = 2,30</text>
+  <text class="sv-d" x="40" y="312" fill="var(--muted)">nhãn là 1, nên p càng gần 1 thì loss càng nhỏ</text>
+  <text class="sv-d" x="480" y="312" fill="var(--muted)">nhãn là 0, nên p càng gần 0 thì loss càng nhỏ</text>
+  </svg>
+    <figcaption>Một mẫu duy nhất, hai trường hợp nhãn. Đoán đúng và chắc thì <span class="mth"><var>L</var></span> gần 0. Lưỡng lự ở 0,5 thì <span class="mth"><var>L</var></span> = 0,69. Sai mà rất chắc thì <span class="mth"><var>L</var></span> vọt lên.</figcaption>
+    </figure>
+
+  <div class="eq">
+      <p class="read"><b>Log loss</b> là <b>trung bình</b> của <span class="mth"><var>L</var></span> vừa vẽ, lấy trên cả <span class="mth"><var>n</var></span> mẫu (còn gọi binary cross-entropy):</p>
+      <div class="line">
+        <span class="t"><span><var>L</var></span></span>
+        <span class="op">=</span>
+        <span class="t p"><span>− <span class="frac"><i>1</i><i><var>n</var></i></span> Σ [ <var>y</var><sub><var>i</var></sub>·<b class="fn">log</b>(<var>p</var><sub><var>i</var></sub>) + (1−<var>y</var><sub><var>i</var></sub>)·<b class="fn">log</b>(1−<var>p</var><sub><var>i</var></sub>) ]</span><em>chỉ một trong hai số hạng sống, tuỳ nhãn 0 hay 1</em></span>
+      </div>
+      <p class="read">Đi ngược lại để biết chỉnh <span class="mth"><var>w</var></span> theo hướng nào — <b>gradient</b>, kết quả rất gọn:</p>
+      <div class="line">
+        <span class="t"><span><span class="frac"><i>∂<var>L</var></i><i>∂<var>w</var><sub><var>j</var></sub></i></span></span></span>
+        <span class="op">=</span>
+        <span class="t g"><span><span class="frac"><i>1</i><i><var>n</var></i></span> Σ (<var>p</var><sub><var>i</var></sub> − <var>y</var><sub><var>i</var></sub>) · <var>x</var><sub><var>ij</var></sub></span><em>giống hệt dạng của linear regression</em></span>
+      </div>
+    </div>
+
+  <dl class="defs">
+    <dt>y</dt><dd>nhãn thật, chỉ nhận 0 hoặc 1</dd>
+    <dt>n</dt><dd>số mẫu trong tập huấn luyện</dd>
+    <dt>L</dt><dd>loss trung bình trên cả tập</dd>
+  </dl>
 
   <ul class="why">
-    <li><b>Khởi tạo đẹp thì hai loss ngang nhau</b> — đó là lý do sai lầm này sống dai. Bắt đầu từ <code>w = 0</code>, sau 2.000 vòng log loss test là 0,2738 còn MSE là 0,2747, độ chính xác đều 88%. Ai thử một lần rồi kết luận "MSE cũng chạy được" là đã dừng ở đúng chỗ không thấy gì.</li>
-    <li><b>Khởi tạo xa thì MSE không ra nổi.</b> Đặt <code>w = ±8</code> — sigmoid bão hoà, mọi mẫu đều nằm ở hai đầu bẹt. Log loss vẫn về đúng 0,2738; MSE sau 2.000 vòng còn 1,0357 và chỉ đạt 86,6%. Nhân tử <code>σ'(z) = p(1−p)</code> bằng khoảng 0,0003 ở đó, nên gradient của MSE gần như bằng 0 ở đúng những mẫu sai nặng nhất.</li>
-    <li>MSE không sai về nguyên tắc — nó chỉ <b>tắt tín hiệu học ở chỗ cần học nhất</b>. Model càng sai càng học chậm là một vòng luẩn quẩn không thoát ra được.</li>
+    <li>Gradient có dạng <span class="mth">(<var>p</var> − <var>y</var>)·<var>x</var></span>, <b>giống hệt</b> gradient của linear regression với MSE.</li>
+    <li>Chỉ thay <span class="mth"><var>ŷ</var></span> bằng <span class="mth"><var>p</var></span>.</li>
+    <li>Không phải trùng hợp: đó là tính chất chung của họ hàm mũ khi dùng hàm liên kết chuẩn.</li>
   </ul>
-
 </section>
 
 <section id="logreg-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Odds ratio — cách diễn giải đúng</h2></div>
+  <div class="sh"><b>05</b><h2>Vì sao không giữ MSE</h2></div>
+  <p class="key">MSE ghép với sigmoid hỏng ở hai chỗ: <em>mặt mất mát có nhiều đáy, và gradient tắt ở đúng mẫu sai nặng nhất</em>.</p>
 
   <figure class="scrollx">
-<svg viewBox="0 0 860 386" role="img" aria-label="bản đồ sáu ý của logistic regression: vì sao không dùng linear, sigmoid và log loss, vì sao không phải MSE, odds ratio, ngưỡng quyết định, và regularization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">① VÌ SAO KHÔNG DÙNG LINEAR</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">đầu ra phải là xác suất</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">② SIGMOID + LOG LOSS</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">ép về (0,1) và phạt đúng cách</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VÌ SAO KHÔNG PHẢI MSE</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">MSE ở đây không lồi, gradient tắt</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="235" fill="var(--filled)">④ ODDS RATIO</text>
-<text class="sv-d" x="13" y="253" fill="var(--muted)">cách đọc hệ số cho đúng</text>
-<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
-<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NGƯỠNG QUYẾT ĐỊNH</text>
-<text class="sv-d" x="13" y="316" fill="var(--dim)">model cho xác suất, ta chọn ngưỡng</text>
-<line x1="170.0" y1="319" x2="170.0" y2="329" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,337 165.8,329 174.2,329" fill="var(--rule-hi)"/>
-<rect x="0" y="341" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="361" fill="var(--dim)">⑥ REGULARIZATION Ở ĐÂY</text>
-<text class="sv-d" x="13" y="379" fill="var(--dim)">và vì sao vẫn là baseline</text>
-<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">ODDS RATIO — ĐỌC CHO ĐÚNG</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">Hệ số β là thay đổi của log-odds</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">không phải thay đổi của xác suất</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">e^β là odds ratio</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">β = 0,7 ⇒ odds nhân đôi khi biến tăng một đơn vị</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--tomb)">Cùng một β, ảnh hưởng lên xác suất khác nhau</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">từ 0,50 lên 0,67 khác hẳn từ 0,98 lên 0,99</text>
-</svg>
-  <figcaption>&#212; &#9315; &#8212; odds ratio &#8212; &#273;&#7885;c cho &#273;&#250;ng.</figcaption>
-  </figure>
-
-<p class="key">Phần tuyến tính <code>w·x + b</code> <em>chính là log-odds</em>. Nên tăng một đơn vị của x thì odds được <b>nhân</b> chứ không phải cộng.</p>
-
-  <div class="eq">
-    <div class="line">
-      <span class="t"><span><b class="fn">log</b></span></span>
-      <span class="t b"><span><span class="frac"><i><var>p</var></i><i>1 − <var>p</var></i></span></span><em>odds — tỉ lệ cược</em></span>
-      <span class="op">=</span>
-      <span class="t"><span><var>w</var>·<var>x</var> + <var>b</var></span></span>
-    </div>
-    <p class="read">Với <code>w = 0,7</code> cho biến "có tiền sử mua hàng": <code>e<sup>0,7</sup> ≈ 2</code> → <b>odds mua lại gấp đôi</b>, khi giữ nguyên các biến khác.</p>
-  </div>
-
-  <p class="key">Nhưng <em>odds gấp đôi không phải xác suất gấp đôi</em> — và mức chênh phụ thuộc xác suất nền:</p>
-
-  <div class="bars">
-    <div class="b"><i>p nền 0,10 → sau khi ×2</i><u style="width:18%"></u><b>0,18 — gần gấp đôi thật</b></div>
-    <div class="b"><i>p nền 0,50 → sau khi ×2</i><u style="width:67%"></u><b>0,67 — không gấp đôi</b></div>
-    <div class="b bad"><i>p nền 0,90 → sau khi ×2</i><u style="width:95%"></u><b>0,95 — nhích rất ít</b></div>
-  </div>
-  <p class="stripnote"><span>cùng một odds ratio bằng 2</span><span><em>xác suất nền càng cao thì đụng trần, tăng càng ít</em></span></p>
+  <svg viewBox="0 0 900 300" role="img" aria-label="Hai chỗ MSE hỏng khi ghép với sigmoid: mặt mất mát của MSE có hai đáy còn log loss chỉ một đáy; và ở một mẫu sai nặng thì gradient của MSE gần bằng không trong khi gradient của log loss vẫn lớn">
+  <text class="sv-hv" x="0" y="18">HAI CHỖ MSE HỎNG KHI GHÉP VỚI SIGMOID</text>
+  <text class="sv-hv" x="30" y="44" fill="var(--tomb)">① Mặt mất mát — cắt dọc theo một hệ số</text>
+  <rect x="30" y="62" width="400" height="210" rx="6" fill="rgba(var(--red-a),.05)" stroke="var(--tomb)" stroke-width="1.4"/>
+  <text class="sv-hv" x="480" y="44" fill="var(--probe)">② Tín hiệu học ở một mẫu sai nặng</text>
+  <rect x="480" y="62" width="400" height="210" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
+  <text class="sv-d" x="46" y="88" fill="var(--tomb)">MSE + sigmoid</text>
+  <polyline points="46.0,109.4 49.1,109.6 52.1,109.8 55.2,110.2 58.3,110.6 61.3,111.1 64.4,111.7 67.5,112.5 70.5,113.3 73.6,114.3 76.7,115.4 79.7,116.7 82.8,118.0 85.9,119.5 88.9,121.1 92.0,122.8 95.1,124.6 98.1,126.4 101.2,128.2 104.3,130.1 107.3,131.8 110.4,133.6 113.5,135.2 116.5,136.6 119.6,137.9 122.7,138.9 125.7,139.8 128.8,140.3 131.9,140.6 134.9,140.6 138.0,140.3 141.1,139.7 144.1,138.8 147.2,137.7 150.3,136.4 153.3,134.9 156.4,133.2 159.5,131.4 162.5,129.5 165.6,127.6 168.7,125.6 171.7,123.7 174.8,121.8 177.9,120.1 180.9,118.4 184.0,116.9 187.1,115.6 190.1,114.5 193.2,113.5 196.3,112.8 199.3,112.3 202.4,112.0 205.5,112.0 208.5,112.1 211.6,112.5 214.7,113.1 217.7,113.9 220.8,115.0 223.9,116.2 226.9,117.6 230.0,119.3 233.1,121.1 236.1,123.0 239.2,125.1 242.3,127.2 245.3,129.5 248.4,131.8 251.5,134.2 254.5,136.5 257.6,138.8 260.7,141.0 263.7,143.1 266.8,145.1 269.9,146.8 272.9,148.4 276.0,149.7 279.1,150.7 282.1,151.4 285.2,151.9 288.3,152.0 291.3,151.8 294.4,151.3 297.5,150.4 300.5,149.3 303.6,147.9 306.7,146.2 309.7,144.4 312.8,142.3 315.9,140.0 318.9,137.6 322.0,135.1 325.1,132.6 328.1,130.0 331.2,127.4 334.3,124.9 337.3,122.4 340.4,120.0 343.5,117.7 346.5,115.5 349.6,113.4 352.7,111.5 355.7,109.7 358.8,108.0 361.9,106.5 364.9,105.2 368.0,103.9 371.1,102.8 374.1,101.8 377.2,101.0 380.3,100.2 383.3,99.5 386.4,98.9 389.5,98.4 392.5,98.0 395.6,97.6 398.7,97.2 401.7,96.9 404.8,96.6 407.9,96.4 410.9,96.2 414.0,96.0" fill="none" stroke="var(--tomb)" stroke-width="2"/>
+  <circle cx="133.2" cy="140.6" r="4.4" fill="var(--tomb)"/>
+  <circle cx="288.0" cy="152.0" r="4.4" fill="var(--tomb)"/>
+  <line x1="46" y1="156" x2="414" y2="156" stroke="var(--rule-hi)" stroke-width="1"/>
+  <text class="sv-d" x="414" y="171" text-anchor="end" fill="var(--muted)">hai đáy · dừng ở đâu là tuỳ nơi bắt đầu</text>
+  <text class="sv-d" x="46" y="186" fill="var(--ok)">log loss</text>
+  <polyline points="46.0,194.0 49.1,195.8 52.1,197.5 55.2,199.3 58.3,200.9 61.3,202.6 64.4,204.3 67.5,205.9 70.5,207.4 73.6,209.0 76.7,210.5 79.7,212.0 82.8,213.5 85.9,214.9 88.9,216.3 92.0,217.7 95.1,219.0 98.1,220.4 101.2,221.6 104.3,222.9 107.3,224.1 110.4,225.4 113.5,226.5 116.5,227.7 119.6,228.8 122.7,229.9 125.7,230.9 128.8,232.0 131.9,233.0 134.9,234.0 138.0,234.9 141.1,235.8 144.1,236.7 147.2,237.6 150.3,238.4 153.3,239.2 156.4,240.0 159.5,240.7 162.5,241.4 165.6,242.1 168.7,242.8 171.7,243.4 174.8,244.0 177.9,244.6 180.9,245.1 184.0,245.6 187.1,246.1 190.1,246.6 193.2,247.0 196.3,247.4 199.3,247.8 202.4,248.1 205.5,248.4 208.5,248.7 211.6,249.0 214.7,249.2 217.7,249.4 220.8,249.6 223.9,249.7 226.9,249.8 230.0,249.9 233.1,250.0 236.1,250.0 239.2,250.0 242.3,250.0 245.3,249.9 248.4,249.8 251.5,249.7 254.5,249.6 257.6,249.4 260.7,249.2 263.7,248.9 266.8,248.7 269.9,248.4 272.9,248.1 276.0,247.7 279.1,247.3 282.1,246.9 285.2,246.5 288.3,246.0 291.3,245.5 294.4,245.0 297.5,244.5 300.5,243.9 303.6,243.3 306.7,242.7 309.7,242.0 312.8,241.3 315.9,240.6 318.9,239.8 322.0,239.0 325.1,238.2 328.1,237.4 331.2,236.5 334.3,235.6 337.3,234.7 340.4,233.8 343.5,232.8 346.5,231.8 349.6,230.7 352.7,229.7 355.7,228.6 358.8,227.4 361.9,226.3 364.9,225.1 368.0,223.9 371.1,222.7 374.1,221.4 377.2,220.1 380.3,218.8 383.3,217.4 386.4,216.0 389.5,214.6 392.5,213.2 395.6,211.7 398.7,210.2 401.7,208.7 404.8,207.1 407.9,205.5 410.9,203.9 414.0,202.3" fill="none" stroke="var(--ok)" stroke-width="2"/>
+  <circle cx="237.4" cy="250.0" r="4.4" fill="var(--ok)"/>
+  <line x1="46" y1="254" x2="414" y2="254" stroke="var(--rule-hi)" stroke-width="1"/>
+  <text class="sv-d" x="414" y="269" text-anchor="end" fill="var(--muted)">một đáy duy nhất · chắc chắn tới</text>
+  <text class="sv-d" x="502" y="82" fill="var(--muted)">sigmoid — hai đầu bẹt</text>
+  <path d="M 502.0 171.8 L 507.7 171.7 L 513.3 171.7 L 519.0 171.6 L 524.7 171.5 L 530.3 171.4 L 536.0 171.3 L 541.7 171.2 L 547.3 171.0 L 553.0 170.8 L 558.7 170.5 L 564.3 170.2 L 570.0 169.8 L 575.7 169.3 L 581.3 168.7 L 587.0 168.0 L 592.7 167.2 L 598.3 166.2 L 604.0 165.0 L 609.7 163.6 L 615.3 162.0 L 621.0 160.1 L 626.7 157.9 L 632.3 155.4 L 638.0 152.6 L 643.7 149.4 L 649.3 146.0 L 655.0 142.2 L 660.7 138.3 L 666.3 134.2 L 672.0 130.0 L 677.7 125.8 L 683.3 121.7 L 689.0 117.8 L 694.7 114.0 L 700.3 110.6 L 706.0 107.4 L 711.7 104.6 L 717.3 102.1 L 723.0 99.9 L 728.7 98.0 L 734.3 96.4 L 740.0 95.0 L 745.7 93.8 L 751.3 92.8 L 757.0 92.0 L 762.7 91.3 L 768.3 90.7 L 774.0 90.2 L 779.7 89.8 L 785.3 89.5 L 791.0 89.2 L 796.7 89.0 L 802.3 88.8 L 808.0 88.7 L 813.7 88.6 L 819.3 88.5 L 825.0 88.4 L 830.7 88.3 L 836.3 88.3 L 842.0 88.2" fill="none" stroke="var(--filled)" stroke-width="2"/>
+  <line x1="502" y1="172" x2="842" y2="172" stroke="var(--rule-hi)" stroke-width="1"/>
+  <circle cx="818.2" cy="88.8" r="5" fill="var(--tomb)"/>
+  <text class="sv-m" x="808.2" y="80.8" text-anchor="end" fill="var(--tomb)"><tspan class="v">p</tspan> = 0,999 · <tspan class="v">y</tspan> = 0</text>
+  <text class="sv-d" x="842" y="188" text-anchor="end" fill="var(--muted)">đuôi bẹt — sigmoid gần như không đổi</text>
+  <text class="sv-d" x="502" y="212" fill="var(--muted)">gradient nhận được ở đúng mẫu đó</text>
+  <text class="sv-d" x="502" y="235" fill="var(--tomb)">MSE</text>
+  <rect x="576" y="226" width="4" height="12" rx="2" fill="var(--tomb)"/>
+  <text class="sv-d" x="588" y="235" fill="var(--muted)">≈ 0,0003 — gần như không học</text>
+  <text class="sv-d" x="502" y="257" fill="var(--ok)">log loss</text>
+  <rect x="576" y="248" width="200" height="12" rx="2" fill="var(--ok)"/>
+  <text class="sv-d" x="784" y="257" fill="var(--muted)">≈ 1 — học mạnh</text>
+  </svg>
+      <figcaption>Cùng một tập dữ liệu, chỉ đổi công thức loss.</figcaption>
+    </figure>
 
   <ul class="why">
-    <li>Nói với người không chuyên thì <b>quy về xác suất tại một mức nền cụ thể</b>, đừng nói odds ratio trần trụi.</li>
+    <li><b>Đáy.</b> Gradient descent dừng ở đáy đầu tiên gặp. MSE có nhiều đáy nên dừng ở đâu là tuỳ nơi bắt đầu.</li>
+    <li><b>Tín hiệu.</b> Gradient của MSE mang thêm nhân tử <span class="mth"><var>p</var>(1−<var>p</var>)</span>. Mẫu sai nặng có <span class="mth"><var>p</var></span> sát 0 hoặc sát 1, nhân tử đó gần 0.</li>
+    <li>Công thức log loss ở mục trước được dựng để khử đúng nhân tử đó.</li>
+    <li>MSE không sai về nguyên tắc. Nó chỉ <b class="hl">tắt tín hiệu học ở chỗ cần học nhất</b>.</li>
   </ul>
+
+  <figure>
+      <table>
+        <tr><th>Khởi tạo</th><th>Loss</th><th>Sau 2.000 vòng</th></tr>
+        <tr><td rowspan="2">gần 0</td><td>log loss</td><td>0,2738</td></tr>
+        <tr><td>MSE</td><td>0,2747</td></tr>
+        <tr><td rowspan="2">xa — <span class="mth"><var>w</var> = ±8</span></td><td>log loss</td><td><b>0,2738</b></td></tr>
+        <tr><td>MSE</td><td><b>1,0357</b></td></tr>
+      </table>
+      <figcaption>800 mẫu, cùng learning rate. Khởi tạo gần 0 thì hai loss ngang nhau, độ chính xác đều 88%. Khởi tạo xa thì sigmoid bão hoà và MSE không ra nổi.</figcaption>
+    </figure>
 </section>
 
 <section id="logreg-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lab: ngưỡng quyết định</h2></div>
+  <div class="sh"><b>06</b><h2>Odds ratio — cách đọc hệ số</h2></div>
+  <p class="key">Phần tuyến tính <span class="mth"><var>w</var>·<var>x</var> + <var>b</var></span> <em>chính là log-odds</em>. Nên tăng một đơn vị của <span class="mth"><var>x</var></span> thì odds được <b>nhân</b>, không phải cộng.</p>
 
   <figure class="scrollx">
-<svg viewBox="0 0 860 386" role="img" aria-label="bản đồ sáu ý của logistic regression: vì sao không dùng linear, sigmoid và log loss, vì sao không phải MSE, odds ratio, ngưỡng quyết định, và regularization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">① VÌ SAO KHÔNG DÙNG LINEAR</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">đầu ra phải là xác suất</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">② SIGMOID + LOG LOSS</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">ép về (0,1) và phạt đúng cách</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VÌ SAO KHÔNG PHẢI MSE</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">MSE ở đây không lồi, gradient tắt</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">④ ODDS RATIO</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cách đọc hệ số cho đúng</text>
-<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
-<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="298" fill="var(--ok)">⑤ NGƯỠNG QUYẾT ĐỊNH</text>
-<text class="sv-d" x="13" y="316" fill="var(--muted)">model cho xác suất, ta chọn ngưỡng</text>
-<line x1="170.0" y1="319" x2="170.0" y2="329" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,337 165.8,329 174.2,329" fill="var(--rule-hi)"/>
-<rect x="0" y="341" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="361" fill="var(--dim)">⑥ REGULARIZATION Ở ĐÂY</text>
-<text class="sv-d" x="13" y="379" fill="var(--dim)">và vì sao vẫn là baseline</text>
-<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">NGƯỠNG — VIỆC CỦA TA, KHÔNG CỦA MODEL</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--ok)">Model xuất xác suất, ngưỡng do ta đặt</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">0,5 chỉ là mặc định, không phải chân lý</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">Đặt theo chi phí hai loại sai</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">bỏ sót ung thư đắt hơn báo động nhầm</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--filled)">Đổi ngưỡng không đổi model</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">không phải train lại, chỉ là đọc đầu ra khác đi</text>
-</svg>
-  <figcaption>&#212; &#9316; &#8212; ng&#432;&#7905;ng l&#224; vi&#7879;c c&#7911;a ta.</figcaption>
-  </figure>
+  <svg viewBox="0 0 900 278" role="img" aria-label="Odds là số người mua chia số người không mua, khác với xác suất là số người mua chia tổng; và cùng một odds ratio bằng hai thì xác suất nền càng cao càng tăng ít">
+  <text class="sv-hv" x="0" y="18">ODDS LÀ GÌ · CÙNG MỘT ODDS RATIO NHƯNG XÁC SUẤT ĐỔI KHÁC NHAU</text>
+  <text class="sv-hv" x="30" y="40" fill="var(--filled)">① 100 khách · 30 người mua lại</text>
+  <rect x="30" y="56" width="400" height="212" rx="6" fill="rgba(var(--blue-a),.05)" stroke="var(--filled)" stroke-width="1.4"/>
+  <text class="sv-hv" x="480" y="40" fill="var(--probe)">② Odds nhân đôi — xác suất tăng bao nhiêu</text>
+  <rect x="480" y="56" width="400" height="212" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
+  <rect x="54" y="86" width="105.6" height="30" rx="3" fill="var(--ok)"/>
+  <rect x="159.6" y="86" width="246.4" height="30" rx="3" fill="var(--rule-hi)"/>
+  <text class="sv-m" x="106.8" y="106" text-anchor="middle" fill="#14110E">30</text>
+  <text class="sv-m" x="282.8" y="106" text-anchor="middle" fill="var(--muted)">70</text>
+  <text class="sv-d" x="54" y="78" fill="var(--ok)">mua lại</text>
+  <text class="sv-d" x="406" y="78" text-anchor="end" fill="var(--muted)">không mua lại</text>
+  <path d="M 54 132 v 8 H 406 v -8" fill="none" stroke="var(--filled)" stroke-width="1.4"/>
+  <text class="sv-m" x="230" y="158" text-anchor="middle" fill="var(--filled)">xác suất = 30 trên cả 100 = 0,30</text>
+  <path d="M 54 176 v 8 H 159.6 v -8" fill="none" stroke="var(--probe)" stroke-width="1.4"/>
+  <path d="M 159.6 176 v 8 H 406 v -8" fill="none" stroke="var(--probe)" stroke-width="1.4"/>
+  <text class="sv-m" x="230" y="202" text-anchor="middle" fill="var(--probe)">odds = 30 so với 70 = 0,43</text>
+  <text class="sv-d" x="230" y="220" text-anchor="middle" fill="var(--muted)">odds so hai phần với nhau, không so với tổng</text>
+  <text class="sv-m" x="502" y="91" fill="var(--muted)">0,10</text>
+  <rect x="540" y="82" width="25.0" height="11" rx="2" fill="var(--rule-hi)"/>
+  <rect x="540" y="97" width="45.0" height="11" rx="2" fill="var(--probe)"/>
+  <text class="sv-m" x="593.0" y="106" fill="var(--probe)">0,18</text>
+  <text class="sv-m" x="502" y="139" fill="var(--muted)">0,50</text>
+  <rect x="540" y="130" width="125.0" height="11" rx="2" fill="var(--rule-hi)"/>
+  <rect x="540" y="145" width="167.5" height="11" rx="2" fill="var(--probe)"/>
+  <text class="sv-m" x="715.5" y="154" fill="var(--probe)">0,67</text>
+  <text class="sv-m" x="502" y="187" fill="var(--muted)">0,90</text>
+  <rect x="540" y="178" width="225.0" height="11" rx="2" fill="var(--rule-hi)"/>
+  <rect x="540" y="193" width="237.5" height="11" rx="2" fill="var(--probe)"/>
+  <text class="sv-m" x="785.5" y="202" fill="var(--probe)">0,95</text>
+  <text class="sv-d" x="502" y="254" fill="var(--muted)">nền càng cao càng đụng trần 1, tăng càng ít</text>
+  </svg>
+      <figcaption>Xác suất so với tổng. Odds so hai phần với nhau.</figcaption>
+    </figure>
 
-  <p>Model cho ra xác suất; <strong>ngưỡng là quyết định nghiệp vụ</strong>, không phải tham số của model. Kéo ngưỡng để xem precision và recall đánh đổi nhau.</p>
-  <div class="lab">
-    <div class="bar">
-      <div><label>ngưỡng</label><input type="number" id="thr" value="0.5" step="0.05" min="0" max="1"></div>
-      <div><label>tình huống</label>
-        <select id="tcase">
-          <option value="balanced" selected>cân bằng — 50/50</option>
-          <option value="rare">lớp dương hiếm — 10%</option>
-        </select>
+  <div class="eq">
+      <div class="line">
+        <span class="t"><span><b class="fn">log</b> <b class="par">(</b></span></span>
+        <span class="t b"><span><span class="frac"><i><var>p</var></i><i>1 − <var>p</var></i></span></span><em>odds</em></span>
+        <span class="t"><span><b class="par">)</b></span></span>
+        <span class="op">=</span>
+        <span class="t p"><span><var>w</var>·<var>x</var> + <var>b</var></span><em>log-odds</em></span>
+      </div>
+      <div class="line">
+        <span class="t g"><span><b class="fn">e</b><sup><var>w</var></sup></span><em>odds ratio</em></span>
+        <span class="op">=</span>
+        <span class="t"><span>odds nhân lên mấy lần khi <var>x</var> tăng 1</span></span>
       </div>
     </div>
-    <div id="thrview"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
-      Hạ ngưỡng xuống 0.2: bắt được gần hết ca dương (recall cao) nhưng báo sai nhiều (precision thấp) — hợp cho sàng lọc bệnh.<br>
-      Nâng lên 0.8: chỉ báo khi rất chắc — hợp khi báo sai gây tốn kém.<br>
-      Chuyển sang tình huống <strong>lớp dương hiếm</strong> để thấy accuracy trở nên vô nghĩa.
-    </p>
-  </div>
-</section>
 
+  <dl class="defs">
+    <dt>odds</dt><dd>số ca xảy ra chia số ca không xảy ra</dd>
+    <dt>log-odds</dt><dd>logarit của odds, đúng bằng phần tuyến tính</dd>
+    <dt>odds ratio</dt><dd>odds bị nhân lên mấy lần khi <span class="mth"><var>x</var></span> tăng một đơn vị</dd>
+  </dl>
+
+  <div class="note">
+      <h4>Ví dụ — vẫn khách hàng đó</h4>
+      <p>Biến "có tiền sử mua hàng" có hệ số <span class="mth"><var>w</var> = 0,7</span>. Khách này chưa từng mua, xác suất mua lại <span class="mth"><var>p</var> = 0,30</span>. Giờ biết khách <b>đã từng mua</b>.</p>
+      <div class="flow">
+        <div class="n"><h5>log-odds = −0,85</h5><p>vế phải công thức, tính từ <span class="mth"><var>p</var> = 0,30</span></p></div>
+        <div class="a act"><i>cộng w = 0,7</i>→</div>
+        <div class="n"><h5>log-odds = −0,15</h5><p>bên log-odds thì hệ số <b>cộng</b> vào</p></div>
+      </div>
+      <div class="flow">
+        <div class="n"><h5>odds 0,43 → 0,86</h5><p>bỏ log ra thì thành <b>nhân</b> với <span class="mth"><b class="fn">e</b><sup>0,7</sup> ≈ 2</span> — đúng odds ratio</p></div>
+        <div class="a act"><i>đổi về xác suất</i>→</div>
+        <div class="n ok"><h5>p = 0,30 → 0,46</h5><p>odds gấp đôi nhưng xác suất chỉ lên 0,46</p></div>
+      </div>
+      <p>Cộng ở thang log-odds, nhân ở thang odds, và ở thang xác suất thì không có phép nào gọn cả. Nói với người không chuyên thì bỏ hai thang đầu, chỉ nói <b>"từ 30% lên 46%"</b>.</p>
+    </div>
+</section>
 
 <section id="logreg-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Regularization ở đây khác gì</h2></div>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 386" role="img" aria-label="bản đồ sáu ý của logistic regression: vì sao không dùng linear, sigmoid và log loss, vì sao không phải MSE, odds ratio, ngưỡng quyết định, và regularization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">① VÌ SAO KHÔNG DÙNG LINEAR</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">đầu ra phải là xác suất</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">② SIGMOID + LOG LOSS</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">ép về (0,1) và phạt đúng cách</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VÌ SAO KHÔNG PHẢI MSE</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">MSE ở đây không lồi, gradient tắt</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">④ ODDS RATIO</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cách đọc hệ số cho đúng</text>
-<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
-<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NGƯỠNG QUYẾT ĐỊNH</text>
-<text class="sv-d" x="13" y="316" fill="var(--dim)">model cho xác suất, ta chọn ngưỡng</text>
-<line x1="170.0" y1="319" x2="170.0" y2="329" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,337 165.8,329 174.2,329" fill="var(--rule-hi)"/>
-<rect x="0" y="341" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="361" fill="var(--ok)">⑥ REGULARIZATION Ở ĐÂY</text>
-<text class="sv-d" x="13" y="379" fill="var(--muted)">và vì sao vẫn là baseline</text>
-<line x1="340" y1="361.5" x2="372" y2="361.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">REGULARIZATION VÀ VÌ SAO VẪN SỐNG</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">L2 kéo hệ số về gần 0, L1 đẩy hẳn về 0</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">giống ridge/lasso, chỉ khác loss nền</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--tomb)">Không có regularization, dữ liệu tách được thì hệ số chạy ra vô cực</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">nên sklearn bật L2 mặc định</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">Vẫn là baseline vì đọc được và cho xác suất hiệu chuẩn tốt</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">hai thứ mà model mạnh hơn thường mất</text>
-</svg>
-  <figcaption>&#212; &#9317; &#8212; regularization v&#224; v&#236; sao v&#7851;n s&#7889;ng.</figcaption>
-  </figure>
-
-  <div class="cmp two">
-    <div><h5>Giữ nguyên từ Ridge &amp; Lasso</h5>
-      <p><b>Cơ chế L1 / L2</b> không đổi một chút nào.</p>
-      <p><b>Vẫn phải chuẩn hoá</b> — hình phạt tính trên độ lớn hệ số, mà hệ số phụ thuộc thang đo.</p>
-      <p>Vì sao vùng phạt hình thoi ép hệ số về đúng 0 còn hình tròn thì không: <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>.</p></div>
-    <div><h5>Khác khi áp lên logistic</h5>
-      <p><b>Thư viện bật sẵn.</b> <code>LogisticRegression</code> mặc định có L2, và <code>C</code> là <b>nghịch đảo</b> của <code>λ</code> — <code>C</code> nhỏ là phạt mạnh.</p>
-      <p><b>Chia tách hoàn hảo.</b> Một đặc trưng tách hai lớp tuyệt đối thì hệ số chạy ra vô cực; chỉ regularization chặn được.</p></div>
-  </div>
-</section>
-
-<section id="logreg-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Ưu và nhược</h2></div>
-
-  <p class="key">Mọi ưu điểm của logistic regression đến từ <em>một đường thẳng ép qua sigmoid</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
-
-  <table>
-    <tr><th>Mặt</th><th>Ưu</th><th>Nhược</th></tr>
-    <tr><td>Đầu ra</td><td>Xác suất đã hiệu chỉnh sẵn, dùng thẳng để xếp hạng hay đặt ngưỡng</td><td>&#8212;</td></tr>
-    <tr><td>Diễn giải</td><td>Mỗi hệ số là một odds ratio, nói được thành lời</td><td>&#8212;</td></tr>
-    <tr><td>Huấn luyện</td><td>Loss lồi nên chỉ có một đáy, chạy nhanh trên triệu dòng thưa</td><td>&#8212;</td></tr>
-    <tr><td>Ranh giới</td><td>&#8212;</td><td>Chỉ là một hyperplane &#8212; quan hệ cong phải tự tạo đặc trưng</td></tr>
-    <tr><td>Tương tác</td><td>&#8212;</td><td>Không tự bắt được, phải khai bằng tay</td></tr>
-    <tr><td>Chuẩn bị</td><td>&#8212;</td><td>Cần chuẩn hoá thang đo và mã hoá biến phân loại</td></tr>
-  </table>
+  <div class="sh"><b>07</b><h2>Lab: ngưỡng quyết định</h2></div>
+  <p class="key">Model dừng lại ở xác suất. <em>Ngưỡng là quyết định nghiệp vụ, không phải tham số của model</em>.</p>
+  <p>Cùng một bộ xác suất, chỉ đổi ngưỡng cắt. Xem precision và recall đánh đổi nhau.</p>
+  <div class="lab">
+      <div class="bar">
+        <div><label>ngưỡng cắt</label><input type="number" id="thr" value="0.5" step="0.05" min="0" max="1"></div>
+      </div>
+      <div id="thrview"></div>
+    </div>
 
   <ul class="why">
-    <li>Luôn chạy nó <b>đầu tiên làm mốc</b>: model phức tạp không thắng nổi mốc này thì vấn đề nằm ở dữ liệu chứ không ở model.</li>
-    <li>Chọn nó khi cần <b>xác suất tin được</b> và <b>giải thích được từng đặc trưng</b>: chấm điểm tín dụng, đánh giá rủi ro, lọc thư rác.</li>
-    <li>Cần độ chính xác cuối trên dữ liệu bảng thì <a href="../../06-tree-models/xgboost/index.html">boosting</a> thắng &#8212; nhưng xác suất của nó thường phải <a href="../../09-evaluation/calibration/index.html">hiệu chỉnh</a> lại.</li>
-    <li>Ý tưởng còn lại: <b>ép một con số bất kỳ về khoảng 0&#8211;1 bằng sigmoid</b> &#8212; đúng lớp cuối của mọi mạng phân loại nhị phân.</li>
+    <li><b>Hạ xuống 0,2</b> — bắt gần hết ca dương, recall cao, nhưng báo sai nhiều.</li>
+    <li><b>Nâng lên 0,8</b> — chỉ báo khi rất chắc, hợp khi báo sai gây tốn kém.</li>
+    <li>Không có ngưỡng nào đúng sẵn. Chọn theo <b class="hl">chi phí của hai loại lỗi</b>.</li>
   </ul>
 </section>
 
-<section id="logreg-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
-  <div class="grid2">
-    <div class="card bad"><h4>Dùng MSE cho bài phân loại</h4><p>Mặt mất mát không lồi, và gradient triệt tiêu ở đúng mẫu sai nặng nhất.</p></div>
-    <div class="card bad"><h4>Diễn giải odds ratio thành xác suất</h4><p>"Odds gấp đôi" không phải "xác suất gấp đôi" — chênh lệch rất lớn khi p đã cao.</p></div>
-    <div class="card bad"><h4>Coi ngưỡng 0.5 là mặc định đúng</h4><p>Ngưỡng là quyết định nghiệp vụ. Với dữ liệu lệch thì 0.5 gần như luôn sai.</p></div>
-    <div class="card bad"><h4>Tưởng sigmoid làm model phi tuyến</h4><p>Ranh giới quyết định vẫn là mặt phẳng. Muốn cong thì phải tự thêm đặc trưng bậc cao.</p></div>
-    <div class="card bad"><h4>Quên rằng thư viện đã bật L2 sẵn</h4><p>Báo cáo hệ số "thuần" trong khi chúng đã bị co lại — và <code>C</code> là nghịch đảo của <code>λ</code>.</p></div>
-    <div class="card bad"><h4>Nói hệ số là nhân quả</h4><p>Nó là quan hệ trong dữ liệu quan sát được, không phải hiệu quả của can thiệp.</p></div>
+<section id="logreg-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Regularization</h2></div>
+  <p class="key">Cơ chế L1 và L2 giữ nguyên từ Ridge và Lasso, <em>chỉ đổi loss nền từ MSE sang log loss</em>.</p>
+
+  <div class="cmp two">
+    <div><h5>Giữ nguyên từ Ridge &amp; Lasso</h5>
+      <p>Vùng phạt hình thoi ép hệ số về đúng 0.</p>
+      <p>Hình tròn thì chỉ co nhỏ lại.</p>
+      <p>Vẫn phải chuẩn hoá thang đo trước khi fit.</p>
+      <p>Chi tiết ở <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>.</p></div>
+    <div><h5>Chỉ gặp ở logistic</h5>
+      <p><code>LogisticRegression</code> bật sẵn L2.</p>
+      <p>Tham số là <span class="mth"><var>C</var></span>, nghịch đảo của <span class="mth"><var>λ</var></span>.</p>
+      <p>Nên <span class="mth"><var>C</var></span> càng nhỏ thì phạt càng mạnh.</p>
+      <p>Một đặc trưng tách hai lớp tuyệt đối thì hệ số chạy ra vô cực. Chỉ regularization chặn được.</p></div>
   </div>
 </section>
 
+<section id="logreg-s9" class="lesson">
+  <div class="sh"><b>09</b><h2>Ưu và nhược</h2></div>
+  <p class="key">Mọi ưu điểm của logistic regression đến từ <em>một đường thẳng ép qua sigmoid</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
+
+  <table>
+      <tr><th>Mặt</th><th>Ưu</th><th>Nhược</th></tr>
+      <tr><td>Đầu ra</td><td>Xác suất đã hiệu chỉnh sẵn, dùng thẳng để xếp hạng hay đặt ngưỡng</td><td>&#8212;</td></tr>
+      <tr><td>Diễn giải</td><td>Mỗi hệ số là một odds ratio, nói được thành lời</td><td>&#8212;</td></tr>
+      <tr><td>Huấn luyện</td><td>Loss lồi nên chỉ có một đáy, chạy nhanh trên triệu dòng thưa</td><td>&#8212;</td></tr>
+      <tr><td>Ranh giới</td><td>&#8212;</td><td>Chỉ là một hyperplane &#8212; quan hệ cong phải tự tạo đặc trưng</td></tr>
+      <tr><td>Tương tác</td><td>&#8212;</td><td>Không tự bắt được, phải khai bằng tay</td></tr>
+      <tr><td>Chuẩn bị</td><td>&#8212;</td><td>Cần chuẩn hoá thang đo và mã hoá biến phân loại</td></tr>
+    </table>
+
+  <ul class="why">
+    <li>Ranh giới cong thì phải <b>tự tạo đặc trưng</b> bậc cao hoặc tương tác.</li>
+    <li>Đó cũng là chỗ tree model không cần làm gì thêm.</li>
+  </ul>
+</section>
+
 <section id="logreg-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>10</b><h2>Chọn khi nào</h2></div>
+  <p class="key">Chọn theo <em>thứ bài toán đòi hỏi</em>, không theo độ mạnh của model.</p>
 
+  <div class="stack">
+      <div class="s ok"><b>Baseline &#183; luôn chạy đầu tiên</b><span>model phức tạp không thắng nổi mốc này thì vấn đề nằm ở dữ liệu, không ở model</span></div>
+      <div class="s"><b>Cần xác suất tin được</b><span>xác suất đã hiệu chỉnh sẵn, dùng thẳng để xếp hạng hay đặt ngưỡng</span></div>
+      <div class="s"><b>Cần giải thích từng đặc trưng</b><span>chấm điểm tín dụng, đánh giá rủi ro, lọc thư rác &#8212; nơi có yêu cầu pháp lý phải giải thích</span></div>
+      <div class="s"><b>Độ trễ rất thấp</b><span>suy luận chỉ là một phép nhân vector, chạy được trên triệu dòng thưa</span></div>
+      <div class="s bad"><b>Cần độ chính xác cuối trên dữ liệu bảng</b><span>chuyển sang <a href="../../06-tree-models/xgboost/index.html">boosting</a>, rồi <a href="../../09-evaluation/calibration/index.html">hiệu chỉnh</a> xác suất của nó lại</span></div>
+    </div>
+
+  <ul class="why">
+    <li>Ý tưởng còn sống ngoài bài này: <b class="hl">ép một số bất kỳ về khoảng 0–1 bằng sigmoid</b>.</li>
+    <li>Đó đúng là lớp cuối của mọi mạng phân loại nhị phân.</li>
+  </ul>
+</section>
+
+<section id="logreg-s11" class="lesson">
+  <div class="sh"><b>11</b><h2>Lỗi hay gặp</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Diễn giải odds ratio thành xác suất</h4><p>"Odds gấp đôi" không phải "xác suất gấp đôi" — chênh lệch rất lớn khi p đã cao.</p></div>
+    <div class="card bad"><h4>Coi ngưỡng 0.5 là mặc định đúng</h4><p>Ngưỡng là quyết định nghiệp vụ. Với dữ liệu lệch thì 0.5 gần như luôn sai.</p></div>
+    <div class="card bad"><h4>Tưởng sigmoid làm model phi tuyến</h4><p>Ranh giới quyết định vẫn là mặt phẳng. Muốn cong thì phải tự thêm đặc trưng bậc cao.</p></div>
+    <div class="card bad"><h4>Quên rằng thư viện đã bật L2 sẵn</h4><p>Báo cáo hệ số "thuần" trong khi chúng đã bị co lại. Và <span class="mth"><var>C</var></span> là nghịch đảo của <span class="mth"><var>λ</var></span>.</p></div>
+    <div class="card bad"><h4>Nói hệ số là nhân quả</h4><p>Nó là quan hệ trong dữ liệu quan sát được, không phải hiệu quả của can thiệp.</p></div>
+    <div class="card bad"><h4>Quên chuẩn hoá thang đo</h4><p>Hình phạt tính trên độ lớn hệ số, mà hệ số phụ thuộc đơn vị của đặc trưng.</p></div>
+  </div>
+</section>
+
+<section id="logreg-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Hỏi đáp</h2></div>
   <details class="qa"><summary>Vì sao logistic regression dùng log loss chứ không phải MSE?</summary>
-  <p>Hai lý do. Thứ nhất, MSE ghép với sigmoid tạo ra mặt mất mát không lồi theo trọng số, nên gradient descent có thể mắc ở cực tiểu địa phương; log loss thì lồi. Thứ hai và quan trọng hơn: gradient của MSE có nhân tử <code>σ'(z) = p(1−p)</code>, giá trị này gần 0 khi model dự đoán rất sai — nên đúng ở những mẫu sai nặng nhất thì tín hiệu học lại bị triệt tiêu. Log loss triệt tiêu chính nhân tử đó, cho gradient gọn là <code>(p − y)·x</code>. Nhìn từ góc thống kê, log loss là âm log-likelihood của Bernoulli, nên tối thiểu hoá nó chính là MLE.</p></details>
-
-  <details class="qa"><summary>Vì sao không gán nhãn 0/1 rồi fit thẳng linear regression?</summary>
-  <p>Ba vấn đề. Đầu ra không bị chặn trong [0, 1] nên không diễn giải được thành xác suất — có thể ra 1.7 hoặc −0.4. MSE giả định phần dư phân phối chuẩn, còn nhãn nhị phân theo Bernoulli, sai giả định ngay từ gốc. Và một điểm ở rất xa sẽ kéo cả đường thẳng, làm đổi ranh giới quyết định cho những điểm ở giữa — dù chính nó mới là điểm dễ phân loại nhất.</p></details>
+  <p>Hai lý do.</p>
+  <p>Thứ nhất là mặt mất mát. MSE ghép với sigmoid cho mặt không lồi, gradient descent mắc ở cực tiểu địa phương. Log loss thì lồi.</p>
+  <p>Thứ hai quan trọng hơn, là tín hiệu học. Gradient của MSE có nhân tử <span class="mth"><var>σ</var>′(<var>z</var>) = <var>p</var>(1−<var>p</var>)</span>.</p>
+  <p>Nhân tử đó gần 0 khi model đoán rất sai. Nên ở đúng mẫu sai nặng nhất thì tín hiệu học bị triệt tiêu.</p>
+  <p>Log loss được dựng để khử chính nhân tử đó, cho gradient gọn là <span class="mth">(<var>p</var> − <var>y</var>)·<var>x</var></span>.</p>
+  <p>Nhìn từ góc thống kê, log loss là âm log-likelihood của Bernoulli. Tối thiểu hoá nó chính là MLE.</p></details>
 
   <details class="qa"><summary>Giải thích hệ số logistic regression cho người không chuyên.</summary>
-  <p>Phần tuyến tính <code>w·x + b</code> chính là log-odds, nên tăng một đơn vị của biến làm odds được <b>nhân</b> với <code>e^w</code>. Với <code>w = 0.7</code> thì <code>e^0.7 ≈ 2</code>, tức odds gấp đôi khi giữ nguyên các biến khác. Điểm phải cẩn thận là odds không phải xác suất: cùng một odds ratio bằng 2 làm xác suất từ 0.1 lên 0.18 nhưng chỉ từ 0.9 lên 0.95. Nên khi trình bày cho người không chuyên, tôi thường quy về xác suất tại một mức nền cụ thể thay vì nói odds ratio.</p></details>
+  <p>Phần tuyến tính <span class="mth"><var>w</var>·<var>x</var> + <var>b</var></span> chính là log-odds.</p>
+  <p>Nên tăng một đơn vị của biến làm odds được <b>nhân</b> với <span class="mth"><b class="fn">e</b><sup><var>w</var></sup></span>, không phải cộng.</p>
+  <p>Với <span class="mth"><var>w</var> = 0,7</span> thì <span class="mth"><b class="fn">e</b><sup>0,7</sup> ≈ 2</span>, tức odds gấp đôi khi giữ nguyên các biến khác.</p>
+  <p>Điểm phải cẩn thận là odds không phải xác suất.</p>
+  <p>Cùng odds ratio bằng 2 làm xác suất từ 0,1 lên 0,18, nhưng chỉ từ 0,9 lên 0,95.</p>
+  <p>Nên với người không chuyên thì quy về xác suất tại một mức nền cụ thể, đừng nói odds ratio trần trụi.</p></details>
 
   <details class="qa"><summary>Chọn ngưỡng thế nào?</summary>
-  <p>Ngưỡng <b>không phải tham số của model</b> — model chỉ cho xác suất, ngưỡng là quyết định nghiệp vụ dựa trên chi phí của hai loại lỗi. Sàng lọc bệnh thì bỏ sót đắt hơn báo nhầm, nên hạ ngưỡng để được recall cao. Chặn giao dịch thì báo nhầm làm phiền khách, nên nâng ngưỡng. Cách làm là quét ngưỡng trên tập validation, vẽ precision–recall và chọn điểm khớp với chi phí thật. Với lớp dương hiếm thì accuracy vô nghĩa — phải nhìn PR-AUC.</p></details>
-
-  <details class="qa"><summary>Sigmoid có làm model phi tuyến không?</summary>
-  <p>Không. <b>Ranh giới quyết định vẫn là một mặt phẳng tuyến tính</b> trong không gian đặc trưng — sigmoid chỉ biến điểm số thành xác suất, nó đơn điệu nên không đổi được chỗ <code>z = 0</code>. Muốn ranh giới cong thì phải tự thêm đặc trưng bậc cao hoặc đặc trưng tương tác.</p></details>
+  <p>Ngưỡng <b>không phải tham số của model</b>. Model chỉ cho xác suất.</p>
+  <p>Ngưỡng là quyết định nghiệp vụ, dựa trên chi phí của hai loại lỗi.</p>
+  <p>Sàng lọc bệnh thì bỏ sót nặng hơn báo nhầm, nên hạ ngưỡng để được recall cao.</p>
+  <p>Chặn giao dịch thì báo nhầm làm phiền khách, nên nâng ngưỡng.</p>
+  <p>Cách làm là quét ngưỡng trên tập validation, vẽ precision–recall, chọn điểm khớp chi phí thật.</p>
+  <p>Với lớp dương hiếm thì accuracy vô nghĩa, phải nhìn PR-AUC.</p></details>
 
   <details class="qa"><summary>Vì sao vẫn dùng logistic regression khi đã có boosting và deep learning?</summary>
-  <p>Vì bốn thứ nó vẫn thắng: diễn giải được từng hệ số — bắt buộc ở tài chính và y tế nơi có yêu cầu pháp lý phải giải thích quyết định; xác suất được hiệu chỉnh tốt sẵn, không cần bước calibration; suy luận chỉ là một phép nhân vector nên phù hợp ràng buộc độ trễ rất thấp; và nó là mốc so sánh — nếu model phức tạp không thắng nổi nó thì vấn đề nằm ở dữ liệu hoặc đặc trưng chứ không ở model. Tôi luôn dựng nó làm baseline trước khi thử gì phức tạp hơn.</p></details>
+  <p>Vì bốn thứ nó vẫn thắng.</p>
+  <p>Diễn giải được từng hệ số. Tài chính và y tế có yêu cầu pháp lý phải giải thích quyết định.</p>
+  <p>Xác suất được hiệu chỉnh tốt sẵn, không cần bước calibration.</p>
+  <p>Suy luận chỉ là một phép nhân vector, hợp với ràng buộc độ trễ rất thấp.</p>
+  <p>Và nó là mốc so sánh. Model phức tạp không thắng nổi nó thì vấn đề nằm ở dữ liệu, không ở model.</p>
+  <p>Nên luôn dựng nó làm baseline trước khi thử gì phức tạp hơn.</p></details>
 </section>
 
 <footer>Machine learning · Classical models · công thức viết theo quy ước một mẫu, bỏ chỉ số batch cho gọn. Phần dự đoán số nằm ở bài <a href="../linear-regression/index.html">Linear regression</a>.</footer>

@@ -3,7 +3,7 @@ name: khuon-eq-cong-thuc
 description: "Vì sao MazeAI chọn khuôn .eq thay vì KaTeX; dáng LaTeX phải phủ cả ba chỗ (.eq display · .mth trong văn xuôi · sv-m trong SVG); ranh giới .eq vs <pre> và <code> vs .mth; quy ước vẽ đường cong bằng SVG"
 metadata:
   type: feedback
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 Ngày 2026-09-03 chốt: công thức display trong kho dùng khuôn HTML `.eq` (khuôn thứ 9 trong
@@ -71,6 +71,11 @@ Nên chỉ đổi dáng, theo đúng luật sắp chữ của TeX:
 | chú thích số hạng | `<em>` trong `.t` | giữ nguyên — thứ LaTeX không có |
 
 Chữ số để nguyên, KHÔNG bọc `<var>` — TeX cũng in số đứng.
+
+**Có phân số thì phải xuống dòng thành `.frac`, kể cả khi viết một dòng vẫn đọc được.** 2026-09-09
+người dùng nhắc lại vế này ở `naive-bayes`: định lý Bayes đang là bốn số hạng nối bằng `·` và `/`
+trên một dòng. Đúng là `.frac` một tử `P(x|c)·P(c)` trên mẫu `P(x)`. Dấu `/` giữa hai số hạng luôn
+là dấu hiệu còn nợ `.frac` — grep `<span class="op">/</span>` để tìm.
 
 `.frac` canh `vertical-align:middle`, `.eq .line` canh `align-items:center`. Canh theo
 baseline thì `max` treo lên trên còn phân số tụt xuống — đã dính đúng lỗi này một lượt.
