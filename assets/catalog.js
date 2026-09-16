@@ -1435,10 +1435,10 @@ window.CATALOG = [
       "title": "Decision tree",
       "tag": "ML",
       "blurb": "Đọc một cây, máy chọn câu hỏi ra sao, Gini và information gain, vì sao cây học thuộc dữ liệu, và ba hyperparameter để hãm nó lại.",
-      "n": 11,
+      "n": 9,
       "path": "content/05-machine-learning/06-tree-models/decision-tree/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {

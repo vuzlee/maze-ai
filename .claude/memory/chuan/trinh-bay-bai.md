@@ -3,7 +3,7 @@ name: trinh-bay-bai
 description: "Luật TRÌNH BÀY cho mọi kệ — ít chữ nhiều hình, rất ít note, câu đơn (cả trong Hỏi đáp), công thức dáng LaTeX, bảng tra ký hiệu, mỗi trường hợp một ô hình; kèm khuôn overview và cách báo cáo"
 metadata:
   type: feedback
-updated: 2026-09-09
+updated: 2026-09-14
 ---
 
 Gộp từ bốn ghi chú cũ (ít-chữ-nhiều-hình · câu-đơn-và-bảng-tra · quy-ước-overview · cách-trả-lời).
@@ -38,6 +38,20 @@ lần thấy một vế bị phạm** — nên đọc lại đủ tám vế trư
 **`.note` phải hiếm.** Nó là khối tô nền, mắt nhảy vào trước — dùng nhiều thì hết tác dụng nhấn.
 Cách chữa: hoà tan thành `ul.why` (điều kiện, cảnh báo, hệ quả) hoặc thành hình. Chỉ giữ khi nó
 là *một câu chốt đáng dừng lại*.
+
+**Nhắc lần tư 2026-09-14 ở `decision-tree`**, kèm đúng hai câu hỏi *"đã note memory chưa?"* cho
+vế **phân số xuống dòng** và vế **tách hình theo trường hợp**. Cả hai đã có luật từ trước — nên
+câu hỏi đó **không phải yêu cầu ghi thêm**, mà là dấu hiệu tôi đã giao bài phạm một luật đã ghi.
+Đọc lại đủ tám vế **trước khi** giao, đừng đợi bị bắt.
+
+Lần này vế bị phạm là một vế khác nữa: **độ sâu**. Bài đúng cả tám vế trình bày mà vẫn bị chê
+*"hơi kĩ quá"* — người dùng chỉ cần **lượng kiến thức tối thiểu để nhớ lại core**, không cần
+số đo thực nghiệm, không cần lý do cặn kẽ. Cách sửa đã dùng: giữ nguyên bộ hình và bộ mục, chỉ
+rút `p.key` · `figcaption` · `ul.why` về **keyword để lướt**, và tách mọi câu trong `details.qa`
+thành câu đơn. 2.094 → 1.557 chữ, 78 → 56 chữ/hình, bullet dài nhất 65 → 19 từ.
+
+> **Bài quá kĩ thì cắt CHỮ, đừng cắt MỤC.** Bỏ một mục là mất một ô của bản đồ mental model;
+> rút chữ trong mục thì bản đồ còn nguyên mà bài lướt được.
 
 ## Chỉ số chữ/hình
 

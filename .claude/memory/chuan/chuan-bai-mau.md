@@ -3,7 +3,7 @@ name: chuan-bai-mau
 description: "Mười luật viết một bài đạt chất lượng — rút ra từ Random forest, luật 1 rút ra từ Memory management & GC; dùng để viết mới và sửa bài cũ"
 metadata:
   type: feedback
-updated: 2026-09-08
+updated: 2026-09-14
 ---
 
 Ngày 2026-09-03, sau khoảng mười lượt review liên tiếp riêng bài
@@ -109,7 +109,7 @@ hình đó. Bố cục không gợi ra được một đường đi tuyến tín
 **Đo "bài này đã theo luật 1 chưa" bằng markup, không bằng tên mục:** `<section id="…-s1">` phải
 chứa `figure class="gist"` **và** số `<svg>` của bài ≥ số mục nội dung. Đếm bằng tên mục
 *Mental model* sẽ trượt (`transaction-isolation` đặt tên mục 01 là *Transaction là gì*), còn đếm
-mỗi `gist` thì lọt bài mới làm được nửa (`logistic-regression`: có `gist`, 4 hình / 10 mục).
+mỗi `gist` thì lọt bài mới làm được nửa — có bản đồ ở §01 nhưng các mục sau chưa bóc ô nào.
 
 Hai loại này vẫn giữ **một hình ở mục 01**, chỉ bỏ phần "vẽ lại bản đồ ở mọi mục".
 
@@ -130,12 +130,149 @@ Bộ công cụ `frame.py` / `check.py` / `apply.py` chép lại được — m�
 [[bai-hoc-soan-noi-dung]]. `check.py` (đo bề rộng chữ, bắt tràn khung) bắt được lỗi mà
 ảnh chụp không lộ; chạy nó trước khi chụp.
 
-#### Bài không có cấu trúc phân cấp tự nhiên — chưa kiểm chứng
+#### Bài là một chuỗi biến đổi — kiểm chứng 2026-09-10 ở `logistic-regression`
 
-`sql-join`, `feature-engineering`, `statistics` không có "gốc chứa các nhánh" theo nghĩa hệ thống.
-Bốn bài đã làm đều là bài cấu trúc rõ nên chưa lộ vấn đề. Cách đang đề xuất, **chưa thử**:
-gốc là **câu hỏi bài trả lời**, các ô là **các lựa chọn / chiều đánh đổi**, flow là **cách chọn
-giữa chúng**. Vẽ thử một bài rồi mới ghi thành luật — đừng nghĩ ra luật trước.
+Không phải bài nào cũng có "gốc chứa các nhánh". Bài mà nội dung là **một mẫu đi qua nhiều chặng,
+mỗi chặng đổi nó thành thứ khác** (logistic regression, request lifecycle, RAG, forward pass) thì
+bản đồ là **flow ngang một hàng**, không phải cây. Người dùng nghiệm thu: *"chuẩn này đây mới là
+cái tôi luôn muốn ở 1 mental model"*.
+
+Mất bốn lượt mới ra, và **ba lượt đầu đều sai theo cùng một kiểu: ô chỉ chứa chữ**. Lượt 1 vẽ năm
+ô rời cạnh nhau — đúng nội dung, sai quan hệ. Lượt 2 nối thành flow nhưng ô chỉ ghi tên và một
+câu chú. Lượt 3 thêm công thức vào ô, vẫn là chữ. Lượt 4 mới đúng: **mỗi ô là một đồ thị thật**.
+Yêu cầu gốc của người dùng ngay từ đầu là *"ảnh flow nhìn là hiểu"* — chữ trong ô không phải hình.
+
+Sáu thứ làm nên ô đúng, thiếu cái nào cũng hụt:
+
+1. **Ba dòng cố định mỗi ô: công thức · số ra · miền giá trị.** `z = w·x + b` / `= 0,85` /
+   `−∞ … +∞`. Công thức ở **dạng rút gọn nhất đúng cho ca đang vẽ** (`L = −log p`, không phải hai
+   số hạng đầy đủ) — dạng đủ để ở mục chuyên trách.
+2. **Miền giá trị là dòng quan trọng nhất** và là thứ dễ quên nhất. `−∞…+∞` → `0…1` → `0 hoặc 1`
+   nói ngay **vì sao phải có chặng sau**: số ra khỏi chặng này chưa dùng được vào việc kia. Bỏ
+   dòng này thì flow thành chuỗi công thức nối nhau, không còn lý do tồn tại.
+3. **Đồ thị thật trong ô**, không phải chữ trong khung: đường thẳng cắt trục 0, đường cong sigmoid
+   giữa hai vạch 0/1, trục xác suất có vạch ngưỡng, cặp thanh tỉ lệ.
+4. **Một chấm probe duy nhất, cùng một mẫu, xuất hiện ở mọi đồ thị.** Đây là thứ khiến mắt bám
+   theo được: chấm nằm trên đường thẳng → rơi lên đường cong → đáp vào nửa phải trục ngưỡng.
+   Các đồ thị rời nhau mà không có chấm chung thì vẫn là mấy hình cạnh nhau, không phải một luồng.
+5. **Hình tự nói ra lập luận của bài.** Đường thẳng vẽ vượt khỏi khung, đường cong bẹt vào hai
+   vạch 0/1 — người đọc thấy lý do phải bọc sigmoid *trước khi* đọc mục nói về nó. Đó là phép thử:
+   xoá hết chữ trong hình mà vẫn còn lập luận thì hình đúng.
+6. **Tách đường chính khỏi nhánh rẽ.** `log loss` và `odds` không phải chặng của luồng — chúng rẽ
+   **xuống** từ `p`, có nhãn *lúc học* / *đọc hệ số*. Xếp ngang hàng là nói dối về cấu trúc: người
+   đọc tưởng phải đi qua log loss mới ra được nhãn.
+
+Đánh số các ô **theo thứ tự mục của bài**, không theo thứ tự nhìn — nhánh rẽ nằm dưới nhưng mang
+số của mục nói về nó, nên dãy số trên hình có thể nhảy cóc so với đường mắt đi. Nhờ vậy `ul.why`
+chỉ cần một dòng *"mỗi mục sau bóc một ô, theo đúng số trên hình"*.
+
+**Hệ quả về chữ trong bài.** Hình đúng thì `p.key` của mục 01 rút còn một dòng
+(`x → z → p, rồi mới tới nhãn`), và câu giải thích *vì sao đổi tên `ŷ` thành `z`* ở mục 02 rút
+còn một câu. Người dùng chốt: *"tối thiểu chữ của bài mà vẫn hiểu luồng"* — hình gánh phần giải
+thích, chữ chỉ còn phần hình không vẽ được.
+
+**Bẫy đã dính khi làm:** `class="gist scrollx"` thì `soat.py` phép 8 không nhận (nó tìm đúng chuỗi
+`class="gist"`). Flow ngang vừa khung thì bỏ `scrollx` — chỉ thêm khi `svgkit/check.py` báo tràn.
+
+#### Flow ngang là mặc định — kể cả bài đệ quy · 2026-09-14 ở `decision-tree`
+
+Bản đồ §01 đầu tiên của `decision-tree` vẽ đúng **cấu trúc**: khung "một node" ở giữa, hai nhánh
+con trỏ ngược lên nó, một ô đỏ dưới cùng, và cột phải liệt kê bốn ý. Đúng logic, nhưng người dùng
+bác: *"cái mental model hãy giống kiểu flow giống bài Logistic regression ý"*.
+
+> **Mặc định của mọi bản đồ §01 là flow ngang bốn chặng, không phải sơ đồ cấu trúc.** Chỉ đổi khi
+> bài thật sự không có luồng nào cả.
+
+Cây là cấu trúc đệ quy, nên phản xạ là vẽ hộp lồng hộp. Nhưng **cái người đọc cần hiểu không phải
+cây trông thế nào — mà dữ liệu đi qua cái gì để thành cây**. Bốn chặng đó có thật:
+`bảng vào → chấm điểm mọi ngưỡng → chia đôi → leaf mang nhãn đa số`.
+
+Hai điều chỉnh so với khuôn `logistic-regression`:
+
+- **Đệ quy vẽ bằng một mũi tên đứt quay ngược từ chặng cuối về chặng ①**, nằm *dưới* hàng ô, có
+  nhãn. Không lồng hộp. Flow vẫn đọc trái sang phải, vòng lặp chỉ là một nét thêm.
+- **Cái phá luồng thì tách ra khỏi hàng**: "đệ quy không tự dừng" là dải đỏ **dưới** cả flow, vì
+  nó không phải một chặng — nó là lý do hyperparameter tồn tại.
+
+Bỏ luôn **cột "bốn ý — hết" bên phải**. Nó là bản tóm tắt bằng chữ đặt cạnh bản đồ: hai lần nói
+cùng một điều, và làm hình rộng gấp đôi. Flow đúng thì không cần chú thích lại bằng câu.
+
+#### Tên mục phải trùng chặng trong bản đồ §01 · 2026-09-14 ở `decision-tree`
+
+Bản đồ §01 vẽ bốn chặng nhưng tên mục lại đặt kiểu khác (`Chia một node`, `Mọc cả cây`) — người
+dùng bác: *"rất khó hiểu… title và nội dung phải thật ngắn gọn dễ hiểu, đừng bôi vẽ nhiều"*.
+
+> **Mỗi ô trong bản đồ §01 mang nhãn `mục NN · <tên chặng>`, và tên mục là đúng cụm chữ đó.**
+> Đọc bản đồ xong là biết mục nào bóc chặng nào, không phải dò lại.
+
+`Dữ liệu vào` · `Chấm điểm` · `Chia đôi rồi lặp lại` · `Dừng — hyperparameter`. Tên mục là **danh
+từ hoặc việc đang xảy ra**, không phải câu ví von.
+
+#### Không đóng khung màu — vạch trái, chú thích trong hình · 2026-09-14
+
+Ba lượt người dùng bác cùng một thứ: *"hơi khó nhìn"*, *"không đóng khung màu linh tinh"*. Nền mờ
++ viền màu quanh mỗi dòng chữ biến hình thành một đống ô lổn nhổn.
+
+| Thay vì | Dùng |
+|---|---|
+| `<rect>` nền mờ + viền màu quanh một dòng | **vạch trái** `<rect width="3" height="20" rx="1.5">` màu ngữ nghĩa |
+| chú thích thành dòng chữ **dưới** hình | **khoanh vùng nét đứt ngay trong hình**, nhãn ở góc |
+| dải màu to nguyên chiều rộng làm cảnh báo | vạch trái + hai cột chữ (thuật ngữ x=14, giải thích x=238) |
+
+Cây ba tầng ở `decision-tree` cũ phải chú thích `root · internal · leaf` bằng một dòng riêng. Sửa
+thành **ba vùng nét đứt bao đúng các tầng**, nhãn `ROOT · cả bộ dữ liệu` nằm ở góc phải vùng, lề
+trái ghi `DEPTH 0…3` — chú thích biến mất vì hình đã tự nói.
+
+**Tầng INTERNAL phải có ≥2 tầng**, không thì người đọc tưởng cây chỉ sâu được một mức. Và mỗi tầng
+hỏi một cột khác nhau, để thấy *mỗi nhánh tự chọn câu hỏi riêng*.
+
+#### Phân vùng bằng dải nền, không bằng khung nét đứt · 2026-09-14
+
+Lượt đầu khoanh vùng root/internal/leaves bằng `<rect stroke-dasharray>` bao quanh các node, nhãn
+đặt ở **góc phải**. Người dùng vẫn bác: *"hình phân vùng không rõ ràng, hơi khó nhìn"*. Ba lý do:
+khung nét đứt cùng màu `--rule-hi` với đường branch nên chìm; nhãn ở góc phải xa các node nó mô
+tả; lại còn một cột `DEPTH 0…3` riêng ở lề trái → hai hệ nhãn cho cùng một thứ.
+
+> **Vùng = một dải nền `--sunk` chạy hết chiều rộng + vạch màu 3px ở mép trái + nhãn nằm TRONG dải
+> ở lề trái.** Không khung nét đứt, không nhãn ở góc xa.
+
+Và **gộp hai hệ nhãn làm một**: `ROOT · depth 0` / `INTERNAL · depth 1–2` / `LEAVES · depth 3` —
+bỏ hẳn cột depth riêng. Chừa lề trái ~150px cho nhãn, cây vẽ trong phần còn lại; toạ độ node tính
+bằng `cx(i,n) = G + W*(i+0.5)/n` để mọi tầng tự căn giữa.
+
+#### Gọi thẳng keyword chuẩn của lĩnh vực · 2026-09-14 ở `decision-tree`
+
+Người dùng đọc bài xong hỏi: *"Logits · Leaves · Training algorithm · stop criteria · Inference ·
+Pruning — có các cái này chưa?"*. Bài đang mô tả đúng **cơ chế** nhưng đặt tên bằng tiếng Việt tự
+chế (`Chia đôi rồi lặp lại`, `Dừng — hyperparameter`) nên người học không nối được với tài liệu
+tiếng Anh, và **pruning thì thiếu hẳn**.
+
+> **Trước khi coi một bài là xong, liệt kê keyword chuẩn của chủ đề rồi soát xem bài có gọi đúng
+> tên chưa** — cơ chế đúng mà tên tự chế thì vẫn là thiếu.
+
+Sửa: `04 Training algorithm` · `05 Stop criteria và pruning`; hình §02 đặt nhãn `LEAVES`,
+`INFERENCE`; thêm hẳn pre-pruning vs post-pruning (`ccp_alpha`); nói rõ leaf trả về **tỉ lệ lớp,
+không phải logits**. Nêu cả khái niệm bài **không** có, để người đọc khỏi tự suy sai.
+
+#### Hyperparameter là danh sách tra, không phải hình · 2026-09-14
+
+Hình §05 từng có thang `max_depth = 1 / 3–10 / 20 / không giới hạn` — bốn dòng chữ đóng khung,
+người dùng bác: *"không cần mấy cái thừa như hyperparam của code đâu, cứ đủ các khái niệm,
+keyword core là được"* và *"tối thiểu hoá vùng cần nhìn"*.
+
+Hình chỉ vẽ **phân loại khái niệm** (pre vs post-pruning, hai cột), còn giá trị nên đặt bao nhiêu
+thì để ở `ul.why` hoặc bảng. Bỏ thang đó: viewBox 398 → 262.
+
+#### Câu chữ trong hình: không ví von, gọi đúng tên · 2026-09-14
+
+*"một đường = một luật"* bị bác là *"nghe cực khó hiểu"*. Đường từ root xuống leaf là một chuỗi
+**điều kiện tách nhánh** — gọi đúng thế. Câu mở đầu hình kiểu *"Ba tầng, ba tên gọi — và một
+đường đọc thành luật"* thì bỏ hẳn: nó chỉ là bản tóm tắt bằng chữ của thứ hình đang vẽ. Cũng đừng
+lặp lại nguyên câu `.key` ngay bên trên vào trong hình.
+
+**Còn lại loại thứ ba, chưa kiểm chứng:** bài không phân cấp mà cũng không phải chuỗi biến đổi —
+`sql-join`, `feature-engineering`, `statistics`. Đề xuất cũ: gốc là **câu hỏi bài trả lời**, các ô
+là **các lựa chọn / chiều đánh đổi**. Vẽ thử một bài rồi mới ghi thành luật.
 
 ### 2. Chỉ 1–2 hình dạng, lặp lại suốt bài
 
