@@ -3,7 +3,7 @@ name: khuon-eq-cong-thuc
 description: "Vì sao MazeAI chọn khuôn .eq thay vì KaTeX; dáng LaTeX phải phủ cả ba chỗ (.eq display · .mth trong văn xuôi · sv-m trong SVG); ranh giới .eq vs <pre> và <code> vs .mth; quy ước vẽ đường cong bằng SVG"
 metadata:
   type: feedback
-updated: 2026-09-09
+updated: 2026-09-24
 ---
 
 Ngày 2026-09-03 chốt: công thức display trong kho dùng khuôn HTML `.eq` (khuôn thứ 9 trong
@@ -82,7 +82,7 @@ baseline thì `max` treo lên trên còn phân số tụt xuống — đã dính
 
 Trong SVG không có `.frac`, phải vẽ tay: tử ở `y-7`, `<line>` ở `y`, mẫu ở `y+11`.
 
-Bài mẫu: `05-classical-ml/svm` — xem [[bai-mau-svm-knn]].
+Bài mẫu: hai khối `.eq` của [[chuan-bai-mau]] — mỗi nửa công thức một `<em>`, `dl.defs` đặt sau.
 
 ## Dáng LaTeX phải phủ CẢ BA CHỖ, không chỉ `.eq` (2026-09-08)
 

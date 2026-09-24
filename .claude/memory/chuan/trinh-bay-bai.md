@@ -1,9 +1,9 @@
 ---
 name: trinh-bay-bai
-description: "Luật TRÌNH BÀY cho mọi kệ — ít chữ nhiều hình, rất ít note, câu đơn (cả trong Hỏi đáp), công thức dáng LaTeX, bảng tra ký hiệu, mỗi trường hợp một ô hình; kèm khuôn overview và cách báo cáo"
+description: "Luật TRÌNH BÀY cho mọi kệ — ít chữ nhiều hình (mốc 57), không dùng note, câu đơn (cả trong Hỏi đáp), công thức dáng LaTeX, bảng tra ký hiệu, mỗi trường hợp một ô hình; kèm khuôn overview và cách báo cáo"
 metadata:
   type: feedback
-updated: 2026-09-14
+updated: 2026-09-24
 ---
 
 Gộp từ bốn ghi chú cũ (ít-chữ-nhiều-hình · câu-đơn-và-bảng-tra · quy-ước-overview · cách-trả-lời).
@@ -15,8 +15,7 @@ Gộp từ bốn ghi chú cũ (ít-chữ-nhiều-hình · câu-đơn-và-bảng-
 > tách bạch rõ ràng cho dễ đọc, nội dung ngắn gọn câu đơn, xuống dòng thì bullet, câu chữ dễ hiểu
 > đơn giản không ví von đánh đố, **công thức latex**,… (xem lại kĩ svm, knn)"
 
-Nhắc lại nguyên văn ngày 2026-09-08, lần này có thêm hai vế cuối. Hai bài mẫu:
-[[bai-mau-svm-knn]].
+Nhắc lại nguyên văn ngày 2026-09-08, lần này có thêm hai vế cuối. Bài mẫu: [[chuan-bai-mau]].
 
 **Nhắc lần ba cùng ngày**, sau khi sửa `ridge-lasso-elasticnet`, kèm câu hỏi *"đã note đủ trong
 chuẩn chưa?"*. Cả tám vế đều đã có luật; vế **không ví von** thì chỉ có nửa (mới cấm ẩn dụ kinh
@@ -26,7 +25,7 @@ lần thấy một vế bị phạm** — nên đọc lại đủ tám vế trư
 | Luật | Kiểm thế nào |
 |---|---|
 | ít chữ, nhiều hình | chỉ số chữ/hình — công thức bên dưới |
-| **rất ít note** | `grep -c '<div class="note'` — tối đa **một** cái một bài |
+| **rất ít note** | `grep -c '<div class="note'` — bài mẫu 2026-09-24 có **0**; coi 0 là đích, 1 là trần |
 | phân hình theo từng trường hợp | một `<svg>`, mỗi trường hợp một panel, cùng bộ ví dụ |
 | chú thích **trên hình** | chữ nằm trong `<svg>`/`<figcaption>`, không phải đoạn văn dưới hình |
 | tách bạch rõ ràng | mỗi mục một việc, đừng trộn hai ý vào một khối |
@@ -36,8 +35,8 @@ lần thấy một vế bị phạm** — nên đọc lại đủ tám vế trư
 | **phân số xuống dòng** | tử/mẫu là `.frac` hai `<i>` — vạch ngang thật, **không viết `a / b` một dòng** |
 
 **`.note` phải hiếm.** Nó là khối tô nền, mắt nhảy vào trước — dùng nhiều thì hết tác dụng nhấn.
-Cách chữa: hoà tan thành `ul.why` (điều kiện, cảnh báo, hệ quả) hoặc thành hình. Chỉ giữ khi nó
-là *một câu chốt đáng dừng lại*.
+Cách chữa: hoà tan thành `ul.why` (điều kiện, cảnh báo, hệ quả) hoặc thành hình. Bài mẫu
+[[chuan-bai-mau]] không có cái nào, và không thiếu gì — nên mặc định là **không dùng**.
 
 **Nhắc lần tư 2026-09-14 ở `decision-tree`**, kèm đúng hai câu hỏi *"đã note memory chưa?"* cho
 vế **phân số xuống dòng** và vế **tách hình theo trường hợp**. Cả hai đã có luật từ trước — nên
@@ -64,7 +63,8 @@ t = re.sub(r'<svg.*?</svg>', '', s, flags=re.S); t = re.sub(r'<[^>]+>', ' ', t)
 ratio = len(t.split()) / max(v, 1)
 ```
 
-Mốc: `random-forest` **123 chữ/hình**; trên **250 đáng soát**, trên **300 phải sửa**.
+Mốc mới 2026-09-24 theo [[chuan-bai-mau]]: **57 chữ/hình**. Trên **100 là còn phải cắt chữ**;
+trên **250** thì bài đang là một bài viết chứ không phải bài ôn.
 Thứ tự chữa: bảng so sánh văn xuôi → khuôn hình · `<ol>`/`ul.why` dài → `.stack` · đoạn văn lẽ ra
 nên là hình → vẽ mới · bảng Hỏi đáp → `details.qa`. **Bảng tra thật thì để yên** — đó là bảng
 đúng chỗ. `.axiscap`/`.stripnote` là flex ba `<span>` (nhãn · `<em>` · nhãn), viết câu trơn vào
@@ -144,8 +144,9 @@ Soát ẩn dụ phải soát cả `<text>` bên trong `<svg>`, không dừng ở
 2. **Chi tiết thư viện là code, không phải nội dung** — «sklearn mặc định mean…» bị gạt thẳng.
 3. **Không tự chế thuật ngữ** — «điểm hỏi» → **điểm cần dự đoán**. Chữ nào chỉ tồn tại trong bài
    của mình thì là chữ tự chế.
-4. **In đậm trong văn xuôi → `.hl` màu cam** (`.lesson .hl{color:var(--clay);font-weight:600}`).
-   `<b>` để dành cho trong hình và bảng.
+4. **In đậm trong văn xuôi dùng `<b>`** — thuật ngữ và con số đáng nhớ (**out-of-bag**, **37%**,
+   **√p**). `.hl` cam đã thử ở `knn` rồi bỏ: bài mẫu 2026-09-24 dùng 18 lượt `<b>`, không `.hl`
+   nào, vì cam là màu link — in đậm bằng cam thì người đọc tưởng bấm được.
 5. **Đừng trỏ bằng vị trí** — «cả hai ô trên» không chỉ vào đâu. Gọi thẳng tên.
 6. Điểm đánh dấu trong hình nên **cùng hình dạng với điểm dữ liệu, khác bằng vân** (`<pattern>`
    sọc chéo), không phải khác hình dạng.

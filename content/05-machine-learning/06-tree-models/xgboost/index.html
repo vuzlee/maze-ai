@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>XGBoost — MazeAI</title>
-<meta name="description" content="Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.">
+<meta name="description" content="Đưa cả cây về một công thức: mỗi mẫu cho hai số g và h, lá nào cũng tính thẳng ra giá trị, phép tách nào cũng chấm được điểm — nên λ, γ và ô trống đều nằm trong cùng một chỗ.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/xgboost/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="XGBoost">
-<meta property="og:description" content="Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.">
+<meta property="og:description" content="Đưa cả cây về một công thức: mỗi mẫu cho hai số g và h, lá nào cũng tính thẳng ra giá trị, phép tách nào cũng chấm được điểm — nên λ, γ và ô trống đều nằm trong cùng một chỗ.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,485 +39,199 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-xgb" data-title="XGBoost" data-tag="Ensemble" data-blurb="Xấp xỉ Taylor bậc hai cho công thức điểm lá tính thẳng, số hạng phạt nằm trong objective, và cách nó xử lý dữ liệu thưa.">
+      <article class="doc" id="art-xgb" data-title="XGBoost" data-tag="Ensemble" data-reviewed="1" data-blurb="Đưa cả cây về một công thức: mỗi mẫu cho hai số g và h, lá nào cũng tính thẳng ra giá trị, phép tách nào cũng chấm được điểm — nên λ, γ và ô trống đều nằm trong cùng một chỗ.">
         <header class="hero">
   <p class="eyebrow">Machine learning · Tree models</p>
-  <h1><em>XGBoost</em></h1>
-  <p class="lede">Không phải "gradient boosting chạy nhanh hơn" — nó <b>đổi hẳn hàm mục tiêu</b>. Từ chỗ đi mò theo gradient, nó viết ra được <b>công thức tính thẳng giá trị tối ưu của mỗi lá</b>, và nhét regularization vào ngay trong công thức đó.</p>
+  <h1>XG<em>Boost</em></h1>
+  <p class="lede">Vẫn là gradient boosting, nhưng mọi quyết định của cây được đưa về một công thức duy nhất. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>mỗi mẫu rút gọn thành hai số g và h</li>
+    <li>giá trị lá tính thẳng, không phải dò</li>
+    <li>λ và γ nằm ngay trong công thức</li>
+  </ul>
 </header>
 
 <section id="xgb-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Không phải "gradient boosting chạy nhanh hơn" — nó <em>đổi hẳn thước đo cây tốt là cây nào</em>. Ba ô giữa bản đồ là ba việc, nhưng cùng làm bằng một công thức.</p>
-
+  <p class="key">XGBoost rút mỗi mẫu thành <em>hai con số</em>, rồi mọi việc còn lại của cây chỉ là cộng hai con số đó lại.</p>
   <figure class="gist">
-<svg viewBox="0 0 860 232" role="img" aria-label="Hai chỗ hở của gradient boosting gốc ở trên; dưới là một công thức duy nhất dùng cho ba việc: vẽ loss thành đường cong, tìm đáy đường cong ra giá trị lá, so hai đáy để quyết có tách nút không">
-<rect x="0" y="8" width="860" height="48" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="16" y="30" fill="var(--tomb)">Chỗ hở của gradient boosting gốc</text>
-<text class="sv-s" x="16" y="47" fill="var(--dim)">chỉ biết dốc về hướng nào, không biết còn bao xa · cây mọc theo một thước đo, boosting lại chấm điểm bằng thước đo khác</text>
-
-<line x1="430" y1="58" x2="430" y2="76" stroke="var(--filled)" stroke-width="1.3"/><polygon points="430,84 425.5,76 434.5,76" fill="var(--filled)"/>
-<text class="sv-s" x="442" y="76" fill="var(--muted)">XGBoost vá cả hai chỗ bằng MỘT công thức</text>
-
-<rect x="0" y="94" width="860" height="130" rx="6" fill="none" stroke="var(--text)" stroke-width="1.4"/>
-<text class="sv-hv" x="18" y="116" fill="var(--text)">MỘT CÔNG THỨC, DÙNG CHO BA VIỆC</text>
-
-<rect x="18" y="128" width="250" height="40" rx="4" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
-<text class="sv-d" x="32" y="146" fill="var(--filled)">① Chấm điểm một cây</text>
-<text class="sv-s" x="32" y="162" fill="var(--dim)">mỗi mẫu góp vào một cặp số (g, h)</text>
-<text class="sv-t" x="288" y="154" fill="var(--text)" text-anchor="middle">=</text>
-<rect x="306" y="128" width="250" height="40" rx="4" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.2"/>
-<text class="sv-d" x="320" y="146" fill="var(--probe)">② Tìm số mỗi lá trả về</text>
-<text class="sv-s" x="320" y="162" fill="var(--dim)">tính thẳng ra: w* = − G/(H+λ)</text>
-<text class="sv-t" x="576" y="154" fill="var(--text)" text-anchor="middle">=</text>
-<rect x="592" y="128" width="250" height="40" rx="4" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
-<text class="sv-d" x="606" y="146" fill="var(--ok)">③ Quyết có tách nút không</text>
-<text class="sv-s" x="606" y="162" fill="var(--dim)">so điểm trước và sau khi tách</text>
-
-<text class="sv-s" x="18" y="196" fill="var(--muted)">Nối bằng dấu = chứ không phải mũi tên: ba ô không xảy ra lần lượt, chúng là cùng một công thức dùng</text>
-<text class="sv-s" x="18" y="213" fill="var(--muted)">cho ba việc. Hai cái hãm λ và γ nằm sẵn trong đó, nên mọc cây và chống overfit là một việc.</text>
-</svg>
-    <figcaption>Cả bài chỉ có một công thức. Ba mục tiếp theo là ba việc nó làm — <b>①</b> Loss function, <b>②</b> giá trị lá, <b>③</b> gain.</figcaption>
+    <svg viewBox="0 0 860 330" role="img" aria-label="Mỗi mẫu cho hai số g và h; một cây chia sáu mẫu bằng câu hỏi x nhỏ hơn hoặc bằng 3,5 thành lá trái A B C với G bằng cộng 27,5 và lá phải D E F với G bằng trừ 27,5; mỗi lá tính thẳng giá trị w bằng trừ G chia H cộng lambda, ra trừ 6,88 và cộng 6,87, rồi cây sau tính lại g và h trên dự đoán vừa cập nhật"><style>@keyframes xm1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}5.500%{animation-timing-function:ease-in-out;opacity:1}90.000%{animation-timing-function:ease-in-out;opacity:1}96.000%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:0}}@keyframes xm2{0%{animation-timing-function:ease-in-out;opacity:0}22.000%{animation-timing-function:ease-in-out;opacity:0}25.500%{animation-timing-function:ease-in-out;opacity:1}90.000%{animation-timing-function:ease-in-out;opacity:1}96.000%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:0}}@keyframes xm3{0%{animation-timing-function:ease-in-out;opacity:0}42.000%{animation-timing-function:ease-in-out;opacity:0}45.500%{animation-timing-function:ease-in-out;opacity:1}90.000%{animation-timing-function:ease-in-out;opacity:1}96.000%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:0}}@keyframes xm4{0%{animation-timing-function:ease-in-out;opacity:0}62.000%{animation-timing-function:ease-in-out;opacity:0}65.500%{animation-timing-function:ease-in-out;opacity:1}90.000%{animation-timing-function:ease-in-out;opacity:1}96.000%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:0}}@media (prefers-reduced-motion:no-preference){.xm1{animation:xm1 10s linear infinite}.xm2{animation:xm2 10s linear infinite}.xm3{animation:xm3 10s linear infinite}.xm4{animation:xm4 10s linear infinite}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><g class="xm1"><rect x="0" y="50" width="232" height="216" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="12" y="38" fill="var(--muted)" style="fill:var(--muted)">① mỗi mẫu hai số</text><text class="sv-d" x="16" y="89" fill="var(--text)" style="fill:var(--text)">A</text><rect x="38" y="76" width="84" height="19" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="48" y="90" fill="var(--tomb)" style="fill:var(--tomb)">g +10,2</text><text class="sv-d" x="136" y="90" fill="var(--faint)" style="fill:var(--faint)">h 1</text><text class="sv-d" x="16" y="119" fill="var(--text)" style="fill:var(--text)">B</text><rect x="38" y="106" width="84" height="19" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="48" y="120" fill="var(--tomb)" style="fill:var(--tomb)">g +8,2</text><text class="sv-d" x="136" y="120" fill="var(--faint)" style="fill:var(--faint)">h 1</text><text class="sv-d" x="16" y="149" fill="var(--text)" style="fill:var(--text)">C</text><rect x="38" y="136" width="84" height="19" rx="3" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="48" y="150" fill="var(--tomb)" style="fill:var(--tomb)">g +9,2</text><text class="sv-d" x="136" y="150" fill="var(--faint)" style="fill:var(--faint)">h 1</text><text class="sv-d" x="16" y="179" fill="var(--text)" style="fill:var(--text)">D</text><rect x="38" y="166" width="84" height="19" rx="3" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="48" y="180" fill="var(--filled)" style="fill:var(--filled)">g −7,8</text><text class="sv-d" x="136" y="180" fill="var(--faint)" style="fill:var(--faint)">h 1</text><text class="sv-d" x="16" y="209" fill="var(--text)" style="fill:var(--text)">E</text><rect x="38" y="196" width="84" height="19" rx="3" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="48" y="210" fill="var(--filled)" style="fill:var(--filled)">g −10,8</text><text class="sv-d" x="136" y="210" fill="var(--faint)" style="fill:var(--faint)">h 1</text><text class="sv-d" x="16" y="239" fill="var(--text)" style="fill:var(--text)">F</text><rect x="38" y="226" width="84" height="19" rx="3" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="48" y="240" fill="var(--filled)" style="fill:var(--filled)">g −8,8</text><text class="sv-d" x="136" y="240" fill="var(--faint)" style="fill:var(--faint)">h 1</text></g><g class="xm2"><rect x="282" y="50" width="232" height="216" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="294" y="38" fill="var(--muted)" style="fill:var(--muted)">② một cây chia chúng</text><line x1="242" y1="158.0" x2="264" y2="158.0" stroke="var(--rule-hi)" stroke-width="1.5"/><polygon points="272,158.0 264,153.8 264,162.2" fill="var(--rule-hi)"/><circle cx="398.0" cy="96" r="17" fill="rgba(var(--amber-a),.22)" stroke="var(--probe)" stroke-width="1.4"/><text class="sv-d" x="398.0" y="100" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">6</text><text class="sv-d" x="398.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">x ≤ 3,5 ?</text><line x1="398.0" y1="113" x2="336" y2="158" stroke="var(--rule-hi)" stroke-width="1.3"/><circle cx="336" cy="174" r="16" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="336" y="178" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">3</text><text class="sv-d" x="336" y="210" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">A B C</text><text class="sv-d" x="336" y="230" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">G +27,5</text><text class="sv-d" x="336" y="248" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">H 3</text><line x1="398.0" y1="113" x2="460" y2="158" stroke="var(--rule-hi)" stroke-width="1.3"/><circle cx="460" cy="174" r="16" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="460" y="178" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">3</text><text class="sv-d" x="460" y="210" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">D E F</text><text class="sv-d" x="460" y="230" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">G −27,5</text><text class="sv-d" x="460" y="248" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">H 3</text><text class="sv-d" x="296" y="134" fill="var(--faint)" style="fill:var(--faint)">đúng</text><text class="sv-d" x="468" y="134" fill="var(--faint)" style="fill:var(--faint)">sai</text></g><g class="xm3"><rect x="564" y="50" width="232" height="216" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="576" y="38" fill="var(--muted)" style="fill:var(--muted)">③ tính thẳng ra số</text><line x1="524" y1="158.0" x2="546" y2="158.0" stroke="var(--rule-hi)" stroke-width="1.5"/><polygon points="554,158.0 546,153.8 546,162.2" fill="var(--rule-hi)"/><rect x="580" y="74" width="200" height="78" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="594" y="96" fill="var(--text)" style="fill:var(--text)">giá trị lá</text><text class="sv-d" x="594" y="118" fill="var(--ok)" style="fill:var(--ok)">w = − G / (H + λ)</text><text class="sv-d" x="594" y="140" fill="var(--ok)" style="fill:var(--ok)">−6,88  ·  +6,87</text><rect x="580" y="166" width="200" height="78" rx="5" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.3"/><text class="sv-d" x="594" y="188" fill="var(--text)" style="fill:var(--text)">điểm của phép tách</text><text class="sv-d" x="594" y="210" fill="var(--probe)" style="fill:var(--probe)">gain 189,1</text><text class="sv-d" x="594" y="232" fill="var(--probe)" style="fill:var(--probe)">phải vượt γ mới giữ</text></g><g class="xm4"><path d="M 680 278 L 680 304 L 46 304 L 46 280" fill="none" stroke="var(--ok)" stroke-width="1.4" stroke-dasharray="5 4"/><polygon points="46,270 42,280 50,280" fill="var(--ok)"/><text class="sv-d" x="46" y="328" fill="var(--ok)" style="fill:var(--ok)">cây sau: tính lại g và h trên dự đoán vừa cập nhật</text></g></svg>
   </figure>
-
   <ul class="why">
-    <li>Điểm mới của XGBoost là <b>công thức chấm điểm cây</b> (hàm mục tiêu), không phải tốc độ: histogram hay chạy song song chỉ làm nó nhanh hơn, bỏ hết đi thì kết quả vẫn thế.</li>
-    <li>Ô đỏ trên cùng là hai chỗ hở của <a href="../gradient-boosting/index.html">Gradient boosting</a> gốc — công thức này sinh ra để vá đúng hai chỗ đó.</li>
-    <li>Cơ chế cộng dồn từng cây nằm ở <a href="../gradient-boosting/index.html">Gradient boosting</a>; ở đây chỉ nói phần XGBoost làm khác. Bản tối ưu cho tốc độ là <a href="../lightgbm/index.html">LightGBM</a>.</li>
+    <li>Ba việc này là toàn bộ thuật toán. Các mục sau chỉ phóng to từng việc.</li>
+    <li>Ý tưởng gốc nằm ở <a href="../gradient-boosting/index.html">Gradient boosting</a>; cách một cây học nằm ở <a href="../decision-tree/index.html">Decision tree</a>.</li>
   </ul>
 </section>
 
 <section id="xgb-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Vấn đề nó giải</h2></div>
-
-  <p class="key">Bản gốc để ngỏ hai chỗ: <em>nó chỉ nhìn độ dốc, và nó không biết gì về độ phức tạp của cây mình vừa mọc</em>.</p>
-
+  <div class="sh"><b>02</b><h2>Đổi gì so với bản gốc</h2></div>
+  <p class="key">Ba thay đổi, nhưng thật ra là <em>một</em>: viết objective ra thành công thức rồi bắt cây phục tùng nó.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 312" role="img" aria-label="Ba cột nối nhau: dữ liệu vào Train ra một cây, Predict ra phần còn sai, phần còn sai vòng lên thành dữ liệu cho cây kế tiếp, cột cuối là cây thứ N cộng lại thành dự đoán">
-<rect x="0" y="34" width="150" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
-<text class="sv-d" x="75" y="56" fill="var(--filled)" text-anchor="middle">dữ liệu gốc (X, y)</text>
-<line x1="75" y1="68" x2="75" y2="88" stroke="var(--muted)" stroke-width="1.2"/><polygon points="75,96 71,88 79,88" fill="var(--muted)"/>
-<text class="sv-s" x="82" y="86" fill="var(--faint)">Train</text>
-<rect x="0" y="100" width="150" height="92" rx="5" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-s" x="8" y="116" fill="var(--probe)">Tree 1</text>
-<line x1="75" y1="141" x2="41" y2="156" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="75" y1="141" x2="109" y2="156" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="41" y1="169" x2="23" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="41" y1="169" x2="59" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="109" y1="169" x2="91" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="109" y1="169" x2="127" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="75" cy="134" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="41" cy="162" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="109" cy="162" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="23" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="59" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="91" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="127" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<line x1="75" y1="192" x2="75" y2="212" stroke="var(--muted)" stroke-width="1.2"/><polygon points="75,220 71,212 79,212" fill="var(--muted)"/>
-<text class="sv-s" x="82" y="210" fill="var(--faint)">Predict</text>
-<rect x="0" y="224" width="150" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.3"/>
-<text class="sv-d" x="75" y="246" fill="var(--tomb)" text-anchor="middle">phần còn sai r₁</text>
-<path d="M150 241 L228 241 L228 51 L300 51" fill="none" stroke="var(--ok)" stroke-width="1.3"/><polygon points="300,51 292,47 292,55" fill="var(--ok)"/>
-<text class="sv-s" x="160" y="234" fill="var(--ok)">thành dữ liệu cho cây sau</text>
-<rect x="300" y="34" width="150" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
-<text class="sv-d" x="375" y="56" fill="var(--filled)" text-anchor="middle">(X, r₁)</text>
-<line x1="375" y1="68" x2="375" y2="88" stroke="var(--muted)" stroke-width="1.2"/><polygon points="375,96 371,88 379,88" fill="var(--muted)"/>
-<text class="sv-s" x="382" y="86" fill="var(--faint)">Train</text>
-<rect x="300" y="100" width="150" height="92" rx="5" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-s" x="308" y="116" fill="var(--probe)">Tree 2</text>
-<line x1="375" y1="141" x2="341" y2="156" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="375" y1="141" x2="409" y2="156" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="341" y1="169" x2="323" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="341" y1="169" x2="359" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="409" y1="169" x2="391" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="409" y1="169" x2="427" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="375" cy="134" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="341" cy="162" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="409" cy="162" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="323" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="359" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="391" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="427" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<line x1="375" y1="192" x2="375" y2="212" stroke="var(--muted)" stroke-width="1.2"/><polygon points="375,220 371,212 379,212" fill="var(--muted)"/>
-<text class="sv-s" x="382" y="210" fill="var(--faint)">Predict</text>
-<rect x="300" y="224" width="150" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.3"/>
-<text class="sv-d" x="375" y="246" fill="var(--tomb)" text-anchor="middle">phần còn sai r₂</text>
-<path d="M450 241 L528 241 L528 51 L600 51" fill="none" stroke="var(--ok)" stroke-width="1.3"/><polygon points="600,51 592,47 592,55" fill="var(--ok)"/>
-<text class="sv-s" x="460" y="234" fill="var(--ok)">thành dữ liệu cho cây sau</text>
-<text class="sv-n" x="525" y="150" fill="var(--faint)" text-anchor="middle">………</text>
-<rect x="600" y="34" width="150" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
-<text class="sv-d" x="675" y="56" fill="var(--filled)" text-anchor="middle">(X, r₍ₙ₋₁₎)</text>
-<line x1="675" y1="68" x2="675" y2="88" stroke="var(--muted)" stroke-width="1.2"/><polygon points="675,96 671,88 679,88" fill="var(--muted)"/>
-<text class="sv-s" x="682" y="86" fill="var(--faint)">Train</text>
-<rect x="600" y="100" width="150" height="92" rx="5" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-s" x="608" y="116" fill="var(--probe)">Tree N</text>
-<line x1="675" y1="141" x2="641" y2="156" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="675" y1="141" x2="709" y2="156" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="641" y1="169" x2="623" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="641" y1="169" x2="659" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="709" y1="169" x2="691" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<line x1="709" y1="169" x2="727" y2="177" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="675" cy="134" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="641" cy="162" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="709" cy="162" r="7" fill="var(--panel)" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="623" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="659" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="691" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<circle cx="727" cy="183" r="6" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.3"/>
-<line x1="675" y1="192" x2="675" y2="212" stroke="var(--muted)" stroke-width="1.2"/><polygon points="675,220 671,212 679,212" fill="var(--muted)"/>
-<text class="sv-s" x="682" y="210" fill="var(--faint)">Predict</text>
-<rect x="600" y="224" width="150" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
-<text class="sv-d" x="675" y="246" fill="var(--ok)" text-anchor="middle">ŷ = tổng mọi cây</text>
-<text class="sv-s" x="0" y="282" fill="var(--faint)">Mỗi cây chỉ học phần cây trước còn làm sai. Chỗ XGBoost khác bản gốc nằm trong ô cây: giá trị mỗi lá xanh</text>
-<text class="sv-s" x="0" y="300" fill="var(--faint)">tính thẳng bằng công thức w* = − G/(H + λ), không phải mò dần theo độ dốc.</text>
-</svg>
-    <figcaption>Cây <b>n</b> chỉ học phần cây <b>n−1</b> còn sai — đó là "boosting". Lá xanh là chỗ XGBoost khác bản gốc.</figcaption>
+    <svg viewBox="0 0 860 292" role="img" aria-label="Gradient boosting gốc chỉ dùng độ dốc, mọc cây theo tiêu chí khác và cắt tỉa sau; XGBoost thêm độ cong, mọc cây theo chính hàm mục tiêu và đặt phạt vào ngay trong đó"><style>@keyframes cmin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><text class="sv-d" x="224" y="42" fill="var(--tomb)" style="fill:var(--tomb)">Gradient boosting gốc</text><text class="sv-d" x="548" y="42" fill="var(--ok)" style="fill:var(--ok)">XGBoost</text><line x1="208" y1="54" x2="208" y2="256" stroke="var(--rule-hi)" stroke-width="1.1"/><line x1="532" y1="54" x2="532" y2="256" stroke="var(--rule-hi)" stroke-width="1.1"/><text class="sv-d" x="0" y="108" fill="var(--text)" style="fill:var(--text)">Dùng gì của loss</text><rect x="224" y="78" width="300" height="46" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="238" y="107" fill="var(--tomb)" style="fill:var(--tomb)">chỉ độ dốc — biết hướng, không biết bao xa</text><rect x="548" y="78" width="300" height="46" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="562" y="107" fill="var(--ok)" style="fill:var(--ok)">độ dốc và độ cong — tính thẳng ra bước nhảy</text><text class="sv-d" x="0" y="170" fill="var(--text)" style="fill:var(--text)">Tách nút theo gì</text><rect x="224" y="140" width="300" height="46" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="238" y="169" fill="var(--tomb)" style="fill:var(--tomb)">theo MSE hoặc Gini, khác thứ đang tối ưu</text><rect x="548" y="140" width="300" height="46" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="562" y="169" fill="var(--ok)" style="fill:var(--ok)">theo chính hàm mục tiêu đang tối ưu</text><text class="sv-d" x="0" y="232" fill="var(--text)" style="fill:var(--text)">Chống overfit</text><rect x="224" y="202" width="300" height="46" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="238" y="231" fill="var(--tomb)" style="fill:var(--tomb)">mọc xong rồi cắt tỉa, là một bước riêng</text><rect x="548" y="202" width="300" height="46" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="562" y="231" fill="var(--ok)" style="fill:var(--ok)">λ và γ là số hạng của công thức</text><text class="sv-d" x="0" y="274" fill="var(--muted)" style="fill:var(--muted)">ba dòng này là cùng một thay đổi: đưa mọi thứ về một công thức duy nhất</text></svg>
   </figure>
-
-  <div class="cmp two">
-    <div>
-      <h5>Gradient boosting gốc</h5>
-      <p><b>Đạo hàm bậc nhất.</b> Chỉ biết dốc nghiêng về hướng nào, không biết còn bao xa tới đáy — nên phải mò từng bước nhỏ.</p>
-      <p><b>Cây mọc theo Gini hoặc MSE.</b> Tiêu chí tách nút không phải thứ boosting đang tối ưu.</p>
-      <p><b>Chống overfit làm sau.</b> Mọc cây xong mới cắt tỉa, cộng thêm <code>learning_rate</code> cho chậm lại.</p>
-    </div>
-    <div>
-      <h5>XGBoost</h5>
-      <p><b>Thêm đạo hàm bậc hai.</b> Biết cả độ cong nên tính thẳng ra bước nhảy tối ưu, không phải mò.</p>
-      <p><b>Cây mọc theo chính hàm mục tiêu.</b> Tách nút và boosting cùng tối ưu một thứ.</p>
-      <p><b>Chống overfit nằm trong hàm mục tiêu.</b> Phạt độ phức tạp là một số hạng của công thức, không phải bước xử lý sau.</p>
-    </div>
-  </div>
-
-  <p class="key">Điểm mới thật sự của XGBoost là <em>hàm mục tiêu</em>. Histogram và block nén chỉ là kỹ thuật chạy nhanh hơn — chúng không đổi bài toán đang giải.</p>
+  <ul class="why">
+    <li>Gradient boosting gốc trồng cây bằng tiêu chí riêng rồi mới gán giá trị lá; XGBoost làm cả hai bằng cùng một công thức.</li>
+    <li>Phần phạt không còn là bước cắt tỉa sau, nó nằm ngay trong thứ cây đang tối ưu.</li>
+  </ul>
 </section>
 
 <section id="xgb-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Loss function</h2></div>
-
-  <p class="key">Cả bài chỉ có <em>một dòng công thức</em>: loss đã làm cho dễ giải, cộng tiền phạt cho cây rườm rà.</p>
-
+  <div class="sh"><b>03</b><h2>Objective</h2></div>
+  <p class="key">Biết độ dốc thì chỉ biết <em>đi hướng nào</em>; biết thêm độ cong thì biết <em>đi bao xa</em>.</p>
   <div class="eq">
     <div class="line">
-      <span class="t"><span>Obj</span></span>
+      <span class="t"><span><var>L</var><sup>(<var>m</var>)</sup></span></span>
       <span class="op">≈</span>
-      <span class="t b"><span>Σ<sub>mẫu <var>i</var></sub> [ <var>g</var><sub><var>i</var></sub>·<var>f</var><sub><var>i</var></sub> + ½ <var>h</var><sub><var>i</var></sub>·<var>f</var><sub><var>i</var></sub><sup>2</sup> ]</span><em>loss xấp xỉ bằng parabol</em></span>
+      <span class="t b"><span>Σ<sub><var>i</var></sub> [ <var>g</var><sub><var>i</var></sub><var>f</var>(<var>x</var><sub><var>i</var></sub>) + ½ <var>h</var><sub><var>i</var></sub><var>f</var>(<var>x</var><sub><var>i</var></sub>)<sup>2</sup> ]</span><em>khai triển Taylor tới bậc hai</em></span>
       <span class="op">+</span>
-      <span class="t p"><span><var>γ</var>·<var>T</var></span><em>tiền thuê mỗi chiếc lá</em></span>
-      <span class="op">+</span>
-      <span class="t g"><span>½ <var>λ</var> Σ<sub>lá <var>j</var></sub> <var>w</var><sub><var>j</var></sub><sup>2</sup></span><em>phạt lá nói to</em></span>
+      <span class="t p"><span><var>γ</var><var>T</var> + ½ <var>λ</var> Σ<sub><var>j</var></sub> <var>w</var><sub><var>j</var></sub><sup>2</sup></span><em>phần phạt nằm luôn trong đây</em></span>
     </div>
-    <dl>
-      <dt>g<sub>i</sub> · h<sub>i</sub></dt><dd>độ dốc và độ cong của loss tại mẫu i — đây là chỗ duy nhất loss thật đi vào công thức</dd>
-      <dt>f<sub>i</sub></dt><dd>cây mới định cộng thêm bao nhiêu cho mẫu i</dd>
-      <dt>T · w<sub>j</sub></dt><dd>số lá của cây, và giá trị lá j trả về</dd>
-    </dl>
-    <p class="read">Hai vế sau <b>chính là regularization</b> — nằm ngay trong hàm mục tiêu, không phải bước cắt tỉa làm sau. Đó là chỗ khác bản gốc.</p>
   </div>
-
+  <dl class="defs">
+    <dt>g<sub>i</sub></dt><dd>đạo hàm bậc nhất của loss tại mẫu i</dd>
+    <dt>h<sub>i</sub></dt><dd>đạo hàm bậc hai — độ cong tại mẫu đó</dd>
+    <dt>T</dt><dd>số lá của cây đang mọc</dd>
+  </dl>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 306" role="img" aria-label="Chỉ biết độ dốc thì phải mò từng bước nhỏ theo hướng đi xuống; biết thêm độ cong thì dựng được một parabol xấp xỉ và nhảy thẳng tới đáy của nó"><style>@keyframes tvin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){.tv1{animation:tvin .45s ease-out 0.00s both}.tv2{animation:tvin .45s ease-out 1.60s both}.tv3{animation:tvin .45s ease-out 3.20s both}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><rect x="0" y="56" width="380" height="200" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="12" y="44" fill="var(--tomb)" style="fill:var(--tomb)">chỉ đạo hàm bậc nhất</text><rect x="466" y="56" width="380" height="200" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="478" y="44" fill="var(--ok)" style="fill:var(--ok)">thêm đạo hàm bậc hai</text><path d="M 24.0 88.3 L 29.5 93.1 L 35.1 97.9 L 40.6 102.5 L 46.1 107.0 L 51.7 111.3 L 57.2 115.6 L 62.7 119.7 L 68.3 123.7 L 73.8 127.7 L 79.3 131.4 L 84.9 135.1 L 90.4 138.7 L 95.9 142.1 L 101.5 145.4 L 107.0 148.6 L 112.5 151.7 L 118.1 154.7 L 123.6 157.6 L 129.1 160.3 L 134.7 162.9 L 140.2 165.4 L 145.7 167.8 L 151.3 170.1 L 156.8 172.3 L 162.3 174.3 L 167.9 176.2 L 173.4 178.0 L 178.9 179.7 L 184.5 181.3 L 190.0 182.8 L 195.5 184.1 L 201.1 185.3 L 206.6 186.4 L 212.1 187.4 L 217.7 188.3 L 223.2 189.1 L 228.7 189.7 L 234.3 190.2 L 239.8 190.6 L 245.3 190.9 L 250.9 191.1 L 256.4 191.2 L 261.9 191.1 L 267.5 190.9 L 273.0 190.6 L 278.5 190.2 L 284.1 189.7 L 289.6 189.1 L 295.1 188.3 L 300.7 187.4 L 306.2 186.4 L 311.7 185.3 L 317.3 184.1 L 322.8 182.8 L 328.3 181.3 L 333.9 179.7 L 339.4 178.0 L 344.9 176.2 L 350.5 174.3 L 356.0 172.3" fill="none" stroke="var(--muted)" stroke-width="2.0"/><text class="sv-d" x="364" y="88" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">loss</text><path d="M 490.0 88.3 L 495.5 93.1 L 501.1 97.9 L 506.6 102.5 L 512.1 107.0 L 517.7 111.3 L 523.2 115.6 L 528.7 119.7 L 534.3 123.7 L 539.8 127.7 L 545.3 131.4 L 550.9 135.1 L 556.4 138.7 L 561.9 142.1 L 567.5 145.4 L 573.0 148.6 L 578.5 151.7 L 584.1 154.7 L 589.6 157.6 L 595.1 160.3 L 600.7 162.9 L 606.2 165.4 L 611.7 167.8 L 617.3 170.1 L 622.8 172.3 L 628.3 174.3 L 633.9 176.2 L 639.4 178.0 L 644.9 179.7 L 650.5 181.3 L 656.0 182.8 L 661.5 184.1 L 667.1 185.3 L 672.6 186.4 L 678.1 187.4 L 683.7 188.3 L 689.2 189.1 L 694.7 189.7 L 700.3 190.2 L 705.8 190.6 L 711.3 190.9 L 716.9 191.1 L 722.4 191.2 L 727.9 191.1 L 733.5 190.9 L 739.0 190.6 L 744.5 190.2 L 750.1 189.7 L 755.6 189.1 L 761.1 188.3 L 766.7 187.4 L 772.2 186.4 L 777.7 185.3 L 783.3 184.1 L 788.8 182.8 L 794.3 181.3 L 799.9 179.7 L 805.4 178.0 L 810.9 176.2 L 816.5 174.3 L 822.0 172.3" fill="none" stroke="var(--muted)" stroke-width="2.0"/><text class="sv-d" x="830" y="88" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">loss</text><g class="tv1"><circle cx="43.92" cy="105.17200405738302" r="4.5" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.3"/><circle cx="77.12" cy="129.94413853064776" r="4.5" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.3"/><circle cx="107.0" cy="148.64919939139259" r="4.5" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.3"/><circle cx="133.56" cy="162.42082669178382" r="4.5" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.3"/><circle cx="156.8" cy="172.26670047819158" r="4.5" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="24" y="234" fill="var(--tomb)" style="fill:var(--tomb)">năm cây rồi vẫn chưa tới đáy</text></g><g class="tv2"><path d="M 490.0 86.8 L 495.5 92.3 L 501.1 97.6 L 506.6 102.7 L 512.1 107.6 L 517.7 112.4 L 523.2 117.0 L 528.7 121.4 L 534.3 125.6 L 539.8 129.6 L 545.3 133.5 L 550.9 137.2 L 556.4 140.7 L 561.9 144.0 L 567.5 147.2 L 573.0 150.1 L 578.5 152.9 L 584.1 155.5 L 589.6 158.0 L 595.1 160.2 L 600.7 162.3 L 606.2 164.2 L 611.7 165.9 L 617.3 167.5 L 622.8 168.9 L 628.3 170.1 L 633.9 171.1 L 639.4 171.9 L 644.9 172.6 L 650.5 173.1 L 656.0 173.4 L 661.5 173.5 L 667.1 173.4 L 672.6 173.2 L 678.1 172.8 L 683.7 172.2 L 689.2 171.4 L 694.7 170.5 L 700.3 169.4 L 705.8 168.1 L 711.3 166.6 L 716.9 164.9 L 722.4 163.1 L 727.9 161.1 L 733.5 158.9 L 739.0 156.5 L 744.5 154.0 L 750.1 151.3 L 755.6 148.4 L 761.1 145.3 L 766.7 142.0 L 772.2 138.6 L 777.7 135.0 L 783.3 131.2 L 788.8 127.2 L 794.3 123.1 L 799.9 118.7 L 805.4 114.2 L 810.9 109.6 L 816.5 104.7 L 822.0 99.7" fill="none" stroke="var(--ok)" stroke-width="1.6" stroke-dasharray="5 4"/><circle cx="509.92" cy="105.17200405738302" r="4.5" fill="rgba(var(--green-a),.42)" stroke="var(--ok)" stroke-width="1.3"/><path d="M 516.9 102.2 Q 585.7 79.2 651.2 160.6" fill="none" stroke="var(--probe)" stroke-width="1.8"/><polygon points="656.8,167.6 646.0,162.2 653.8,155.9" fill="var(--probe)"/><circle cx="661.5333333333333" cy="173.47854376982406" r="5.5" fill="rgba(var(--amber-a),.42)" stroke="var(--probe)" stroke-width="1.5"/><text class="sv-d" x="490" y="234" fill="var(--ok)" style="fill:var(--ok)">một bước là tới đáy của parabol</text></g><g class="tv3"><text class="sv-d" x="0" y="290" fill="var(--muted)" style="fill:var(--muted)">cái giá: loss phải khả vi hai lần — MSE và log loss đều thoả</text></g></svg>
+  </figure>
   <ul class="why">
-    <li><b>g và h là chỗ loss thật đi vào.</b> Đổi từ hồi quy sang phân loại thì chỉ đổi cách tính hai số đó; phần còn lại của XGBoost không biết và không cần biết.</li>
-    <li><b>Cái giá của cách viết này:</b> loss phải khả vi hai lần mới có <code>h</code>. Hầu hết loss thông dụng đều thoả nên thực tế không vướng.</li>
-    <li>Ba mục sau chỉ là giải dòng này ra: gộp theo lá, tìm giá trị lá, rồi so hai bên để quyết định tách.</li>
+    <li>Đây là toàn bộ chỗ chữ <b>X</b> trong tên: eXtreme chẳng qua là viết objective ra rồi giải nó.</li>
+    <li>Đọc công thức theo đúng thứ tự đó: cây nào giảm được tổng bên trái nhiều nhất mà không đẻ thêm quá nhiều lá thì được chọn.</li>
   </ul>
 </section>
 
 <section id="xgb-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Gộp theo lá — từ (g, h) thành (G, H)</h2></div>
-
-  <p class="key">Biết mỗi mẫu rơi vào lá nào là <em>gộp được</em>: mỗi chiếc lá thành một hàm bậc hai riêng, giải độc lập với các lá khác.</p>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 308" role="img" aria-label="Sáu mẫu ở trên, mỗi mẫu có cặp g và h; cây tách chúng xuống ba chiếc lá; mỗi lá cộng dồn thành một cặp G và H duy nhất, lá ba chỉ có một mẫu nên H rất nhỏ">
-<text class="sv-hv" x="0" y="16" fill="var(--muted)">MỖI MẪU CÓ CẶP (g, h) CỦA RIÊNG NÓ — CÂY CHỈ QUYẾT ĐỊNH CHÚNG RƠI VÀO LÁ NÀO</text>
-<rect x="40" y="34" width="104" height="42" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<text class="sv-d" x="50" y="51" fill="var(--text)">mẫu A</text>
-<text class="sv-s" x="50" y="68" fill="var(--dim)">g −2,1  ·  h 0,8</text>
-<rect x="168" y="34" width="104" height="42" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<text class="sv-d" x="178" y="51" fill="var(--text)">mẫu B</text>
-<text class="sv-s" x="178" y="68" fill="var(--dim)">g −1,8  ·  h 0,7</text>
-<rect x="296" y="34" width="104" height="42" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<text class="sv-d" x="306" y="51" fill="var(--text)">mẫu C</text>
-<text class="sv-s" x="306" y="68" fill="var(--dim)">g −2,4  ·  h 0,9</text>
-<rect x="424" y="34" width="104" height="42" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<text class="sv-d" x="434" y="51" fill="var(--text)">mẫu D</text>
-<text class="sv-s" x="434" y="68" fill="var(--dim)">g +0,6  ·  h 0,5</text>
-<rect x="552" y="34" width="104" height="42" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<text class="sv-d" x="562" y="51" fill="var(--text)">mẫu E</text>
-<text class="sv-s" x="562" y="68" fill="var(--dim)">g −0,4  ·  h 0,6</text>
-<rect x="680" y="34" width="104" height="42" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<text class="sv-d" x="690" y="51" fill="var(--text)">mẫu F</text>
-<text class="sv-s" x="690" y="68" fill="var(--dim)">g +3,2  ·  h 0,4</text>
-<line x1="404" y1="112" x2="404" y2="96" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="404" cy="126" r="15" fill="var(--panel)" stroke="var(--filled)" stroke-width="1.4"/>
-<text class="sv-s" x="404" y="131" fill="var(--filled)" text-anchor="middle">x₁?</text>
-<text class="sv-s" x="424" y="120" fill="var(--dim)">nút tách</text>
-<line x1="404" y1="141" x2="128" y2="172" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="128" cy="186" r="16" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/>
-<text class="sv-d" x="128" y="191" fill="var(--ok)" text-anchor="middle">lá 1</text>
-<line x1="92" y1="78" x2="128" y2="168" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
-<line x1="220" y1="78" x2="128" y2="168" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
-<line x1="348" y1="78" x2="128" y2="168" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
-<rect x="24" y="222" width="208" height="46" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
-<text class="sv-n" x="128" y="242" fill="var(--ok)" text-anchor="middle">G −6,3   H 2,4</text>
-<text class="sv-s" x="128" y="260" fill="var(--dim)" text-anchor="middle">cộng 3 mẫu lại</text>
-<line x1="404" y1="141" x2="404" y2="172" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="404" cy="186" r="16" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/>
-<text class="sv-d" x="404" y="191" fill="var(--probe)" text-anchor="middle">lá 2</text>
-<line x1="476" y1="78" x2="404" y2="168" stroke="var(--probe)" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
-<line x1="604" y1="78" x2="404" y2="168" stroke="var(--probe)" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
-<rect x="300" y="222" width="208" height="46" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
-<text class="sv-n" x="404" y="242" fill="var(--probe)" text-anchor="middle">G +0,2   H 1,1</text>
-<text class="sv-s" x="404" y="260" fill="var(--dim)" text-anchor="middle">cộng 2 mẫu lại</text>
-<line x1="404" y1="141" x2="680" y2="172" stroke="var(--rule-hi)" stroke-width="1.1"/>
-<circle cx="680" cy="186" r="16" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/>
-<text class="sv-d" x="680" y="191" fill="var(--tomb)" text-anchor="middle">lá 3</text>
-<line x1="732" y1="78" x2="680" y2="168" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
-<rect x="576" y="222" width="208" height="46" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.4"/>
-<text class="sv-n" x="680" y="242" fill="var(--tomb)" text-anchor="middle">G +3,2   H 0,4</text>
-<text class="sv-s" x="680" y="260" fill="var(--dim)" text-anchor="middle">chỉ 1 mẫu — H rất nhỏ</text>
-<text class="sv-s" x="0" y="296" fill="var(--faint)">Cộng dồn g và h của các mẫu cùng lá → mỗi lá còn đúng hai số. Từ đó mỗi lá là một hàm bậc hai riêng, giải độc lập nhau.</text>
-</svg>
-    <figcaption>Cây không tính g, h — nó chỉ quyết định mẫu nào rơi vào lá nào. Cộng lại thì mỗi lá còn hai số. Lá 3 chỉ một mẫu nên <code>H</code> nhỏ, mục sau sẽ thấy hệ quả.</figcaption>
-  </figure>
-
-<div class="eq">
+  <div class="sh"><b>04</b><h2>Loss function</h2></div>
+  <p class="key">Công thức trên không nói <span class="mth"><var>g</var></span> và <span class="mth"><var>h</var></span> từ đâu ra. Chúng là <em>đạo hàm bậc nhất và bậc hai của một hàm loss cụ thể</em> — chọn loss nào là chọn hai công thức đó.</p>
+  <div class="eq">
     <div class="line">
-      <span class="t"><span>Obj</span></span>
+      <span class="t"><span><var>g</var><sub><var>i</var></sub></span><em>độ dốc</em></span>
       <span class="op">=</span>
-      <span class="t b"><span>Σ<sub>lá <var>j</var></sub> [ <var>G</var><sub><var>j</var></sub>·<var>w</var><sub><var>j</var></sub> + ½(<var>H</var><sub><var>j</var></sub> + <var>λ</var>)·<var>w</var><sub><var>j</var></sub><sup>2</sup> ]</span><em>một hàm bậc hai cho mỗi lá</em></span>
-      <span class="op">+</span>
-      <span class="t p"><span><var>γ</var>·<var>T</var></span><em>phạt theo số lá</em></span>
-    </div>
-    <dl>
-      <dt>G<sub>j</sub> · H<sub>j</sub></dt><dd>tổng g và tổng h của các mẫu rơi vào lá j</dd>
-      <dt>w<sub>j</sub></dt><dd>giá trị lá j trả về</dd>
-      <dt>λ · γ</dt><dd>hai siêu tham số phạt</dd>
-    </dl>
-    <p class="read">Đạo hàm theo w<sub>j</sub> rồi cho bằng 0:</p>
-    <div class="line">
-      <span class="t"><span><var>w</var><sub><var>j</var></sub>*</span></span>
+      <span class="t b"><span><span class="frac"><i>∂<var>l</var></i><i>∂<var>F</var></i></span></span><em>lệch về phía nào</em></span>
+      <span class="op">,</span>
+      <span class="t"><span><var>h</var><sub><var>i</var></sub></span><em>độ cong</em></span>
       <span class="op">=</span>
-      <span class="t g"><span>− <span class="frac"><i><var>G</var><sub><var>j</var></sub></i><i><var>H</var><sub><var>j</var></sub> + <var>λ</var></i></span></span><em>giá trị lá tối ưu, tính thẳng</em></span>
-    </div>
-    <div class="line">
-      <span class="t"><span>Obj*</span></span>
-      <span class="op">=</span>
-      <span class="t g"><span>− ½ Σ <span class="frac"><i><var>G</var><sub><var>j</var></sub><sup>2</sup></i><i><var>H</var><sub><var>j</var></sub> + <var>λ</var></i></span> + <var>γ</var><var>T</var></span><em>điểm của cả cây</em></span>
+      <span class="t g"><span><span class="frac"><i>∂<sup>2</sup><var>l</var></i><i>∂<var>F</var><sup>2</sup></i></span></span><em>bước đi được bao xa</em></span>
     </div>
   </div>
-
+  <dl class="defs">
+    <dt>l</dt><dd>loss trên đúng một mẫu</dd>
+    <dt>F</dt><dd>dự đoán hiện tại cho mẫu đó, cộng dồn từ các cây trước</dd>
+  </dl>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 264" role="img" aria-label="Hai hàm loss cụ thể: với MSE thì g bằng F trừ y và h luôn bằng 1, ví dụ mẫu A có y bằng 12 và F bằng 22,17 nên g bằng cộng 10,17; với log loss thì g bằng p trừ y và h bằng p nhân một trừ p, ví dụ nhãn 1 mà p bằng 0,30 cho g bằng trừ 0,70 và h bằng 0,21"><style>@keyframes lfin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){.lf1{animation:lfin .45s ease-out 0.00s both}.lf2{animation:lfin .45s ease-out 1.60s both}.lf3{animation:lfin .45s ease-out 3.20s both}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><g class="lf1"><rect x="0" y="46" width="406" height="182" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="0" y="32" fill="var(--filled)" style="fill:var(--filled)">hồi quy · MSE</text><text class="sv-d" x="20" y="80" fill="var(--faint)" style="fill:var(--faint)">loss</text><text class="sv-d" x="88" y="80" fill="var(--text)" style="fill:var(--text)">l = ½ (F − y)²</text><text class="sv-d" x="20" y="110" fill="var(--faint)" style="fill:var(--faint)">g = ∂l/∂F</text><text class="sv-d" x="88" y="110" fill="var(--filled)" style="fill:var(--filled)">F − y</text><text class="sv-d" x="20" y="140" fill="var(--faint)" style="fill:var(--faint)">h = ∂²l/∂F²</text><text class="sv-d" x="88" y="140" fill="var(--filled)" style="fill:var(--filled)">1</text><line x1="20" y1="158" x2="386" y2="158" stroke="var(--rule-hi)" stroke-width="1.1" stroke-dasharray="4 4"/><text class="sv-d" x="20" y="184" fill="var(--faint)" style="fill:var(--faint)">ví dụ một mẫu</text><text class="sv-d" x="20" y="208" fill="var(--muted)" style="fill:var(--muted)">A: y = 12 · F = 22,17</text><text class="sv-d" x="210" y="208" fill="var(--filled)" style="fill:var(--filled)">g = +10,17 · h = 1</text></g><g class="lf2"><rect x="454" y="46" width="406" height="182" rx="8" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="454" y="32" fill="var(--ok)" style="fill:var(--ok)">phân loại · log loss</text><text class="sv-d" x="474" y="80" fill="var(--faint)" style="fill:var(--faint)">loss</text><text class="sv-d" x="542" y="80" fill="var(--text)" style="fill:var(--text)">l = −[ y ln p + (1−y) ln(1−p) ]</text><text class="sv-d" x="474" y="110" fill="var(--faint)" style="fill:var(--faint)">g = ∂l/∂F</text><text class="sv-d" x="542" y="110" fill="var(--ok)" style="fill:var(--ok)">p − y</text><text class="sv-d" x="474" y="140" fill="var(--faint)" style="fill:var(--faint)">h = ∂²l/∂F²</text><text class="sv-d" x="542" y="140" fill="var(--ok)" style="fill:var(--ok)">p (1 − p)</text><line x1="474" y1="158" x2="840" y2="158" stroke="var(--rule-hi)" stroke-width="1.1" stroke-dasharray="4 4"/><text class="sv-d" x="474" y="184" fill="var(--faint)" style="fill:var(--faint)">ví dụ một mẫu</text><text class="sv-d" x="474" y="208" fill="var(--muted)" style="fill:var(--muted)">nhãn 1 · p = 0,30</text><text class="sv-d" x="664" y="208" fill="var(--ok)" style="fill:var(--ok)">g = −0,70 · h = 0,21</text></g><g class="lf3"><text class="sv-d" x="0" y="252" fill="var(--probe)" style="fill:var(--probe)">đổi bài toán chỉ là đổi hai dòng g và h — phần còn lại của cây không đổi một chữ</text></g></svg>
+  </figure>
   <ul class="why">
-    <li>Gộp xong thì <code>Obj</code> <b>tách rời theo lá</b> — đó là lý do giải ra được bằng công thức đóng.</li>
-    <li><code>λ</code> ở mẫu số kéo mọi giá trị lá về gần 0 — đúng là <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">L2</a> áp lên giá trị lá.</li>
-    <li><code>γ</code> tính tiền cho mỗi chiếc lá tồn tại, nên cây <b>chỉ mọc thêm khi lợi ích vượt cái giá đó</b>. Cả hai nằm <b>ngay trong công thức</b>, không phải một bước xử lý sau.</li>
+    <li>Với <b>MSE</b> thì <span class="mth"><var>g</var> = <var>F</var> − <var>y</var></span> — đúng là <a href="../gradient-boosting/index.html">phần dư</a> đổi dấu — và <span class="mth"><var>h</var></span> luôn bằng 1, nên <span class="mth"><var>H</var></span> chính là số mẫu trong lá.</li>
+    <li>Với <b>log loss</b> thì <span class="mth"><var>h</var> = <var>p</var>(1−<var>p</var>)</span>: mẫu nào model còn lưỡng lự thì nặng, mẫu nào đã chắc thì gần như không kéo được nữa.</li>
+    <li>Cái giá là loss phải <b>khả vi hai lần</b> — MSE và log loss đều thoả, MAE thì không.</li>
   </ul>
 </section>
 
 <section id="xgb-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Giá trị lá và tác dụng của λ</h2></div>
-
-  <p class="key"><code>w* = − G/(H + λ)</code> — và vì <code>H</code> ở mẫu số, <em>cùng một λ ghìm lá mỏng mạnh hơn hẳn lá dày</em>.</p>
-
+  <div class="sh"><b>05</b><h2>Giá trị lá và λ</h2></div>
+  <p class="key">Đạo hàm objective theo <span class="mth"><var>w</var></span> rồi cho bằng 0, ra <em>một công thức đóng</em> cho giá trị lá. Không phải dò, không phải lấy trung bình.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><var>w</var><sub><var>j</var></sub></span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>− <span class="frac"><i><var>G</var><sub><var>j</var></sub></i><i><var>H</var><sub><var>j</var></sub> + <var>λ</var></i></span></span><em>λ ở mẫu số nên lá mỏng bị ghìm mạnh hơn</em></span>
+    </div>
+  </div>
+  <dl class="defs">
+    <dt>G<sub>j</sub></dt><dd>tổng g của mọi mẫu rơi vào lá j</dd>
+    <dt>H<sub>j</sub></dt><dd>tổng h của chúng — với MSE là số mẫu</dd>
+  </dl>
   <figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="Hai chiếc lá của cùng cái cây ở mục trước: lá bốn mẫu và lá hai mẫu, giá trị mỗi lá co ngắn lại khi lambda tăng, lá ít mẫu co mạnh hơn hẳn">
-<text class="sv-hv" x="0" y="16" fill="var(--muted)">VẪN HAI CHIẾC LÁ CỦA CÂY Ở MỤC TRƯỚC — CÙNG MỘT λ, HAI SỐ PHẬN KHÁC NHAU</text>
-
-<circle cx="60" cy="72" r="20" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-d" x="60" y="70" fill="var(--ok)" text-anchor="middle">A–D</text>
-<text class="sv-s" x="60" y="84" fill="var(--dim)" text-anchor="middle">4 mẫu</text>
-<text class="sv-n" x="60" y="112" fill="var(--muted)" text-anchor="middle">H 3,0</text>
-
-<text class="sv-s" x="112" y="42" fill="var(--dim)">λ = 0</text>
-<rect x="160" y="30" width="380" height="18" rx="3" fill="rgba(var(--green-a),.20)" stroke="var(--ok)" stroke-width="1.3"/>
-<text class="sv-n" x="552" y="44" fill="var(--ok)">w* 2,23   ·   100%</text>
-<text class="sv-s" x="112" y="76" fill="var(--dim)">λ = 1</text>
-<rect x="160" y="64" width="285" height="18" rx="3" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.3"/>
-<text class="sv-n" x="552" y="78" fill="var(--muted)">w* 1,68   ·   còn 75%</text>
-<text class="sv-s" x="112" y="110" fill="var(--dim)">λ = 5</text>
-<rect x="160" y="98" width="144" height="18" rx="3" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
-<text class="sv-n" x="552" y="112" fill="var(--muted)">w* 0,84   ·   còn 38%</text>
-
-<line x1="0" y1="136" x2="860" y2="136" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
-
-<circle cx="60" cy="192" r="20" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-d" x="60" y="190" fill="var(--probe)" text-anchor="middle">E, F</text>
-<text class="sv-s" x="60" y="204" fill="var(--dim)" text-anchor="middle">2 mẫu</text>
-<text class="sv-n" x="60" y="232" fill="var(--muted)" text-anchor="middle">H 0,9</text>
-
-<text class="sv-s" x="112" y="162" fill="var(--dim)">λ = 0</text>
-<rect x="160" y="150" width="380" height="18" rx="3" fill="rgba(var(--amber-a),.20)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-n" x="552" y="164" fill="var(--probe)">w* −4,22   ·   100%</text>
-<text class="sv-s" x="112" y="196" fill="var(--dim)">λ = 1</text>
-<rect x="160" y="184" width="179" height="18" rx="3" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-n" x="552" y="198" fill="var(--muted)">w* −2,00   ·   còn 47%</text>
-<text class="sv-s" x="112" y="230" fill="var(--dim)">λ = 5</text>
-<rect x="160" y="218" width="57" height="18" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.3"/>
-<text class="sv-n" x="552" y="232" fill="var(--muted)">w* −0,64   ·   còn 15%</text>
-
-<text class="sv-s" x="0" y="270" fill="var(--faint)">λ cộng vào mẫu số. Lá dày có H lớn nên λ chỉ là phần nhỏ; lá mỏng có H bé nên λ lấn át hẳn.</text>
-<text class="sv-s" x="0" y="288" fill="var(--faint)">Cùng λ = 5: lá 4 mẫu giữ được 38% giá trị, lá 2 mẫu chỉ còn 15%.</text>
-</svg>
-    <figcaption>Cùng <code>λ = 5</code>: lá dày còn 38% giá trị, lá mỏng chỉ còn 15%. <strong>Cây tự nghi ngờ lá ít mẫu</strong>, không cần một luật riêng cho việc đó.</figcaption>
+    <svg viewBox="0 0 860 284" role="img" aria-label="Hai lá cùng giá trị 10 khi lambda bằng 0, nhưng lá mỏng một mẫu tụt về 1,67 còn lá dày bốn mẫu chỉ tụt về 4,44 khi lambda bằng 5, và trên dữ liệu thật RMSE test tốt nhất ở lambda bằng 5 với 5,18"><style>@keyframes lmin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){.lm1{animation:lmin .45s ease-out 0.00s both}.lm2{animation:lmin .45s ease-out 0.36s both}.lm3{animation:lmin .45s ease-out 0.71s both}.lm4{animation:lmin .45s ease-out 1.07s both}.lm5{animation:lmin .45s ease-out 1.42s both}.lm6{animation:lmin .45s ease-out 1.78s both}.lm7{animation:lmin .45s ease-out 2.13s both}.lm8{animation:lmin .45s ease-out 2.49s both}.lm9{animation:lmin .45s ease-out 2.84s both}.lm10{animation:lmin .45s ease-out 3.20s both}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><text class="sv-d" x="0" y="40" fill="var(--ok)" style="fill:var(--ok)">w = − G / (H + λ)</text><text class="sv-d" x="236" y="40" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">λ = 0</text><text class="sv-d" x="354" y="40" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">λ = 1</text><text class="sv-d" x="472" y="40" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">λ = 5</text><g class="lm1"><text class="sv-d" x="0" y="92" fill="var(--text)" style="fill:var(--text)">lá dày · 4 mẫu</text><text class="sv-d" x="0" y="116" fill="var(--filled)" style="fill:var(--filled)">G -40 · H 4</text><rect x="210" y="80.0" width="52" height="46.0" rx="3" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="236" y="142" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">10,00</text><rect x="328" y="89.19999999999999" width="52" height="36.800000000000004" rx="3" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="354" y="142" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">8,00</text><rect x="446" y="105.55555555555556" width="52" height="20.444444444444446" rx="3" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="472" y="142" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">4,44</text></g><g class="lm2"><text class="sv-d" x="0" y="180" fill="var(--text)" style="fill:var(--text)">lá mỏng · 1 mẫu</text><text class="sv-d" x="0" y="204" fill="var(--tomb)" style="fill:var(--tomb)">G -10 · H 1</text><rect x="210" y="168.0" width="52" height="46.0" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="236" y="230" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">10,00</text><rect x="328" y="191.0" width="52" height="23.0" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="354" y="230" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">5,00</text><rect x="446" y="206.33333333333334" width="52" height="7.666666666666668" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="472" y="230" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">1,67</text></g><g class="lm3"><text class="sv-d" x="0" y="250" fill="var(--muted)" style="fill:var(--muted)">cùng w khi λ = 0; λ lớn dần thì lá mỏng tụt nhanh hơn hẳn</text></g><g class="lm4"><rect x="596" y="48" width="264" height="196" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="612" y="74" fill="var(--text)" style="fill:var(--text)">đo thật · 300 hàng · 80 cây</text><text class="sv-d" x="612" y="100" fill="var(--faint)" style="fill:var(--faint)">λ</text><text class="sv-d" x="692" y="100" fill="var(--faint)" style="fill:var(--faint)">RMSE test</text><text class="sv-d" x="804" y="100" fill="var(--faint)" style="fill:var(--faint)">số lá</text></g><g class="lm5"><text class="sv-d" x="612" y="126" fill="var(--muted)" style="fill:var(--muted)">0</text><text class="sv-d" x="692" y="126" fill="var(--muted)" style="fill:var(--muted)">6,29</text><text class="sv-d" x="804" y="126" fill="var(--muted)" style="fill:var(--muted)">55,7</text></g><g class="lm6"><text class="sv-d" x="612" y="150" fill="var(--muted)" style="fill:var(--muted)">1</text><text class="sv-d" x="692" y="150" fill="var(--muted)" style="fill:var(--muted)">5,63</text><text class="sv-d" x="804" y="150" fill="var(--muted)" style="fill:var(--muted)">37,9</text></g><g class="lm7"><text class="sv-d" x="612" y="174" fill="var(--ok)" style="fill:var(--ok)">5</text><text class="sv-d" x="692" y="174" fill="var(--ok)" style="fill:var(--ok)">5,18</text><text class="sv-d" x="804" y="174" fill="var(--ok)" style="fill:var(--ok)">27,9</text></g><g class="lm8"><text class="sv-d" x="612" y="198" fill="var(--muted)" style="fill:var(--muted)">20</text><text class="sv-d" x="692" y="198" fill="var(--muted)" style="fill:var(--muted)">5,36</text><text class="sv-d" x="804" y="198" fill="var(--muted)" style="fill:var(--muted)">24,1</text></g><g class="lm9"><text class="sv-d" x="612" y="222" fill="var(--muted)" style="fill:var(--muted)">100</text><text class="sv-d" x="692" y="222" fill="var(--muted)" style="fill:var(--muted)">7,23</text><text class="sv-d" x="804" y="222" fill="var(--muted)" style="fill:var(--muted)">15,0</text></g><g class="lm10"><text class="sv-d" x="612" y="264" fill="var(--ok)" style="fill:var(--ok)">λ = 5 tốt nhất ở đây</text></g></svg>
   </figure>
-
   <ul class="why">
-    <li><code>λ</code> kéo mọi giá trị lá về gần 0 — đúng là <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">L2 của Ridge</a>, chỉ khác là áp lên giá trị lá thay vì lên hệ số.</li>
-    <li><code>H</code> nhỏ thì <code>λ</code> lấn át, nên <b>lá ít mẫu tự bị nghi ngờ</b> — regularization ở đây không phải một bước thêm vào mà là hệ quả trực tiếp của công thức.</li>
-    <li>Vẫn cần <code>learning_rate</code> (<code>eta</code>): <code>λ</code> hãm <em>từng cây</em>, <code>eta</code> hãm <em>tốc độ tích luỹ</em> qua nhiều cây.</li>
-  </ul>
-
-  <p><code>λ</code> và <code>γ</code> đều chống overfit, nhưng <b>hãm hai kiểu khác nhau</b>. Đo trên 400 mẫu, 80 cây, <code>eta</code> 0,1, sâu tối đa 6:</p>
-
-  <table>
-    <tr><th>λ</th><th>γ</th><th>RMSE train</th><th>RMSE test</th><th>lá mỗi cây</th><th></th></tr>
-    <tr><td>0</td><td>0</td><td>0,356</td><td>2,852</td><td>25,6</td><td>học thuộc — train gần 0</td></tr>
-    <tr><td>1</td><td>0</td><td>0,427</td><td>2,754</td><td>24,5</td><td></td></tr>
-    <tr><td>5</td><td>0</td><td>0,571</td><td>2,720</td><td>26,1</td><td></td></tr>
-    <tr><td><b style="color:var(--ok)">20</b></td><td>0</td><td>0,966</td><td><b style="color:var(--ok)">2,606</b></td><td>24,8</td><td><b style="color:var(--ok)">tốt nhất — cây vẫn 25 lá</b></td></tr>
-    <tr><td>0</td><td>2</td><td>1,075</td><td>3,086</td><td>11,4</td><td></td></tr>
-    <tr><td>0</td><td><b style="color:var(--tomb)">10</b></td><td>1,850</td><td><b style="color:var(--tomb)">3,282</b></td><td>5,6</td><td><b style="color:var(--tomb)">cắt quá tay — còn 5,6 lá</b></td></tr>
-  </table>
-
-  <ul class="why">
-    <li><code>λ</code> ghìm <b>độ lớn</b> của giá trị lá mà không đổi hình cây: 25 lá vẫn là 25 lá, chỉ mỗi lá nói nhỏ đi.</li>
-    <li><code>γ</code> đổi <b>hình</b> cây — nó chặn không cho tách, nên số lá tụt hẳn.</li>
-    <li>Vì vậy <b>chỉnh <code>λ</code> trước</b>: nó hạ RMSE test từ 2,852 xuống 2,606 mà không mất lá nào. <code>γ</code> là dao mổ, để dành cho lúc cây phình quá.</li>
+    <li>Đo thật: <code>reg_lambda</code> = 5 cho RMSE test <b>5,18</b>, tốt hơn hẳn 6,29 khi bỏ hẳn phần phạt.</li>
+    <li>Cùng ý đồ với <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">Ridge</a>: phạt bình phương trọng số, chỉ khác chỗ trọng số ở đây là giá trị lá.</li>
   </ul>
 </section>
 
 <section id="xgb-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Gain — tiêu chí tách nút</h2></div>
-
-  <p class="key">So điểm hai đỉnh sau khi tách với điểm trước khi tách, rồi <em>trừ đi tiền thuê chiếc lá mới</em>.</p>
-
+  <div class="sh"><b>06</b><h2>Gain và γ</h2></div>
+  <p class="key">Thay <span class="mth"><var>w</var></span> ngược vào objective thì <em>mọi phép tách đều chấm được điểm</em>, và γ là vạch sàn điểm đó phải vượt.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="Vẫn sáu mẫu A đến F của mục trước: nút chưa tách có điểm 0,86; tách ra hai nhánh được 5,61 và 3,80; phép trừ cho gain +8,05 lớn hơn 0 nên tách">
-<text class="sv-hv" x="0" y="16" fill="var(--muted)">VẪN SÁU MẪU A–F CỦA MỤC TRƯỚC — CÓ NÊN TÁCH NÚT NÀY KHÔNG?</text>
-
-<text class="sv-s" x="0" y="60" fill="var(--dim)">TRƯỚC KHI TÁCH</text>
-<circle cx="150" cy="100" r="26" fill="var(--panel)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-d" x="150" y="97" fill="var(--filled)" text-anchor="middle">A–F</text>
-<text class="sv-s" x="150" y="112" fill="var(--dim)" text-anchor="middle">6 mẫu</text>
-<text class="sv-n" x="150" y="150" fill="var(--muted)" text-anchor="middle">G −2,9 · H 3,9</text>
-<rect x="72" y="162" width="156" height="28" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/>
-<text class="sv-n" x="150" y="181" fill="var(--filled)" text-anchor="middle">điểm 0,86</text>
-
-<text class="sv-s" x="330" y="60" fill="var(--dim)">SAU KHI TÁCH Ở NGƯỠNG 4,5</text>
-<circle cx="470" cy="100" r="18" fill="var(--panel)" stroke="var(--rule-hi)" stroke-width="1.4"/>
-<text class="sv-s" x="470" y="105" fill="var(--dim)" text-anchor="middle">x₁?</text>
-<line x1="470" y1="118" x2="400" y2="152" stroke="var(--ok)" stroke-width="1.3"/>
-<line x1="470" y1="118" x2="600" y2="152" stroke="var(--probe)" stroke-width="1.3"/>
-<circle cx="392" cy="168" r="22" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-d" x="392" y="166" fill="var(--ok)" text-anchor="middle">A–D</text>
-<text class="sv-s" x="392" y="180" fill="var(--dim)" text-anchor="middle">4 mẫu</text>
-<text class="sv-n" x="392" y="212" fill="var(--muted)" text-anchor="middle">G −6,7 · H 3,0</text>
-<rect x="314" y="224" width="156" height="28" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.4"/>
-<text class="sv-n" x="392" y="243" fill="var(--ok)" text-anchor="middle">điểm 5,61</text>
-<circle cx="608" cy="168" r="22" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-d" x="608" y="166" fill="var(--probe)" text-anchor="middle">E, F</text>
-<text class="sv-s" x="608" y="180" fill="var(--dim)" text-anchor="middle">2 mẫu</text>
-<text class="sv-n" x="608" y="212" fill="var(--muted)" text-anchor="middle">G +3,8 · H 0,9</text>
-<rect x="530" y="224" width="156" height="28" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/>
-<text class="sv-n" x="608" y="243" fill="var(--probe)" text-anchor="middle">điểm 3,80</text>
-
-<line x1="270" y1="40" x2="270" y2="270" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<line x1="700" y1="40" x2="700" y2="270" stroke="var(--rule)" stroke-width="1.2" stroke-dasharray="3 3"/>
-
-<text class="sv-s" x="730" y="60" fill="var(--dim)">GAIN</text>
-<text class="sv-n" x="730" y="100" fill="var(--ok)">5,61 + 3,80</text>
-<text class="sv-n" x="730" y="122" fill="var(--filled)">− 0,86</text>
-<text class="sv-n" x="730" y="144" fill="var(--tomb)">− γ · 1 lá mới</text>
-<line x1="730" y1="156" x2="852" y2="156" stroke="var(--rule-hi)" stroke-width="1.2"/>
-<rect x="722" y="166" width="130" height="34" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.8"/>
-<text class="sv-n" x="787" y="188" fill="var(--ok)" text-anchor="middle">+8,05</text>
-<text class="sv-s" x="787" y="220" fill="var(--ok)" text-anchor="middle">&gt; 0 → tách</text>
-
-<text class="sv-s" x="0" y="288" fill="var(--faint)">Điểm mỗi nút là ½·G²/(H+λ) — chính công thức Obj* của mục trước. γ là tiền thuê chiếc lá vừa mọc thêm.</text>
-</svg>
-    <figcaption>Ngưỡng 4,5 là ngưỡng lab bên dưới mở sẵn — bấm sang ngưỡng khác thì mấy con số này đổi theo. Gain dương thì tách, âm thì đóng nút lại. <code>γ</code> là <b>tiền thuê một chiếc lá</b>: không lợi hơn từng ấy thì đừng thêm lá.</figcaption>
+    <svg viewBox="0 0 860 292" role="img" aria-label="Năm chỗ cắt được chấm điểm gain: 34,4 · 89,6 · 189,1 · 103,1 · 26,0, chỗ x nhỏ hơn hoặc bằng 3,5 cao nhất nên được chọn, và γ là vạch sàn mà gain phải vượt qua thì nhánh mới được giữ"><style>@keyframes gnin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){.gn1{animation:gnin .45s ease-out 0.00s both}.gn2{animation:gnin .45s ease-out 0.53s both}.gn3{animation:gnin .45s ease-out 1.07s both}.gn4{animation:gnin .45s ease-out 1.60s both}.gn5{animation:gnin .45s ease-out 2.13s both}.gn6{animation:gnin .45s ease-out 2.67s both}.gn7{animation:gnin .45s ease-out 3.20s both}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><text class="sv-d" x="0" y="32" fill="var(--muted)" style="fill:var(--muted)">gain = nửa phần lợi của Obj sau khi tách, rồi trừ γ</text><g class="gn1"><text class="sv-d" x="0" y="65" fill="var(--muted)" style="fill:var(--muted)">x ≤ 1,5</text><rect x="138" y="48" width="79.11999999999999" height="22" rx="3" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="229.12" y="65" fill="var(--tomb)" style="fill:var(--tomb)">34,4</text></g><g class="gn2"><text class="sv-d" x="0" y="105" fill="var(--muted)" style="fill:var(--muted)">x ≤ 2,5</text><rect x="138" y="88" width="206.07999999999998" height="22" rx="3" fill="rgba(var(--blue-a),.18)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="356.08" y="105" fill="var(--filled)" style="fill:var(--filled)">89,6</text></g><g class="gn3"><text class="sv-d" x="0" y="145" fill="var(--text)" style="fill:var(--text)">x ≤ 3,5</text><rect x="138" y="128" width="434.92999999999995" height="22" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="584.93" y="145" fill="var(--ok)" style="fill:var(--ok)">189,1</text><text class="sv-d" x="646.93" y="145" fill="var(--ok)" style="fill:var(--ok)">chọn chỗ này</text></g><g class="gn4"><text class="sv-d" x="0" y="185" fill="var(--muted)" style="fill:var(--muted)">x ≤ 5,5</text><rect x="138" y="168" width="237.12999999999997" height="22" rx="3" fill="rgba(var(--blue-a),.18)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="387.13" y="185" fill="var(--filled)" style="fill:var(--filled)">103,1</text></g><g class="gn5"><text class="sv-d" x="0" y="225" fill="var(--muted)" style="fill:var(--muted)">x ≤ 6,5</text><rect x="138" y="208" width="59.8" height="22" rx="3" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="209.8" y="225" fill="var(--tomb)" style="fill:var(--tomb)">26,0</text></g><g class="gn6"><line x1="276.0" y1="36" x2="276.0" y2="238" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="6 4"/><text class="sv-d" x="286.0" y="28" fill="var(--probe)" style="fill:var(--probe)">γ = 60 · sàn phải vượt</text></g><g class="gn7"><text class="sv-d" x="0" y="254" fill="var(--muted)" style="fill:var(--muted)">hai chỗ cắt dưới sàn bị bỏ ngay — γ là cách cắt tỉa trước khi cây mọc</text><text class="sv-d" x="0" y="278" fill="var(--muted)" style="fill:var(--muted)">đo thật: γ từ 0 lên 40 kéo số lá mỗi cây từ 37,9 xuống 7,2</text></g></svg>
   </figure>
-
-  <p>Lab dưới đây chạy trên <b>đúng sáu mẫu A–F của hình trên</b>, <code>λ = 1</code> giữ nguyên. Chỉ một câu hỏi: <b>tiền thuê lá đắt tới đâu thì cây thôi mọc?</b></p>
-
-  <div class="lab" id="xgblab">
-    <div class="bar">
-      <div><label>γ — tiền thuê mỗi chiếc lá</label><div class="scen" id="xgam"></div></div>
-    </div>
-
-    <div id="xview"></div>
-
-    <p class="labsay" id="xexp"></p>
-
-    <div class="labbar">
-      <button class="ghost" id="xrst">Đặt lại</button>
-      <span id="xstat"></span>
-    </div>
-
-    <p class="verdict" id="xverdict" hidden></p>
-  </div>
-
   <ul class="why">
-    <li>Gain sinh <b>thẳng từ <code>Obj*</code></b>, nên nó không phải một tiêu chí thứ hai cần chỉnh riêng.</li>
-    <li>Đây là điểm khác <a href="../decision-tree/index.html">Decision tree</a> rõ nhất: cây thường tách theo Gini rồi cắt tỉa sau, còn ở đây <b>mọc cây và chống overfit là một việc</b>.</li>
+    <li>γ cắt tỉa <b>trước</b> khi nhánh mọc, nên rẻ hơn hẳn cách trồng xong rồi cắt: <code>gamma</code> từ 0 lên 40 kéo số lá mỗi cây từ 37,9 xuống <b>7,2</b>.</li>
+    <li>Nhưng nó gần như không cải thiện test ở bộ này — chỉnh <code>reg_lambda</code> trước, γ chỉ dùng khi cây phình quá to.</li>
   </ul>
 </section>
 
 <section id="xgb-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Ưu và nhược</h2></div>
-
-  <p class="key">Đổi <em>công sức tinh chỉnh</em> lấy <em>độ chính xác và sự ổn định</em>. Mặc định hiếm khi là cấu hình tốt nhất.</p>
-
-  <div class="cmp two">
-    <div><h5>Mạnh</h5>
-      <p>Chính xác hàng đầu trên <b>dữ liệu bảng</b>, và rất ổn định giữa các lần chạy.</p>
-      <p>Không cần co giãn đặc trưng; giá trị thiếu xử lý sẵn.</p>
-    </div>
-    <div><h5>Yếu</h5>
-      <p>Chậm hơn <a href="../lightgbm/index.html">LightGBM</a> rõ rệt khi dữ liệu rất lớn; biến phân loại phải mã hoá trước.</p>
-      <p>Nhiều hyperparameter nên tinh chỉnh tốn công — mặc định hiếm khi là cấu hình tốt nhất.</p>
-    </div>
-  </div>
-
-  <p>Nó thống trị ở <b>dữ liệu bảng cỡ vừa</b> — vài nghìn tới vài triệu dòng, và là lựa chọn mặc định ở Kaggle gần một thập kỷ.</p>
-
-  <p>Nhiều hyperparameter nên phải chỉnh theo thứ tự và bằng random search chứ đừng grid — xem <a href="../../04-core-concepts/overfitting-regularization/index.html">Overfitting &amp; regularization</a>.</p>
+  <div class="sh"><b>07</b><h2>Ô trống</h2></div>
+  <p class="key">Hàng thiếu dữ liệu không bị điền số. Mỗi nút <em>học lấy hướng mặc định</em> cho chúng, bằng đúng cái gain ở mục trên.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 300" role="img" aria-label="Hàng có ô trống không bị điền số; mỗi nút thử cho chúng đi hẳn sang trái rồi sang phải, bên nào gain cao hơn thì thành hướng mặc định, và trên bộ 30 phần trăm ô trống cách này cho RMSE 8,01 so với 8,65 khi điền trung bình"><style>@keyframes msin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){.ms1{animation:msin .45s ease-out 0.00s both}.ms2{animation:msin .45s ease-out 0.80s both}.ms3{animation:msin .45s ease-out 1.60s both}.ms4{animation:msin .45s ease-out 2.40s both}.ms5{animation:msin .45s ease-out 3.20s both}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><text class="sv-d" x="0" y="34" fill="var(--faint)" style="fill:var(--faint)">cột c · 92 / 300 hàng trống</text><g class="ms1"><rect x="0" y="62" width="74" height="22" rx="3" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="20" y="78" fill="var(--filled)" style="fill:var(--filled)">3,1</text><rect x="0" y="92" width="74" height="22" rx="3" fill="rgba(var(--amber-a),.22)" stroke="var(--probe)" stroke-width="1.2"/><text class="sv-d" x="20" y="108" fill="var(--probe)" style="fill:var(--probe)">—</text><rect x="0" y="122" width="74" height="22" rx="3" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="20" y="138" fill="var(--filled)" style="fill:var(--filled)">7,4</text><rect x="0" y="152" width="74" height="22" rx="3" fill="rgba(var(--amber-a),.22)" stroke="var(--probe)" stroke-width="1.2"/><text class="sv-d" x="20" y="168" fill="var(--probe)" style="fill:var(--probe)">—</text><rect x="0" y="182" width="74" height="22" rx="3" fill="rgba(var(--blue-a),.22)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="20" y="198" fill="var(--filled)" style="fill:var(--filled)">5,9</text></g><g class="ms2"><line x1="86" y1="88" x2="132" y2="88" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="140,88 132,83.8 132,92.2" fill="var(--rule-hi)"/><rect x="150" y="56" width="262" height="60" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="166" y="81" fill="var(--text)" style="fill:var(--text)">trống sang trái</text><text class="sv-d" x="166" y="104" fill="var(--ok)" style="fill:var(--ok)">gain 853,6</text><text class="sv-d" x="428" y="92" fill="var(--ok)" style="fill:var(--ok)">giữ hướng này</text></g><g class="ms3"><line x1="86" y1="166" x2="132" y2="166" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="140,166 132,161.8 132,170.2" fill="var(--rule-hi)"/><rect x="150" y="134" width="262" height="60" rx="6" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="166" y="159" fill="var(--text)" style="fill:var(--text)">trống sang phải</text><text class="sv-d" x="166" y="182" fill="var(--tomb)" style="fill:var(--tomb)">gain 662,8</text></g><g class="ms4"><rect x="566" y="46" width="294" height="132" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3"/><text class="sv-d" x="582" y="72" fill="var(--text)" style="fill:var(--text)">RMSE test · 30% ô trống</text><text class="sv-d" x="582" y="104" fill="var(--ok)" style="fill:var(--ok)">học hướng mặc định</text><text class="sv-d" x="798" y="104" fill="var(--ok)" style="fill:var(--ok)">8,01</text><text class="sv-d" x="582" y="134" fill="var(--tomb)" style="fill:var(--tomb)">điền trung bình</text><text class="sv-d" x="798" y="134" fill="var(--tomb)" style="fill:var(--tomb)">8,65</text><text class="sv-d" x="582" y="162" fill="var(--faint)" style="fill:var(--faint)">không phải đoán hộ dữ liệu</text></g><g class="ms5"><text class="sv-d" x="0" y="264" fill="var(--muted)" style="fill:var(--muted)">hướng mặc định học được từ gain, nên nó là một phần của model chứ không phải bước tiền xử lý</text><text class="sv-d" x="0" y="288" fill="var(--muted)" style="fill:var(--muted)">kèm theo: nút chỉ duyệt các giá trị có thật, nên cột thưa chạy nhanh hơn hẳn</text></g></svg>
+  </figure>
+  <ul class="why">
+    <li>Đo thật với 30% ô trống: học hướng cho RMSE test <b>8,01</b>, điền trung bình cho <b>8,65</b>.</li>
+    <li>Ô trống nhiều khi tự nó là thông tin — điền trung bình là xoá mất thông tin đó.</li>
+  </ul>
 </section>
 
 <section id="xgb-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Lỗi hay gặp</h2></div>
-
-  <p class="key">Nhiều hyperparameter nên cũng nhiều chỗ chỉnh sai — <em>phần lớn lỗi tới từ việc đối xử với nó như Random forest</em>.</p>
-
-  <div class="grid2">
-    <div class="card bad"><h4>Điền giá trị thiếu trước khi đưa vào</h4><p>Mỗi nút của XGBoost tự học một hướng mặc định cho mẫu thiếu, nên "thiếu" là một tín hiệu. Điền trước là xoá mất nó — cứ để nguyên <code>NaN</code>.</p></div>
-    <div class="card bad"><h4>Không dùng early stopping</h4><p>Boosting overfit dần theo số cây. Đặt <code>n_estimators</code> cao rồi để tập validation quyết định điểm dừng.</p></div>
-    <div class="card bad"><h4>Giảm <code>learning_rate</code> mà quên tăng số cây</h4><p>Hai tham số bù trừ nhau. Giảm eta mà giữ nguyên số cây là underfit.</p></div>
-    <div class="card bad"><h4>Dùng tập test làm tập early stopping</h4><p>Con số cuối cùng thành lạc quan giả. Cần một tập validation riêng.</p></div>
-    <div class="card bad"><h4>Cây quá sâu</h4><p><code>max_depth</code> 10+ trên dữ liệu bảng gần như luôn overfit. Boosting cần cây <em>nông</em> — sức mạnh tới từ số lượng cây.</p></div>
-  </div>
+  <div class="sh"><b>08</b><h2>Ưu và nhược</h2></div>
+  <p class="key">Mọi ưu điểm đến từ việc <em>viết objective ra thành công thức</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
+  <table>
+    <tr><th>Mặt</th><th>Được gì</th><th>Mất gì</th></tr>
+    <tr><td>Độ chính xác</td><td>Mạnh nhất nhóm trên dữ liệu bảng, thắng nhiều cuộc thi</td><td>—</td></tr>
+    <tr><td>Chống overfit</td><td>λ và γ nằm sẵn trong objective, không phải bước riêng</td><td>Thêm hai tham số phải chỉnh cùng ba tham số cũ</td></tr>
+    <tr><td>Loss</td><td>Tự định nghĩa được, chỉ cần đưa g và h</td><td>Phải khả vi hai lần — MAE dùng thẳng không được</td></tr>
+    <tr><td>Ô trống</td><td>Học hướng mặc định, không cần điền số trước</td><td>Cột trống vì lý do khác nhau vẫn bị gộp một hướng</td></tr>
+    <tr><td>Tốc độ</td><td>Chia histogram, chạy nhiều luồng trong một cây</td><td>Vẫn tuần tự theo cây, không song song hoá theo vòng được</td></tr>
+    <tr><td>Chỉnh tham số</td><td>Mặc định đã chạy được ngay</td><td>Cả chục tham số, dễ chỉnh mò mà không biết cái nào có tác dụng</td></tr>
+    <tr><td>Đọc model</td><td>Có bảng feature importance và SHAP</td><td>Vài trăm cây cộng lại không đọc thành luật được</td></tr>
+  </table>
+  <ul class="why">
+    <li><b>Chọn XGBoost</b> cho dữ liệu bảng cỡ vừa, nhiều ô trống, cần độ chính xác cao nhất.</li>
+    <li><b>Chọn <a href="../lightgbm/index.html">LightGBM</a></b> khi dữ liệu rất lớn và thời gian huấn luyện là thứ đáng lo nhất.</li>
+    <li><b>Chọn <a href="../random-forest/index.html">Random forest</a></b> khi nhãn nghi bẩn hoặc không muốn chỉnh tham số.</li>
+  </ul>
 </section>
 
 <section id="xgb-s9" class="lesson">
   <div class="sh"><b>09</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
+  <details class="qa"><summary>Đạo hàm bậc hai thêm được gì mà gradient boosting gốc không có?</summary>
+  <p>Bậc nhất chỉ nói hướng đi xuống, nên phải đi từng bước nhỏ và đi nhiều lần.</p>
+  <p>Bậc hai nói thêm độ cong, nên dựng được một parabol xấp xỉ và nhảy thẳng tới đáy của nó.</p>
+  <p>Nhờ vậy giá trị lá có công thức đóng thay vì phải dò.</p>
+  <p>Cái giá là loss phải khả vi hai lần.</p></details>
 
-  <details class="qa"><summary>XGBoost khác gradient boosting gốc ở chỗ nào?</summary>
-  <p>Điểm mới thật sự là hàm mục tiêu. Gradient boosting gốc chỉ dùng đạo hàm bậc nhất và mọc cây theo tiêu chí quen thuộc của decision tree, rồi chống overfit bằng cắt tỉa sau. XGBoost khai triển Taylor tới bậc hai nên có thêm thông tin về độ cong, từ đó viết ra công thức tính thẳng giá trị tối ưu của mỗi lá thay vì mò theo gradient. Và nó đưa hai số hạng phạt — lambda cho độ lớn giá trị lá, gamma cho số lá — vào ngay trong objective, nên tiêu chí tách nút chính là hàm mục tiêu đang tối ưu: mọc cây và chống overfit trở thành một việc.</p></details>
+  <details class="qa"><summary>λ và γ khác nhau ở chỗ nào?</summary>
+  <p>λ ghìm giá trị của lá, γ ghìm số lượng lá.</p>
+  <p>λ nằm ở mẫu số của w nên lá càng ít mẫu càng bị kéo về 0 mạnh.</p>
+  <p>γ là vạch sàn gain phải vượt thì nhánh mới được mọc.</p>
+  <p>Đo thật: λ = 5 cho RMSE test tốt nhất 5,18, còn γ = 40 chủ yếu làm cây nhỏ đi từ 37,9 xuống 7,2 lá.</p></details>
 
-  <details class="qa"><summary>Vì sao cần đạo hàm bậc hai?</summary>
-  <p>Đạo hàm bậc nhất chỉ cho biết dốc về hướng nào, không cho biết đi bao xa thì tới đáy — nên phải mò từng bước nhỏ. Thêm đạo hàm bậc hai là biết cả độ cong, và xấp xỉ loss bằng một parabol quanh chỗ đang đứng. Parabol thì có đỉnh giải ra được bằng công thức, nên giá trị tối ưu của lá tính thẳng ra là <code>−G/(H+λ)</code>. Cái giá là loss phải khả vi hai lần, nhưng MSE và log loss đều thoả nên trong thực tế đây không phải hạn chế.</p></details>
+  <details class="qa"><summary>Vì sao không cần điền giá trị cho ô trống trước khi huấn luyện?</summary>
+  <p>Vì mỗi nút thử cho hàng trống đi hẳn sang trái rồi hẳn sang phải và giữ bên nào gain cao hơn.</p>
+  <p>Hướng đó trở thành một phần của model, không phải một bước tiền xử lý.</p>
+  <p>Đo thật với 30% ô trống: 8,01 so với 8,65 khi điền trung bình.</p>
+  <p>Điền trung bình còn xoá mất việc ô đó vốn trống, mà nhiều khi chính nó là thông tin.</p></details>
 
-  <details class="qa"><summary><code>lambda</code> và <code>gamma</code> làm gì?</summary>
-  <p>Cả hai là regularization đặt thẳng trong objective. <code>lambda</code> đứng ở mẫu số của công thức giá trị lá nên kéo mọi giá trị lá về gần 0 — đúng là L2 áp lên giá trị lá, và nó ghìm mạnh hơn ở những lá chứa ít mẫu vì khi đó H nhỏ. <code>gamma</code> là tiền phải trả cho mỗi chiếc lá tồn tại, nên một phép tách chỉ được chấp nhận khi gain vượt qua gamma. Cả hai khác <code>learning_rate</code>: lambda và gamma hãm từng cây, còn learning_rate hãm tốc độ tích luỹ qua nhiều cây.</p></details>
+  <details class="qa"><summary>Chỉnh tham số theo thứ tự nào?</summary>
+  <p>Đầu tiên là <code>learning_rate</code> và số cây, chốt bằng early stopping trên tập validation riêng.</p>
+  <p>Sau đó tới <code>max_depth</code>, vì nó quyết định model phức tạp tới đâu.</p>
+  <p>Rồi mới tới <code>reg_lambda</code>, thứ cải thiện rõ nhất trong hai tham số phạt.</p>
+  <p><code>gamma</code> để cuối, và chỉ dùng khi cây đang phình ra quá nhiều lá.</p></details>
 
-  <details class="qa"><summary>Khi nào chọn XGBoost, khi nào LightGBM?</summary>
-  <p>Dữ liệu cỡ vừa và ưu tiên độ ổn định thì XGBoost: cây mọc theo tầng nên cân bằng, kết quả ít dao động giữa các lần chạy. Dữ liệu rất lớn hoặc phải huấn luyện lại thường xuyên thì LightGBM nhanh hơn nhiều lần và ăn ít bộ nhớ hơn, lại nhận biến phân loại trực tiếp — đổi lại cách mọc theo lá dễ overfit trên dữ liệu nhỏ nên phải chặn <code>num_leaves</code> cùng <code>min_data_in_leaf</code>. Nếu dữ liệu đầy biến phân loại nhiều giá trị như mã sản phẩm hay mã vùng thì cân nhắc CatBoost.</p></details>
+  <details class="qa"><summary>Cùng dữ liệu mà XGBoost thua random forest — nên nghi gì trước?</summary>
+  <p>Nghi nhãn bẩn trước, vì boosting dồn sức vào chỗ đang sai còn rừng thì lấy trung bình.</p>
+  <p>Kế đó nghi thiếu early stopping, vì thêm cây quá tay làm test xấu đi mà train vẫn đẹp.</p>
+  <p>Rồi nghi <code>max_depth</code> để quá sâu, khiến một cây đã khớp hết phần dư ngay vòng đầu.</p>
+  <p>Cuối cùng mới nghi tới λ và γ — chúng tinh chỉnh chứ hiếm khi là nguyên nhân thua.</p></details>
 </section>
 
-<footer>Machine learning · Tree models · cơ chế nền ở <a href="../gradient-boosting/index.html">Gradient boosting</a>; bản tối ưu cho tốc độ là <a href="../lightgbm/index.html">LightGBM</a>.</footer>
+<footer>Machine learning · Tree models · số đo trên cài đặt thuần Python, 600 hàng ba đặc trưng, train và test chia đôi. Ý tưởng gốc ở <a href="../gradient-boosting/index.html">Gradient boosting</a>, bản nhanh hơn ở <a href="../lightgbm/index.html">LightGBM</a>.</footer>
 
       </article>
       <div class="nextprev" id="np"></div>
@@ -530,6 +244,5 @@
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
-<script src="lab.js"></script>
 </body>
 </html>

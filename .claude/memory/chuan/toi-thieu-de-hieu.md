@@ -3,7 +3,7 @@ name: toi-thieu-de-hieu
 description: "Ba luật người dùng chốt 2026-09-06: chữ meta không được vào bài; bài nào có cấu trúc dữ liệu phải vẽ đúng cấu trúc đó; chỉ giữ thứ tối thiểu để hiểu mental model"
 metadata:
   type: feedback
-updated: 2026-09-06
+updated: 2026-09-24
 ---
 
 Ngày 2026-09-06, sau khi xem bản đồ ver bài ([[trang-thai-kho]]), người dùng bổ sung ba
@@ -85,6 +85,12 @@ dạng vật lý của nó**, không thay bằng ô chữ nhật:
 **Cách đo có đang vi phạm không.** Đếm `<circle>` + `<path>` cộng lại trong mọi SVG của bài, so
 với `<rect>`. Tên bài là một cấu trúc dữ liệu mà tổng `circle+path` ≤ 3 → **đang vẽ bằng ô chữ
 nhật**, tức vẽ quan hệ chứ chưa vẽ vật.
+
+**Phép này chỉ là sàng, và nó báo nhầm khi vật thật sự LÀ ô vuông.** Bài mẫu 2026-09-24
+([[chuan-bai-mau]]) có 170 `<rect>` và chỉ 13 `<circle>` mà vẫn đúng luật B: 170 ô đó là **ô của
+một bảng dữ liệu**, mỗi ô một khách, đúng hình dạng vật đang học. Câu hỏi thật là *ô chữ nhật này
+đang là cái gì* — là ô bảng, ô nhớ, byte, pixel thì đúng; chỉ là cái khung để chứa chữ thì sai
+(luật D).
 
 **Quét toàn kho 2026-09-06 — 11 bài vi phạm** (tên bài có cấu trúc dữ liệu, `circle+path` = 2):
 

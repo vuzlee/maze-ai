@@ -3,7 +3,7 @@ name: trang-thai-kho
 description: "Trạng thái toàn kho — mốc số liệu duy nhất, sáu trục nghiệm thu, chất lượng trình bày từng kệ, việc còn lại"
 metadata:
   type: project
-updated: 2026-09-09
+updated: 2026-09-24
 ---
 
 **Đây là mốc duy nhất.** Mọi con số rời rạc trong các phiên trước đã lệch; đo lại từ file bằng
@@ -78,15 +78,20 @@ DSA 13 bài, nặng nhất `tree-bst-traversal` 566 · `union-find` 499 · `link
 `random-forest` · `statistics` · `normalization` · `rag-end-to-end` · `inference-optimization`.
 Chạm bài nào thì đổi bài đó.
 
-### Hai khuôn mới còn là bản thử, chưa thành chuẩn kho
+### Hình động — mới nhất, mới có ở đúng một bài
 
-`dl.defs` (bảng tra ký hiệu) chỉ có ở `svm` — 3 chỗ. `.hl` (in đậm cam thay `<b>`) chỉ có ở `knn`
-— 3 chỗ. Cả hai đã chốt là đúng, nhưng chưa bài nào khác dùng. Chạm bài nào thì đổi bài đó.
+Keyframe trong `<style>` của từng `<svg>` ([[chuan-bai-mau]]) hiện chỉ có ở bản mẫu
+`bai-mau/random-forest.html`. **Không bài nào trong `content/` có `@keyframes`.** Đây là việc lớn
+nhất còn lại của trục trình bày; làm dần, chạm bài nào thì thêm cho bài đó.
+
+`dl.defs` (bảng tra ký hiệu) đã thành chuẩn. `.hl` (in đậm cam) thì **bỏ** — 2026-09-24 chốt in
+đậm bằng `<b>`, cam để dành cho link. Còn 3 chỗ `.hl` ở `knn`, 2 ở `linear-regression`, 2 ở
+`logistic-regression`; chạm bài nào thì đổi bài đó.
 
 ### Câu đơn trong `details.qa` — chỗ hổng lớn nhất còn lại
 
-Mặt bài đã sạch (0 đoạn >33 từ). **Bên trong `details.qa` thì chưa**: cả kho chỉ `svm` (0 đoạn
-dài) và `decision-tree` (1) là đạt. Riêng kệ ML còn **29 bài** trả lời bằng một khối liền —
+Mặt bài đã sạch (0 đoạn >33 từ). **Bên trong `details.qa` thì chưa**: mốc là bài mẫu
+2026-09-24 — 5 câu, mỗi câu 4–5 `<p>`, đoạn dài nhất **20 từ**. Riêng kệ ML còn **29 bài** trả lời bằng một khối liền —
 `train-val-test-cv` 126 từ · `statistics` 122 · `ab-testing` 108 · `knn` 118.
 (`naive-bayes` đã sửa 2026-09-09: 5 câu, 24 đoạn, dài nhất 16 từ — cùng lần dựng lại theo luật 1.)
 
@@ -138,8 +143,8 @@ bài còn *Tổng kết một hình*", #6 "8 bài ≥12 mục") hoá ra đã v�
 2. **Trước khi viết bất kỳ khung nào, đọc hết bài đã viết CÙNG NHÓM.** Bốn lần liên tiếp việc thật
    hoá ra là **tách bài**, không phải viết mới — xem [[bai-hoc-soan-noi-dung]].
 3. Rút được bài học chung thì **vá thẳng vào `tools/`**, không giữ riêng cho bài đang làm.
-4. Viết bài mới ở kệ 06→10 thì lấy [[bai-mau-svm-knn]] làm khuôn ngay từ nháp đầu — rẻ hơn nhiều
-   so với viết xong rồi sửa theo chuẩn.
+4. Viết bài mới ở kệ 06→10 thì mở thẳng `bai-mau/random-forest.html` ra chép khung ngay từ nháp
+   đầu ([[chuan-bai-mau]]) — rẻ hơn nhiều so với viết xong rồi sửa theo chuẩn.
 
 ## Việc còn lại
 

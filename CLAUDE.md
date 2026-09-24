@@ -104,12 +104,14 @@ trong `category.json`. Kệ chỉ có đúng một nhóm thì trang chủ không
 
 ## Bộ nhớ giữa các phiên
 
-[`.claude/memory/`](.claude/memory/) giữ những thứ **không suy ra được từ code**, chia hai thư mục:
-`chuan/` là luật viết bài (còn đúng mãi), `nhat-ky/` là việc đã làm tới đâu ở từng kệ.
+[`.claude/memory/`](.claude/memory/) giữ những thứ **không suy ra được từ code**, chia ba chỗ:
+`bai-mau/` là bản mẫu để mở ra xem, `chuan/` là luật viết bài (còn đúng mãi), `nhat-ky/` là việc đã
+làm tới đâu ở từng kệ.
 **Đọc [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) trước khi bắt tay vào việc** — nó là
-chỉ mục một dòng một ghi chú. Sắp sửa nội dung thì đọc hết `chuan/`, đặc biệt
-[`chuan/chuan-bai-mau.md`](.claude/memory/chuan/chuan-bai-mau.md) — bài
-`random-forest` là thước đo chất lượng của cả kho. Quy ước ghi nằm trong `MEMORY.md`.
+chỉ mục một dòng một ghi chú. Sắp sửa nội dung thì đọc hết `chuan/` **và mở
+[`bai-mau/random-forest.html`](.claude/memory/bai-mau/random-forest.html) bằng trình duyệt** — bản
+đó là thước đo chất lượng của cả kho (chốt 2026-09-24), luật rút từ nó nằm ở
+[`chuan/chuan-bai-mau.md`](.claude/memory/chuan/chuan-bai-mau.md). Quy ước ghi nằm trong `MEMORY.md`.
 
 Ranh giới: `CLAUDE.md` mô tả kho **đang như thế nào** (cấu trúc, quy ước, cách build), thư mục
 memory ghi việc **đang làm tới đâu và vì sao chọn cách đó**. Cùng một điều đừng viết ở cả hai chỗ.

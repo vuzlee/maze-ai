@@ -1,9 +1,9 @@
 ---
 name: cong-cu-va-cach-kiem
-description: "Bộ công cụ kiểm (soat.py 8 phép, svgkit) + luật kiểm lại chính cái thước + chạy bao nhiêu vòng cho mỗi loại sửa"
+description: "Bộ công cụ kiểm (soat.py 8 phép, svgkit) + luật kiểm lại chính cái thước + cách kiểm hình động bằng mắt + bẫy khi sửa .eq + chạy bao nhiêu vòng cho mỗi loại sửa"
 metadata:
   type: reference
-updated: 2026-09-08
+updated: 2026-09-24
 ---
 
 Gộp từ `soat-tu-dong-8-phep` + `bo-ve-hinh-svgkit` + `kiem-lai-chinh-cai-thuoc` + `sua-nhanh-it-vong-kiem`.
@@ -48,7 +48,7 @@ hỏng và bài sạch in ra **cùng một dòng**, không có cảnh báo nào 
 1. **Thước nhận danh sách file thì phải in số file đã đọc.** `TONG 0` mà không kèm `128 bài` là vô
    nghĩa — có thể `sys.argv[1:]` rỗng. Đây đúng là chuyện đã xảy ra.
 2. **Chép regex từ file chuẩn, đừng viết lại từ trí nhớ.** Bản chép thiếu `(?![^>]*class=)` biến
-   10 vi phạm thành 144. Regex chuẩn của luật 8 ở `chuan-bai-mau.md:398`.
+   10 vi phạm thành 144. Regex chuẩn của phép đếm đoạn >33 từ nằm ở mục *Ba phép đo tay* cuối file này.
 3. **Chạy thử trên một chỗ đã biết là SAI trước.** Thước không bắt được chỗ sai đã biết thì thước
    hỏng. Phép thử rẻ nhất, và bỏ qua nó là gốc của cả hai lỗi trên.
 4. **Số vi phạm cao bất thường = nghi thước trước, nghi bài sau.**
@@ -105,3 +105,49 @@ Và **gộp lệnh**: sinh cả ba bài + `tools/build.py` trong một lượt b
 Chụp headless ở 430px thì trang nào cũng bị cắt, kể cả trang chưa sửa — tật của công cụ, không
 phải lỗi bố cục. Muốn xem nhiều khối `.eq` cùng lúc thì sinh trang gộp ở `/tmp` **nhúng
 `assets/style.css` đọc lại từ đĩa**, không thì ảnh chụp nói dối bằng CSS cũ.
+
+## Bẫy kỹ thuật khi sửa khối `.eq` và khi chèn khối mới
+
+Gộp về đây 2026-09-24 khi bỏ ghi chú `bai-mau-svm-knn` — đây là phần duy nhất của nó còn dùng được.
+
+- Sửa `.eq .t>span:first-child` sang `display:inline-flex` thì flex **cắt sạch dấu cách hai đầu mỗi
+  text node** — "từ <var>a</var> tới" hiện thành "từatới". Giữ `display:inline`; phân số vẫn gióng
+  giữa nhờ `vertical-align` của `.frac`.
+- Regex bọc `<var>` phải chạy **quanh thẻ**, không xuyên qua: chạy lần hai trên file đã chuyển ra
+  `<var><var>x</var></var>`.
+- Chèn khối mới bằng `s.index('  </div>\n', …)` **rơi vào khối `.eq` của mục khác** — luôn neo bằng
+  một chuỗi dài duy nhất của đúng mục đang sửa.
+- Dấu căn cần vinculum: `.eq .ov{border-top:1px solid currentColor}`. Lớp màu chỉ có `.t.b` `.t.p`
+  `.t.g` `.t.r` — **không có `.t.a`**, viết nhầm thì mất màu.
+- Muốn nhìn nhiều khối `.eq` cùng lúc thì sinh trang gộp ở `/tmp` **nhúng `assets/style.css` đọc
+  lại từ đĩa** — trang gộp cũ giữ CSS cũ, sửa CSS xong mà không sinh lại thì ảnh chụp nói dối.
+
+## Kiểm hình động
+
+Hoạt hoạ nằm trong `<style>` của từng `<svg>` ([[chuan-bai-mau]]), nên `check.py` và `getBBox`
+**không thấy nó** — chúng đo hình ở trạng thái cuối. Hai phép phải làm bằng mắt:
+
+1. **Tắt hoạt hoạ rồi xem lại.** Trình duyệt bật "giảm chuyển động", hoặc tạm bỏ khối `@media` —
+   hình phải đọc được đầy đủ. Thiếu chi tiết nào tức là chi tiết đó chỉ sống trong keyframe, sai.
+2. **Xem một vòng trọn chu kỳ.** Lượt cuối phải hiện xong trước mốc 87%; quá mốc thì nó bị tắt
+   ngay khi vừa hiện.
+
+## Ba phép đo tay — chép nguyên, đừng viết lại từ trí nhớ
+
+Chuyển về đây 2026-09-24 từ ghi chú bài mẫu cũ. Ba dòng này là thứ đã sai nhiều lần nhất khi gõ lại.
+
+```python
+# 1 · chữ/hình — mốc 57, trên 100 là còn phải cắt chữ
+v = len(re.findall(r'<figure|<svg |class="(?:strip|flow|cmp|stack|mtx|axis|seq|bars|eq|cellrow|cells)\b', s))
+t = re.sub(r'<svg.*?</svg>', '', s, flags=re.S); t = re.sub(r'<[^>]+>', ' ', t)
+ratio = len(t.split()) / max(v, 1)
+
+# 2 · đoạn văn MẶT BÀI quá 33 từ — bắt buộc bỏ <details> và <figure> trước,
+#     không thì <text> trong SVG bị đếm thành văn xuôi và ra số ảo.
+#     (?!re\b) là bắt buộc — thiếu nó thì <pre> khớp luôn vào <p...> và số bị thổi lên
+mat = re.sub(r'<details.*?</details>|<figure.*?</figure>', '', s, flags=re.S)
+doan = [re.sub(r'<[^>]+>', ' ', p) for p in re.findall(r'<p(?!re\b)[^>]*>(.*?)</p>', mat, re.S)]
+
+# 3 · chữ trong hình — đo theo từng dòng <br>, không đo cả khối:
+#     nhãn lab ngắt dòng bằng <br> là hợp lệ
+```
