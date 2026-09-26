@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XGBoost — MazeAI</title>
+<meta name="description" content="Từ bảng dữ liệu tới dự đoán: residual, Similarity Score, Gain, Output value, cộng dồn nhiều cây; hai dạng regression và classification; hàm loss với γ và λ.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/xgboost/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="XGBoost">
+<meta property="og:description" content="Từ bảng dữ liệu tới dự đoán: residual, Similarity Score, Gain, Output value, cộng dồn nhiều cây; hai dạng regression và classification; hàm loss với γ và λ.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/05-machine-learning/06-tree-models/xgboost/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MazeAI — hệ thiết kế "mực ấm"
+   Nền mực ám nâu như giấy than, nhấn cam đất, tiêu đề serif.
+   Một file dùng chung cho trang thư viện, trang bài và kit.
+   ============================================================ */
+
+:root{
+  /* --- bề mặt: mực ấm, phân tầng bằng độ sáng --- */
+  --bg:#14110E; --bg2:#191512; --sunk:#0E0C0A;
+  --panel:#1C1815; --raise:#241F1A;
+  --rule:#2E2822; --rule-hi:#3D352C;
+  --glass:rgba(237,231,222,.045);
+
+  /* --- chữ: ngà → nâu nhạt, bốn mức --- */
+  --text:#EDE7DE; --dim:#C4BAAC; --muted:#9A8F81; --faint:#7A6F63;
+
+  /* --- cam đất: màu thương hiệu, KHÔNG mang nghĩa nội dung --- */
+  --clay:#E0855C; --clay-hi:#EE9E7A;
+
+  /* --- bốn màu ngữ nghĩa — ĐỪNG đổi nghĩa giữa các bài --- */
+  --filled:#8CA9F2;   /* xanh dương · dữ liệu, thứ đang xét */
+  --probe:#EDB44A;    /* vàng · con trỏ, điểm nhấn, đáp án  */
+  --tomb:#F2718A;     /* đỏ · sai, bị loại, chưa thoả       */
+  --ok:#5BCFA0;       /* xanh lá · đúng, kết quả, đã thoả   */
+
+  /* hai sắc phụ chỉ dùng cho chữ nhỏ trong hình */
+  --filled-lo:#A8BEF6; /* nhãn sv-l trên nền xanh — sáng hơn --filled một nấc */
+  --ghost:#4A423A;     /* nhãn mờ nhất, dưới cả --faint */
+
+  --clay-a:224,133,92;  --blue-a:140,169,242;
+  --amber-a:237,180,74; --red-a:242,113,138; --green-a:91,207,160;
+
+  /* --- hình khối: bo nhẹ, bóng ấm --- */
+  --r-xs:5px; --r-sm:8px; --r:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 2px 6px rgba(0,0,0,.3), 0 16px 32px -20px rgba(0,0,0,.9);
+  --ring:0 0 0 1px rgba(237,231,222,.05) inset;
+
+  --display:"Newsreader",Georgia,"Times New Roman",serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace;
+  /* font công thức: Newsreader trước, Georgia/Times đỡ mấy dấu toán
+     (‖ √ Σ ∇) mà Newsreader không có glyph */
+  --math:"Newsreader",Georgia,"Times New Roman",serif;
+
+  --bar:60px;
+  --ease:cubic-bezier(.22,.8,.28,1);
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--body);font-size:16px;line-height:1.75;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+/* ánh sáng ấm hắt từ trên xuống — như đèn đọc trên mặt giấy */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(1100px 620px at 12% -12%, rgba(var(--clay-a),.13), transparent 64%),
+    radial-gradient(820px 480px at 88% -6%, rgba(var(--amber-a),.07), transparent 62%),
+    radial-gradient(1000px 700px at 50% 114%, rgba(var(--clay-a),.04), transparent 64%);
+}
+/* thớ giấy: cực mờ, chỉ để mặt phẳng không "chết" */
+body::after{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:repeating-linear-gradient(0deg,rgba(237,231,222,.022) 0 1px,transparent 1px 3px);
+  -webkit-mask-image:linear-gradient(180deg,#000,transparent 70%);
+          mask-image:linear-gradient(180deg,#000,transparent 70%);
+}
+.wrap{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:0 22px}
+::selection{background:rgba(var(--clay-a),.32);color:#fff}
+:focus-visible{outline:2px solid var(--clay);outline-offset:3px;border-radius:3px}
+
+*{scrollbar-width:thin;scrollbar-color:var(--rule-hi) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--rule-hi);border:3px solid var(--bg);border-radius:99px}
+*::-webkit-scrollbar-track{background:transparent}
+
+/* ============================================================
+   THANH TRÊN CÙNG
+   ============================================================ */
+.topbar{
+  position:sticky;top:0;z-index:40;height:var(--bar);
+  background:color-mix(in srgb,var(--bg) 84%,transparent);
+  backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+  border-bottom:1px solid var(--rule);
+}
+.topbar .in{max-width:1240px;height:100%;margin:0 auto;padding:0 28px;display:flex;gap:20px;align-items:center}
+
+.brand{
+  display:flex;align-items:center;gap:10px;flex:none;text-decoration:none;
+  font-family:var(--display);font-weight:600;font-size:18px;letter-spacing:-.01em;color:var(--text);
+}
+.brand i{font-style:italic;font-weight:400;color:var(--clay)}
+/* dấu ◆ nhỏ: hai nét lệch nhau, gợi lối rẽ trong mê cung */
+.brand .mk{
+  width:21px;height:21px;border-radius:6px;position:relative;flex:none;
+  background:linear-gradient(145deg,var(--clay-hi),#C96A44);
+  box-shadow:0 3px 12px -3px rgba(var(--clay-a),.7),var(--ring);
+  transition:transform .3s var(--ease);
+}
+.brand .mk::before,.brand .mk::after{content:"";position:absolute;background:var(--bg);border-radius:1px}
+.brand .mk::before{left:5px;top:6px;width:11px;height:1.8px}
+.brand .mk::after{left:5px;top:11.5px;width:6px;height:1.8px;box-shadow:4px 4px 0 var(--bg)}
+.brand:hover .mk{transform:rotate(-8deg) scale(1.05)}
+
+.find{
+  flex:1;max-width:480px;display:flex;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-pill);
+  padding:0 13px;height:38px;cursor:text;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.find:hover{border-color:var(--rule-hi)}
+.find:focus-within{border-color:rgba(var(--clay-a),.65);background:var(--raise);
+  box-shadow:0 0 0 4px rgba(var(--clay-a),.11)}
+.find svg{width:15px;height:15px;flex:none;fill:none;stroke:var(--faint);stroke-width:2;stroke-linecap:round}
+.find:focus-within svg{stroke:var(--clay)}
+.topbar input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--text);
+  font-family:var(--body);font-size:13.5px;padding:0}
+.topbar input::placeholder{color:var(--faint)}
+.topbar input::-webkit-search-cancel-button{-webkit-appearance:none}
+.kbd{
+  font-family:var(--mono);font-size:10px;color:var(--muted);flex:none;
+  background:var(--raise);border:1px solid var(--rule);border-bottom-width:2px;
+  border-radius:4px;padding:1px 6px;line-height:1.7;
+}
+.navlink{
+  flex:none;text-decoration:none;color:var(--muted);font-size:13px;
+  padding:7px 13px;border-radius:var(--r-pill);transition:color .2s,background .2s;
+}
+.navlink:hover{color:var(--text);background:var(--glass)}
+@media(max-width:800px){.find .kbd,.navlink{display:none}}
+
+#prog{position:fixed;left:0;top:0;height:2px;width:0;z-index:60;
+  background:linear-gradient(90deg,var(--clay),var(--probe));
+  box-shadow:0 0 14px rgba(var(--clay-a),.7);transition:width .12s linear}
+
+/* ============================================================
+   TRANG BÌA — dateline, tiêu đề serif khổ lớn, chân trang bìa
+   ============================================================ */
+.mast{padding:58px 0 0}
+.dateline{
+  display:flex;flex-wrap:wrap;align-items:center;gap:0;margin:0 0 30px;padding:0 0 16px;
+  border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);
+}
+.dateline span+span::before{content:"·";margin:0 12px;color:var(--rule-hi)}
+.dateline .live{margin-left:auto;color:var(--clay);display:flex;align-items:center;gap:8px}
+.dateline .live::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--clay);
+  box-shadow:0 0 0 3px rgba(var(--clay-a),.2)}
+@media(max-width:700px){.dateline .live{margin-left:0;width:100%;margin-top:10px}
+  .dateline .live::after{content:none}}
+
+.mast h1{
+  font-family:var(--display);font-weight:400;font-size:clamp(38px,5.4vw,66px);
+  line-height:1.08;letter-spacing:-.02em;margin:0;color:var(--text);max-width:15ch;
+}
+.mast h1 em{font-style:italic;color:var(--clay)}
+
+.mastfoot{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);
+  gap:56px;align-items:end;margin:38px 0 0;padding:0 0 30px;
+}
+.mastfoot .lede{margin:0;max-width:56ch;color:var(--dim);font-size:16.5px;line-height:1.78}
+.mastfoot .lede b{color:var(--text);font-weight:600}
+
+/* --- cột phải: ba con số, tiến độ, hai nút --- */
+.counts{display:flex;gap:0;margin:0 0 22px;padding:0;list-style:none;border-top:1px solid var(--rule)}
+.counts li{flex:1;padding:14px 16px 0 0}
+.counts li+li{padding-left:16px;border-left:1px solid var(--rule)}
+.counts b{display:block;font-family:var(--display);font-weight:400;font-size:32px;
+  line-height:1;color:var(--text);letter-spacing:-.02em}
+.counts span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin-top:8px}
+
+.heroact{display:flex;gap:10px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:9px;text-decoration:none;cursor:pointer;
+  font-family:var(--body);font-weight:600;font-size:13.5px;
+  border-radius:var(--r-pill);padding:11px 20px;border:1px solid transparent;
+  transition:transform .2s var(--ease),box-shadow .2s,background .2s,border-color .2s,color .2s;
+}
+.btn.primary{background:var(--clay);color:#14110E;box-shadow:0 8px 22px -12px rgba(var(--clay-a),1)}
+.btn.primary:hover{background:var(--clay-hi);transform:translateY(-2px);
+  box-shadow:0 14px 28px -14px rgba(var(--clay-a),1)}
+.btn.ghost{background:transparent;color:var(--dim);border-color:var(--rule-hi)}
+.btn.ghost:hover{color:var(--text);border-color:var(--muted);background:var(--glass)}
+.btn .kbd{background:rgba(0,0,0,.22);border-color:rgba(0,0,0,.3)}
+.btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .2s var(--ease)}
+.btn.primary:hover svg{transform:translateX(3px)}
+
+/* ============================================================
+   THANH KỆ DÍNH
+   ============================================================ */
+.shelfnav{
+  position:sticky;top:var(--bar);z-index:30;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+}
+.shelfnav .in{display:flex;gap:4px;overflow-x:auto;padding:9px 0;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 30px),transparent);
+          mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 30px),transparent)}
+.shelfnav .in::-webkit-scrollbar{display:none}
+.shelfnav a{
+  flex:none;text-decoration:none;white-space:nowrap;display:flex;align-items:baseline;gap:8px;
+  font-size:12.8px;color:var(--muted);border-radius:var(--r-pill);padding:6px 13px;
+  border:1px solid transparent;transition:color .2s,background .2s,border-color .2s;
+}
+.shelfnav a i{font-style:normal;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--faint)}
+.shelfnav a em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.shelfnav a:hover{color:var(--text);background:var(--glass)}
+.shelfnav a.on{color:var(--text);background:var(--raise);border-color:var(--rule-hi)}
+.shelfnav a.on i,.shelfnav a.on em{color:var(--clay)}
+
+/* --- dải tiến độ: một hàng kẻ mảnh, không phải thẻ --- */
+.libbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:18px 0;border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+}
+.libbar b{font-family:var(--display);font-weight:400;font-size:19px;letter-spacing:0;
+  text-transform:none;color:var(--text)}
+.libbar .track{flex:1;min-width:100px;height:2px;background:var(--rule);overflow:hidden}
+.libbar .track i{display:block;height:100%;background:var(--ok);transition:width .5s var(--ease)}
+.libbar .pct{color:var(--ok);letter-spacing:.08em}
+.libbar .acts{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.libbar button{
+  background:transparent;color:var(--muted);border:1px solid var(--rule);
+  font-family:var(--body);font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;
+  border-radius:var(--r-pill);padding:6px 14px;cursor:pointer;transition:all .2s;
+}
+.libbar button:hover{color:var(--text);border-color:var(--rule-hi);background:var(--glass);filter:none}
+.libbar button.on{color:var(--clay);border-color:rgba(var(--clay-a),.5);background:rgba(var(--clay-a),.09)}
+
+/* ============================================================
+   KỆ = MỘT CHƯƠNG. Số chương treo ở lề, bài xếp thành hàng.
+   Hàng đọc nhanh hơn thẻ khi có 34 mục, và hợp với chất "kho sách".
+   ============================================================ */
+.shelf{padding:64px 0 0;scroll-margin-top:calc(var(--bar) + 58px)}
+.shelfhead{
+  display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:0 14px;
+  align-items:start;padding-bottom:22px;border-bottom:1px solid var(--rule-hi);
+}
+.shelfhead .num{
+  font-family:var(--display);font-weight:400;font-size:54px;line-height:.82;
+  color:var(--rule-hi);letter-spacing:-.03em;transition:color .3s;
+}
+.shelf:hover .shelfhead .num{color:var(--clay)}
+.shelfhead h2{
+  font-family:var(--display);font-weight:400;font-size:29px;letter-spacing:-.015em;
+  line-height:1.2;margin:0;color:var(--text);
+}
+.gnote{font-size:14.2px;color:var(--muted);margin:9px 0 0;max-width:64ch;line-height:1.65}
+.shelfstat{text-align:right;padding-top:8px;min-width:132px}
+.shelfstat b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim)}
+.shelfstat .sk{display:block;font-style:normal;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;color:var(--faint);margin-top:3px;white-space:nowrap}
+.shelfstat .track{display:block;height:2px;background:var(--rule);margin-top:9px;overflow:hidden}
+.shelfstat .track i{display:block;height:100%;background:var(--ok);transition:width .5s var(--ease)}
+
+h3.sub{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--faint);font-weight:400;margin:30px 0 2px;padding:0;border:0;
+  display:flex;align-items:center;gap:16px;
+}
+h3.sub::after{content:"";flex:1;height:1px;background:var(--rule)}
+h3.sub .gc{flex:none;color:var(--faint)}
+.cards{display:block}
+
+/* --- một bài = một hàng --- */
+.bk{
+  position:relative;display:grid;grid-template-columns:46px minmax(0,1fr) auto 22px;
+  gap:0 18px;align-items:baseline;text-decoration:none;
+  padding:19px 16px 19px 14px;border-bottom:1px solid var(--rule);
+  transition:background .22s var(--ease),padding-left .22s var(--ease);
+}
+.bk::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--clay);transform:scaleY(0);transform-origin:50% 50%;
+  transition:transform .26s var(--ease);
+}
+.bk:hover{background:var(--panel);padding-left:22px}
+.bk:hover::before{transform:scaleY(1)}
+.bk .ix{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em;transition:color .22s}
+.bk:hover .ix{color:var(--clay)}
+.bk .tt{min-width:0}
+.bk .tt b{
+  display:block;font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.012em;
+  line-height:1.3;color:var(--text);transition:color .22s;
+}
+.bk:hover .tt b{color:#fff}
+.bk .tt i{display:block;font-style:normal;font-size:13.6px;line-height:1.6;color:var(--muted);
+  margin-top:4px;max-width:74ch}
+.bk .tag{
+  font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;align-self:start;padding-top:7px;
+}
+.bk .go{
+  font-family:var(--mono);font-size:13px;color:var(--rule-hi);text-align:right;align-self:start;
+  padding-top:4px;transition:color .22s,transform .22s var(--ease);
+}
+.bk:hover .go{color:var(--clay);transform:translateX(4px)}
+
+/* đã học: dấu ✓ ở cột số, chữ dịu xuống */
+.bk.done .ix{color:var(--ok)}
+.bk.done .ix::after{content:" ✓"}
+.bk.done .tt b{color:var(--dim)}
+.bk.done .tag{color:rgba(var(--green-a),.65)}
+.bk .tag .rv{
+  display:table;margin:4px 0 0 auto;font-style:normal;
+  padding:2px 7px 3px;border-radius:5px;font-size:8.5px;
+  color:rgba(var(--green-a),.9);
+  background:rgba(var(--green-a),.09);
+  border:1px solid rgba(var(--green-a),.3);
+}
+.bk.soon{opacity:.4;pointer-events:none}
+.shelf.empty{display:none}
+.bk[hidden]{display:none}
+
+
+/* --- khung bài: đã chốt dàn ý, chưa viết nội dung --- */
+.bk.wip .tt b{color:var(--muted);font-weight:400}
+.bk.wip:hover .tt b{color:var(--dim)}
+.bk.wip .tt i{color:var(--faint)}
+.bk.wip .ix{color:var(--rule-hi)}
+.bk.wip .tag{color:var(--faint);letter-spacing:.14em}
+.bk.wip::after{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:repeating-linear-gradient(180deg,var(--rule-hi) 0 4px,transparent 4px 8px)}
+.bk.wip:hover::before{opacity:0}
+
+p.wip{
+  display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin:18px 0 0;
+  border:1px dashed var(--rule-hi);border-radius:var(--r-pill);padding:5px 14px;
+}
+p.plan{
+  color:var(--muted);font-size:14.6px;line-height:1.7;max-width:70ch;margin:0;
+  padding-left:16px;border-left:1px dashed var(--rule-hi);
+}
+
+/* ============================================================
+   KẾT QUẢ TÌM KIẾM
+   ============================================================ */
+.res{padding:48px 0 100px}
+.res h2{font-family:var(--display);font-weight:400;font-size:34px;letter-spacing:-.02em;margin:0 0 6px}
+.res h2 em{font-style:italic;color:var(--clay)}
+.res .cnt{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 8px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
+a.hit{
+  position:relative;display:block;text-decoration:none;padding:18px 16px 18px 14px;
+  border-bottom:1px solid var(--rule);transition:background .22s,padding-left .22s var(--ease);
+}
+a.hit::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--clay);
+  transform:scaleY(0);transition:transform .26s var(--ease)}
+a.hit:hover{background:var(--panel);padding-left:22px}
+a.hit:hover::before{transform:scaleY(1)}
+a.hit .src{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+a.hit h3{font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.012em;
+  color:var(--text);margin:7px 0 5px}
+a.hit:hover h3{color:#fff}
+a.hit p{color:var(--muted);font-size:13.8px;line-height:1.65;margin:0;max-width:88ch}
+a.hit mark{background:rgba(var(--amber-a),.18);color:var(--probe);padding:1px 3px;border-radius:2px}
+.empty-res{color:var(--muted);border:1px dashed var(--rule-hi);border-radius:var(--r);
+  padding:34px;text-align:center;margin-top:24px}
+
+/* ============================================================
+   TRANG BÀI
+   ============================================================ */
+.crumb{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);padding:28px 0 0;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+}
+.crumb a{color:var(--muted);text-decoration:none;transition:color .2s}
+.crumb a:hover{color:var(--clay)}
+
+.cols{display:grid;grid-template-columns:172px minmax(0,1fr);gap:26px;padding:26px 0 96px;align-items:start}
+/* màn hình rộng: kéo mục lục ra sát lề, chừa thêm chỗ cho phần đọc */
+@media(min-width:1280px){nav.toc{margin-left:-52px}}
+main{min-width:0}
+
+/* --- mục lục --- */
+nav.toc{position:sticky;top:calc(var(--bar) + 26px);max-height:calc(100vh - var(--bar) - 52px);
+  overflow:auto;padding-right:6px}
+nav.toc .head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--rule);
+}
+nav.toc .head b{letter-spacing:.06em;color:var(--dim);font-weight:400;font-size:10.5px}
+nav.toc a{
+  position:relative;display:flex;gap:9px;align-items:flex-start;text-decoration:none;
+  color:var(--muted);font-size:12.6px;line-height:1.45;padding:6px 6px 6px 11px;
+  border-left:1px solid var(--rule);margin-left:0;
+  transition:color .2s,background .2s,border-color .2s;
+}
+nav.toc a span{font-family:var(--mono);font-size:10px;color:var(--faint);flex:none;padding-top:2px;transition:color .2s}
+nav.toc a:hover{color:var(--text);background:var(--glass)}
+nav.toc a.seen{color:var(--dim);border-left-color:rgba(var(--green-a),.45)}
+nav.toc a.seen span{color:var(--ok)}
+nav.toc a.on{color:var(--text);border-left:2px solid var(--clay);padding-left:10px;background:rgba(var(--clay-a),.07)}
+nav.toc a.on span{color:var(--clay)}
+nav.toc .hint{font-family:var(--mono);font-size:10px;color:var(--faint);line-height:2.1;
+  border-top:1px solid var(--rule);margin-top:20px;padding-top:14px}
+nav.toc .hint kbd{font-family:var(--mono);color:var(--muted);background:var(--raise);
+  border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:1px 5px;margin-right:6px}
+
+/* --- đầu bài --- */
+.doc .hero{padding:4px 0 28px;margin-bottom:30px;border-bottom:1px solid var(--rule)}
+.doc .hero h1{
+  font-family:var(--display);font-weight:400;letter-spacing:-.02em;
+  font-size:clamp(34px,5.4vw,58px);line-height:1.08;margin:0;color:var(--text);
+}
+.doc .hero h1 em{font-style:italic;color:var(--clay)}
+.doc .hero .lede{font-size:16.5px;color:var(--dim);max-width:66ch;margin:18px 0 0;line-height:1.72}
+.doc .hero .lede b{color:var(--text);font-weight:600}
+/* lede tách ý: câu dẫn rồi các ý thành dòng riêng, mỗi ý một vạch màu */
+.doc .hero .ledelist{list-style:none;padding:0;margin:16px 0 0;max-width:66ch;
+  display:grid;gap:10px}
+.doc .hero .ledelist li{position:relative;padding:0 0 0 20px;font-size:15.6px;
+  color:var(--dim);line-height:1.62}
+.doc .hero .ledelist li::before{content:"";position:absolute;left:0;top:11px;
+  width:9px;height:1.5px;background:var(--clay);opacity:.85}
+.doc .hero .ledelist b{color:var(--text);font-weight:600}
+.doc .hero .ledelist em{font-style:normal;color:var(--muted)}
+.eyebrow{
+  display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--clay);margin:0 0 18px;
+}
+.doc .hero .eyebrow{margin-bottom:18px}
+
+/* --- nhịp mục --- */
+.doc section{padding-top:0;margin-bottom:44px;scroll-margin-top:calc(var(--bar) + 32px)}
+.doc section+section{border-top:1px solid var(--rule);padding-top:38px}
+section{scroll-margin-top:calc(var(--bar) + 32px)}
+
+/* --- tiêu đề mục: số treo ở lề, tên serif --- */
+.sh{display:flex;align-items:baseline;gap:16px;margin:0 0 20px;padding:0;border:0}
+.sh b{
+  flex:none;font-family:var(--mono);font-size:10.5px;font-weight:400;letter-spacing:.14em;
+  color:var(--clay);padding-top:6px;
+}
+.sh h2{font-family:var(--display);font-weight:400;font-size:31px;letter-spacing:-.018em;
+  line-height:1.22;margin:0;color:var(--text)}
+.sh .tool{
+  margin-left:auto;flex:none;font-family:var(--body);font-size:11.5px;font-weight:500;letter-spacing:0;
+  text-transform:none;background:transparent;color:var(--muted);
+  border:1px solid var(--rule);border-radius:var(--r-pill);padding:6px 14px;cursor:pointer;transition:all .2s;
+}
+.sh .tool:hover{color:var(--text);border-color:var(--rule-hi);background:var(--glass);filter:none}
+.sh .tool+.tool{margin-left:8px}
+a.tool{text-decoration:none;white-space:nowrap}
+
+/* --- chữ --- */
+h3{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em;
+  margin:34px 0 10px;color:var(--text)}
+p{margin:14px 0}
+.doc section>p,.doc section>ul,.doc section>ol,
+.doc section>h3,.doc section>.note,.doc section>details{max-width:70ch}
+main a{color:var(--clay);text-decoration:none;
+  border-bottom:1px solid rgba(var(--clay-a),.35);transition:border-color .2s,color .2s}
+main a:hover{color:var(--clay-hi);border-bottom-color:var(--clay)}
+strong{font-weight:600;color:#fff}
+ul,ol{margin:13px 0;padding-left:22px}
+li{margin:6px 0}
+li::marker{color:var(--rule-hi)}
+hr{border:0;border-top:1px solid var(--rule);margin:36px 0}
+
+code{font-family:var(--mono);font-size:.85em;background:var(--raise);
+  border:1px solid var(--rule);border-radius:var(--r-xs);padding:1.5px 6px;color:var(--dim)}
+pre{
+  font-family:var(--mono);font-size:12.8px;line-height:1.7;
+  background:var(--sunk);border:1px solid var(--rule);border-left:2px solid var(--filled);
+  border-radius:var(--r-sm);padding:17px 19px;overflow:auto;margin:20px 0;
+}
+pre code{background:none;border:0;padding:0;font-size:inherit;color:var(--dim)}
+pre.core{border-left-color:var(--ok)}
+.cm{color:var(--faint);font-style:italic}
+.kw{color:var(--probe)}
+.st{color:var(--ok)}
+
+table{width:100%;border-collapse:separate;border-spacing:0;margin:22px 0;font-size:14.2px;
+  border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);font-weight:400;background:var(--sunk)}
+tbody tr:hover td{background:var(--panel)}
+td code{font-size:12.4px}
+
+/* --- khối nhấn --- */
+.note{
+  border:1px solid var(--rule);border-left:2px solid var(--ok);
+  background:var(--panel);border-radius:var(--r-sm);
+  padding:16px 20px;margin:22px 0;font-size:14.6px;line-height:1.72;
+}
+.note.warn{border-left-color:var(--tomb)}
+.note.key{border-left-color:var(--probe)}
+.note h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 8px;font-weight:400}
+.note>*:last-child{margin-bottom:0}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-sm);padding:16px 19px}
+.card h4{font-family:var(--display);font-weight:600;font-size:16px;margin:0 0 9px;color:var(--text)}
+.card.ok{border-top:2px solid var(--ok)}
+.card.bad{border-top:2px solid var(--tomb)}
+
+/* --- hỏi đáp --- */
+.doc section>details.qa{max-width:none}
+.qa{border-bottom:1px solid var(--rule);padding:0;margin:0;background:none}
+.qa summary{cursor:pointer;font-weight:500;font-size:16px;color:var(--text);font-family:var(--display);
+  list-style:none;display:flex;gap:13px;align-items:flex-start;padding:16px 4px;transition:color .2s}
+.qa summary:hover{color:var(--clay)}
+.qa summary::-webkit-details-marker{display:none}
+.qa summary::before{content:"+";color:var(--clay);font-family:var(--mono);font-size:14px;
+  flex:none;line-height:1.5;transition:transform .22s var(--ease)}
+.qa[open] summary::before{content:"–"}
+.qa p{margin:0 4px 18px;color:var(--dim);font-size:14.8px;padding-left:27px;
+  line-height:1.72;max-width:72ch}
+.qa p b{color:#fff}
+
+/* --- đánh dấu đã học --- */
+.donebar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  border-top:1px solid var(--rule);padding-top:26px;margin-top:44px}
+.donebar span{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.donebar button{
+  background:transparent;color:var(--dim);border:1px solid var(--rule-hi);
+  font-family:var(--body);font-size:13px;font-weight:600;
+  border-radius:var(--r-pill);padding:10px 20px;cursor:pointer;transition:all .22s var(--ease);
+}
+.donebar button:hover{color:#14110E;border-color:var(--ok);background:var(--ok);filter:none}
+.donebar button.on{background:rgba(var(--green-a),.12);border-color:rgba(var(--green-a),.5);color:var(--ok)}
+.donebar button.on:hover{background:rgba(var(--green-a),.2);color:var(--ok)}
+
+/* --- bài trước / bài sau --- */
+.nextprev{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);
+  margin-top:30px;padding:0}
+.nextprev a{
+  text-decoration:none;padding:24px 20px;transition:background .22s;border-bottom:1px solid var(--rule);
+}
+.nextprev a:first-child{border-right:1px solid var(--rule);padding-left:0}
+.nextprev a:only-child{grid-column:1/-1;border-right:0}
+.nextprev a:hover{background:var(--panel)}
+.nextprev span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+.nextprev b{color:var(--dim);font-family:var(--display);font-weight:400;font-size:19px;
+  letter-spacing:-.01em;line-height:1.3;transition:color .22s}
+.nextprev a:hover b{color:var(--clay)}
+
+footer{border-top:1px solid var(--rule);padding:28px 0 80px;margin-top:44px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--faint);line-height:1.9}
+
+/* ============================================================
+   BỘ KHUÔN BÀI HỌC — câu chốt → vì sao → đào sâu
+   ============================================================ */
+.lesson .key{
+  font-family:var(--display);font-style:italic;font-size:23px;line-height:1.48;
+  color:var(--text);font-weight:400;letter-spacing:-.012em;max-width:56ch;
+  border-left:2px solid var(--clay);padding:2px 0 2px 22px;margin:0 0 24px;
+}
+.lesson .key em{font-style:italic;color:var(--clay)}
+.lesson .hl{color:var(--clay);font-weight:600}
+
+.lesson .why{list-style:none;padding:0;margin:22px 0;max-width:70ch}
+.lesson .why li{position:relative;display:block;padding:0 0 0 24px;font-size:15.2px;
+  line-height:1.68;margin:0 0 11px}
+.lesson .why li:last-child{margin-bottom:0}
+.lesson .why li::before{content:"";position:absolute;left:4px;top:10px;
+  width:5px;height:5px;border-radius:50%;background:var(--clay)}
+.lesson .why b{color:var(--clay);font-weight:600}
+
+/* --- .steps — dãy việc làm nối tiếp: số thứ tự nối bằng một vạch dọc liền --- */
+.lesson .steps{list-style:none;padding:0;margin:22px 0;max-width:70ch;counter-reset:st}
+.lesson .steps li{position:relative;padding:0 0 20px 42px;font-size:15.2px;line-height:1.68;margin:0}
+.lesson .steps li:last-child{padding-bottom:0}
+.lesson .steps li::before{
+  counter-increment:st;content:counter(st);position:absolute;left:0;top:0;
+  width:24px;height:24px;border-radius:50%;background:var(--sunk);
+  border:1px solid var(--rule-hi);color:var(--clay);
+  font-family:var(--mono);font-size:11px;line-height:23px;text-align:center;
+}
+.lesson .steps li::after{content:"";position:absolute;left:12px;top:26px;bottom:-2px;
+  width:1px;background:var(--rule-hi)}
+.lesson .steps li:last-child::after{display:none}
+.lesson .steps b{color:#fff;font-weight:600}
+.lesson .steps .end{color:var(--muted)}
+.lesson .steps .end::before{content:"✓";color:var(--ok);font-size:12px;
+  border-color:rgba(var(--green-a),.5)}
+
+details.deep{
+  border:1px solid var(--rule);border-radius:var(--r-sm);background:var(--panel);
+  margin:24px 0;max-width:none;padding:0;transition:border-color .2s;
+}
+details.deep:hover{border-color:var(--rule-hi)}
+details.deep>summary{cursor:pointer;list-style:none;padding:13px 18px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);transition:color .2s}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{content:"+";color:var(--clay);margin-right:11px}
+details.deep[open]>summary::before{content:"–"}
+details.deep>summary:hover{color:var(--text)}
+details.deep[open]>summary{border-bottom:1px solid var(--rule)}
+details.deep .body{padding:4px 19px 18px}
+details.deep .body>*:first-child{margin-top:16px}
+
+/* ============================================================
+   KHUÔN HÌNH — vẽ bằng HTML/CSS
+   Quy ước màu dùng chung cho MỌI hình:
+     xanh dương = dữ liệu / đang xét   ·  vàng = con trỏ, điểm nhấn
+     đỏ = sai, bị loại                 ·  xanh lá = đúng, kết quả
+   Cam đất KHÔNG xuất hiện trong hình — nó là màu thương hiệu.
+   ============================================================ */
+
+/* --- .strip — dãy ô --- */
+.strip{display:flex;gap:5px;margin:22px 0 6px}
+.strip .c{
+  flex:1 1 0;min-width:0;text-align:center;font-family:var(--mono);
+  border:1px solid var(--rule);border-radius:var(--r-xs);background:var(--raise);
+  padding:8px 2px;transition:all .22s var(--ease);
+}
+.strip .c i{display:block;font-style:normal;font-size:9.5px;color:var(--faint);line-height:1.4}
+.strip .c b{display:block;font-size:13px;font-weight:500;color:var(--text);line-height:1.5}
+.strip .c u{display:block;text-decoration:none;font-size:9.5px;line-height:1.5;
+  color:var(--probe);min-height:14px;letter-spacing:.04em}
+.strip .c.f{background:rgba(var(--red-a),.1);border-color:rgba(var(--red-a),.38)}
+.strip .c.f b{color:#F79BAB}
+.strip .c.t{background:rgba(var(--green-a),.1);border-color:rgba(var(--green-a),.38)}
+.strip .c.t b{color:#8EE0BE}
+.strip .c.on{border-color:var(--probe);background:rgba(var(--amber-a),.14);
+  box-shadow:0 0 0 3px rgba(var(--amber-a),.1)}
+.strip .c.on b{color:var(--probe)}
+.strip .c.dim{opacity:.26}
+.strip .cut{flex:0 0 3px;min-width:3px;border-radius:2px;background:var(--probe);
+  align-self:stretch;padding:0;border:0;box-shadow:0 0 10px rgba(var(--amber-a),.6)}
+.stripnote{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.06em;color:var(--muted);margin:0 0 22px}
+.stripnote em{font-style:normal;color:var(--probe)}
+
+/* --- .flow — chuỗi bước --- */
+.flow{display:flex;align-items:stretch;flex-wrap:wrap;gap:0;margin:22px 0}
+.flow .n{flex:1 1 0;min-width:132px;max-width:360px;background:var(--panel);border:1px solid var(--rule);
+  border-radius:var(--r-sm);padding:13px 16px}
+.flow .n h5{margin:0 0 5px;font-family:var(--display);font-size:15px;color:var(--text);font-weight:600}
+.flow .n p{margin:0;font-size:12.8px;color:var(--muted);line-height:1.55}
+.flow .n code{font-size:11.5px;padding:0 4px}
+.flow .n.ok{border-color:rgba(var(--green-a),.38)}
+.flow .n.no{border-color:rgba(var(--red-a),.38)}
+.flow .a{flex:none;align-self:center;color:var(--rule-hi);padding:0 11px;font-size:15px}
+/* mũi tên mang tên HÀNH ĐỘNG, ô hai đầu là KẾT QUẢ — cùng ngữ pháp với hình SVG */
+.flow .a.act{display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:0 9px;color:var(--probe);line-height:1.1}
+.flow .a.act i{font-family:var(--mono);font-style:normal;font-size:10px;letter-spacing:.04em;
+  color:var(--probe);text-align:center;max-width:108px;line-height:1.4}
+
+/* --- .eq — công thức display --- */
+.eq{margin:22px 0;background:var(--sunk);border:1px solid var(--rule);overflow-x:auto;
+  border-left:2px solid var(--filled);border-radius:var(--r-sm);padding:18px 20px}
+/* Dáng LaTeX dựng bằng chính font của kho, không nạp thư viện: Newsreader là
+   serif kiểu cũ nên chữ toán đã gần Computer Modern. Luật sắp chữ của TeX:
+   BIẾN nghiêng (<var>), TÊN HÀM và toán tử ĐỨNG (min, max, log, exp), dấu
+   nhị nguyên có khoảng thở rộng hơn khoảng chữ thường. */
+/* Hai HÀNG cố định: hàng trên là công thức, hàng dưới là chú thích. Dựng bằng
+   grid chứ không phải flex — flex canh giữa từng số hạng nên số hạng nào cao
+   hơn (có phân số) sẽ đẩy chú thích của nó xuống, mỗi chú thích một cao độ. */
+.eq .line{font-family:var(--math);font-size:18.5px;line-height:1.62;color:var(--text);
+  display:grid;grid-auto-flow:column;grid-auto-columns:max-content;
+  grid-template-rows:auto auto;align-items:center;justify-content:start;
+  gap:0 .34em;font-variant-numeric:lining-nums}
+.eq .t{display:contents}
+.eq .t>span:first-child{grid-row:1}
+.eq .t em{grid-row:2;justify-self:stretch}
+.eq .op{grid-row:1}
+.eq var{font-style:italic;font-family:var(--math)}
+.eq .fn{font-style:normal;font-weight:400;padding-right:.12em}
+.eq .line+.line{margin-top:10px}
+.eq .t>span:first-child{white-space:nowrap}
+.eq .t em{font-family:var(--body);font-size:10.5px;font-style:normal;letter-spacing:.06em;
+  color:var(--muted);border-top:1px solid var(--rule-hi);padding-top:3px;margin-top:2px;
+  text-align:center;white-space:nowrap}
+.eq .op{color:var(--dim);font-style:normal;padding:0 .22em}
+.eq .t.b em{color:var(--filled);border-top-color:rgba(var(--blue-a),.5)}
+.eq .t.p em{color:var(--probe);border-top-color:rgba(var(--amber-a),.5)}
+.eq .t.g em{color:var(--ok);border-top-color:rgba(var(--green-a),.5)}
+.eq .t.r em{color:var(--tomb);border-top-color:rgba(var(--red-a),.5)}
+.eq sub,.eq sup{font-size:.62em}
+.eq .ov{border-top:1px solid currentColor;padding:.06em .18em 0 .1em;margin-left:-.06em}
+/* Ngoặc ôm phân số: cao bằng hai tầng, không thì nhìn như ngoặc ôm mỗi tử số. */
+.eq .par{font-size:2.05em;font-weight:300;color:var(--dim);padding:0 .04em}
+.eq .t>span:first-child{letter-spacing:.005em}
+/* phân số xếp tầng: <span class="frac"><i>tử</i><i>mẫu</i></span> — dùng ở mọi
+   công thức có dấu chia, để mắt không phải đọc "1 trên w" thành "1 chia w". */
+.frac{display:inline-flex;flex-direction:column;align-items:center;
+  vertical-align:middle;margin:0 .18em;line-height:1.15;font-size:.82em}
+.frac i{font-style:normal;padding:0 .3em}
+.frac i:first-child{border-bottom:1px solid currentColor;padding-bottom:.1em}
+.frac i:last-child{padding-top:.12em}
+/* Chữ đứng cạnh phân số (max, min, =) gióng theo GIỮA phân số nhờ vertical-align
+   của .frac. KHÔNG dùng inline-flex ở đây: flex biến mỗi text node thành một item
+   rồi cắt sạch dấu cách hai đầu — "từ a tới" thành "từatới". */
+.eq .t>span:first-child,.defs dt{display:inline}
+.eq dl{margin:15px 0 0;padding-top:13px;border-top:1px solid var(--rule);
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;font-size:13px}
+.eq dt{font-family:var(--mono);color:var(--dim);white-space:nowrap}
+.eq dd{margin:0;color:var(--muted);line-height:1.55}
+.eq .read{margin:13px 0 0;font-size:13px;color:var(--muted);line-height:1.6}
+.eq .read+.line{margin-top:13px}
+
+/* --- .mth — công thức NGẮN nằm trong dòng văn xuôi ---------------------------
+   Cùng luật sắp chữ với .eq, chỉ khác là inline: biến nghiêng, hàm và số đứng,
+   font serif toán. KHÔNG dùng <code> cho ký hiệu toán — <code> là mono, nó nói
+   "đây là thứ gõ vào máy", trong khi λ hay ‖w‖² là toán. <code> để dành cho tên
+   API thật: reg_lambda, RidgeCV, class_weight. */
+.mth{font-family:var(--math);font-size:1.06em;white-space:nowrap;color:var(--text)}
+.mth var{font-style:italic;font-family:var(--math)}
+.mth .fn{font-style:normal;font-weight:400;padding-right:.12em}
+.mth sub,.mth sup{font-size:.68em}
+/* Phân số HAI TẦNG luôn đội chiều cao dòng lên, chỉnh font-size hay
+   vertical-align đều không cứu được. Phân số dài thì đưa xuống .eq;
+   giữ lại đây cho phân số một ký tự trên một ký tự. */
+.mth .frac{font-size:.86em}
+
+/* --- .defs — bảng chú thích ký hiệu: ngắn, tra nhanh, không phải công thức --- */
+.defs{margin:18px 0;padding:14px 18px;background:var(--sunk);border:1px solid var(--rule);
+  border-radius:var(--r-sm);display:grid;grid-template-columns:auto minmax(0,1fr);
+  gap:7px 16px;font-size:13px}
+.defs dt{font-family:var(--mono);color:var(--probe);white-space:nowrap}
+.defs dd{margin:0;color:var(--muted);line-height:1.55}
+
+/* --- .cmp — đối chiếu hai cột --- */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+.cmp>div{border:1px solid var(--rule);border-radius:var(--r-sm);padding:15px 18px;background:var(--panel);min-width:0}
+.cmp h5{margin:0 0 11px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);font-weight:400}
+.cmp.two>div:first-child{border-top:2px solid rgba(var(--blue-a),.55)}
+.cmp.two>div:last-child{border-top:2px solid rgba(var(--amber-a),.55)}
+.cmp.two>div:first-child h5{color:var(--filled)}
+.cmp.two>div:last-child h5{color:var(--probe)}
+.cmp p{margin:6px 0;font-size:13.6px;color:var(--muted);line-height:1.6}
+.cmp p b{color:var(--text)}
+.cmp code{font-size:12px}
+
+/* --- .stack — pipeline dọc --- */
+.stack{margin:26px 0}
+.stack .s{position:relative;background:var(--panel);border:1px solid var(--rule);
+  border-left:2px solid var(--filled);border-radius:var(--r-sm);padding:13px 17px;margin-bottom:30px}
+.stack .s:last-child{margin-bottom:0}
+.stack .s b{display:block;font-family:var(--display);font-size:16px;color:var(--text);font-weight:600}
+.stack .s span{display:block;font-size:13.4px;color:var(--muted);line-height:1.58;margin-top:3px}
+.stack .s::after{content:"";position:absolute;left:50%;bottom:-24px;width:1px;height:24px;background:var(--rule-hi)}
+.stack .s::before{content:"▾";position:absolute;left:50%;bottom:-31px;transform:translateX(-50%);
+  color:var(--rule-hi);font-size:12px;line-height:1}
+.stack .s:last-child::after,.stack .s:last-child::before{display:none}
+.stack .s.ok{border-left-color:var(--ok)}
+.stack .s.warn{border-left-color:var(--tomb)}
+
+/* --- .mtx — ma trận 2×2 --- */
+.mtx{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;margin:26px 0}
+.mtx .hd{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:4px 6px}
+.mtx .hd.rl{justify-content:flex-end;text-align:right;max-width:104px}
+.mtx .q{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-sm);padding:14px 17px}
+.mtx .q b{display:block;font-family:var(--display);font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px}
+.mtx .q span{color:var(--muted);font-size:13.2px;line-height:1.58}
+.mtx .q.ok{border-color:rgba(var(--green-a),.38)}
+.mtx .q.ok b{color:var(--ok)}
+.mtx .q.bad{border-color:rgba(var(--red-a),.38)}
+.mtx .q.bad b{color:var(--tomb)}
+
+/* --- .axis — trục đánh đổi --- */
+.axis{display:flex;margin:28px 0 20px;position:relative}
+.axis::before{content:"";position:absolute;left:6%;right:6%;top:9px;height:1px;background:var(--rule-hi)}
+.axis .stop{flex:1;text-align:center;position:relative;padding-top:30px}
+.axis .stop::before{content:"";position:absolute;top:3px;left:50%;transform:translateX(-50%);
+  width:13px;height:13px;border-radius:50%;background:var(--bg);border:1px solid var(--rule-hi)}
+.axis .stop.on::before{border-color:var(--probe);background:var(--probe);
+  box-shadow:0 0 0 4px rgba(var(--amber-a),.14)}
+.axis .stop b{display:block;font-family:var(--mono);font-size:11.5px;color:var(--text)}
+.axis .stop span{display:block;font-size:12.4px;color:var(--muted);line-height:1.5;margin-top:5px}
+.axiscap{display:flex;justify-content:space-between;gap:24px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.06em;color:var(--muted);margin:-12px 0 20px}
+.axiscap span{flex:1}
+.axiscap span:nth-child(2){text-align:center}
+.axiscap span:last-child{text-align:right}
+.axiscap em{font-style:normal;color:var(--probe)}
+
+/* --- .seq — trình tự hai bên --- */
+.seq{margin:26px 0;border:1px solid var(--rule);border-radius:var(--r-sm);padding:15px 19px;background:var(--panel)}
+.seq .who{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding-bottom:11px;
+  border-bottom:1px solid var(--rule)}
+.seq .m{padding:13px 0 10px;border-bottom:1px dashed var(--rule)}
+.seq .m:last-child{border-bottom:0}
+.seq .m i{display:block;font-style:normal;font-family:var(--mono);font-size:12.4px;color:var(--text);text-align:center}
+.seq .m u{display:block;text-decoration:none;font-size:12.8px;color:var(--muted);text-align:center;margin-top:5px}
+.seq .ar{height:1px;background:rgba(var(--blue-a),.55);margin:9px 0 0;position:relative}
+.seq .ar::after{content:"";position:absolute;top:-3.5px;width:0;height:0;border:4px solid transparent}
+.seq .ar.r::after{right:0;border-left-color:var(--filled);border-right-width:0}
+.seq .ar.l::after{left:0;border-right-color:var(--filled);border-left-width:0}
+.seq .m.wait .ar{background:rgba(var(--amber-a),.55)}
+.seq .m.wait .ar.r::after{border-left-color:var(--probe)}
+.seq .m.wait .ar.l::after{border-right-color:var(--probe)}
+
+/* --- .bars — so sánh đại lượng --- */
+.bars{margin:24px 0}
+.bars .b{display:grid;grid-template-columns:132px minmax(0,1fr) auto;align-items:center;gap:14px;
+  margin:10px 0;font-family:var(--mono);font-size:12.3px}
+.bars .b i{font-style:normal;color:var(--muted);text-align:right;line-height:1.35}
+.bars .b u{text-decoration:none;height:16px;border-radius:3px;min-width:3px;display:block;
+  background:rgba(var(--blue-a),.6)}
+.bars .b b{color:var(--text);font-weight:500;white-space:nowrap}
+.bars .b.hi u{background:var(--probe)}
+.bars .b.hi b{color:var(--probe)}
+.bars .b.bad u{background:rgba(var(--red-a),.6)}
+
+/* --- .cells — lưới ô vuông --- */
+.cells{display:grid;gap:4px;margin:20px 0;max-width:300px}
+.cells div{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  border:1px solid var(--rule);border-radius:var(--r-xs);background:var(--raise)}
+.cells div.w{background:var(--sunk);border-color:var(--sunk);color:var(--rule)}
+.cells div.a{background:rgba(var(--blue-a),.18);border-color:var(--filled);color:#B9C8F7}
+.cells div.b{background:rgba(var(--green-a),.16);border-color:var(--ok);color:#8EE0BE}
+.cells div.on{background:rgba(var(--amber-a),.18);border-color:var(--probe);color:var(--probe)}
+.cellrow{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;margin:20px 0}
+.cellrow .cells{margin:0}
+.cellrow p{margin:0 0 10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted)}
+
+/* --- .rail/.slot — dãy ô có nhãn --- */
+.rail{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:18px 0}
+.slot{min-width:0;text-align:center;font-family:var(--mono);font-size:11px;
+  border:1px solid var(--rule);border-radius:var(--r-xs);background:var(--raise);overflow:hidden}
+.slot i{display:block;font-style:normal;font-size:9.5px;color:var(--faint);background:var(--sunk);
+  border-bottom:1px solid var(--rule);padding:2px 0}
+.slot u{display:block;text-decoration:none;padding:7px 0;color:var(--muted)}
+.slot.f u{color:#14110E;background:var(--filled);font-weight:600}
+.slot.p u{color:#14110E;background:var(--probe);font-weight:600}
+.slot.t u{color:#14110E;background:var(--tomb);font-weight:600}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:10px 0 0}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+/* --- .probs — danh sách bài LeetCode --- */
+.probs{margin:18px 0 4px}
+.probs a{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:baseline;
+  text-decoration:none;padding:10px 12px;border-radius:var(--r-xs);border:0;
+  border-bottom:1px solid var(--rule);transition:background .18s,padding-left .18s var(--ease)}
+.probs a:hover{background:var(--panel);padding-left:18px}
+.probs a i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--faint);text-align:right}
+.probs a b{color:var(--dim);font-weight:500;font-size:14.4px;line-height:1.45;
+  font-family:var(--display);border:0}
+.probs a b em{font-style:normal;color:var(--muted);font-weight:400;font-size:13.2px;font-family:var(--body)}
+.probs a u{text-decoration:none;font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;white-space:nowrap}
+.probs a u.e{color:var(--ok)}
+.probs a u.m{color:var(--probe)}
+.probs a u.h{color:var(--tomb)}
+.probs a:hover b{color:var(--text)}
+.sig{font-family:var(--mono);font-size:12.5px;color:var(--probe);
+  border-left:2px solid var(--probe);padding:6px 0 6px 15px;margin:18px 0}
+
+/* ============================================================
+   LAB
+   ============================================================ */
+.lab{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);
+  padding:20px;margin:24px 0}
+.lab .bar{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.lab label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.lab input,.lab select{font-family:var(--mono);font-size:13px;background:var(--sunk);color:var(--text);
+  border:1px solid var(--rule);border-radius:var(--r-xs);padding:8px 11px;width:150px;
+  transition:border-color .2s,box-shadow .2s}
+.lab input:focus,.lab select:focus{border-color:rgba(var(--clay-a),.6);
+  box-shadow:0 0 0 3px rgba(var(--clay-a),.12);outline:none}
+.lab input[type=number]{width:104px}
+.lab input[type=checkbox]{width:auto}
+.chk{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+  color:var(--text);cursor:pointer;padding-bottom:8px}
+button{font-family:var(--body);font-weight:600;font-size:13px;cursor:pointer;
+  background:var(--clay);color:#14110E;border:0;border-radius:var(--r-pill);padding:10px 19px;
+  transition:background .2s,transform .18s var(--ease)}
+button:hover{background:var(--clay-hi)}
+button:active{transform:translateY(1px)}
+button.ghost{background:transparent;color:var(--dim);border:1px solid var(--rule-hi)}
+button.ghost:hover{color:var(--text);border-color:var(--muted);background:var(--glass)}
+.stat{display:flex;gap:28px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;margin-top:16px}
+.stat u{text-decoration:none;color:var(--muted)}
+.stat b{color:var(--text)}
+
+.lab .scen{display:flex;gap:8px;flex-wrap:wrap}
+.lab .scen button{background:transparent;color:var(--muted);border:1px solid var(--rule);
+  font-family:var(--mono);font-size:11.5px;font-weight:400;padding:8px 13px}
+.lab .scen button.on{border-color:rgba(var(--blue-a),.55);color:var(--text);background:rgba(var(--blue-a),.12)}
+.lab .labrow{margin:16px 0 6px;font-size:12.5px;color:var(--muted)}
+.lab .labrow b{color:var(--probe);font-weight:500;font-family:var(--mono)}
+.lab .labrow+.strip{margin-top:0}
+.lab .labsay{margin:12px 0 0;font-size:13.5px;line-height:1.7;color:var(--muted)}
+.lab .labsay b{color:var(--text);font-weight:600}
+
+/* --- bảng dữ liệu trong lab: rút dòng từ bảng này sang bảng kia --- */
+.lab .dtwrap{overflow-x:auto;border:1px solid var(--rule-hi);border-radius:var(--r-sm);background:var(--sunk)}
+.lab table.dt{margin:0;border:0;border-radius:0;font-size:13.4px;min-width:420px;
+  border-collapse:collapse;table-layout:fixed}
+.lab table.dt th{padding:7px 10px;background:var(--raise);font-size:9px;letter-spacing:.13em;
+  color:var(--dim);border:1px solid var(--rule-hi);text-align:center}
+.lab table.dt td{padding:8px 10px;color:var(--text);border:1px solid var(--rule-hi);
+  white-space:nowrap;line-height:1.4;text-align:center;transition:background .2s,color .2s}
+.lab table.dt tbody tr:hover td{background:transparent}
+.lab table.dt .id{color:var(--dim);text-align:left;font-size:12.6px}
+.lab table.dt th:first-child{text-align:left}
+.lab table.dt th.note,.lab table.dt .cnt{width:96px}
+.lab table.dt .y.yes{color:var(--ok)}
+.lab table.dt .y.no{color:var(--tomb)}
+.lab table.dt .cnt,.lab table.dt th.note{font-family:var(--mono);font-size:10px;
+  color:var(--faint);text-align:center;white-space:normal}
+
+/* dòng trống ở bảng mẫu · dòng bị rút trùng · dòng out-of-bag · dòng đang được rút */
+.lab table.dt tr.empty td{color:var(--rule-hi)}
+.lab table.dt tr.dup td{background:rgba(var(--amber-a),.09)}
+.lab table.dt tr.dup .id,.lab table.dt tr.dup .cnt{color:var(--probe)}
+.lab table.dt tr.oob td{background:rgba(var(--red-a),.07);color:var(--faint)}
+.lab table.dt tr.oob .id,.lab table.dt tr.oob .cnt{color:var(--tomb)}
+.lab table.dt tr.pick td{background:rgba(var(--amber-a),.16);color:var(--text)}
+.lab table.dt tr.land td{animation:rowland .44s var(--ease)}
+@keyframes rowland{0%{background:rgba(var(--amber-a),.28)}100%{background:transparent}}
+
+/* cột phần dư: số có dấu + thanh dài ngắn theo độ lớn, xanh dần khi co về 0 */
+.lab table.dt td.gr{font-family:var(--mono);color:var(--tomb)}
+.lab table.dt td.gz{font-family:var(--mono);color:var(--ok)}
+.lab table.dt td.rbar{padding:8px 10px}
+.lab table.dt td.rbar u{display:block;height:9px;border-radius:2px;min-width:2px;
+  text-decoration:none;background:rgba(var(--red-a),.55);transition:width .42s var(--ease),background .42s}
+.lab table.dt td.rbar u.ok{background:rgba(var(--green-a),.6)}
+.lab table.dt.pulse{animation:dtpulse .42s var(--ease)}
+@keyframes dtpulse{0%{opacity:.55}100%{opacity:1}}
+.lab .bars.pulse,.lab #xbars.pulse{animation:dtpulse .38s var(--ease)}
+
+/* hai cây mọc song song — mọc theo tầng vs mọc theo lá */
+.lab .lgbcmp{margin:0}
+.lab .lgbcmp svg{width:100%;height:auto;display:block;background:var(--sunk);
+  border:1px solid var(--rule);border-radius:var(--r-sm);margin:4px 0 10px}
+.lab .lgbcmp p{margin:0;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.lab .lgbcmp p b.n{color:var(--filled)}
+.lab .lgbcmp p b.p{color:var(--probe)}
+.lab .lgbcmp circle.pop{animation:leafpop .42s var(--ease)}
+@keyframes leafpop{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
+
+/* bản sao của dòng, bay từ bảng gốc xuống bảng mẫu */
+.lab{position:relative}
+.flyrow{position:absolute;z-index:5;display:flex;align-items:center;padding:0 12px;
+  font-family:var(--mono);font-size:11.5px;color:#14110E;background:var(--probe);
+  border-radius:var(--r-sm);box-shadow:0 6px 20px rgba(0,0,0,.45);pointer-events:none;
+  white-space:nowrap;overflow:hidden;
+  transition:transform .48s cubic-bezier(.36,.8,.3,1)}
+
+/* rừng cây mini */
+.lab .forest{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 4px;min-height:44px}
+.lab .forest .empty{margin:8px 0 0;font-size:13px;color:var(--faint)}
+.lab .tree{flex:0 0 128px;background:var(--sunk);border:1px solid var(--rule);
+  border-radius:var(--r-sm);padding:8px 4px 4px;text-align:center}
+.lab .tree svg{width:100%;height:auto;display:block}
+.lab .tree .tag{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  color:var(--faint);margin-bottom:4px}
+.lab .tree.new{animation:treegrow .42s var(--ease)}
+@keyframes treegrow{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
+.lab .strip{margin:18px 0 4px}
+.lab .strip .c.out{opacity:.24}
+
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;margin:20px 0 4px}
+.codebox{background:var(--sunk);border:1px solid var(--rule);border-radius:var(--r-sm);padding:13px 0;overflow-x:auto}
+.codebox .ln{font-family:var(--mono);font-size:12.4px;line-height:1.8;white-space:pre;
+  padding:0 16px;color:#A99E90;border-left:2px solid transparent;transition:background .15s}
+.codebox .ln.on{background:rgba(var(--amber-a),.1);border-left-color:var(--probe);color:#fff}
+.codebox .ln .cm{color:var(--faint)}
+.codebox .ln .kw{color:var(--probe)}
+
+.explain{background:var(--sunk);border:1px solid var(--rule);border-radius:var(--r-sm);padding:15px 18px}
+.explain h6{margin:0 0 9px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);font-weight:400}
+.explain p{margin:0 0 10px;font-size:14px;line-height:1.68}
+.explain .vals{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  border-top:1px solid var(--rule);padding-top:11px;margin:0}
+.explain .vals b{color:var(--probe)}
+
+/* --- thanh tiến độ + chú giải màu của lab chạy từng bước --- */
+.lab .slider{height:3px;background:var(--rule);border-radius:2px;margin:9px 0 4px;overflow:hidden}
+.lab .slider i{display:block;height:100%;background:var(--probe);transition:width .25s var(--ease)}
+.lab .stripnote .idx{color:var(--faint);white-space:nowrap}
+.lab .legend{margin:16px 0 0;gap:9px 18px}
+
+.labbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.labbar span{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.labbar button[disabled]{opacity:.38;cursor:default;box-shadow:none}
+.verdict{background:rgba(var(--green-a),.08);border:1px solid rgba(var(--green-a),.35);
+  border-radius:var(--r-sm);padding:15px 18px;margin:18px 0 0;font-size:14.4px;
+  line-height:1.68;max-width:none}
+.verdict b{color:var(--ok)}
+
+.steps{font-family:var(--mono);font-size:12.5px;margin-top:16px}
+.steps div{display:flex;gap:10px;padding:4px 0;border-bottom:1px dashed var(--rule)}
+.steps span:nth-child(1){width:56px;color:var(--muted)}
+.steps span:nth-child(2){width:190px;color:var(--muted)}
+.steps span:nth-child(3){color:var(--probe)}
+
+/* --- heatmap --- */
+.hm{overflow-x:auto;margin-top:8px}
+.hm table{font-family:var(--mono);font-size:11.5px;margin:0;min-width:520px;border:0;border-radius:0}
+.hm th{color:var(--muted);font-size:10px;letter-spacing:.08em;text-align:center;border:0;padding:4px 3px;background:none}
+.hm td{text-align:center;padding:0;border:0;background:none!important}
+.hm td.rl{text-align:right;color:var(--muted);padding-right:9px;white-space:nowrap;font-size:11px}
+.hm .cell{border-radius:3px;padding:8px 4px;color:#14110E;font-weight:600;margin:1px;transition:background .15s}
+.hm .cell.mask{background:var(--sunk)!important;color:var(--rule-hi);font-weight:400}
+
+/* --- hình SVG --- */
+figure{margin:24px 0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:11px;line-height:1.6}
+.sv-l{font-family:"JetBrains Mono",monospace;font-size:11px;fill:var(--muted)}
+.sv-t{font-family:"Be Vietnam Pro",sans-serif;font-size:12.5px;fill:var(--text)}
+.sv-b{fill:#1C1815;stroke:#2E2822}
+/* công thức TRONG hình: cùng dáng LaTeX với .eq và .mth — serif toán, biến
+   nghiêng qua <tspan class="v">. Trước đây công thức trong hình dùng sv-h
+   (mono chữ hoa giãn chữ) nên "λ Σ w²" hiện ra như một nhãn máy, lệch hẳn
+   với chính công thức đó in bằng .eq ở ngay dưới. */
+.sv-m{font-family:var(--math);font-size:14px;fill:var(--text)}
+.sv-m .v{font-style:italic}
+.sv-m .fn{font-style:normal}
+/* nhãn phụ trong hình: tiêu đề vùng (sv-h), chú thích (sv-d), tên/giá trị (sv-n) */
+.sv-h{font-family:"JetBrains Mono",monospace;font-size:9.5px;letter-spacing:.16em;fill:var(--muted)}
+.sv-hv{font-family:"Be Vietnam Pro",sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.14em;fill:var(--muted)}
+/* dòng giải thích ngay dưới một nhãn: cùng họ nhưng KHÔNG mờ đi — nó mang kết luận */
+.sv-s{font-family:"Be Vietnam Pro",sans-serif;font-size:11.5px;font-weight:500;fill:var(--dim)}
+.sv-d{font-family:"Be Vietnam Pro",sans-serif;font-size:10.5px;fill:var(--muted)}
+.sv-n{font-family:"JetBrains Mono",monospace;font-size:13px;fill:var(--text)}
+/* hình quá chi tiết để co xuống mobile: cho cuộn ngang thay vì thu nhỏ chữ */
+figure.scrollx{overflow-x:auto}
+figure.scrollx svg{min-width:720px}
+/* bảng nhiều cột: cuộn ngang thay vì bóp cột đến vỡ chữ */
+figure.scrollx table{margin:0;min-width:620px}
+
+/* ============================================================
+   TRANG ÔN TẬP — quiz.html
+   Thẻ lật: mặt trước câu hỏi, mặt sau ý trả lời. Nội dung mặt sau là
+   HTML bóc nguyên từ <details class="qa"> nên dùng lại đúng kiểu chữ của .qa p.
+   ============================================================ */
+.quizmast{padding-bottom:38px;border-bottom:1px solid var(--rule)}
+.quizmast .lede{max-width:66ch;margin:0}
+.quizmast h1{margin-bottom:20px}
+
+.quizpick{padding:30px 0 70px}
+.quizpick .counts{max-width:420px;margin-bottom:26px}
+.qtop{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.qhint{font-size:13.6px;color:var(--muted);margin:0 0 26px;max-width:62ch}
+.qhint b{color:var(--dim);font-weight:500}
+
+.qshelves{display:grid;gap:0;border-top:1px solid var(--rule)}
+.qshelf{display:grid;grid-template-columns:44px minmax(0,1fr) 86px 120px;gap:0 18px;
+  align-items:center;text-align:left;width:100%;
+  padding:17px 10px 17px 12px;background:none;border:0;border-radius:0;
+  border-bottom:1px solid var(--rule);
+  cursor:pointer;color:inherit;font:inherit;position:relative;
+  transition:background .18s var(--ease),padding .18s var(--ease)}
+.qshelf::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--clay);opacity:0;transition:opacity .18s var(--ease)}
+.qshelf:hover{background:var(--panel);padding-left:20px}
+.qshelf:hover::before{opacity:1}
+.qshelf i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.qshelf b{font-family:var(--display);font-weight:400;font-size:19px;color:var(--text);line-height:1.3}
+.qshelf .qn{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
+
+.qtrack{display:block;height:3px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.qtrack i{display:block;height:100%;background:var(--clay);transition:width .3s var(--ease)}
+
+/* --- một lượt ôn --- */
+.quizrun{max-width:74ch;margin:0 auto;padding:34px 0 80px}
+.qmeta{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:9px}
+.qwhere{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qwhere em{font-style:normal;color:var(--faint);margin-right:10px}
+.qcount{color:var(--faint);white-space:nowrap}
+.quizrun .qtrack{margin-bottom:26px}
+
+.qcard{border:1px solid var(--rule);border-radius:var(--r);background:var(--panel);
+  padding:34px 32px;transition:border-color .2s var(--ease)}
+.qcard.open{border-color:var(--rule-hi)}
+.qq{font-family:var(--display);font-size:25px;line-height:1.36;color:var(--text);margin:0}
+.qa2{margin-top:24px;padding-top:22px;border-top:1px solid var(--rule)}
+.qa2 p{margin:0 0 14px;color:var(--dim);font-size:15.2px;line-height:1.72}
+.qa2 p:last-child{margin-bottom:0}
+.qa2 b{color:#fff;font-weight:500}
+.qa2 code{font-family:var(--mono);font-size:.88em;background:var(--sunk);
+  border:1px solid var(--rule);border-radius:4px;padding:1px 5px;color:var(--text)}
+.qa2 a{color:var(--clay);text-decoration:none;border-bottom:1px solid rgba(224,133,92,.35)}
+.qa2 .qlc{margin-top:18px;padding-top:14px;border-top:1px dashed var(--rule);
+  font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--muted)}
+.qa2 .qlc b{color:var(--probe);font-weight:500}
+.qflip{margin-top:26px;width:100%;padding:13px;border-radius:var(--r);
+  border:1px dashed var(--rule-hi);background:none;color:var(--muted);cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  transition:color .18s var(--ease),border-color .18s var(--ease)}
+.qflip:hover{color:var(--clay);border-color:var(--clay)}
+
+.qacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.qacts .btn{justify-content:center}
+.qfoot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px}
+.qlink{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none}
+.qlink:hover{color:var(--clay)}
+.qstop{background:none;border:0;cursor:pointer;color:var(--faint);
+  font-family:var(--mono);font-size:11px;padding:0}
+.qstop:hover{color:var(--dim)}
+
+.quizdone{max-width:74ch;margin:0 auto;padding:48px 0 90px}
+.quizdone h2{font-family:var(--display);font-weight:400;font-size:34px;margin:0 0 24px;color:var(--text)}
+.quizdone h2 em{font-style:italic;color:var(--clay)}
+.quizdone .counts{max-width:420px;margin-bottom:22px}
+.quizdone p{color:var(--dim);font-size:15.2px;line-height:1.72;max-width:62ch;margin:0 0 24px}
+
+/* ============================================================
+   MÀN HÌNH HẸP
+   ============================================================ */
+@media(max-width:1060px){
+  .cols{grid-template-columns:172px minmax(0,1fr);gap:26px}
+  .mastfoot{grid-template-columns:1fr;gap:34px;align-items:start}
+  .mastfoot .lede{max-width:62ch}
+  .counts{max-width:420px}
+}
+@media(max-width:900px){
+  .wrap,.topbar .in{padding:0 17px}
+  .mast{padding:52px 0 0}
+  .cols{grid-template-columns:1fr;gap:0;padding-top:24px}
+  nav.toc{position:static;max-height:none;margin-bottom:32px;
+    border:1px solid var(--rule);border-radius:var(--r);padding:18px 18px 8px;background:var(--panel)}
+  nav.toc .list{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  nav.toc .hint{display:none}
+  .grid2,.cmp,.split{grid-template-columns:1fr}
+  .grid2>*,.split>*{min-width:0}
+  .eq{padding:14px 0 14px 13px}
+  .eq .line{font-size:13px;gap:0 .35em;flex-wrap:nowrap;
+    overflow-x:auto;padding-bottom:9px;padding-right:13px}
+  .eq dl{grid-template-columns:1fr;gap:2px 0;margin-right:13px}
+  .eq dt{margin-top:9px}
+  .eq .read{margin-right:13px}
+  .flow{gap:10px}
+  .flow .a{display:none}
+  /* nhãn hành động không được biến mất trên mobile — cho nó thành một dòng riêng */
+  .flow .n{max-width:none}
+  .flow .a.act{display:flex;flex-direction:row;align-items:center;gap:7px;
+    flex-basis:100%;padding:0 2px;justify-content:flex-start}
+  .flow .a.act i{max-width:none;text-align:left}
+  .shelfhead{grid-template-columns:52px minmax(0,1fr);gap:0 18px}
+  .shelfhead .num{font-size:38px}
+  .shelfhead h2{font-size:24px}
+  .shelfstat{grid-column:2;text-align:left;padding-top:14px;min-width:0}
+  .shelfstat .track{max-width:200px}
+  .bk{grid-template-columns:34px minmax(0,1fr) 20px;gap:0 12px;padding:16px 8px 16px 10px}
+  .bk .tag,.bk .rv{display:none}
+  .bk .tt b{font-size:17px}
+  .nextprev{grid-template-columns:1fr}
+  .nextprev a:first-child{border-right:0;padding-left:20px}
+  table{font-size:13.2px}
+  th,td{padding:9px 11px}
+  .lesson .key{font-size:20px}
+  .sh h2{font-size:24px}
+  .doc .hero h1{font-size:clamp(30px,7vw,40px)}
+}
+@media(max-width:620px){
+  .kbd{display:none}
+  .qshelf{grid-template-columns:32px minmax(0,1fr);gap:0 12px;padding:15px 8px 15px 10px}
+  .qshelf .qn{grid-column:2;font-size:10px;padding-top:7px}
+  .qshelf .qtrack{grid-column:2;margin-top:8px}
+  .qcard{padding:26px 20px}
+  .qq{font-size:21px}
+  .qacts{grid-template-columns:1fr}
+  .lab .bar{display:grid;grid-template-columns:1fr;gap:15px;align-items:stretch}
+  .lab .bar>div{min-width:0}
+  .lab select{width:100%}
+  .libbar .acts{margin-left:0;width:100%}
+  .bars .b{grid-template-columns:88px minmax(0,1fr) auto;gap:9px;font-size:11.5px}
+  .lab table.dt{font-size:12.4px;min-width:380px}
+  .lab table.dt td{padding:7px 6px}
+  .lab table.dt th{padding:6px 6px}
+  .lab table.dt th.note,.lab table.dt .cnt{width:74px}
+  nav.toc .list{grid-template-columns:1fr}
+  .strip{gap:3px}
+  .strip .c{padding:6px 1px}
+  .strip .c i,.strip .c u{overflow-wrap:anywhere}
+  .heroact .btn{flex:1;justify-content:center}
+  .counts li{padding-right:10px}
+  .counts li+li{padding-left:10px}
+  .counts b{font-size:26px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{transition:none!important;animation:none!important}
+  .bk:hover,a.hit:hover,.probs a:hover{padding-left:inherit}
+}
+@media print{
+  body::before,body::after,.topbar,.shelfnav,nav.toc,.libbar,.donebar,.nextprev,#prog{display:none!important}
+  body{background:#fff;color:#000}
+  .cols{grid-template-columns:1fr}
+}
+
+/* --- hình mở bài: một hình ngay dưới lede, đọc phát hiểu bài nói gì --- */
+figure.gist{margin:26px 0 0;padding:20px 22px 16px;background:var(--panel);
+  border:1px solid var(--rule);border-radius:var(--r);overflow-x:auto}
+figure.gist svg{min-width:640px}
+figure.gist figcaption{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule);
+  font-family:var(--body);font-size:13.2px;color:var(--muted);line-height:1.65}
+figure.gist figcaption b{color:var(--text);font-weight:600}
+@media(max-width:620px){figure.gist{padding:16px 14px 13px}}
+
+</style>
+<style>.topbar,nav.toc,#results,.nextprev{display:none!important}.cols{display:block!important}</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><span style="color:var(--clay)">← Tất cả bài</span> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-xgb" data-title="XGBoost" data-tag="Ensemble" data-blurb="Từ bảng dữ liệu tới dự đoán: residual, Similarity Score, Gain, Output value, cộng dồn nhiều cây; hai dạng regression và classification; hàm loss với γ và λ.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Tree models</p>
+  <h1><em>XGBoost</em></h1>
+  <p class="lede">Nhiều cây nhỏ nối tiếp, mỗi cây học phần dư của các cây trước. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>cây sau học phần dư (residual) của cây trước</li>
+    <li>chia nhánh ở chỗ Gain lớn nhất, chấm bằng một công thức</li>
+    <li>dự đoán cuối là cộng các cây, không phải trung bình</li>
+  </ul>
+</header>
+
+<section id="xgb-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">XGBoost là <em>nhiều cây nhỏ nối tiếp</em>: mỗi cây học <em>phần dư</em> (residual) mà các cây trước còn sai, rồi <em>cộng tất cả</em> lại.</p>
+  <figure class="gist">
+    <svg viewBox="0 0 860 282" role="img" aria-label="Bản đồ bài: mục 02 công thức tổng quát, mục 03 thay g và h của regression hoặc classification vào, mục 04 từ bảng tới một cây, mục 05 cộng dồn nhiều cây rồi quay lại học phần còn sai, mục 06 vì sao công thức có dạng đó" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}10.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}17.500%{animation-timing-function:ease-in-out;opacity:0}24.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}31.250%{animation-timing-function:ease-in-out;opacity:0}38.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}45.000%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}64.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}70.000%{animation-timing-function:ease-in-out;opacity:0}77.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 5.0s linear 1 forwards}.mm2{animation:mm2 5.0s linear 1 forwards}.mm3{animation:mm3 5.0s linear 1 forwards}.mm4{animation:mm4 5.0s linear 1 forwards}.mm5{animation:mm5 5.0s linear 1 forwards}.mm6{animation:mm6 5.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<g class="mm1"><text class="sv-d" x="0" y="26" fill="var(--probe)" style="fill:var(--probe)">Công thức tổng quát</text><rect x="0" y="34" width="152" height="196" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="12" y="54" fill="var(--probe)" style="fill:var(--probe)">02</text><text class="sv-d" x="14" y="90" fill="var(--text)" style="fill:var(--text)">Obj = loss + phạt</text><text class="sv-d" x="14" y="110" fill="var(--muted)" style="fill:var(--muted)">phạt: γT và ½λΣw²</text><text class="sv-d" x="14" y="146" fill="var(--text)" style="fill:var(--text)">Loss chỉ đi vào</text><text class="sv-d" x="14" y="166" fill="var(--probe)" style="fill:var(--probe)">qua hai số g, h</text></g>
+<g class="mm2"><line x1="154" y1="132.0" x2="167" y2="132.0" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="175,132.0 167,127.8 167,136.2" fill="var(--rule-hi)"/><text class="sv-d" x="177" y="26" fill="var(--probe)" style="fill:var(--probe)">Regression và classification</text><rect x="177" y="34" width="152" height="196" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="189" y="54" fill="var(--probe)" style="fill:var(--probe)">03</text><text class="sv-d" x="191" y="90" fill="var(--text)" style="fill:var(--text)">thay g, h vào</text><text class="sv-d" x="191" y="124" fill="var(--muted)" style="fill:var(--muted)">Regression</text><text class="sv-d" x="191" y="142" fill="var(--muted)" style="fill:var(--muted)">g = ŷ − y, h = 1</text><text class="sv-d" x="191" y="174" fill="var(--muted)" style="fill:var(--muted)">Classification</text><text class="sv-d" x="191" y="192" fill="var(--muted)" style="fill:var(--muted)">g = p − y, h = p(1−p)</text></g>
+<g class="mm3"><line x1="331" y1="132.0" x2="344" y2="132.0" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="352,132.0 344,127.8 344,136.2" fill="var(--rule-hi)"/><text class="sv-d" x="354" y="26" fill="var(--probe)" style="fill:var(--probe)">Từ bảng tới một cây</text><rect x="354" y="34" width="152" height="196" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="366" y="54" fill="var(--probe)" style="fill:var(--probe)">04</text><rect x="366" y="68" width="128" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="372" y="80" fill="var(--text)" style="fill:var(--text)">A</text><text class="sv-d" x="394" y="80" fill="var(--muted)" style="fill:var(--muted)">24 · 12tr · không</text><rect x="366" y="88" width="128" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="372" y="100" fill="var(--text)" style="fill:var(--text)">B</text><text class="sv-d" x="394" y="100" fill="var(--muted)" style="fill:var(--muted)">28 · 22tr · không</text><rect x="366" y="108" width="128" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="372" y="120" fill="var(--text)" style="fill:var(--text)">C</text><text class="sv-d" x="394" y="120" fill="var(--muted)" style="fill:var(--muted)">35 · 18tr · có</text><rect x="366" y="128" width="128" height="16" rx="3" fill="none" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="372" y="140" fill="var(--text)" style="fill:var(--text)">D</text><text class="sv-d" x="394" y="140" fill="var(--muted)" style="fill:var(--muted)">41 · 26tr · có</text><text class="sv-d" x="368" y="168" fill="var(--text)" style="fill:var(--text)">residual → thử nhánh</text><text class="sv-d" x="368" y="186" fill="var(--text)" style="fill:var(--text)">→ giá trị lá</text><text class="sv-d" x="368" y="212" fill="var(--muted)" style="fill:var(--muted)">Gain lớn nhất được chia</text></g>
+<g class="mm4"><line x1="508" y1="132.0" x2="521" y2="132.0" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="529,132.0 521,127.8 521,136.2" fill="var(--rule-hi)"/><text class="sv-d" x="531" y="26" fill="var(--probe)" style="fill:var(--probe)">Cộng dồn nhiều cây</text><rect x="531" y="34" width="152" height="196" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="543" y="54" fill="var(--probe)" style="fill:var(--probe)">05</text><text class="sv-d" x="545" y="92" fill="var(--text)" style="fill:var(--text)">cây 1</text><text class="sv-d" x="545" y="116" fill="var(--text)" style="fill:var(--text)">+ cây 2</text><text class="sv-d" x="545" y="140" fill="var(--text)" style="fill:var(--text)">+ cây 3</text><text class="sv-d" x="545" y="164" fill="var(--text)" style="fill:var(--text)">+ …</text><text class="sv-d" x="545" y="200" fill="var(--probe)" style="fill:var(--probe)">= dự đoán cuối</text></g>
+<g class="mm5"><path d="M661 230 L661 246 L376 246 L376 232" fill="none" stroke="var(--probe)" stroke-width="1.6"/><polygon points="376,231 372,239 380,239" fill="var(--probe)"/><text class="sv-d" x="518.5" y="264" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">cây sau học phần còn sai</text></g>
+<g class="mm6"><text class="sv-d" x="708" y="10" fill="var(--faint)" style="fill:var(--faint)">đi sâu hơn</text><text class="sv-d" x="708" y="26" fill="var(--muted)" style="fill:var(--muted)">Vì sao công thức có dạng đó</text><rect x="708" y="34" width="152" height="196" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4" stroke-dasharray="4 3"/><text class="sv-d" x="720" y="54" fill="var(--muted)" style="fill:var(--muted)">06</text><text class="sv-d" x="722" y="94" fill="var(--text)" style="fill:var(--text)">parabola của lá</text><text class="sv-d" x="722" y="146" fill="var(--muted)" style="fill:var(--muted)">tác dụng của γ và λ</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Có một công thức chấm điểm cây. Regression và classification chỉ điền số khác vào đó.</li>
+    <li>Ví dụ chạy suốt bài: 6 khách A–F, y là mức chi tiêu tăng thêm (triệu). Classification dùng nhãn mua hoặc không.</li>
+    <li>Cách cộng dồn nói chung: <span style="color:var(--clay)">Gradient boosting</span>. Bản nhanh hơn: <span style="color:var(--clay)">LightGBM</span>.</li>
+  </ul>
+</section>
+
+<section id="xgb-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Công thức tổng quát</h2></div>
+  <p class="key"><em>Obj = loss + hai khoản phạt.</em> Loss là sai số của từng dòng. Obj cộng loss cả cây rồi thêm phạt, và là thứ cây cần làm nhỏ nhất.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>Obj</span></span>
+      <span class="op">≈</span>
+      <span class="t b"><span>Σ<sub><var>j</var></sub> [ <var>G</var><sub><var>j</var></sub><var>w</var><sub><var>j</var></sub> + ½ <var>H</var><sub><var>j</var></sub><var>w</var><sub><var>j</var></sub><sup>2</sup> ]</span><em>khối 1: loss cả cây, xấp xỉ</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span><var>γ</var><var>T</var></span><em>khối 2: phạt số lá</em></span>
+      <span class="op">+</span>
+      <span class="t r"><span>½ <var>λ</var> Σ<sub><var>j</var></sub> <var>w</var><sub><var>j</var></sub><sup>2</sup></span><em>khối 3: phạt độ lớn lá</em></span>
+    </div>
+  </div>
+  <dl class="defs">
+    <dt>Obj</dt><dd>objective: loss cộng phạt, thứ cây cần làm nhỏ nhất</dd>
+    <dt>khối 1</dt><dd>loss của từng dòng, cộng cho mọi dòng, xấp xỉ bằng parabola rồi gộp theo lá</dd>
+    <dt>khối 2, 3</dt><dd>hai khoản phạt, không phải loss</dd>
+    <dt><var>j</var></dt><dd>một lá</dd>
+    <dt><var>w</var><sub><var>j</var></sub></dt><dd>giá trị của lá <var>j</var> (Output value)</dd>
+    <dt><var>g</var>, <var>h</var></dt><dd>độ dốc và độ cong của loss tại một dòng</dd>
+    <dt><var>G</var><sub><var>j</var></sub>, <var>H</var><sub><var>j</var></sub></dt><dd>tổng <var>g</var> và tổng <var>h</var> của các dòng trong lá</dd>
+    <dt><var>T</var></dt><dd>số lá của cây</dd>
+    <dt><var>γ</var></dt><dd>mức phạt cho mỗi lá</dd>
+    <dt><var>λ</var></dt><dd>mức phạt độ lớn giá trị lá</dd>
+  </dl>
+  <p>Thứ tự tính, từ bảng tới giá trị lá:</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 426" role="img" aria-label="Chuỗi tính: có bảng và loss, tính g và h từng dòng, xếp dòng vào lá theo cách chia đang thử, cộng thành G và H mỗi lá, giải giá trị lá w bằng trừ G chia H cộng lambda, rồi ghép ba khối thành Obj" data-anim><style>@keyframes ch1{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}10.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch2{0%{animation-timing-function:ease-in-out;opacity:0}18.571%{animation-timing-function:ease-in-out;opacity:0}25.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch3{0%{animation-timing-function:ease-in-out;opacity:0}32.857%{animation-timing-function:ease-in-out;opacity:0}39.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch4{0%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:0}53.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch5{0%{animation-timing-function:ease-in-out;opacity:0}61.429%{animation-timing-function:ease-in-out;opacity:0}67.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch6{0%{animation-timing-function:ease-in-out;opacity:0}74.286%{animation-timing-function:ease-in-out;opacity:0}80.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch7{0%{animation-timing-function:ease-in-out;opacity:0}22.857%{animation-timing-function:ease-in-out;opacity:0}29.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ch1{animation:ch1 5.384615384615384s linear 1 forwards}.ch2{animation:ch2 5.384615384615384s linear 1 forwards}.ch3{animation:ch3 5.384615384615384s linear 1 forwards}.ch4{animation:ch4 5.384615384615384s linear 1 forwards}.ch5{animation:ch5 5.384615384615384s linear 1 forwards}.ch6{animation:ch6 5.384615384615384s linear 1 forwards}.ch7{animation:ch7 5.384615384615384s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<g class="ch1"><rect x="110" y="8" width="560" height="50" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.5"/><text class="sv-d" x="126" y="28" fill="var(--text)" style="fill:var(--text)">Bảng và loss</text><text class="sv-d" x="126" y="47" fill="var(--muted)" style="fill:var(--muted)">y, dự đoán ŷ = 0,5, loss ½(y − ŷ)²</text><text class="sv-d" x="96" y="38" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">loss</text></g>
+<g class="ch2"><rect x="110" y="90" width="560" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.5"/><text class="sv-d" x="126" y="110" fill="var(--text)" style="fill:var(--text)">g, h của 6 dòng</text><text class="sv-d" x="126" y="129" fill="var(--muted)" style="fill:var(--muted)">g = +4,5 +1,5 −0,5 −0,5 −6,5 −0,5  ·  h = 1 mỗi dòng</text><text class="sv-d" x="96" y="120" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">g, h</text><line x1="150" y1="60" x2="150" y2="82" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="150,89 146,81 154,81" fill="var(--rule-hi)"/><text class="sv-d" x="166" y="78" fill="var(--probe)" style="fill:var(--probe)">tính g, h từng dòng</text></g>
+<g class="ch3"><rect x="110" y="172" width="560" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.5"/><text class="sv-d" x="126" y="192" fill="var(--text)" style="fill:var(--text)">Cách chia đang thử</text><text class="sv-d" x="126" y="211" fill="var(--muted)" style="fill:var(--muted)">tuổi &lt; 31,5  →  lá 1 = A B  ·  lá 2 = C D E F</text><line x1="150" y1="142" x2="150" y2="164" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="150,171 146,163 154,163" fill="var(--rule-hi)"/><text class="sv-d" x="166" y="160" fill="var(--probe)" style="fill:var(--probe)">xếp dòng vào lá</text></g>
+<g class="ch4"><rect x="110" y="254" width="560" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.5"/><text class="sv-d" x="126" y="274" fill="var(--text)" style="fill:var(--text)">G, H của mỗi lá</text><text class="sv-d" x="126" y="293" fill="var(--muted)" style="fill:var(--muted)">lá 1: G = +6,0, H = 2  ·  lá 2: G = −8,0, H = 4</text><text class="sv-d" x="96" y="284" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">G, H</text><line x1="150" y1="224" x2="150" y2="246" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="150,253 146,245 154,245" fill="var(--rule-hi)"/><text class="sv-d" x="166" y="242" fill="var(--probe)" style="fill:var(--probe)">cộng theo lá</text></g>
+<g class="ch5"><rect x="110" y="336" width="560" height="50" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.5"/><text class="sv-d" x="126" y="356" fill="var(--text)" style="fill:var(--text)">Giá trị lá w</text><text class="sv-d" x="126" y="375" fill="var(--muted)" style="fill:var(--muted)">lá 1: −2,00  ·  lá 2: +1,60  (λ = 1)</text><text class="sv-d" x="96" y="366" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">w</text><line x1="150" y1="306" x2="150" y2="328" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="150,335 146,327 154,327" fill="var(--rule-hi)"/><text class="sv-d" x="166" y="324" fill="var(--probe)" style="fill:var(--probe)">giải w = −G / (H + λ)</text></g>
+<g class="ch6"><line x1="150" y1="388" x2="150" y2="410" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="150,417 146,409 154,409" fill="var(--rule-hi)"/><text class="sv-d" x="166" y="408" fill="var(--probe)" style="fill:var(--probe)">ghép ba khối thành Obj (hình dưới)</text></g>
+<g class="ch7"><text class="sv-d" x="686" y="78.0" fill="var(--probe)" style="fill:var(--probe)">loss chỉ đi vào</text><text class="sv-d" x="686" y="96.0" fill="var(--probe)" style="fill:var(--probe)">ở bước này</text><text class="sv-d" x="686" y="201.0" fill="var(--muted)" style="fill:var(--muted)">từ đây chỉ còn g, h</text></g>
+</svg>
+  </figure>
+  <p>Rồi ghép ba khối thành Obj:</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 280" role="img" aria-label="Một cây hai lá với giá trị lá trừ 2 và cộng 1,6; điểm của nó bằng sai số trừ 15,68, cộng phạt số lá 4, cộng phạt độ lớn lá 3,28, bằng trừ 8,4" data-anim><style>@keyframes o1{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}10.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes o2{0%{animation-timing-function:ease-in-out;opacity:0}21.429%{animation-timing-function:ease-in-out;opacity:0}27.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes o3{0%{animation-timing-function:ease-in-out;opacity:0}38.571%{animation-timing-function:ease-in-out;opacity:0}45.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes o4{0%{animation-timing-function:ease-in-out;opacity:0}55.714%{animation-timing-function:ease-in-out;opacity:0}62.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes o5{0%{animation-timing-function:ease-in-out;opacity:0}71.429%{animation-timing-function:ease-in-out;opacity:0}77.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.o1{animation:o1 5.384615384615384s linear 1 forwards}.o2{animation:o2 5.384615384615384s linear 1 forwards}.o3{animation:o3 5.384615384615384s linear 1 forwards}.o4{animation:o4 5.384615384615384s linear 1 forwards}.o5{animation:o5 5.384615384615384s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<g class="o1"><rect x="95" y="24" width="110" height="30" rx="6" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="150" y="43" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">tuổi &lt; 31,5</text><line x1="150" y1="54" x2="70" y2="116" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="18" y="116" width="104" height="30" rx="15" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="70" y="135" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">w = −2,00</text><text class="sv-d" x="70" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">A B</text><text class="sv-d" x="70" y="186" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">G = +6,0</text><text class="sv-d" x="70" y="204" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">H = 2</text><line x1="150" y1="54" x2="230" y2="116" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="178" y="116" width="104" height="30" rx="15" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="230" y="135" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">w = +1,60</text><text class="sv-d" x="230" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">C D E F</text><text class="sv-d" x="230" y="186" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">G = −8,0</text><text class="sv-d" x="230" y="204" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">H = 4</text><text class="sv-d" x="150" y="232" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">một cây, hai lá</text></g>
+<g class="o2"><rect x="330" y="24" width="470" height="54" rx="6" fill="rgba(var(--blue-a),.14)" stroke="var(--filled)" stroke-width="1.6"/><text class="sv-d" x="346" y="47" fill="var(--text)" style="fill:var(--text)">khối 1 · loss của cả cây (xấp xỉ)</text><text class="sv-d" x="346" y="66" fill="var(--muted)" style="fill:var(--muted)">Σ [ G·w + ½ H·w² ] = −8,00 + −7,68</text><text class="sv-d" x="784" y="58" fill="var(--filled)" style="fill:var(--filled)" text-anchor="end">−15,68</text></g>
+<g class="o3"><rect x="330" y="90" width="470" height="54" rx="6" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="346" y="113" fill="var(--text)" style="fill:var(--text)">khối 2 · phạt số lá</text><text class="sv-d" x="346" y="132" fill="var(--muted)" style="fill:var(--muted)">γ · T = 2 × 2</text><text class="sv-d" x="784" y="124" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">+4,00</text></g>
+<g class="o4"><rect x="330" y="156" width="470" height="54" rx="6" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="346" y="179" fill="var(--text)" style="fill:var(--text)">khối 3 · phạt độ lớn lá</text><text class="sv-d" x="346" y="198" fill="var(--muted)" style="fill:var(--muted)">½ λ Σ w² = ½ × 1 × (4,00 + 2,56)</text><text class="sv-d" x="784" y="190" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">+3,28</text></g>
+<g class="o5"><line x1="330" y1="224" x2="800" y2="224" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="346" y="252" fill="var(--text)" style="fill:var(--text)">Obj = khối 1 + khối 2 + khối 3, càng thấp càng tốt</text><text class="sv-d" x="784" y="252" fill="var(--text)" style="fill:var(--text)" text-anchor="end">−8,40</text></g>
+</svg>
+  </figure>
+  <p>Giải công thức cho từng lá ra ba thứ:</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><var>w</var>*</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>− <span class="frac"><i><var>G</var></i><i><var>H</var> + <var>λ</var></i></span></span><em>Output value: giá trị lá</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Similarity Score</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span><span class="frac"><i><var>G</var><sup>2</sup></i><i><var>H</var> + <var>λ</var></i></span></span><em>điểm của một lá</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Gain</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>Sim(trái) + Sim(phải) − Sim(gốc)</span><em>hai lá mới hơn lá cũ bao nhiêu điểm</em></span>
+    </div>
+  </div>
+  <ul class="why">
+    <li><var>g</var> và <var>h</var> là chỗ duy nhất loss đi vào. Đổi loss thì đổi hai số này, phần còn lại giữ nguyên.</li>
+    <li>Obj bỏ phần loss không đổi giữa các cây, nên chỉ dùng để so hai cây với nhau.</li>
+    <li><var>γ</var> là mức phạt để giữ nhánh: Gain − <var>γ</var> nhỏ hơn 0 thì cắt.</li>
+    <li>Vì sao công thức có dạng này: mục 06.</li>
+  </ul>
+</section>
+
+<section id="xgb-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Regression và classification</h2></div>
+  <p class="key">Thay <em><var>g</var> và <var>h</var> của loss</em> vào công thức mục 02. Phần còn lại giữ nguyên.</p>
+  <table>
+    <tr><th>Loss</th><th><span class="mth"><var>g</var></span></th><th><span class="mth"><var>h</var></span></th><th>gọi theo StatQuest</th></tr>
+    <tr><td>Regression: ½(<var>y</var> − <var>ŷ</var>)²</td><td><span class="mth"><var>ŷ</var> − <var>y</var></span></td><td><span class="mth">1</span></td><td>residual = <var>y</var> − <var>ŷ</var> = −<var>g</var>, Cover = <var>n</var></td></tr>
+    <tr><td>Classification: log loss</td><td><span class="mth"><var>p</var> − <var>y</var></span></td><td><span class="mth"><var>p</var>(1 − <var>p</var>)</span></td><td>residual = <var>y</var> − <var>p</var> = −<var>g</var>, Cover = Σ <var>p</var>(1 − <var>p</var>)</td></tr>
+  </table>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 342" role="img" aria-label="Cùng sáu khách và cùng lá C D E F; regression điền g bằng ŷ trừ y và h bằng một; classification điền g bằng p trừ y và h bằng p nhân một trừ p; cùng công thức Similarity bằng G bình phương chia H cộng lambda ra 12,80 và 0,50" data-anim><style>@keyframes t1{0%{animation-timing-function:ease-in-out;opacity:0}1.111%{animation-timing-function:ease-in-out;opacity:0}6.556%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes t2{0%{animation-timing-function:ease-in-out;opacity:0}45.556%{animation-timing-function:ease-in-out;opacity:0}51.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes t3{0%{animation-timing-function:ease-in-out;opacity:0}22.222%{animation-timing-function:ease-in-out;opacity:0}27.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes t4{0%{animation-timing-function:ease-in-out;opacity:0}66.667%{animation-timing-function:ease-in-out;opacity:0}72.111%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes t5{0%{animation-timing-function:ease-in-out;opacity:0}82.222%{animation-timing-function:ease-in-out;opacity:0}87.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.t1{animation:t1 6.428571428571429s linear 1 forwards}.t2{animation:t2 6.428571428571429s linear 1 forwards}.t3{animation:t3 6.428571428571429s linear 1 forwards}.t4{animation:t4 6.428571428571429s linear 1 forwards}.t5{animation:t5 6.428571428571429s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-d" x="142.0" y="22" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text>
+<text class="sv-d" x="224.0" y="22" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text>
+<text class="sv-d" x="306.0" y="22" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text>
+<text class="sv-d" x="388.0" y="22" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text>
+<text class="sv-d" x="470.0" y="22" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text>
+<text class="sv-d" x="552.0" y="22" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text>
+<g class="t1"><text class="sv-d" x="0" y="40" fill="var(--probe)" style="fill:var(--probe)">Regression</text><text class="sv-d" x="0" y="70" fill="var(--text)" style="fill:var(--text)">g</text><text class="sv-d" x="22" y="70" fill="var(--faint)" style="fill:var(--faint)">= ŷ − y</text><text class="sv-d" x="0" y="120" fill="var(--text)" style="fill:var(--text)">h</text><text class="sv-d" x="22" y="120" fill="var(--faint)" style="fill:var(--faint)">= 1</text><text class="sv-d" x="0" y="148" fill="var(--faint)" style="fill:var(--faint)">residual = −g · Cover = H</text><rect x="110" y="52" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="142.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+4,5</text><rect x="110" y="100" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="142.0" y="120" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1</text><rect x="192" y="52" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="224.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1,5</text><rect x="192" y="100" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="224.0" y="120" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1</text><rect x="274" y="52" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="306.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,5</text><rect x="274" y="100" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="306.0" y="120" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1</text><rect x="356" y="52" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="388.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,5</text><rect x="356" y="100" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="388.0" y="120" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1</text><rect x="438" y="52" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="470.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−6,5</text><rect x="438" y="100" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="470.0" y="120" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1</text><rect x="520" y="52" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="552.0" y="72" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,5</text><rect x="520" y="100" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552.0" y="120" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1</text></g>
+<g class="t2"><text class="sv-d" x="0" y="180" fill="var(--probe)" style="fill:var(--probe)">Classification</text><text class="sv-d" x="0" y="210" fill="var(--text)" style="fill:var(--text)">g</text><text class="sv-d" x="22" y="210" fill="var(--faint)" style="fill:var(--faint)">= p − y</text><text class="sv-d" x="0" y="260" fill="var(--text)" style="fill:var(--text)">h</text><text class="sv-d" x="22" y="260" fill="var(--faint)" style="fill:var(--faint)">= p(1 − p)</text><text class="sv-d" x="0" y="288" fill="var(--faint)" style="fill:var(--faint)">residual = −g · Cover = H</text><rect x="110" y="192" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="142.0" y="212" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,5</text><rect x="110" y="240" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="142.0" y="260" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,25</text><rect x="192" y="192" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="224.0" y="212" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,5</text><rect x="192" y="240" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="224.0" y="260" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,25</text><rect x="274" y="192" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="306.0" y="212" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,5</text><rect x="274" y="240" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="306.0" y="260" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,25</text><rect x="356" y="192" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="388.0" y="212" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,5</text><rect x="356" y="240" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="388.0" y="260" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,25</text><rect x="438" y="192" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="470.0" y="212" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,5</text><rect x="438" y="240" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="470.0" y="260" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,25</text><rect x="520" y="192" width="64" height="30" rx="5" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)" stroke-width="1.3"/><text class="sv-d" x="552.0" y="212" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,5</text><rect x="520" y="240" width="64" height="30" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552.0" y="260" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,25</text></g>
+<g class="t3"><rect x="268" y="46" width="320" height="92" rx="8" fill="none" stroke="var(--probe)" stroke-width="2"/><text class="sv-d" x="618" y="58" fill="var(--probe)" style="fill:var(--probe)">lá C D E F</text><text class="sv-d" x="618" y="80" fill="var(--text)" style="fill:var(--text)">G = Σ g = −8,0   H = Σ h = 4,0</text><text class="sv-d" x="618" y="100" fill="var(--probe)" style="fill:var(--probe)">Similarity = G² / (H + λ) = 12,80</text><text class="sv-d" x="618" y="120" fill="var(--ok)" style="fill:var(--ok)">Output value = −G / (H + λ) = +1,60</text></g>
+<g class="t4"><rect x="268" y="186" width="320" height="92" rx="8" fill="none" stroke="var(--probe)" stroke-width="2"/><text class="sv-d" x="618" y="198" fill="var(--probe)" style="fill:var(--probe)">lá C D E F</text><text class="sv-d" x="618" y="220" fill="var(--text)" style="fill:var(--text)">G = Σ g = −1,0   H = Σ h = 1,00</text><text class="sv-d" x="618" y="240" fill="var(--probe)" style="fill:var(--probe)">Similarity = G² / (H + λ) = 0,50</text><text class="sv-d" x="618" y="260" fill="var(--ok)" style="fill:var(--ok)">Output value = −G / (H + λ) = +0,50</text></g>
+<g class="t5"><text class="sv-d" x="618" y="302" fill="var(--text)" style="fill:var(--text)">η × output = 0,15 → p = 0,54</text><text class="sv-d" x="618" y="320" fill="var(--muted)" style="fill:var(--muted)">output là log-odds, đổi về p bằng logistic</text></g>
+</svg>
+  </figure>
+  <p>Đổi <var>g</var> thành −residual và <var>H</var> thành Cover, công thức mục 02 thành dạng quen thuộc:</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>Similarity Score</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span><span class="frac"><i>(Σ <var>residual</var>)<sup>2</sup></i><i><var>Cover</var> + <var>λ</var></i></span></span><em>điểm của lá</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Output value</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span><span class="frac"><i>Σ <var>residual</var></i><i><var>Cover</var> + <var>λ</var></i></span></span><em>giá trị lá trả về</em></span>
+    </div>
+  </div>
+  <ul class="why">
+    <li>Output value của classification là log-odds. Dự đoán mới = log-odds cũ + <var>η</var> × output, rồi đổi về p bằng logistic.</li>
+    <li>Cover nhỏ hơn <code>min_child_weight</code> (mặc định 1) thì bỏ lá. Regression chỉ cần 1 dòng.</li>
+    <li>Classification ở p = 0,5 cần ít nhất 4 dòng. Ví dụ 6 dòng này phải đặt <code>min_child_weight</code> = 0.</li>
+  </ul>
+</section>
+
+<section id="xgb-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Từ bảng tới một cây</h2></div>
+  <p class="key">Cây học <em>residual</em>. Nó thử mọi cột và mọi ngưỡng, chọn chỗ chia có <em>Gain</em> lớn nhất.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 370" role="img" aria-label="Bảng sáu khách thêm cột dự đoán 0,5 và residual; cây thử mọi cột và mọi ngưỡng, chọn tuổi nhỏ hơn 31,5 vì Gain lớn nhất 24,23; các hàng chia vào hai lá, mỗi lá có Output value trừ 2 và cộng 1,6; dự đoán và residual được cập nhật cho cây sau" data-anim><style>@keyframes tb1{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}5.047%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb2{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}13.172%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb3{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.266%{animation-timing-function:ease-in-out;opacity:1}74.375%{animation-timing-function:ease-in-out;opacity:1}76.641%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tb4{0%{animation-timing-function:ease-in-out;opacity:0}18.125%{animation-timing-function:ease-in-out;opacity:0}21.297%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb5{0%{animation-timing-function:ease-in-out;opacity:0}18.125%{animation-timing-function:ease-in-out;opacity:0}20.391%{animation-timing-function:ease-in-out;opacity:1}74.375%{animation-timing-function:ease-in-out;opacity:1}76.641%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tb6{0%{animation-timing-function:ease-in-out;opacity:0}74.375%{animation-timing-function:ease-in-out;opacity:0}77.547%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb7{0%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:0}28.172%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb8{0%{animation-timing-function:ease-in-out;opacity:0}27.500%{animation-timing-function:ease-in-out;opacity:0}29.766%{animation-timing-function:ease-in-out;opacity:1}46.250%{animation-timing-function:ease-in-out;opacity:1}48.516%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tb9{0%{animation-timing-function:ease-in-out;opacity:0}46.250%{animation-timing-function:ease-in-out;opacity:0}49.422%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb10{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}33.172%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb11{0%{animation-timing-function:ease-in-out;opacity:0}32.500%{animation-timing-function:ease-in-out;opacity:0}35.672%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb12{0%{animation-timing-function:ease-in-out;opacity:0}35.000%{animation-timing-function:ease-in-out;opacity:0}38.172%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb13{0%{animation-timing-function:ease-in-out;opacity:0}37.500%{animation-timing-function:ease-in-out;opacity:0}40.672%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb14{0%{animation-timing-function:ease-in-out;opacity:0}41.250%{animation-timing-function:ease-in-out;opacity:0}44.422%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb15{0%{animation-timing-function:ease-in-out;opacity:0}53.750%{animation-timing-function:ease-in-out;opacity:0}56.922%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb16{0%{animation-timing-function:ease-in-out;opacity:0}53.750%{animation-timing-function:ease-in-out;opacity:0}56.922%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb17{0%{animation-timing-function:ease-in-out;opacity:0}63.750%{animation-timing-function:ease-in-out;opacity:0}66.922%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb18{0%{animation-timing-function:ease-in-out;opacity:0}53.750%{animation-timing-function:ease-in-out;opacity:0}56.922%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb19{0%{animation-timing-function:ease-in-out;opacity:0}74.375%{animation-timing-function:ease-in-out;opacity:0}77.547%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb20{0%{animation-timing-function:ease-in-out;opacity:0}81.250%{animation-timing-function:ease-in-out;opacity:0}84.422%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.tb1{animation:tb1 11.03448275862069s linear 1 forwards}.tb2{animation:tb2 11.03448275862069s linear 1 forwards}.tb3{animation:tb3 11.03448275862069s linear 1 forwards}.tb4{animation:tb4 11.03448275862069s linear 1 forwards}.tb5{animation:tb5 11.03448275862069s linear 1 forwards}.tb6{animation:tb6 11.03448275862069s linear 1 forwards}.tb7{animation:tb7 11.03448275862069s linear 1 forwards}.tb8{animation:tb8 11.03448275862069s linear 1 forwards}.tb9{animation:tb9 11.03448275862069s linear 1 forwards}.tb10{animation:tb10 11.03448275862069s linear 1 forwards}.tb11{animation:tb11 11.03448275862069s linear 1 forwards}.tb12{animation:tb12 11.03448275862069s linear 1 forwards}.tb13{animation:tb13 11.03448275862069s linear 1 forwards}.tb14{animation:tb14 11.03448275862069s linear 1 forwards}.tb15{animation:tb15 11.03448275862069s linear 1 forwards}.tb16{animation:tb16 11.03448275862069s linear 1 forwards}.tb17{animation:tb17 11.03448275862069s linear 1 forwards}.tb18{animation:tb18 11.03448275862069s linear 1 forwards}.tb19{animation:tb19 11.03448275862069s linear 1 forwards}.tb20{animation:tb20 11.03448275862069s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-d" x="0" y="24" fill="var(--muted)" style="fill:var(--muted)">6 khách, y = chi tiêu tăng thêm (triệu)</text>
+<g class="tb1"><rect x="0" y="59" width="474" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="85" width="474" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="111" width="474" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="137" width="474" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="163" width="474" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="189" width="474" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="15.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">id</text><text class="sv-d" x="57.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">tuổi</text><text class="sv-d" x="117.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">thu nhập</text><text class="sv-d" x="191.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">đã mua trước</text><text class="sv-d" x="256.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">y</text><line x1="0" y1="56" x2="474" y2="56" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="15.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text><text class="sv-d" x="57.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">24</text><text class="sv-d" x="117.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">12tr</text><text class="sv-d" x="191.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">không</text><text class="sv-d" x="256.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−4</text><text class="sv-d" x="15.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text><text class="sv-d" x="57.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">28</text><text class="sv-d" x="117.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">22tr</text><text class="sv-d" x="191.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">không</text><text class="sv-d" x="256.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−1</text><text class="sv-d" x="15.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text><text class="sv-d" x="57.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">35</text><text class="sv-d" x="117.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">18tr</text><text class="sv-d" x="191.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">có</text><text class="sv-d" x="256.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1</text><text class="sv-d" x="15.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text><text class="sv-d" x="57.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">41</text><text class="sv-d" x="117.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">26tr</text><text class="sv-d" x="191.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">có</text><text class="sv-d" x="256.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1</text><text class="sv-d" x="15.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text><text class="sv-d" x="57.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">52</text><text class="sv-d" x="117.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">30tr</text><text class="sv-d" x="191.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">có</text><text class="sv-d" x="256.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+7</text><text class="sv-d" x="15.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text><text class="sv-d" x="57.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">60</text><text class="sv-d" x="117.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">34tr</text><text class="sv-d" x="191.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">không</text><text class="sv-d" x="256.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1</text></g>
+<g class="tb2"><text class="sv-d" x="316.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">dự đoán</text></g>
+<g class="tb3" opacity="0"><text class="sv-d" x="316.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="316.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="316.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="316.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="316.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="316.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text></g>
+<g class="tb4"><text class="sv-d" x="390.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">residual</text></g>
+<g class="tb5" opacity="0"><text class="sv-d" x="390.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−4,5</text><text class="sv-d" x="390.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−1,5</text><text class="sv-d" x="390.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,5</text><text class="sv-d" x="390.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,5</text><text class="sv-d" x="390.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+6,5</text><text class="sv-d" x="390.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,5</text></g>
+<g class="tb6"><text class="sv-d" x="316.0" y="75" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,10</text><text class="sv-d" x="316.0" y="101" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,10</text><text class="sv-d" x="316.0" y="127" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="316.0" y="153" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="316.0" y="179" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="316.0" y="205" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="390.0" y="75" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−3,90</text><text class="sv-d" x="390.0" y="101" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,90</text><text class="sv-d" x="390.0" y="127" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,02</text><text class="sv-d" x="390.0" y="153" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,02</text><text class="sv-d" x="390.0" y="179" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+6,02</text><text class="sv-d" x="390.0" y="205" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,02</text><text class="sv-d" x="352.0" y="24" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">sau cây 1</text></g>
+<g class="tb7"><text class="sv-d" x="540" y="50" fill="var(--muted)" style="fill:var(--muted)">thử mọi cột × mọi ngưỡng</text><text class="sv-d" x="858" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">Gain</text></g>
+<g class="tb8" opacity="0"><rect x="540" y="62" width="318" height="24" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552" y="78" fill="var(--text)" style="fill:var(--text)">tuổi &lt; 31,5</text><text class="sv-d" x="846" y="78" fill="var(--text)" style="fill:var(--text)" text-anchor="end">24,23</text></g>
+<g class="tb9"><rect x="540" y="62" width="318" height="24" rx="5" fill="none" stroke="var(--probe)" stroke-width="2"/><text class="sv-d" x="552" y="78" fill="var(--probe)" style="fill:var(--probe)">tuổi &lt; 31,5</text><text class="sv-d" x="846" y="78" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">24,23</text></g>
+<g class="tb10"><rect x="540" y="90" width="318" height="24" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552" y="106" fill="var(--text)" style="fill:var(--text)">tuổi &lt; 38</text><text class="sv-d" x="846" y="106" fill="var(--text)" style="fill:var(--text)" text-anchor="end">21,05</text></g>
+<g class="tb11"><rect x="540" y="118" width="318" height="24" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552" y="134" fill="var(--text)" style="fill:var(--text)">đã mua trước ?</text><text class="sv-d" x="846" y="134" fill="var(--text)" style="fill:var(--text)" text-anchor="end">21,05</text></g>
+<g class="tb12"><rect x="540" y="146" width="318" height="24" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552" y="162" fill="var(--text)" style="fill:var(--text)">tuổi &lt; 46,5</text><text class="sv-d" x="846" y="162" fill="var(--text)" style="fill:var(--text)" text-anchor="end">20,76</text></g>
+<g class="tb13"><rect x="540" y="174" width="318" height="24" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="552" y="190" fill="var(--text)" style="fill:var(--text)">tuổi &lt; 26</text><text class="sv-d" x="846" y="190" fill="var(--text)" style="fill:var(--text)" text-anchor="end">16,60</text></g>
+<g class="tb14"><text class="sv-d" x="540" y="214" fill="var(--muted)" style="fill:var(--muted)">còn 2 cách chia khác, Gain thấp hơn</text></g>
+<g class="tb15"><rect x="0" y="59" width="474" height="22" rx="3" fill="rgba(var(--blue-a),.10)" stroke="none" stroke-width="0"/><rect x="0" y="85" width="474" height="22" rx="3" fill="rgba(var(--blue-a),.10)" stroke="none" stroke-width="0"/><rect x="0" y="111" width="474" height="22" rx="3" fill="rgba(var(--blue-a),.32)" stroke="none" stroke-width="0"/><rect x="0" y="137" width="474" height="22" rx="3" fill="rgba(var(--blue-a),.32)" stroke="none" stroke-width="0"/><rect x="0" y="163" width="474" height="22" rx="3" fill="rgba(var(--blue-a),.32)" stroke="none" stroke-width="0"/><rect x="0" y="189" width="474" height="22" rx="3" fill="rgba(var(--blue-a),.32)" stroke="none" stroke-width="0"/><text class="sv-d" x="451.0" y="50" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">lá</text><text class="sv-d" x="451.0" y="75" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 1</text><text class="sv-d" x="451.0" y="101" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 1</text><text class="sv-d" x="451.0" y="127" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 2</text><text class="sv-d" x="451.0" y="153" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 2</text><text class="sv-d" x="451.0" y="179" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 2</text><text class="sv-d" x="451.0" y="205" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 2</text></g>
+<g class="tb16"><rect x="179" y="230" width="116" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="237" y="247" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">tuổi &lt; 31,5</text><line x1="237" y1="256" x2="110" y2="296" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="44" y="296" width="132" height="26" rx="13" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="110" y="313" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 1 · A B</text><line x1="237" y1="256" x2="365" y2="296" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="299" y="296" width="132" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="365" y="313" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">lá 2 · C D E F</text></g>
+<g class="tb17"><text class="sv-d" x="110" y="344" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">Output value = −6,0 / (2+1) = −2,00</text><text class="sv-d" x="365" y="344" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">Output value = +8,0 / (4+1) = +1,60</text></g>
+<g class="tb18"><text class="sv-d" x="540" y="242" fill="var(--probe)" style="fill:var(--probe)">Gain = 12,00 + 12,80 − 0,57 = 24,23</text><text class="sv-d" x="540" y="264" fill="var(--muted)" style="fill:var(--muted)">Gain − γ = 24,23 − 2 &gt; 0: giữ nhánh</text></g>
+<g class="tb19"><text class="sv-d" x="540" y="296" fill="var(--probe)" style="fill:var(--probe)">dự đoán mới = 0,5 + η × output</text><text class="sv-d" x="540" y="314" fill="var(--muted)" style="fill:var(--muted)">η = 0,3</text></g>
+<g class="tb20"><rect x="538" y="338" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="552" y="353" fill="var(--probe)" style="fill:var(--probe)">Cây sau học cột residual mới</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Ví dụ này là regression: <var>g</var> = −residual, <var>h</var> = 1, nên Similarity Score = (Σ residual)² / (<var>n</var> + <var>λ</var>).</li>
+    <li>Mỗi cây có lá như random forest, nhưng lá giữ <b>Output value</b>: một số sửa lỗi, không phải nhãn hay trung bình y.</li>
+    <li>Similarity Score cao khi residual trong lá cùng dấu. Trái dấu thì triệt tiêu nhau.</li>
+    <li>Hình dừng ở một tầng cho gọn. Cây thật chia tiếp trong từng lá tới <code>max_depth</code>, mặc định 6.</li>
+  </ul>
+</section>
+
+<section id="xgb-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Cộng dồn nhiều cây</h2></div>
+  <p class="key">Cây sau học phần cây trước còn sai. Dự đoán cuối là <em>cộng</em> các cây, không phải trung bình hay bỏ phiếu.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 436" role="img" aria-label="Ba cây nối tiếp: cây 1 chia theo tuổi nhỏ hơn 31,5, cây 2 chia theo tuổi nhỏ hơn 46,5, cây 3 chia theo đã mua trước; mỗi cây cộng thêm một phần vào dự đoán và cột còn sai nhỏ dần; khách mới X đi qua cả ba cây rồi cộng ba phần tăng thêm vào 0,5 ra 2,04" data-anim><style>@keyframes ac1{0%{animation-timing-function:ease-in-out;opacity:0}7.059%{animation-timing-function:ease-in-out;opacity:0}10.044%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac2{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.985%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac3{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.132%{animation-timing-function:ease-in-out;opacity:1}69.412%{animation-timing-function:ease-in-out;opacity:1}71.544%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ac4{0%{animation-timing-function:ease-in-out;opacity:0}69.412%{animation-timing-function:ease-in-out;opacity:0}72.397%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac5{0%{animation-timing-function:ease-in-out;opacity:0}28.824%{animation-timing-function:ease-in-out;opacity:0}31.809%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac6{0%{animation-timing-function:ease-in-out;opacity:0}31.765%{animation-timing-function:ease-in-out;opacity:0}34.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac7{0%{animation-timing-function:ease-in-out;opacity:0}31.765%{animation-timing-function:ease-in-out;opacity:0}33.897%{animation-timing-function:ease-in-out;opacity:1}69.412%{animation-timing-function:ease-in-out;opacity:1}71.544%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ac8{0%{animation-timing-function:ease-in-out;opacity:0}69.412%{animation-timing-function:ease-in-out;opacity:0}72.397%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac9{0%{animation-timing-function:ease-in-out;opacity:0}50.588%{animation-timing-function:ease-in-out;opacity:0}53.574%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac10{0%{animation-timing-function:ease-in-out;opacity:0}53.529%{animation-timing-function:ease-in-out;opacity:0}56.515%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac11{0%{animation-timing-function:ease-in-out;opacity:0}53.529%{animation-timing-function:ease-in-out;opacity:0}55.662%{animation-timing-function:ease-in-out;opacity:1}69.412%{animation-timing-function:ease-in-out;opacity:1}71.544%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ac12{0%{animation-timing-function:ease-in-out;opacity:0}69.412%{animation-timing-function:ease-in-out;opacity:0}72.397%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac13{0%{animation-timing-function:ease-in-out;opacity:0}1.765%{animation-timing-function:ease-in-out;opacity:0}4.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac14{0%{animation-timing-function:ease-in-out;opacity:0}12.941%{animation-timing-function:ease-in-out;opacity:0}15.926%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac15{0%{animation-timing-function:ease-in-out;opacity:0}34.706%{animation-timing-function:ease-in-out;opacity:0}37.691%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac16{0%{animation-timing-function:ease-in-out;opacity:0}56.471%{animation-timing-function:ease-in-out;opacity:0}59.456%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac17{0%{animation-timing-function:ease-in-out;opacity:0}1.765%{animation-timing-function:ease-in-out;opacity:0}3.897%{animation-timing-function:ease-in-out;opacity:1}19.412%{animation-timing-function:ease-in-out;opacity:1}21.544%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ac18{0%{animation-timing-function:ease-in-out;opacity:0}19.412%{animation-timing-function:ease-in-out;opacity:0}21.544%{animation-timing-function:ease-in-out;opacity:1}41.176%{animation-timing-function:ease-in-out;opacity:1}43.309%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ac19{0%{animation-timing-function:ease-in-out;opacity:0}41.176%{animation-timing-function:ease-in-out;opacity:0}43.309%{animation-timing-function:ease-in-out;opacity:1}62.941%{animation-timing-function:ease-in-out;opacity:1}65.074%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ac20{0%{animation-timing-function:ease-in-out;opacity:0}62.941%{animation-timing-function:ease-in-out;opacity:0}65.074%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac21{0%{animation-timing-function:ease-in-out;opacity:0}69.412%{animation-timing-function:ease-in-out;opacity:0}72.397%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac22{0%{animation-timing-function:ease-in-out;opacity:0}71.765%{animation-timing-function:ease-in-out;opacity:0}74.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ac23{0%{animation-timing-function:ease-in-out;opacity:0}78.824%{animation-timing-function:ease-in-out;opacity:0}81.809%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ac1{animation:ac1 11.724137931034484s linear 1 forwards}.ac2{animation:ac2 11.724137931034484s linear 1 forwards}.ac3{animation:ac3 11.724137931034484s linear 1 forwards}.ac4{animation:ac4 11.724137931034484s linear 1 forwards}.ac5{animation:ac5 11.724137931034484s linear 1 forwards}.ac6{animation:ac6 11.724137931034484s linear 1 forwards}.ac7{animation:ac7 11.724137931034484s linear 1 forwards}.ac8{animation:ac8 11.724137931034484s linear 1 forwards}.ac9{animation:ac9 11.724137931034484s linear 1 forwards}.ac10{animation:ac10 11.724137931034484s linear 1 forwards}.ac11{animation:ac11 11.724137931034484s linear 1 forwards}.ac12{animation:ac12 11.724137931034484s linear 1 forwards}.ac13{animation:ac13 11.724137931034484s linear 1 forwards}.ac14{animation:ac14 11.724137931034484s linear 1 forwards}.ac15{animation:ac15 11.724137931034484s linear 1 forwards}.ac16{animation:ac16 11.724137931034484s linear 1 forwards}.ac17{animation:ac17 11.724137931034484s linear 1 forwards}.ac18{animation:ac18 11.724137931034484s linear 1 forwards}.ac19{animation:ac19 11.724137931034484s linear 1 forwards}.ac20{animation:ac20 11.724137931034484s linear 1 forwards}.ac21{animation:ac21 11.724137931034484s linear 1 forwards}.ac22{animation:ac22 11.724137931034484s linear 1 forwards}.ac23{animation:ac23 11.724137931034484s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<g class="ac1"><text class="sv-d" x="0" y="14" fill="var(--probe)" style="fill:var(--probe)">cây 1</text><rect x="65" y="26" width="120" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="125" y="43" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">tuổi &lt; 31,5</text></g>
+<g class="ac2"><line x1="125" y1="52" x2="68" y2="92" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="4.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="68" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A B · −2,00</text></g>
+<g class="ac3" opacity="0"><line x1="125" y1="52" x2="200" y2="92" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="136.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="200" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C D E F · +1,60</text></g>
+<g class="ac4"><line x1="125" y1="52" x2="200" y2="92" stroke="var(--probe)" stroke-width="2.4"/><rect x="136.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--probe)" stroke-width="2.2"/><text class="sv-d" x="200" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C D E F · +1,60</text></g>
+<g class="ac5"><text class="sv-d" x="290" y="14" fill="var(--probe)" style="fill:var(--probe)">cây 2</text><rect x="355" y="26" width="120" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="415" y="43" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">tuổi &lt; 46,5</text></g>
+<g class="ac6"><line x1="415" y1="52" x2="358" y2="92" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="294.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="358" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A B C D · −0,95</text></g>
+<g class="ac7" opacity="0"><line x1="415" y1="52" x2="490" y2="92" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="426.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="490" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E F · +2,01</text></g>
+<g class="ac8"><line x1="415" y1="52" x2="490" y2="92" stroke="var(--probe)" stroke-width="2.4"/><rect x="426.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--probe)" stroke-width="2.2"/><text class="sv-d" x="490" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E F · +2,01</text></g>
+<g class="ac9"><text class="sv-d" x="580" y="14" fill="var(--probe)" style="fill:var(--probe)">cây 3</text><rect x="645" y="26" width="120" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="705" y="43" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">đã mua trước ?</text></g>
+<g class="ac10"><line x1="705" y1="52" x2="648" y2="92" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="584.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="648" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A B F · −1,20</text></g>
+<g class="ac11" opacity="0"><line x1="705" y1="52" x2="780" y2="92" stroke="var(--rule-hi)" stroke-width="1.3"/><rect x="716.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="780" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C D E · +1,51</text></g>
+<g class="ac12"><line x1="705" y1="52" x2="780" y2="92" stroke="var(--probe)" stroke-width="2.4"/><rect x="716.0" y="92" width="128" height="26" rx="13" fill="rgba(var(--blue-a),.32)" stroke="var(--probe)" stroke-width="2.2"/><text class="sv-d" x="780" y="109" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C D E · +1,51</text></g>
+<g class="ac13"><rect x="0" y="175" width="642" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="201" width="642" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="227" width="642" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="253" width="642" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="279" width="642" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="305" width="642" height="22" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">id</text><text class="sv-d" x="68.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">y</text><text class="sv-d" x="144.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">dự đoán đầu</text><text class="sv-d" x="507.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">dự đoán</text><text class="sv-d" x="597.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">còn sai</text><line x1="0" y1="172" x2="642" y2="172" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="191" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text><text class="sv-d" x="68.0" y="191" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−4</text><text class="sv-d" x="144.0" y="191" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text><text class="sv-d" x="20.0" y="217" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text><text class="sv-d" x="68.0" y="217" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−1</text><text class="sv-d" x="144.0" y="217" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text><text class="sv-d" x="20.0" y="243" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text><text class="sv-d" x="68.0" y="243" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1</text><text class="sv-d" x="144.0" y="243" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text><text class="sv-d" x="20.0" y="269" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text><text class="sv-d" x="68.0" y="269" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1</text><text class="sv-d" x="144.0" y="269" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text><text class="sv-d" x="20.0" y="295" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text><text class="sv-d" x="68.0" y="295" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+7</text><text class="sv-d" x="144.0" y="295" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text><text class="sv-d" x="20.0" y="321" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text><text class="sv-d" x="68.0" y="321" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1</text><text class="sv-d" x="144.0" y="321" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text></g>
+<g class="ac14"><text class="sv-d" x="237.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">+ cây 1</text><text class="sv-d" x="237.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,60</text><text class="sv-d" x="237.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,60</text><text class="sv-d" x="237.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,48</text><text class="sv-d" x="237.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,48</text><text class="sv-d" x="237.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,48</text><text class="sv-d" x="237.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,48</text></g>
+<g class="ac15"><text class="sv-d" x="327.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">+ cây 2</text><text class="sv-d" x="327.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,29</text><text class="sv-d" x="327.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,29</text><text class="sv-d" x="327.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,29</text><text class="sv-d" x="327.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,29</text><text class="sv-d" x="327.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,60</text><text class="sv-d" x="327.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,60</text></g>
+<g class="ac16"><text class="sv-d" x="417.0" y="166" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">+ cây 3</text><text class="sv-d" x="417.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,36</text><text class="sv-d" x="417.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,36</text><text class="sv-d" x="417.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,45</text><text class="sv-d" x="417.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,45</text><text class="sv-d" x="417.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,45</text><text class="sv-d" x="417.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,36</text></g>
+<g class="ac17" opacity="0"><text class="sv-d" x="507.0" y="191" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="597.0" y="191" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−4,50</text><text class="sv-d" x="507.0" y="217" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="597.0" y="217" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−1,50</text><text class="sv-d" x="507.0" y="243" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="597.0" y="243" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,50</text><text class="sv-d" x="507.0" y="269" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="597.0" y="269" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,50</text><text class="sv-d" x="507.0" y="295" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="597.0" y="295" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+6,50</text><text class="sv-d" x="507.0" y="321" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,50</text><text class="sv-d" x="597.0" y="321" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,50</text></g>
+<g class="ac18" opacity="0"><text class="sv-d" x="507.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,10</text><text class="sv-d" x="597.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−3,90</text><text class="sv-d" x="507.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,10</text><text class="sv-d" x="597.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,90</text><text class="sv-d" x="507.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="597.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,02</text><text class="sv-d" x="507.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="597.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,02</text><text class="sv-d" x="507.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="597.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+6,02</text><text class="sv-d" x="507.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,98</text><text class="sv-d" x="597.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,02</text></g>
+<g class="ac19" opacity="0"><text class="sv-d" x="507.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,39</text><text class="sv-d" x="597.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−3,61</text><text class="sv-d" x="507.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,39</text><text class="sv-d" x="597.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,61</text><text class="sv-d" x="507.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,69</text><text class="sv-d" x="597.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,31</text><text class="sv-d" x="507.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,69</text><text class="sv-d" x="597.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,31</text><text class="sv-d" x="507.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">1,58</text><text class="sv-d" x="597.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+5,42</text><text class="sv-d" x="507.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">1,58</text><text class="sv-d" x="597.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,58</text></g>
+<g class="ac20"><text class="sv-d" x="507.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,75</text><text class="sv-d" x="597.0" y="191" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−3,25</text><text class="sv-d" x="507.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,75</text><text class="sv-d" x="597.0" y="217" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,25</text><text class="sv-d" x="507.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">1,15</text><text class="sv-d" x="597.0" y="243" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,15</text><text class="sv-d" x="507.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">1,15</text><text class="sv-d" x="597.0" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,15</text><text class="sv-d" x="507.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">2,04</text><text class="sv-d" x="597.0" y="295" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+4,96</text><text class="sv-d" x="507.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">1,22</text><text class="sv-d" x="597.0" y="321" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−0,22</text></g>
+<g class="ac21"><rect x="0" y="339" width="642" height="22" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.4"/><text class="sv-d" x="20.0" y="355" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">X</text><text class="sv-d" x="68.0" y="355" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">?</text><text class="sv-d" x="144.0" y="355" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,5</text><text class="sv-d" x="237.0" y="355" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,48</text><text class="sv-d" x="327.0" y="355" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,60</text><text class="sv-d" x="417.0" y="355" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">+0,45</text><text class="sv-d" x="507.0" y="355" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">2,04</text><text class="sv-d" x="597.0" y="355" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">chưa có y</text></g>
+<g class="ac22"><text class="sv-d" x="0" y="386" fill="var(--muted)" style="fill:var(--muted)">X: tuổi 47 · thu nhập 28tr · đã mua trước. Đi qua cả 3 cây (đường vàng), cộng ba phần tăng thêm vào 0,5</text></g>
+<g class="ac23"><rect x="0" y="404" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="419" fill="var(--probe)" style="fill:var(--probe)">Cây sau học cột &quot;còn sai&quot;: sau 3 cây, phần còn sai của A, B, C, D, F nhỏ đi</text></g>
+</svg>
+  </figure>
+  <table>
+    <tr><th></th><th>Random forest</th><th>XGBoost</th></tr>
+    <tr><td>Mỗi cây học</td><td>mẫu bootstrap của y</td><td>residual của các cây trước</td></tr>
+    <tr><td>Gộp</td><td>trung bình hoặc bỏ phiếu</td><td>cộng, mỗi cây nhân <var>η</var></td></tr>
+    <tr><td>Train</td><td>song song</td><td>nối tiếp</td></tr>
+  </table>
+  <ul class="why">
+    <li>Mỗi cây chỉ cộng <var>η</var> × Output value. <var>η</var> nhỏ thì cần nhiều cây hơn. Ở đây <var>η</var> = 0,3.</li>
+    <li>Dừng khi đủ <code>n_estimators</code>, hoặc early stopping: điểm trên tập validation hết cải thiện.</li>
+    <li>Cây sau cần residual của cây trước, nên không train song song từng cây.</li>
+  </ul>
+</section>
+
+<section id="xgb-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Vì sao công thức có dạng đó</h2></div>
+  <p class="key">Mỗi lá là một parabola theo giá trị lá. Đáy là <em>Output value</em>, độ sâu là <em>Similarity Score</em>.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><var>w</var>*</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>− <span class="frac"><i><var>G</var></i><i><var>H</var> + <var>λ</var></i></span></span><em>đáy của parabola</em></span>
+      <span class="op">,</span>
+      <span class="t"><span>Obj*</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>− ½ Σ Similarity Score</span><em>độ sâu của đáy</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span><var>γ</var><var>T</var></span><em>phạt số lá</em></span>
+    </div>
+  </div>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 336" role="img" aria-label="Obj của lá C D E F là một parabola theo giá trị lá; với lambda bằng 0 đáy ở 2 sâu 8; với lambda bằng 1 đáy ở 1,6 sâu 6,4; Similarity bằng hai lần độ sâu của đáy" data-anim><style>@keyframes p1{0%{animation-timing-function:ease-in-out;opacity:0}3.636%{animation-timing-function:ease-in-out;opacity:0}8.091%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes p2{0%{animation-timing-function:ease-in-out;opacity:0}14.545%{animation-timing-function:ease-in-out;opacity:0}19.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes p3{0%{animation-timing-function:ease-in-out;opacity:0}18.182%{animation-timing-function:ease-in-out;opacity:0}22.636%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes p4{0%{animation-timing-function:ease-in-out;opacity:0}30.909%{animation-timing-function:ease-in-out;opacity:0}35.364%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes p5{0%{animation-timing-function:ease-in-out;opacity:0}41.818%{animation-timing-function:ease-in-out;opacity:0}46.273%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes p6{0%{animation-timing-function:ease-in-out;opacity:0}45.455%{animation-timing-function:ease-in-out;opacity:0}49.909%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes p7{0%{animation-timing-function:ease-in-out;opacity:0}67.273%{animation-timing-function:ease-in-out;opacity:0}71.727%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.p1{animation:p1 7.857142857142858s linear 1 forwards}.p2{animation:p2 7.857142857142858s linear 1 forwards}.p3{animation:p3 7.857142857142858s linear 1 forwards}.p4{animation:p4 7.857142857142858s linear 1 forwards}.p5{animation:p5 7.857142857142858s linear 1 forwards}.p6{animation:p6 7.857142857142858s linear 1 forwards}.p7{animation:p7 7.857142857142858s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<line x1="40" y1="192.58823529411762" x2="520" y2="192.58823529411762" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="520" y="210.58823529411762" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">giá trị lá w</text><text class="sv-d" x="40" y="20" fill="var(--muted)" style="fill:var(--muted)">Obj của lá C D E F</text>
+<g class="p1"><path d="M40.0 123.2 L46.9 130.2 L53.7 137.0 L60.6 143.7 L67.4 150.1 L74.3 156.3 L81.1 162.3 L88.0 168.2 L94.9 173.8 L101.7 179.2 L108.6 184.4 L115.4 189.4 L122.3 194.2 L129.1 198.8 L136.0 203.1 L142.9 207.3 L149.7 211.3 L156.6 215.1 L163.4 218.6 L170.3 222.0 L177.1 225.2 L184.0 228.1 L190.9 230.9 L197.7 233.4 L204.6 235.8 L211.4 237.9 L218.3 239.9 L225.1 241.6 L232.0 243.1 L238.9 244.4 L245.7 245.6 L252.6 246.5 L259.4 247.2 L266.3 247.7 L273.1 248.0 L280.0 248.1 L286.9 248.0 L293.7 247.7 L300.6 247.2 L307.4 246.5 L314.3 245.6 L321.1 244.4 L328.0 243.1 L334.9 241.6 L341.7 239.9 L348.6 237.9 L355.4 235.8 L362.3 233.4 L369.1 230.9 L376.0 228.1 L382.9 225.2 L389.7 222.0 L396.6 218.6 L403.4 215.1 L410.3 211.3 L417.1 207.3 L424.0 203.1 L430.9 198.8 L437.7 194.2 L444.6 189.4 L451.4 184.4 L458.3 179.2 L465.1 173.8 L472.0 168.2 L478.9 162.3 L485.7 156.3 L492.6 150.1 L499.4 143.7 L506.3 137.0 L513.1 130.2 L520.0 123.2" fill="none" stroke="var(--filled)" stroke-width="2.4"/></g>
+<g class="p2"><line x1="280.0" y1="248.11764705882354" x2="280.0" y2="192.58823529411762" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/><circle cx="280.0" cy="248.1" r="6" fill="none" stroke="var(--filled)" stroke-width="2.4"/><text class="sv-d" x="286.0" y="184.58823529411762" fill="var(--filled)" style="fill:var(--filled)" text-anchor="start">w* = 2,00</text></g>
+<g class="p3"><line x1="570" y1="60" x2="604" y2="60" stroke="var(--filled)" stroke-width="2.4"/><text class="sv-d" x="614" y="64" fill="var(--text)" style="fill:var(--text)">λ = 0</text><text class="sv-d" x="614" y="84" fill="var(--muted)" style="fill:var(--muted)">w* = −G/(H+λ) = 2,00</text><text class="sv-d" x="614" y="104" fill="var(--muted)" style="fill:var(--muted)">đáy = −8,00</text><text class="sv-d" x="614" y="124" fill="var(--filled)" style="fill:var(--filled)">Similarity = −2 × đáy = 16,00</text></g>
+<g class="p4"><path d="M40.0 119.7 L46.9 127.3 L53.7 134.7 L60.6 141.8 L67.4 148.6 L74.3 155.2 L81.1 161.5 L88.0 167.6 L94.9 173.4 L101.7 179.0 L108.6 184.3 L115.4 189.4 L122.3 194.2 L129.1 198.7 L136.0 203.0 L142.9 207.0 L149.7 210.8 L156.6 214.3 L163.4 217.6 L170.3 220.6 L177.1 223.4 L184.0 225.9 L190.9 228.2 L197.7 230.2 L204.6 231.9 L211.4 233.4 L218.3 234.6 L225.1 235.6 L232.0 236.3 L238.9 236.8 L245.7 237.0 L252.6 237.0 L259.4 236.7 L266.3 236.1 L273.1 235.3 L280.0 234.2 L286.9 232.9 L293.7 231.3 L300.6 229.5 L307.4 227.4 L314.3 225.1 L321.1 222.5 L328.0 219.7 L334.9 216.6 L341.7 213.2 L348.6 209.6 L355.4 205.7 L362.3 201.6 L369.1 197.2 L376.0 192.6 L382.9 187.7 L389.7 182.6 L396.6 177.2 L403.4 171.5 L410.3 165.6 L417.1 159.4 L424.0 153.0 L430.9 146.4 L437.7 139.4 L444.6 132.2 L451.4 124.8 L458.3 117.1 L465.1 109.2 L472.0 101.0 L478.9 92.5 L485.7 83.8 L492.6 74.8 L499.4 65.6 L506.3 56.1 L513.1 46.4 L520.0 36.4" fill="none" stroke="var(--probe)" stroke-width="2.4"/></g>
+<g class="p5"><line x1="248.0" y1="237.01176470588234" x2="248.0" y2="192.58823529411762" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/><circle cx="248.0" cy="237.0" r="6" fill="none" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="242.0" y="184.58823529411762" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">w* = 1,60</text></g>
+<g class="p6"><line x1="570" y1="156" x2="604" y2="156" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="614" y="160" fill="var(--text)" style="fill:var(--text)">λ = 1</text><text class="sv-d" x="614" y="180" fill="var(--muted)" style="fill:var(--muted)">w* = −G/(H+λ) = 1,60</text><text class="sv-d" x="614" y="200" fill="var(--muted)" style="fill:var(--muted)">đáy = −6,40</text><text class="sv-d" x="614" y="220" fill="var(--probe)" style="fill:var(--probe)">Similarity = −2 × đáy = 12,80</text></g>
+<g class="p7"><rect x="0" y="296" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="311" fill="var(--probe)" style="fill:var(--probe)">λ lớn hơn: đáy nông hơn và lệch về 0, nên Similarity và Output value đều nhỏ đi</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Xấp xỉ loss quanh điểm đang đứng bằng parabola: <var>g</var> là độ dốc, <var>h</var> là độ cong. Loss phải khả vi hai lần.</li>
+    <li>λ làm Similarity Score và Gain nhỏ đi, nên γ cắt nhiều nhánh hơn.</li>
+    <li>Thư viện bỏ hệ số ½ khi tính Gain, nên so Gain với γ trực tiếp.</li>
+  </ul>
+</section>
+<section id="xgb-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Ưu và nhược</h2></div>
+  <p class="key">Đổi <em>công sức chỉnh</em> lấy <em>độ chính xác</em>. Mặc định hiếm khi là cấu hình tốt nhất.</p>
+  <table>
+    <tr><th>Mặt</th><th>Được gì</th><th>Mất gì</th></tr>
+    <tr><td>Độ chính xác</td><td>Hàng đầu trên dữ liệu bảng, ổn định giữa các lần chạy</td><td>Nhiều hyperparameter cần chỉnh</td></tr>
+    <tr><td>Overfitting</td><td>γ, λ nằm trong objective, có early stopping</td><td>Thêm cây mãi vẫn overfit dần</td></tr>
+    <tr><td>Dữ liệu vào</td><td>Không cần scaling, nhận thẳng giá trị thiếu</td><td>Biến phân loại thường phải mã hoá trước</td></tr>
+    <tr><td>Đổi loss</td><td>Chỉ đổi cách tính <var>g</var> và <var>h</var></td><td>Loss phải khả vi hai lần</td></tr>
+    <tr><td>Tốc độ</td><td>Tìm ngưỡng chạy song song</td><td>Các cây nối tiếp nên chậm hơn LightGBM khi dữ liệu rất lớn</td></tr>
+    <tr><td>Đọc model</td><td>Có feature importance</td><td>Nhiều cây nối tiếp, không đọc được từng luật</td></tr>
+  </table>
+  <ul class="why">
+    <li><b>Chọn XGBoost</b> khi dữ liệu bảng cỡ vừa, cần độ chính xác cao, chịu chỉnh hyperparameter.</li>
+    <li><b>Chọn LightGBM</b> khi dữ liệu rất lớn hoặc phải huấn luyện lại thường xuyên.</li>
+    <li><b>Chọn random forest</b> khi cần baseline nhanh, ít chỉnh. Xem <span style="color:var(--clay)">Random forest</span>.</li>
+    <li>Số cây chọn bằng early stopping trên tập validation. So sánh đầy đủ: <span style="color:var(--clay)">Tree models overview</span>.</li>
+  </ul>
+</section>
+
+<section id="xgb-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
+
+  <details class="qa"><summary>Kể vòng đời huấn luyện XGBoost từ bảng dữ liệu tới dự đoán.</summary>
+  <p>Bắt đầu từ dự đoán ban đầu 0,5 cho mọi dòng.</p>
+  <p>Tính g, h của từng dòng. Với regression thì residual = −g.</p>
+  <p>Cây thử mọi cột, mọi ngưỡng, chọn chỗ chia có Gain lớn nhất.</p>
+  <p>Mỗi lá trả về Output value bằng −G chia (H + λ).</p>
+  <p>Dự đoán mới bằng dự đoán cũ cộng η nhân Output value.</p>
+  <p>Lặp với cây tiếp theo, dừng khi đủ số cây hoặc early stopping.</p>
+  <p>Dự đoán cuối là tổng của mọi cây.</p></details>
+
+  <details class="qa"><summary>XGBoost khác gradient boosting gốc và random forest ở đâu?</summary>
+  <p>So với gradient boosting gốc: nó dùng cả độ dốc và độ cong của loss.</p>
+  <p>Nên có Similarity Score và Output value tính thẳng, không phải mò.</p>
+  <p>γ và λ nằm ngay trong objective, nên mọc cây và chống overfit là một việc.</p>
+  <p>So với random forest: cây học residual chứ không học mẫu bootstrap.</p>
+  <p>Gộp bằng cộng chứ không trung bình. Train nối tiếp chứ không song song.</p></details>
+
+  <details class="qa"><summary>Similarity Score đo gì, Gain dùng để làm gì?</summary>
+  <p>Similarity Score đo các residual trong lá có cùng hướng không.</p>
+  <p>Cùng dấu thì cộng dồn nên điểm cao. Trái dấu thì triệt tiêu.</p>
+  <p>Mẫu số Cover + λ phạt lá ít dòng.</p>
+  <p>Gain là điểm hai lá mới trừ điểm lá cũ. Gain lớn nhất là chỗ được chia.</p></details>
+
+  <details class="qa"><summary>Regression và classification khác nhau ở đâu?</summary>
+  <p>Cùng một công thức. Loss chỉ đi vào qua g và h.</p>
+  <p>Regression: g = ŷ − y, h = 1. Nên residual là y − ŷ và Cover là số dòng.</p>
+  <p>Classification: g = p − y, h = p(1 − p). Nên Cover là Σ p(1 − p).</p>
+  <p>Output value của classification là log-odds. Cộng η × output rồi đổi về xác suất bằng logistic.</p></details>
+
+  <details class="qa"><summary>λ, γ và η làm gì?</summary>
+  <p>λ ở mẫu số: làm Output value và Similarity Score nhỏ đi, lá ít dòng nhỏ đi nhiều hơn.</p>
+  <p>Gain cũng nhỏ đi nên γ cắt nhiều nhánh hơn.</p>
+  <p>γ: Gain − γ nhỏ hơn 0 thì cắt nhánh.</p>
+  <p>η áp lên tốc độ cộng dồn qua nhiều cây, không áp lên từng cây.</p></details>
+</section>
+
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
+
+<footer>Machine learning · Tree models · cơ chế nền ở <span style="color:var(--clay)">Gradient boosting</span>; bản tối ưu cho tốc độ là <span style="color:var(--clay)">LightGBM</span>.</footer>
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>

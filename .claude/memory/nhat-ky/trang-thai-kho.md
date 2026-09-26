@@ -3,7 +3,7 @@ name: trang-thai-kho
 description: "Trạng thái toàn kho — mốc số liệu duy nhất, sáu trục nghiệm thu, chất lượng trình bày từng kệ, việc còn lại"
 metadata:
   type: project
-updated: 2026-09-24
+updated: 2026-09-26
 ---
 
 **Đây là mốc duy nhất.** Mọi con số rời rạc trong các phiên trước đã lệch; đo lại từ file bằng
@@ -13,7 +13,7 @@ updated: 2026-09-24
 
 | Kệ | Đã viết / tổng |
 |---|---|
-| 01 DSA · 02 Python · 03 CS · 04 Database | 23 · 17 · 14 · 23 — **xong hết** |
+| 01 DSA · 02 Python · 03 CS · 04 Database | **24 · 16 · 13** · 23 — **xong hết** (2026-09-26: bài scheduling gộp vào kệ Python, `leetcode-toolkit` chuyển sang kệ DSA) |
 | 05 Machine learning | **39/39 ✅** |
 | 06 Deep learning | 4/18 |
 | 07 Transformer | 2/16 |
@@ -78,21 +78,82 @@ DSA 13 bài, nặng nhất `tree-bst-traversal` 566 · `union-find` 499 · `link
 `random-forest` · `statistics` · `normalization` · `rag-end-to-end` · `inference-optimization`.
 Chạm bài nào thì đổi bài đó.
 
-### Hình động — mới nhất, mới có ở đúng một bài
+### Hình động — mới, đã lan ra cả nhóm tree models
 
-Keyframe trong `<style>` của từng `<svg>` ([[chuan-bai-mau]]) hiện chỉ có ở bản mẫu
-`bai-mau/random-forest.html`. **Không bài nào trong `content/` có `@keyframes`.** Đây là việc lớn
-nhất còn lại của trục trình bày; làm dần, chạm bài nào thì thêm cho bài đó.
+Keyframe trong `<style>` của từng `<svg>` ([[chuan-bai-mau]]) hiện có ở **bảy bài**: cả nhóm
+`06-tree-models` (`decision-tree` · `random-forest` · `adaboost` · `gradient-boosting` ·
+`xgboost` · `lightgbm`) và `naive-bayes` bên `05-classical-ml` — bài đầu tiên ra khỏi nhóm tree
+models. Bốn bài `xgboost` · `gradient-boosting` · `adaboost` · `naive-bayes` (2026-09-25, đều là
+bài mẫu) dùng cách chạy mới — một lượt khi cuộn tới, không lặp vô hạn — và đó là cách nên theo từ
+nay. Bản chốt mới của `naive-bayes` **không còn hình `infinite`** nào; cả kho giờ sạch `infinite`.
+**2026-09-25 thêm sáu bài nữa**: `knn` · `logistic-regression` · `ridge-lasso-elasticnet` · `svm` ·
+`linear-regression` · `naive-bayes` (khung C, đều là bài mẫu). Cả `05-classical-ml` giờ còn đúng
+`classical-models-overview` là chưa có hình động.
+**2026-09-25, bài mẫu đầu tiên ra khỏi kệ ML**: `memory-model-mutability` (kệ 02 Python) — 8 mục,
+**13 hình động**, và là bản người dùng chốt làm thước cho *cách vẽ hình động* nói chung, không chỉ
+cho một khung bài. Luật rút từ nó ở [[hinh-dong]] (tách khỏi [[chuan-bai-mau]] cùng ngày).
+Nó cũng là bài đầu tiên **bỏ lab** ở kệ Python.
+Cùng ngày, bài kế bên `memory-management-gc` cũng lên bản chốt (7 mục · 6 hình động) — nhóm
+`02-language-core` giờ có hai bài theo thước hình động.
+**2026-09-26 đóng trọn nhóm**: thêm `scope-legb` · `data-model-dunder` · `iterator-generator` ·
+`decorator-context-manager` · `exception-handling`. Cả bảy bài của `02-language-core` giờ là
+bài mẫu, **29 `<svg>` đều động**, và nhóm này là **nhóm đầu tiên ngoài kệ ML sạch trọn vẹn**.
+`iterator-generator` là bài thứ hai của kệ Python bỏ lab; kệ Python giờ còn `leetcode-toolkit`
+là chỗ duy nhất còn `lab.js` trong nhóm đã chạm.
+
+**2026-09-26, lượt hai — gộp bài GIL và bài scheduling làm một.** Thêm bốn bài mẫu
+`thread-process-gil` · `asyncio` · `dict-hash-table` · `list-tuple-set`; kệ Python giờ **sạch trọn
+ba nhóm** `02-language-core` + `03-builtin-structures` + `04-concurrency`.
+
+Bản chốt của `thread-process-gil` **ôm luôn hai mục `Context switch` và `Scheduling`** của bài
+`03-cs-fundamentals/02-os/process-thread-scheduling`, nên bài OS đó đã **xoá**. Vì sao giữ bản
+Python chứ không giữ bản OS: một khái niệm một chủ, và chủ phải là kệ nó đạt độ sâu tự nhiên nhất —
+bản Python đi từ *core → scheduler → process/thread → GIL* rồi trả lời được câu *"chờ hay tính"*
+bằng bảng bốn mô hình, tức là context switch ở đó **có chỗ dùng**; ở kệ OS nó chỉ là một mục rời.
+Kệ CS không mất gì: `os-overview` vẫn giữ bản đồ bốn ô và trỏ sang bài Python cho ô ① + ③,
+`memory-virtual-paging` và `lock-deadlock-race` đổi link theo. **Thứ mất thật** là mục
+`Trạng thái tiến trình` (New → Ready → Running → Terminated) — bản gộp không có; nếu sau này thấy
+thiếu thì viết lại **trong** bài Python, đừng dựng lại bài OS.
+
+**2026-09-26, lượt ba — đóng nốt mọi bài kỹ thuật của kệ Python.** Bốn bản cuối
+`leetcode-toolkit` · `oop-python` · `typing-dataclass` · `performance-profiling`.
+**15/17 bài** có `data-reviewed="1"` và **0 `lab.js` trong cả kệ**; hai bài chưa chốt là
+`python-overview` và `language-core-overview` — đều là bài `*-overview`, theo khuôn riêng
+(xem [[trinh-bay-bai]]) nên không nằm trong khung D.
+
+Bản `typing-dataclass` có **một lỗi thật trong bài mẫu, không phải lỗi map**: hai chỗ viết
+`<__main__.Plain object …>` bằng dấu `<` trần trong `<text>` của `<svg>` và trong `<li>` — HTML
+vẫn hiện được nhưng XML parser (và mọi công cụ đọc SVG) vỡ ngay. Đã sửa thành `&lt;` ở cả
+`content/` và bản lưu trong `bai-mau/`. **Bẫy để nhớ**: chữ trong hình có thể chứa ký tự cần
+escape; `soat.py` và `audit.py` không bắt được — chỉ tầng 2 (parse SVG) bắt được, nên đừng bỏ tầng
+đó khi map bài mẫu vào.
+
+**2026-09-26, lượt bốn — `leetcode-toolkit` chuyển sang kệ DSA, và cả kệ DSA đánh `reviewed`.**
+Bài đó là **bộ công cụ giải bài**, không phải bài giải thích cơ chế Python: nó dạy đọc `bisect`,
+`Counter`, `deque`, `heapq` để viết lời giải ngắn hơn, tức là chủ phải là kệ **dùng** nó. Giờ nằm
+ở `content/01-dsa/05-toolkit/`, link sang kệ Python đổi thành `../../../02-python/…`,
+`dsa-overview` mục *Học theo thứ tự nào* nhắc nó là **thứ đi song song cả sáu chặng chứ không phải
+chặng thứ bảy**, `python-overview` đổi mục 4 thành "Kỹ thuật" và trỏ ngược sang kệ DSA.
+
+Cùng lượt này **23 bài DSA còn lại được đánh `data-reviewed="1"`** theo yêu cầu người dùng. Đây là
+**kệ đầu tiên reviewed 24/24**. Lưu ý khi đọc số: `reviewed` ở kệ DSA nghĩa là *người dùng đã
+nghiệm thu nội dung*, **không** nghĩa là bài đã theo khung D hay đã có hình động — khuôn của DSA
+là khuôn riêng trong `CLAUDE.md` (lõi 1,5 phút + phần tra pattern). Đừng suy từ cờ này ra rằng
+kệ DSA đã qua trục hình động.
+
+Đây vẫn là việc lớn nhất còn lại của trục trình bày; làm dần, chạm bài nào thì thêm cho bài đó.
+Từ nay bài nào thêm hình động thì theo [[hinh-dong]], không phải theo trí nhớ về bài mẫu ML.
 
 `dl.defs` (bảng tra ký hiệu) đã thành chuẩn. `.hl` (in đậm cam) thì **bỏ** — 2026-09-24 chốt in
-đậm bằng `<b>`, cam để dành cho link. Còn 3 chỗ `.hl` ở `knn`, 2 ở `linear-regression`, 2 ở
-`logistic-regression`; chạm bài nào thì đổi bài đó.
+đậm bằng `<b>`, cam để dành cho link. Sáu bài khung C đã sạch theo bản chốt 2026-09-25;
+chỗ còn lại nằm ngoài `05-classical-ml`, chạm bài nào thì đổi bài đó.
 
 ### Câu đơn trong `details.qa` — chỗ hổng lớn nhất còn lại
 
 Mặt bài đã sạch (0 đoạn >33 từ). **Bên trong `details.qa` thì chưa**: mốc là bài mẫu
 2026-09-24 — 5 câu, mỗi câu 4–5 `<p>`, đoạn dài nhất **20 từ**. Riêng kệ ML còn **29 bài** trả lời bằng một khối liền —
-`train-val-test-cv` 126 từ · `statistics` 122 · `ab-testing` 108 · `knn` 118.
+`train-val-test-cv` 126 từ · `statistics` 122 · `ab-testing` 108. Sáu bài khung C 2026-09-25 đã ra
+khỏi danh sách này.
 (`naive-bayes` đã sửa 2026-09-09: 5 câu, 24 đoạn, dài nhất 16 từ — cùng lần dựng lại theo luật 1.)
 
 Đây không phải chuyện đẹp xấu: `tools/build.py` bóc `details.qa` thành **505 thẻ ôn**, nên mỗi
@@ -131,7 +192,8 @@ Nguyên nhân: đợt đó chỉ chạy **trục luật A→I** (chữ meta, đ�
 sửa theo trục nào thì người đọc hiểu là bài đã lên ver mới — sai.
 
 > **Từ nay mọi báo cáo phải ghi rõ SỬA THEO TRỤC NÀO.** Bảy trục: build · audit luật 1 · soat 8
-> phép · check.py · bbox thật · 490px · **trình bày** (bảng ở trên).
+> phép · check.py · bbox thật · 490px · **trình bày** (bảng ở trên). Sửa hình động thì ghi rõ
+> **tầng nào trong bốn tầng** ở [[hinh-dong]] đã chạy — "vẽ xong" mà chưa xem bản tĩnh là chưa xong.
 
 Bài học thứ hai cùng đợt: các số trong bảng phân loại A/B/C/D **tự cũ đi** — hai việc mở (#3 "51
 bài còn *Tổng kết một hình*", #6 "8 bài ≥12 mục") hoá ra đã về **0** từ trước, chỉ là bảng chưa

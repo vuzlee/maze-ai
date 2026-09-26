@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Memory management &amp; GC — MazeAI</title>
-<meta name="description" content="Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.">
+<meta name="description" content="Reference counting dọn ngay khi bộ đếm về 0; cyclic GC chỉ vá một lỗ hổng là reference cycle — kèm del, with và bốn nguồn rò rỉ.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/memory-management-gc/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Memory management &amp; GC">
-<meta property="og:description" content="Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.">
+<meta property="og:description" content="Reference counting dọn ngay khi bộ đếm về 0; cyclic GC chỉ vá một lỗ hổng là reference cycle — kèm del, with và bốn nguồn rò rỉ.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,520 +39,275 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-memgc" data-title="Memory management &amp; GC" data-tag="Python internals" data-blurb="Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.">
-<header class="hero">
+<article class="doc" id="art-memgc" data-title="Memory management &amp; GC" data-reviewed="1" data-tag="Python internals" data-blurb="Reference counting dọn ngay khi bộ đếm về 0; cyclic GC chỉ vá một lỗ hổng là reference cycle — kèm del, with và bốn nguồn rò rỉ.">
+        <header class="hero">
   <p class="eyebrow">Deep dive · Python internals · bộ nhớ</p>
   <h1>Memory management &amp; <em>GC</em></h1>
-  <p class="lede"><b>GC</b> viết tắt của <b>garbage collection</b> — <em>thu gom rác</em>: máy tự tìm object không ai còn dùng rồi thu hồi ô nhớ, thay vì bắt bạn tự giải phóng như trong C. Python làm việc đó bằng hai cơ chế:</p>
+  <p class="lede">Máy tự thu hồi ô nhớ, bạn không gọi <code>free()</code> bao giờ. Ba thứ cần nhớ:</p>
   <ul class="ledelist">
-    <li><b>Reference counting</b> — <em>cơ chế chính, dọn ngay tại chỗ</em></li>
-    <li><b>Cyclic GC</b> — <em>chỉ vá một lỗ hổng của cơ chế trên: reference cycle</em></li>
+    <li>reference counting là cơ chế chính, dọn ngay tại chỗ</li>
+    <li>cyclic GC chỉ vá một lỗ hổng: reference cycle</li>
+    <li>rò rỉ trong Python là do code còn giữ, không phải máy dọn sót</li>
   </ul>
 </header>
 
-
-<section id="memgc-s1" class="lesson">
+<section id="gc-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Nhớ đúng <em>một hình</em> này là trả lời được gần hết câu hỏi về bộ nhớ Python. Mọi mục sau chỉ phóng to một ô của nó — và tỉ lệ hai nhánh <em>rất lệch</em>: tắt hẳn cyclic GC rồi tạo 200.000 object, số byte đọng lại vẫn là <b>0</b>.</p>
-
-<figure class="gist">
-<svg viewBox="0 0 860 294" role="img" aria-label="Bản đồ bốn ô: code của bạn, reference counting là cơ chế chính, cyclic GC xử lý reference cycle, và vạch GC lo bộ nhớ còn file socket dùng with; bên phải là bốn ý cốt lõi">
-<rect x="10" y="26" width="280" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="24" y="47" fill="var(--tomb)">CODE CỦA BẠN</text>
-<text class="sv-d" x="24" y="63" fill="var(--dim)">giữ tham chiếu</text>
-<line x1="150" y1="66" x2="150.0" y2="70.0" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="150.0,78.0 145.8,70.0 154.2,70.0" fill="var(--tomb)"/>
-<rect x="0" y="80" width="300" height="28" rx="6" fill="var(--raise)" stroke="var(--rule-hi)" stroke-width="1"/>
-<text class="sv-t" x="150" y="99" fill="var(--text)" text-anchor="middle">Python memory management</text>
-<path d="M14 108 V 202" stroke="var(--rule)" stroke-width="1" fill="none"/>
-<rect x="24" y="114" width="276" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="38" y="135" fill="var(--ok)">Reference counting</text>
-<text class="sv-d" x="38" y="151" fill="var(--dim)">cơ chế CHÍNH</text>
-<path d="M14 134 H 22" stroke="var(--rule)" stroke-width="1"/>
-<rect x="24" y="162" width="276" height="40" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="38" y="183" fill="var(--filled)">Cyclic GC &#183; 3 generation</text>
-<text class="sv-d" x="38" y="199" fill="var(--dim)">xử lý reference cycle</text>
-<path d="M14 182 H 22" stroke="var(--rule)" stroke-width="1"/>
-<line x1="0" y1="212" x2="300" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<rect x="0" y="222" width="300" height="40" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="243" fill="var(--probe)">GC lo BỘ NHỚ</text>
-<text class="sv-s" x="14" y="259" fill="var(--dim)">file &#183; socket &#183; DB &#8594; dùng with</text>
-<text class="sv-hv" x="360" y="18" fill="var(--muted)">TẮT HẲN CYCLIC GC &#8212; gc.disable() &#8212; RỒI CHẠY HAI KỊCH BẢN</text>
-<rect x="360" y="32" width="500" height="52" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="376" y="53" fill="var(--ok)">200.000 object KHÔNG vòng</text>
-<text class="sv-d" x="844" y="53" fill="var(--ok)" text-anchor="end">còn đọng 0,00 MB</text>
-<text class="sv-t" x="376" y="71" fill="var(--dim)">refcount dọn sạch, không cần nhánh kia</text>
-<rect x="360" y="92" width="500" height="52" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="376" y="113" fill="var(--tomb)">100.000 cặp CÓ vòng</text>
-<text class="sv-d" x="844" y="113" fill="var(--tomb)" text-anchor="end">còn đọng 12,79 MB</text>
-<text class="sv-t" x="376" y="131" fill="var(--dim)">bộ đếm dừng ở 1 &#8212; rò rỉ thật</text>
-<rect x="360" y="152" width="500" height="52" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="376" y="173" fill="var(--filled)">bật lại: gc.collect() một lần</text>
-<text class="sv-d" x="844" y="173" fill="var(--filled)" text-anchor="end">nhặt 200.128 object &#183; về 0,00 MB</text>
-<text class="sv-t" x="376" y="191" fill="var(--dim)">đúng phần refcount bỏ sót, không hơn</text>
+  <p class="key">Hai cơ chế, nhưng <em>không ngang hàng</em>: một cái lo gần hết việc, một cái chỉ vá đúng một lỗ hổng.</p>
+  <figure class="gist">
+    <svg viewBox="0 0 860 388" role="img" aria-label="Nhánh trên: một object có bộ đếm bằng một, xoá tên thì bộ đếm về không và object rơi ngay vào thùng thu hồi; nhánh dưới: hai object trỏ vòng nên bộ đếm không về không và nằm lại, phải chờ GC cắt liên kết rồi mới rơi được" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}4.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}3.125%{animation-timing-function:ease-in-out;opacity:0}5.312%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}6.875%{animation-timing-function:ease-in-out;opacity:0}8.438%{animation-timing-function:ease-in-out;opacity:1}22.500%{animation-timing-function:ease-in-out;opacity:1}24.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}13.750%{animation-timing-function:ease-in-out;opacity:0}15.313%{animation-timing-function:ease-in-out;opacity:1}28.750%{animation-timing-function:ease-in-out;opacity:1}30.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.187%{animation-timing-function:ease-in-out;opacity:1}21.250%{animation-timing-function:ease-in-out;opacity:1}22.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}22.500%{animation-timing-function:ease-in-out;opacity:0}24.062%{animation-timing-function:ease-in-out;opacity:1}27.500%{animation-timing-function:ease-in-out;opacity:1}29.063%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}28.125%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}28.438%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}35.625%{animation-timing-function:ease-in-out;opacity:1;transform:translate(458px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(458px,0px)}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}37.500%{animation-timing-function:ease-in-out;opacity:0}39.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}42.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}41.250%{animation-timing-function:ease-in-out;opacity:0}43.437%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0}43.750%{animation-timing-function:ease-in-out;opacity:0}45.312%{animation-timing-function:ease-in-out;opacity:1}71.250%{animation-timing-function:ease-in-out;opacity:1}72.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}47.500%{animation-timing-function:ease-in-out;opacity:0}49.062%{animation-timing-function:ease-in-out;opacity:1}71.250%{animation-timing-function:ease-in-out;opacity:1}72.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}59.062%{animation-timing-function:ease-in-out;opacity:1}76.250%{animation-timing-function:ease-in-out;opacity:1}77.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}62.500%{animation-timing-function:ease-in-out;opacity:0}64.062%{animation-timing-function:ease-in-out;opacity:1}77.500%{animation-timing-function:ease-in-out;opacity:1}79.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}63.750%{animation-timing-function:ease-in-out;opacity:0}65.312%{animation-timing-function:ease-in-out;opacity:1}77.500%{animation-timing-function:ease-in-out;opacity:1}79.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm16{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}72.500%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}72.812%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}80.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(440px,14px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(440px,14px)}}@keyframes mm17{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}74.375%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}74.688%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}81.875%{animation-timing-function:ease-in-out;opacity:1;transform:translate(488px,-28px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(488px,-28px)}}@keyframes mm18{0%{animation-timing-function:ease-in-out;opacity:0}82.500%{animation-timing-function:ease-in-out;opacity:0}84.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm19{0%{animation-timing-function:ease-in-out;opacity:0}86.250%{animation-timing-function:ease-in-out;opacity:0}88.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm20{0%{animation-timing-function:ease-in-out;opacity:0}90.000%{animation-timing-function:ease-in-out;opacity:0}92.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 16.0s linear 1 forwards}.mm2{animation:mm2 16.0s linear 1 forwards}.mm3{animation:mm3 16.0s linear 1 forwards}.mm4{animation:mm4 16.0s linear 1 forwards}.mm5{animation:mm5 16.0s linear 1 forwards}.mm6{animation:mm6 16.0s linear 1 forwards}.mm7{animation:mm7 16.0s linear 1 forwards}.mm8{animation:mm8 16.0s linear 1 forwards}.mm9{animation:mm9 16.0s linear 1 forwards}.mm10{animation:mm10 16.0s linear 1 forwards}.mm11{animation:mm11 16.0s linear 1 forwards}.mm12{animation:mm12 16.0s linear 1 forwards}.mm13{animation:mm13 16.0s linear 1 forwards}.mm14{animation:mm14 16.0s linear 1 forwards}.mm15{animation:mm15 16.0s linear 1 forwards}.mm16{animation:mm16 16.0s linear 1 forwards}.mm17{animation:mm17 16.0s linear 1 forwards}.mm18{animation:mm18 16.0s linear 1 forwards}.mm19{animation:mm19 16.0s linear 1 forwards}.mm20{animation:mm20 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">HAI CƠ CHẾ · MỘT CHÍNH, MỘT VÁ LỖ HỔNG</text>
+<g class="mm1"><text class="sv-d" x="0" y="64" fill="var(--probe)" style="fill:var(--probe)">reference counting</text></g>
+<g class="mm2"><rect x="640" y="78" width="150" height="56" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4" stroke-dasharray="5 3"/><text class="sv-d" x="640" y="70" fill="var(--tomb)" style="fill:var(--tomb)">thu hồi</text></g>
+<g class="mm3" opacity="0"><rect x="230" y="78" width="56" height="56" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text class="sv-d" x="258" y="124" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text></g>
+<g class="mm4" opacity="0"><rect x="230" y="38" width="59.0" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="241.0" y="56.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">del a</text><line x1="259.5" y1="64.0" x2="258.0" y2="78.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="258.0" cy="78.0" r="2.8" fill="var(--tomb)"/><rect x="226.0" y="74.0" width="64.0" height="64.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="mm5" opacity="0"><rect x="120" y="88" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="147.0" y="106.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><line x1="174" y1="101" x2="230" y2="95" stroke="var(--probe)" stroke-width="1.5"/></g>
+<g class="mm6" opacity="0"><rect x="230" y="78" width="56" height="56" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="258" y="124" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">refcnt 0</text></g>
+<g class="mm7" transform="translate(458 0)"><rect x="230" y="78" width="56" height="56" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="mm8"><text class="sv-d" x="0" y="126" fill="var(--faint)" style="fill:var(--faint)">refcnt về 0 → rơi ngay</text></g>
+<g class="mm9"><text class="sv-d" x="0" y="194" fill="var(--muted)" style="fill:var(--muted)">cyclic GC</text></g>
+<g class="mm10"><rect x="640" y="208" width="150" height="86" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4" stroke-dasharray="5 3"/><text class="sv-d" x="640" y="200" fill="var(--tomb)" style="fill:var(--tomb)">thu hồi</text></g>
+<g class="mm11" opacity="0"><rect x="230" y="200" width="48" height="48" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><rect x="230" y="262" width="48" height="48" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><polyline points="282,224 306,224 306,286 282,286" fill="none" stroke="var(--clay)" stroke-width="1.6"/><polyline points="230,236 206,236 206,274 230,274" fill="none" stroke="var(--clay)" stroke-width="1.6"/><text class="sv-d" x="258" y="276" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">1</text><text class="sv-d" x="258" y="256" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">1</text></g>
+<g class="mm12" opacity="0"><text class="sv-d" x="0" y="238" fill="var(--tomb)" style="fill:var(--tomb)">không ai trỏ tới,</text><text class="sv-d" x="0" y="256" fill="var(--tomb)" style="fill:var(--tomb)">mà refcnt ≠ 0 → nằm lại</text></g>
+<g class="mm13" opacity="0"><rect x="330" y="174" width="110.80000000000001" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="341.0" y="192.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">gc.collect()</text><line x1="385.4" y1="200.0" x2="306.0" y2="254.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="306.0" cy="254.0" r="2.8" fill="var(--ok)"/><rect x="196.0" y="194.0" width="120.0" height="116.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="mm14" opacity="0"><line x1="292" y1="240" x2="320" y2="270" stroke="var(--ok)" stroke-width="2.4"/><line x1="320" y1="240" x2="292" y2="270" stroke="var(--ok)" stroke-width="2.4"/></g>
+<g class="mm15" opacity="0"><line x1="192" y1="240" x2="220" y2="270" stroke="var(--ok)" stroke-width="2.4"/><line x1="220" y1="240" x2="192" y2="270" stroke="var(--ok)" stroke-width="2.4"/></g>
+<g class="mm16" transform="translate(440 14)"><rect x="230" y="200" width="48" height="48" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="mm17" transform="translate(488 -28)"><rect x="230" y="262" width="48" height="48" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="mm18"><text class="sv-d" x="0" y="238" fill="var(--faint)" style="fill:var(--faint)">GC cắt liên kết</text><text class="sv-d" x="0" y="256" fill="var(--faint)" style="fill:var(--faint)">→ mới rơi được</text></g>
+<g class="mm19"><rect x="0" y="324" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="339" fill="var(--probe)" style="fill:var(--probe)">Nhánh trên lo gần hết việc · nhánh dưới chỉ vá reference cycle</text></g>
+<g class="mm20"><text class="sv-d" x="14" y="356" fill="var(--muted)" style="fill:var(--muted)">Tắt hẳn cyclic GC rồi tạo 200.000 list không vòng: đọng lại 1 object.</text></g>
 </svg>
-<figcaption>Bản đồ bên trái lặp lại ở <b>mọi mục</b> của bài — mỗi lần chỉ sáng đúng ô đang học, phần còn lại xám đi; học cách đọc nó một lần là đọc được cả bài. Bên phải là lý do hai nhánh <b>không ngang hàng</b>: reference counting một mình đã sạch, cyclic GC chỉ vào cuộc khi có vòng — và khi vào thì đắt, nên nó phải chạy thưa.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li>Bạn <b>không bao giờ</b> giải phóng object bằng tay — không có <code>free()</code>, và cũng không có cách nào gọi nó.</li>
-    <li><code>gc.disable()</code> chỉ tắt nhánh dưới. Nhiều service tắt nó thật để bỏ khoảng dừng, và <b>vẫn chạy đúng</b> — miễn code không tạo vòng.</li>
-    <li>Rò rỉ trong Python gần như luôn nằm ở ô <b>trên cùng</b>: tham chiếu có thật, code còn giữ, máy không có quyền đoán là bạn hết cần.</li>
-    <li>Ô cuối là ranh giới hay bị hỏi nhất — GC lo <b>bộ nhớ</b>, còn file và socket thì <code>with</code> lo.</li>
-  </ul>
-
-  <p class="stripnote"><span>bài này nối tiếp <a href="../memory-model-mutability/index.html"><em>Memory model &amp; mutability</em></a></span><span>ở đó: tên, object, mutability, copy — <em>đọc trước bài này</em></span></p>
-</section>
-
-<section id="memgc-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Garbage collection</h2></div>
-
-  <p class="key">Máy không đoán được bạn <em>còn cần</em> object nào. Nó chỉ trả lời được một câu cơ học: <em>từ chỗ chương trình đang đứng, còn đường đi tới object này không?</em></p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label=": root set là điểm xuất phát, object còn đường đi tới thì sống, cụm chỉ trỏ vào nhau mà không có đường từ root là rác">
-<text class="sv-hv" x="0.0" y="22">RÁC = KHÔNG CÒN ĐƯỜNG ĐI TỪ ROOT TỚI NÓ</text>
-<rect x="0.0" y="30" width="223.6" height="140" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.72"/>
-<text class="sv-t" x="24.08" y="52" fill="var(--probe)">ROOT SET</text>
-<text class="sv-d" x="24.08" y="76" fill="var(--dim)">biến toàn cục</text>
-<text class="sv-d" x="24.08" y="98" fill="var(--dim)">biến cục bộ</text>
-<text class="sv-d" x="24.08" y="120" fill="var(--dim)">nội bộ</text>
-<text class="sv-d" x="24.08" y="156" fill="var(--muted)">điểm xuất phát</text>
-<rect x="268.32" y="30" width="309.6" height="140" rx="6" fill="var(--panel)" stroke="var(--ok)" stroke-width="1.72" stroke-dasharray="4 4"/>
-<text class="sv-hv" x="292.4" y="50" fill="var(--ok)">CÒN TỚI ĐƯỢC &#8594; SỐNG</text>
-<rect x="292.4" y="60" width="261.44" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.72"/>
-<text class="sv-t" x="316.48" y="81" fill="var(--ok)">list dữ liệu</text>
-<text class="sv-d" x="316.48" y="97" fill="var(--muted)">còn đường đi tới</text>
-<rect x="292.4" y="116" width="261.44" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.72"/>
-<text class="sv-t" x="316.48" y="137" fill="var(--ok)">dict con</text>
-<text class="sv-d" x="316.48" y="153" fill="var(--muted)">sống theo</text>
-<line x1="223.6" y1="78" x2="271.76" y2="79.6" stroke="var(--probe)" stroke-width="1.3"/>
-<polygon points="281.68,80.0 273.48,83.7 273.88,75.4" fill="var(--probe)"/>
-<line x1="423.12" y1="106" x2="423.12" y2="106.0" stroke="var(--ok)" stroke-width="1.3"/>
-<polygon points="423.12,114.0 418.92,106.0 427.32,106.0" fill="var(--ok)"/>
-<line x1="605.44" y1="30" x2="605.44" y2="170" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 4"/>
-<rect x="626.08" y="30" width="227.04" height="140" rx="6" fill="var(--panel)" stroke="var(--tomb)" stroke-width="1.72" stroke-dasharray="4 4"/>
-<text class="sv-hv" x="646.72" y="50" fill="var(--tomb)">RÁC</text>
-<rect x="646.72" y="60" width="158.24" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.72"/>
-<text class="sv-t" x="670.8" y="81" fill="var(--tomb)">node C</text>
-<text class="sv-d" x="670.8" y="97" fill="var(--muted)">không ai tới</text>
-<rect x="646.72" y="116" width="158.24" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.72"/>
-<text class="sv-t" x="670.8" y="137" fill="var(--tomb)">node D</text>
-<text class="sv-d" x="670.8" y="153" fill="var(--muted)">không ai tới</text>
-<line x1="818.72" y1="84" x2="818.72" y2="104.0" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="818.72,112.0 814.52,104.0 822.92,104.0" fill="var(--tomb)"/>
-<line x1="835.92" y1="112" x2="835.92" y2="92.0" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="835.92,84.0 840.12,92.0 831.72,92.0" fill="var(--tomb)"/>
-<text class="sv-d" x="0.0" y="190" fill="var(--muted)">Máy không đoán được bạn CÒN CẦN gì. Nó chỉ trả lời được</text>
-<text class="sv-d" x="0.0" y="208" fill="var(--muted)">một câu: có đường đi từ root tới object này không.</text>
-<text class="sv-d" x="0.0" y="236" fill="var(--ok)">Garbage collection = tự tìm những object hết đường tới,</text>
-<text class="sv-d" x="0.0" y="254" fill="var(--ok)">rồi thu hồi ô nhớ.</text>
-<text class="sv-d" x="0.0" y="282" fill="var(--probe)">Python làm việc đó bằng HAI cơ chế trong bản đồ bên trái.</text>
-</svg>
-<figcaption>Điểm xuất phát gọi là <b>root set</b>: biến toàn cục, biến cục bộ của các hàm đang chạy, vài chỗ nội bộ của interpreter. Còn đường tới thì sống, hết đường là <b>rác</b> — thu hồi an toàn tuyệt đối.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li>Trong C bạn tự gọi <code>free</code>; quên là rò rỉ, gọi hai lần là sập.</li>
-    <li>Python bỏ hẳn việc đó — <b>bạn không bao giờ giải phóng object bằng tay</b>.</li>
-    <li>Python làm điều đó bằng <b>hai cơ chế</b> trong bản đồ, hai mục sau đi vào từng nhánh.</li>
-  </ul>
-
-  <details class="deep"><summary>"Không với tới được" khác "không còn dùng nữa" thế nào?</summary>
-  <div class="body">
-    <p>Máy chỉ đo được vế thứ nhất. Một list bạn đã dùng xong nhưng vẫn còn nằm trong một biến toàn cục thì <b>vẫn với tới được</b>, nên không bộ thu gom nào dám đụng vào — biết đâu dòng sau bạn lại dùng.</p>
-    <p>Khoảng cách giữa hai vế đó chính là chỗ mọi rò rỉ trong Python sinh ra: không phải máy dọn sót, mà là <b>code còn giữ tham chiếu</b>. Đó là ô trên cùng của bản đồ, và là nội dung của mục cuối.</p>
-  </div></details>
-</section>
-
-<section id="memgc-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Reference counting</h2></div>
-
-  <p class="key">Mỗi object mang sẵn một bộ đếm <em>ob_refcnt</em>, và mọi dòng code chỉ làm đúng một việc với nó: <em>thêm một tên, hoặc bớt một tên</em>. Về 0 là giải phóng ngay.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="bốn bước: gán tạo object refcount 1, gán thêm tên lên 2, del một tên xuống 1, del nốt về 0 thì giải phóng ngay">
-<path d="M0.0 150 H 37.12 V 118 H 71.15" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<line x1="71.15" y1="118" x2="69.6" y2="118.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="79.06,118.0 71.06,122.2 71.06,113.8" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22">BỘ ĐẾM CỦA MỘT OBJECT QUA BỐN DÒNG CODE</text>
-<rect x="86.62" y="30" width="179.42" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="177.88" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2]</text>
-<rect x="105.18" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="136.12" y="81" fill="var(--filled)" text-anchor="middle">a</text>
-<line x1="136.12" y1="88" x2="136.12" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="136.12,100.0 131.92,92.0 140.32,92.0" fill="var(--filled)"/>
-<rect x="86.62" y="104" width="179.42" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="125" fill="var(--filled)">[1, 2]</text>
-<text class="sv-d" x="108.27" y="141" fill="var(--muted)">ob_refcnt = 1</text>
-<text class="sv-d" x="86.62" y="168" fill="var(--muted)">object sinh ra</text>
-<rect x="284.6" y="30" width="179.42" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="375.86" y="47" fill="var(--dim)" text-anchor="middle">b = a</text>
-<rect x="303.17" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="334.1" y="81" fill="var(--filled)" text-anchor="middle">a</text>
-<line x1="334.1" y1="88" x2="334.1" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="334.1,100.0 329.9,92.0 338.3,92.0" fill="var(--filled)"/>
-<rect x="374.32" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="405.25" y="81" fill="var(--filled)" text-anchor="middle">b</text>
-<line x1="405.25" y1="88" x2="405.25" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="405.25,100.0 401.05,92.0 409.45,92.0" fill="var(--filled)"/>
-<rect x="284.6" y="104" width="179.42" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="306.26" y="125" fill="var(--filled)">[1, 2]</text>
-<text class="sv-d" x="306.26" y="141" fill="var(--muted)">ob_refcnt = 2</text>
-<text class="sv-d" x="284.6" y="168" fill="var(--muted)">chép ĐỊA CHỈ,</text>
-<text class="sv-d" x="284.6" y="183" fill="var(--muted)">không chép list</text>
-<rect x="479.5" y="30" width="179.42" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="573.85" y="47" fill="var(--dim)" text-anchor="middle">del a</text>
-<rect x="498.06" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="532.09" y="81" fill="var(--filled)" text-anchor="middle">b</text>
-<line x1="532.09" y1="88" x2="532.09" y2="92.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="532.09,100.0 527.89,92.0 536.29,92.0" fill="var(--filled)"/>
-<rect x="479.5" y="104" width="179.42" height="46" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="504.24" y="125" fill="var(--probe)">[1, 2]</text>
-<text class="sv-d" x="504.24" y="141" fill="var(--muted)">ob_refcnt = 1</text>
-<text class="sv-d" x="479.5" y="168" fill="var(--probe)">bớt một tên,</text>
-<text class="sv-d" x="479.5" y="183" fill="var(--probe)">object vẫn sống</text>
-<rect x="674.39" y="30" width="179.42" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="765.65" y="47" fill="var(--dim)" text-anchor="middle">del b</text>
-<text class="sv-d" x="765.65" y="82" fill="var(--muted)" text-anchor="middle">&#8212; hết tên &#8212;</text>
-<rect x="674.39" y="104" width="179.42" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55" stroke-dasharray="4 3"/>
-<text class="sv-t" x="702.23" y="125" fill="var(--ok)">[1, 2]</text>
-<text class="sv-d" x="702.23" y="141" fill="var(--muted)">ob_refcnt = 0</text>
-<text class="sv-d" x="674.39" y="168" fill="var(--ok)">về 0 &#8594;</text>
-<text class="sv-d" x="674.39" y="183" fill="var(--ok)">giải phóng NGAY</text>
-<text class="sv-d" x="86.62" y="212" fill="var(--ok)">Không có lượt quét nào ở đây &#8212; object biến mất ngay tại dòng lệnh làm bộ đếm về 0.</text>
-<text class="sv-d" x="86.62" y="232" fill="var(--muted)">Cái giá: mọi thread đều sửa bộ đếm, muốn an toàn phải có GIL.</text>
-<text class="sv-d" x="86.62" y="258" fill="var(--tomb)">Và đúng một trường hợp bộ đếm KHÔNG BAO GIỜ về 0 &#8212; mục sau.</text>
-</svg>
-<figcaption>Bốn dòng code, bốn giá trị của bộ đếm. Object biến mất <b>ngay tại dòng <code>del b</code></b>, không chờ một lượt quét nào — đó là nghĩa của chữ <em>kịp thời</em>.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li><b>Kịp thời</b> — trả lại ngay tại chỗ, không có khoảng dừng.</li>
-    <li><b>Dự đoán được</b> — biết chính xác lúc nào object bị huỷ.</li>
-    <li><b>Cái giá</b> — mọi thread đều sửa bộ đếm, nên phải có <a href="../../04-concurrency/thread-process-gil/index.html">GIL</a>.</li>
-  </ul>
-
-  <details class="deep"><summary>Vì sao <code>sys.getrefcount</code> luôn trả về số lớn hơn?</summary>
-  <div class="body">
-    <p>Chính lời gọi hàm đó cũng tạo một tham chiếu tạm: object được truyền vào làm đối số, nên trong lúc hàm chạy có thêm đúng một cái tên nữa trỏ tới nó. Đếm được 2 nghĩa là thật ra chỉ có 1.</p>
-    <p>Từ Python 3.12, các object hằng dùng nhiều — <code>None</code>, <code>True</code>, số nguyên nhỏ — đã thành <em>immortal</em>: bộ đếm của chúng không thay đổi nữa, nên đừng ngạc nhiên khi thấy một con số khổng lồ.</p>
-  </div></details>
-</section>
-
-<section id="memgc-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Reference cycle</h2></div>
-
-  <p class="key">Reference counting hỏng đúng một chỗ: <em>các object trỏ vòng vào nhau</em> thì bộ đếm không bao giờ về 0, dù không ai còn với tới chúng.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 310" role="img" aria-label="hai list trỏ vòng vào nhau, sau khi del hết tên ngoài thì bộ đếm vẫn là 1 nên không object nào được giải phóng">
-<path d="M0.0 150 H 37.12 V 96 H 71.15" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<line x1="71.15" y1="96" x2="69.6" y2="96.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="79.06,96.0 71.06,100.2 71.06,91.8" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22">CÙNG MỘT CẶP OBJECT &#8212; TRƯỚC VÀ SAU KHI BỎ HẾT TÊN</text>
-<text class="sv-l" x="86.62" y="46" fill="var(--filled)">a.append(b) &#183; b.append(a)</text>
-<rect x="102.09" y="56" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="133.02" y="71" fill="var(--filled)" text-anchor="middle">a</text>
-<line x1="133.02" y1="78" x2="133.02" y2="80.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="133.02,88.0 128.82,80.0 137.22,80.0" fill="var(--filled)"/>
-<rect x="86.62" y="92" width="232.01" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="113" fill="var(--filled)">list A</text>
-<text class="sv-d" x="108.27" y="129" fill="var(--muted)">ob_refcnt = 2</text>
-<rect x="411.44" y="56" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="442.37" y="71" fill="var(--filled)" text-anchor="middle">b</text>
-<line x1="442.37" y1="78" x2="442.37" y2="80.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="442.37,88.0 438.17,80.0 446.57,80.0" fill="var(--filled)"/>
-<rect x="395.97" y="92" width="232.01" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="417.63" y="113" fill="var(--filled)">list B</text>
-<text class="sv-d" x="417.63" y="129" fill="var(--muted)">ob_refcnt = 2</text>
-<line x1="321.73" y1="104" x2="380.5" y2="104.0" stroke="var(--filled)" stroke-width="1.3"/>
-<polygon points="389.96,104.0 381.96,108.2 381.96,99.8" fill="var(--filled)"/>
-<line x1="392.88" y1="126" x2="334.1" y2="126.0" stroke="var(--filled)" stroke-width="1.3"/>
-<polygon points="324.65,126.0 332.65,121.8 332.65,130.2" fill="var(--filled)"/>
-<text class="sv-d" x="86.62" y="154" fill="var(--filled)">còn tên ngoài trỏ vào &#8212; sống thật</text>
-<text class="sv-l" x="86.62" y="170" fill="var(--tomb)">del a &#183; del b</text>
-<rect x="102.09" y="180" width="61.87" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="133.02" y="195" fill="var(--tomb)" text-anchor="middle">a</text>
-<line x1="108.27" y1="183" x2="157.77" y2="199" stroke="var(--tomb)" stroke-width="1.4"/>
-<rect x="86.62" y="216" width="232.01" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="237" fill="var(--tomb)">list A</text>
-<text class="sv-d" x="108.27" y="253" fill="var(--muted)">ob_refcnt = 1</text>
-<rect x="411.44" y="180" width="61.87" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="442.37" y="195" fill="var(--tomb)" text-anchor="middle">b</text>
-<line x1="417.63" y1="183" x2="467.12" y2="199" stroke="var(--tomb)" stroke-width="1.4"/>
-<rect x="395.97" y="216" width="232.01" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="417.63" y="237" fill="var(--tomb)">list B</text>
-<text class="sv-d" x="417.63" y="253" fill="var(--muted)">ob_refcnt = 1</text>
-<line x1="321.73" y1="228" x2="380.5" y2="228.0" stroke="var(--tomb)" stroke-width="1.3"/>
-<polygon points="389.96,228.0 381.96,232.2 381.96,223.8" fill="var(--tomb)"/>
-<line x1="392.88" y1="250" x2="334.1" y2="250.0" stroke="var(--tomb)" stroke-width="1.3"/>
-<polygon points="324.65,250.0 332.65,245.8 332.65,254.2" fill="var(--tomb)"/>
-<text class="sv-d" x="86.62" y="278" fill="var(--tomb)">không ai với tới nữa, nhưng bộ đếm không về 0 &#8212; không được giải phóng</text>
-<text class="sv-d" x="86.62" y="296" fill="var(--probe)">Đây là lỗ hổng DUY NHẤT của reference counting.</text>
-</svg>
-<figcaption>Hàng dưới là <b>rác</b> theo mọi nghĩa — không code nào chạm tới được nữa — nhưng mỗi object vẫn còn một tham chiếu đến từ object kia, nên bộ đếm dừng ở 1.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li>Không cần cố tình: <b>cây có con trỏ ngược lên cha</b> là đã có vòng.</li>
-    <li>Đồ thị, linked list hai chiều, object giữ callback trỏ về chính nó.</li>
-    <li>Script vài giây thì không sao; <b>service vài tháng</b> thì đây là rò rỉ thật.</li>
+    <li>Máy chỉ đo được một câu: từ chỗ đang chạy, còn đường đi tới object này không?</li>
+    <li>Điểm xuất phát gọi là <b>root set</b>. Hết đường là rác.</li>
+    <li>Nối tiếp <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a>.</li>
   </ul>
 </section>
 
-<section id="memgc-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Cyclic GC</h2></div>
-
-  <p class="key">Đây là thứ vá đúng lỗ hổng vừa thấy — và là thứ duy nhất mà module <code>gc</code> điều khiển. Khi tài liệu Python nói <em>"the garbage collector"</em>, nó nói về nhánh này.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 314" role="img" aria-label="cụm trỏ vòng được GC cắt liên kết nên bộ đếm về 0 và cả cụm được giải phóng, dưới là ba generation quét thưa dần">
-<path d="M0.0 198 H 37.12 V 92 H 71.15" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<line x1="71.15" y1="92" x2="69.6" y2="92.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="79.06,92.0 71.06,96.2 71.06,87.8" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22">CÁI MÀ REFERENCE COUNTING BỎ SÓT, GC ĐI NHẶT</text>
-<rect x="86.62" y="30" width="358.85" height="96" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-d" x="108.27" y="50" fill="var(--tomb)">cụm trỏ vòng, không root nào tới</text>
-<rect x="108.27" y="60" width="142.3" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="129.93" y="81" fill="var(--tomb)">A</text>
-<text class="sv-d" x="129.93" y="97" fill="var(--muted)">refcnt = 1</text>
-<rect x="269.14" y="60" width="142.3" height="46" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="290.79" y="81" fill="var(--tomb)">B</text>
-<text class="sv-d" x="290.79" y="97" fill="var(--muted)">refcnt = 1</text>
-<line x1="253.67" y1="74" x2="253.67" y2="74.0" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="263.12,74.0 255.12,78.2 255.12,69.8" fill="var(--tomb)"/>
-<line x1="266.04" y1="96" x2="266.04" y2="96.0" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="256.59,96.0 264.59,91.8 264.59,100.2" fill="var(--tomb)"/>
-<line x1="457.84" y1="78" x2="507.34" y2="78.0" stroke="var(--ok)" stroke-width="1.4"/>
-<polygon points="516.79,78.0 508.79,82.2 508.79,73.8" fill="var(--ok)"/>
-<text class="sv-h" x="488.78" y="68" fill="var(--ok)" text-anchor="middle">gc</text>
-<rect x="532.09" y="30" width="315.54" height="96" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-d" x="553.74" y="50" fill="var(--ok)">GC cắt liên kết bên trong</text>
-<text class="sv-t" x="553.74" y="80" fill="var(--ok)">refcount &#8594; 0</text>
-<text class="sv-d" x="553.74" y="102" fill="var(--muted)">cả cụm được giải phóng</text>
-<text class="sv-hv" x="86.62" y="158">BA GENERATION &#8212; ĐO TRÊN HEAP 300.000 OBJECT ĐANG SỐNG</text>
-<rect x="86.62" y="168" width="228.92" height="44" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="105.18" y="188" fill="var(--filled)">gen 0</text>
-<text class="sv-d" x="105.18" y="204" fill="var(--muted)">ngưỡng 700</text>
-<line x1="318.63" y1="190" x2="331.01" y2="190.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="340.46,190.0 332.46,194.2 332.46,185.8" fill="var(--probe)"/>
-<rect x="346.47" y="168" width="228.92" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="365.04" y="188" fill="var(--probe)">gen 1</text>
-<text class="sv-d" x="365.04" y="204" fill="var(--muted)">sau 10 lượt gen 0</text>
-<line x1="578.49" y1="190" x2="590.86" y2="190.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="600.32,190.0 592.32,194.2 592.32,185.8" fill="var(--probe)"/>
-<rect x="606.33" y="168" width="228.92" height="44" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-t" x="624.89" y="188" fill="var(--ok)">gen 2</text>
-<text class="sv-d" x="624.89" y="204" fill="var(--muted)">sau 10 lượt gen 1</text>
-<text class="sv-l" x="105.18" y="230" fill="var(--ok)">0,1 &#181;s</text>
-<text class="sv-l" x="365.04" y="230" fill="var(--ok)">0,1 &#181;s</text>
-<text class="sv-l" x="624.89" y="230" fill="var(--tomb)">15.782 &#181;s</text>
-<text class="sv-d" x="86.62" y="256" fill="var(--muted)">Một lượt gen 2 đắt hơn gen 0 <tspan fill="var(--probe)">167.000 lần</tspan> vì nó duyệt cả 300.000 object;</text>
-<text class="sv-d" x="86.62" y="272" fill="var(--muted)">gen 0 chỉ nhìn đám vừa sinh ra. Đó là toàn bộ lý do có ba ngăn thay vì một.</text>
-<text class="sv-d" x="86.62" y="298" fill="var(--probe)">gc.disable() chỉ tắt phần này &#8212; reference counting vẫn chạy.</text>
+<section id="gc-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Reference counting</h2></div>
+  <p class="key">Mỗi object mang sẵn bộ đếm. Mọi dòng code chỉ làm một việc với nó: <em>thêm một tên, hoặc bớt một tên</em>. Về 0 là thu hồi ngay.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 258" role="img" aria-label="Chạy bốn dòng code, bộ đếm của object đổi lần lượt từ một lên hai rồi về một và về không; ngay khi về không object được giải phóng tại chính dòng đó" data-anim><style>@keyframes rc1{0%{animation-timing-function:ease-in-out;opacity:0}2.500%{animation-timing-function:ease-in-out;opacity:0}4.062%{animation-timing-function:ease-in-out;opacity:1}26.250%{animation-timing-function:ease-in-out;opacity:1}27.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc2{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}78.750%{animation-timing-function:ease-in-out;opacity:1}80.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc3{0%{animation-timing-function:ease-in-out;opacity:0}6.250%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}22.500%{animation-timing-function:ease-in-out;opacity:1}24.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc4{0%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:0}9.062%{animation-timing-function:ease-in-out;opacity:1}27.500%{animation-timing-function:ease-in-out;opacity:1}29.063%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc5{0%{animation-timing-function:ease-in-out;opacity:0}27.500%{animation-timing-function:ease-in-out;opacity:0}29.063%{animation-timing-function:ease-in-out;opacity:1}51.250%{animation-timing-function:ease-in-out;opacity:1}52.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc6{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}31.562%{animation-timing-function:ease-in-out;opacity:1}53.750%{animation-timing-function:ease-in-out;opacity:1}55.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc7{0%{animation-timing-function:ease-in-out;opacity:0}31.250%{animation-timing-function:ease-in-out;opacity:0}32.812%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:1}49.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc8{0%{animation-timing-function:ease-in-out;opacity:0}28.750%{animation-timing-function:ease-in-out;opacity:0}30.312%{animation-timing-function:ease-in-out;opacity:1}52.500%{animation-timing-function:ease-in-out;opacity:1}54.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc9{0%{animation-timing-function:ease-in-out;opacity:0}52.500%{animation-timing-function:ease-in-out;opacity:0}54.062%{animation-timing-function:ease-in-out;opacity:1}76.250%{animation-timing-function:ease-in-out;opacity:1}77.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc10{0%{animation-timing-function:ease-in-out;opacity:0}56.250%{animation-timing-function:ease-in-out;opacity:0}57.812%{animation-timing-function:ease-in-out;opacity:1}72.500%{animation-timing-function:ease-in-out;opacity:1}74.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc11{0%{animation-timing-function:ease-in-out;opacity:0}53.750%{animation-timing-function:ease-in-out;opacity:0}55.312%{animation-timing-function:ease-in-out;opacity:1}77.500%{animation-timing-function:ease-in-out;opacity:1}79.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc12{0%{animation-timing-function:ease-in-out;opacity:0}77.500%{animation-timing-function:ease-in-out;opacity:0}79.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rc13{0%{animation-timing-function:ease-in-out;opacity:0}81.250%{animation-timing-function:ease-in-out;opacity:0}82.812%{animation-timing-function:ease-in-out;opacity:1}98.750%{animation-timing-function:ease-in-out;opacity:1}100.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc14{0%{animation-timing-function:ease-in-out;opacity:0}78.750%{animation-timing-function:ease-in-out;opacity:0}80.312%{animation-timing-function:ease-in-out;opacity:1}91.250%{animation-timing-function:ease-in-out;opacity:1}92.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rc15{0%{animation-timing-function:ease-in-out;opacity:0}92.500%{animation-timing-function:ease-in-out;opacity:0}94.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rc16{0%{animation-timing-function:ease-in-out;opacity:0}95.000%{animation-timing-function:ease-in-out;opacity:0}97.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rc17{0%{animation-timing-function:ease-in-out;opacity:0}97.500%{animation-timing-function:ease-in-out;opacity:0}99.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.rc1{animation:rc1 16.0s linear 1 forwards}.rc2{animation:rc2 16.0s linear 1 forwards}.rc3{animation:rc3 16.0s linear 1 forwards}.rc4{animation:rc4 16.0s linear 1 forwards}.rc5{animation:rc5 16.0s linear 1 forwards}.rc6{animation:rc6 16.0s linear 1 forwards}.rc7{animation:rc7 16.0s linear 1 forwards}.rc8{animation:rc8 16.0s linear 1 forwards}.rc9{animation:rc9 16.0s linear 1 forwards}.rc10{animation:rc10 16.0s linear 1 forwards}.rc11{animation:rc11 16.0s linear 1 forwards}.rc12{animation:rc12 16.0s linear 1 forwards}.rc13{animation:rc13 16.0s linear 1 forwards}.rc14{animation:rc14 16.0s linear 1 forwards}.rc15{animation:rc15 16.0s linear 1 forwards}.rc16{animation:rc16 16.0s linear 1 forwards}.rc17{animation:rc17 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">MỖI OBJECT ĐẾM: MẤY TÊN ĐANG TRỎ TỚI</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="rc1" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">a = [1, 2]</text></g>
+<g class="rc2" opacity="0"><rect x="60" y="96" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="87.0" y="114.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><line x1="114" y1="109" x2="330" y2="104" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="rc3" opacity="0"><rect x="330" y="32" width="118.2" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="341.0" y="50.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">refcnt: 0 → 1</text><line x1="389.1" y1="58.0" x2="405.0" y2="84.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="405.0" cy="84.0" r="2.8" fill="var(--ok)"/><rect x="326.0" y="80.0" width="158.0" height="60.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="rc4" opacity="0"><rect x="330" y="84" width="150" height="52" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="405.0" y="104.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1, 2]</text><text class="sv-d" x="405.0" y="122" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text></g>
+<g class="rc5" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b = a</text></g>
+<g class="rc6" opacity="0"><rect x="60" y="146" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="87.0" y="164.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="114" y1="159" x2="330" y2="118" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="rc7" opacity="0"><rect x="330" y="32" width="118.2" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="341.0" y="50.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">refcnt: 1 → 2</text><line x1="389.1" y1="58.0" x2="405.0" y2="84.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="405.0" cy="84.0" r="2.8" fill="var(--ok)"/><rect x="326.0" y="80.0" width="158.0" height="60.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="rc8" opacity="0"><rect x="330" y="84" width="150" height="52" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="405.0" y="104.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1, 2]</text><text class="sv-d" x="405.0" y="122" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 2</text></g>
+<g class="rc9" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">del b</text></g>
+<g class="rc10" opacity="0"><rect x="330" y="32" width="118.2" height="26" rx="5" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.6"/><text x="341.0" y="50.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">refcnt: 2 → 1</text><line x1="389.1" y1="58.0" x2="405.0" y2="84.0" stroke="var(--probe)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="405.0" cy="84.0" r="2.8" fill="var(--probe)"/><rect x="326.0" y="80.0" width="158.0" height="60.0" fill="none" stroke="var(--probe)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="rc11" opacity="0"><rect x="330" y="84" width="150" height="52" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="405.0" y="104.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1, 2]</text><text class="sv-d" x="405.0" y="122" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text></g>
+<g class="rc12"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">del a</text></g>
+<g class="rc13" opacity="0"><rect x="330" y="32" width="118.2" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="341.0" y="50.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">refcnt: 1 → 0</text><line x1="389.1" y1="58.0" x2="405.0" y2="84.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="405.0" cy="84.0" r="2.8" fill="var(--tomb)"/><rect x="326.0" y="80.0" width="158.0" height="60.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="rc14" opacity="0"><rect x="330" y="84" width="150" height="52" rx="6" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.7"/><text x="405.0" y="104.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1, 2]</text><text class="sv-d" x="405.0" y="122" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">refcnt 0</text></g>
+<g class="rc15"><rect x="330" y="84" width="150" height="52" rx="6" fill="none" stroke="var(--tomb)" stroke-width="1.4" stroke-dasharray="4 3"/><text class="sv-d" x="405" y="114" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">đã giải phóng</text></g>
+<g class="rc16"><rect x="0" y="176" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="191" fill="var(--probe)" style="fill:var(--probe)">Về 0 là thu hồi NGAY tại dòng đó · không chờ lượt quét nào</text></g>
+<g class="rc17"><text class="sv-d" x="14" y="208" fill="var(--muted)" style="fill:var(--muted)">Kịp thời và dự đoán được — biết chính xác object chết ở dòng nào.</text><text class="sv-d" x="14" y="226" fill="var(--muted)" style="fill:var(--muted)">Cái giá: mọi thread đều sửa bộ đếm, nên CPython cần GIL.</text></g>
 </svg>
-<figcaption>Trên: GC cắt liên kết bên trong cụm, bộ đếm nhờ đó mới tụt về 0 và cơ chế đếm thông thường lo nốt phần giải phóng. Dưới là cái giá — <b>một lượt gen 2 bằng 167.000 lượt gen 0</b>, nên ba ngăn không phải để phân loại cho gọn mà để lượt quét đắt kia hiếm khi phải chạy.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li>Chỉ quét object <b>tracked</b> — thứ chứa được object khác: list, dict, set, instance.</li>
-    <li><code>int</code>, <code>str</code>, <code>float</code> <b>không bao giờ</b> bị quét — không tạo được vòng.</li>
-    <li>Ngưỡng <code>(700, 10, 10)</code> đọc là: cứ <b>700 object</b> mới sinh ra ròng thì quét gen 0 — không phải 700 mili giây, cũng không phải 700 byte.</li>
-    <li><code>gc.disable()</code> tắt đúng nhánh này. Service nhạy độ trễ làm thật, rồi <code>gc.collect()</code> tay vào lúc rảnh — đổi <b>khoảng dừng bất chợt</b> lấy khoảng dừng có lịch.</li>
-  </ul>
-
-  <details class="deep"><summary>GC biết cụm nào là rác bằng cách nào — và khi nào nên tắt nó</summary>
-  <div class="body">
-    <p>Nó không đi tìm rác mà <b>giả định mọi thứ đều là rác</b>: chép <code>ob_refcnt</code> sang một ô tạm <code>gc_refs</code>, rồi trừ đi mỗi liên kết đến từ bên trong cụm đang xét. Object nào còn dư nghĩa là có ai đó <b>ngoài cụm</b> giữ, nên nó sống, và mọi thứ nó với tới cũng sống. Phần còn lại là rác vòng; GC gọi <code>tp_clear</code> để cắt liên kết trong đó.</p>
-    <p>Một tối ưu đáng kể: <code>gc.is_tracked</code> cho thấy tuple và dict chỉ chứa giá trị immutable được <b>gỡ khỏi danh sách theo dõi</b>, nên GC chỉ phải đi qua đúng những object có khả năng tạo vòng.</p>
-    <p>Với dịch vụ độ trễ thấp, một lượt quét gen 2 có thể gây khoảng dừng thấy được — cách xử lý quen thuộc là tắt GC rồi tự gọi <code>gc.collect()</code> lúc rảnh. Nhưng nói cho rõ trong phỏng vấn: <b>tắt GC không tắt reference counting</b>, phần lớn rác vẫn được dọn như thường, chỉ cụm trỏ vòng là tồn lại.</p>
-  </div></details>
-</section>
-
-<section id="memgc-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>del</h2></div>
-
-  <p class="key"><code>del x</code> <em>không</em> xoá object. Nó xoá <b>cái tên</b> — tức bớt đúng một tham chiếu ở ô refcount vừa học. Object đi hay ở là hệ quả, không phải lệnh của bạn.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 332" role="img" aria-label="del a chỉ bỏ tên a nên object vẫn sống nhờ tên b, del b mới là tên cuối cùng và object được giải phóng">
-<path d="M0.0 150 H 37.12 V 92 H 71.15" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<line x1="71.15" y1="92" x2="69.6" y2="92.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="79.06,92.0 71.06,96.2 71.06,87.8" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22">del XOÁ CÁI TÊN, KHÔNG XOÁ OBJECT</text>
-<rect x="86.62" y="32" width="371.22" height="28" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="105.18" y="51" fill="var(--dim)">a = MyObject() &#183; b = a &#183; del a</text>
-<rect x="105.18" y="70" width="61.87" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="136.12" y="85" fill="var(--tomb)" text-anchor="middle">a</text>
-<line x1="111.37" y1="73" x2="160.86" y2="89" stroke="var(--tomb)" stroke-width="1.4"/>
-<rect x="194.89" y="70" width="61.87" height="22" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="225.83" y="85" fill="var(--filled)" text-anchor="middle">b</text>
-<line x1="225.83" y1="92" x2="225.83" y2="94.0" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="225.83,102.0 221.63,94.0 230.03,94.0" fill="var(--filled)"/>
-<rect x="86.62" y="106" width="371.22" height="46" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="127" fill="var(--probe)">MyObject()</text>
-<text class="sv-d" x="108.27" y="143" fill="var(--muted)">ob_refcnt = 1</text>
-<text class="sv-d" x="482.59" y="124" fill="var(--muted)">còn b trỏ vào &#8594;</text>
-<text class="sv-t" x="482.59" y="142" fill="var(--probe)">object VẪN SỐNG</text>
-<rect x="86.62" y="174" width="371.22" height="28" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="105.18" y="193" fill="var(--dim)">… rồi del b</text>
-<rect x="105.18" y="212" width="61.87" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="136.12" y="227" fill="var(--tomb)" text-anchor="middle">a</text>
-<line x1="111.37" y1="215" x2="160.86" y2="231" stroke="var(--tomb)" stroke-width="1.4"/>
-<rect x="194.89" y="212" width="61.87" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="225.83" y="227" fill="var(--tomb)" text-anchor="middle">b</text>
-<line x1="201.08" y1="215" x2="250.58" y2="231" stroke="var(--tomb)" stroke-width="1.4"/>
-<rect x="86.62" y="248" width="371.22" height="46" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55" stroke-dasharray="4 3"/>
-<text class="sv-t" x="108.27" y="269" fill="var(--ok)">MyObject()</text>
-<text class="sv-d" x="108.27" y="285" fill="var(--muted)">ob_refcnt = 0</text>
-<text class="sv-d" x="482.59" y="266" fill="var(--muted)">tên cuối cùng mất &#8594;</text>
-<text class="sv-t" x="482.59" y="284" fill="var(--ok)">giải phóng NGAY</text>
-<text class="sv-d" x="86.62" y="318" fill="var(--probe)">Câu trả lời chuẩn: del removes the reference, not the object.</text>
-</svg>
-<figcaption>Cùng một object, hai lần <code>del</code>. Lần đầu chỉ bớt một tên nên object vẫn sống nhờ <code>b</code>; lần sau mới là tên cuối cùng, bộ đếm về 0 và object được giải phóng.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li>Câu trả lời chuẩn: <b><code>del</code> removes the reference, not the object</b>.</li>
-    <li>Nên <code>del</code> <b>không phải</b> là gọi GC, và cũng không đảm bảo giải phóng.</li>
-    <li><code>__del__</code> là chuyện khác: phương thức chạy lúc object sắp bị huỷ, <b>không rõ lúc nào</b> — đừng đóng file trong đó.</li>
+    <li><code>del a</code> chỉ <b>gỡ cái tên</b> và bớt bộ đếm đi 1 — không phải <code>free()</code>. Gán <code>a = None</code> y hệt.</li>
+    <li><b>Cái giá</b>: mọi thread đều sửa bộ đếm, nên CPython cần GIL.</li>
+    <li><code>sys.getrefcount</code> luôn lớn hơn 1, vì chính lời gọi đó tạo một tham chiếu tạm.</li>
   </ul>
 </section>
 
-<section id="memgc-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>GC vs resource management</h2></div>
-
-  <p class="key">Vạch dưới cùng của bản đồ là ranh giới hay bị hỏi nhất: GC là bộ quản lý <em>bộ nhớ</em>, không phải bộ quản lý <em>tài nguyên</em>.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="open không có with thì file mở tới lúc GC đụng tới, còn with đóng ngay cuối khối">
-<path d="M0.0 258 H 37.12 V 116 H 71.15" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<line x1="71.15" y1="116" x2="69.6" y2="116.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="79.06,116.0 71.06,120.2 71.06,111.8" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22">CÙNG MỘT FILE &#8212; HAI CÁCH VIẾT, HAI LÚC ĐÓNG</text>
-<rect x="86.62" y="32" width="315.54" height="30" rx="4" fill="var(--sunk)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="105.18" y="52" fill="var(--tomb)">f = open(&quot;data.txt&quot;)</text>
-<line x1="402.16" y1="47" x2="423.81" y2="47.0" stroke="var(--tomb)" stroke-width="1.3"/>
-<polygon points="433.27,47.0 425.27,51.2 425.27,42.8" fill="var(--tomb)"/>
-<rect x="442.37" y="32" width="201.08" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55" stroke-dasharray="4 4"/>
-<text class="sv-d" x="460.94" y="52" fill="var(--dim)">file MỞ &#183; chờ GC</text>
-<line x1="643.45" y1="47" x2="665.11" y2="47.0" stroke="var(--tomb)" stroke-width="1.3"/>
-<polygon points="674.56,47.0 666.56,51.2 666.56,42.8" fill="var(--tomb)"/>
-<rect x="683.67" y="32" width="176.33" height="30" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-d" x="771.83" y="52" fill="var(--tomb)" text-anchor="middle">đóng lúc nào?</text>
-<text class="sv-d" x="86.62" y="84" fill="var(--muted)">Không dự đoán được &#8212; mở nhiều file sẽ chạm trần file descriptor.</text>
-<rect x="86.62" y="124" width="315.54" height="30" rx="4" fill="var(--sunk)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="105.18" y="144" fill="var(--ok)">with open(&quot;data.txt&quot;) as f:</text>
-<line x1="402.16" y1="139" x2="423.81" y2="139.0" stroke="var(--ok)" stroke-width="1.3"/>
-<polygon points="433.27,139.0 425.27,143.2 425.27,134.8" fill="var(--ok)"/>
-<rect x="442.37" y="124" width="201.08" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-d" x="460.94" y="144" fill="var(--dim)">file MỞ &#183; trong khối</text>
-<line x1="643.45" y1="139" x2="665.11" y2="139.0" stroke="var(--ok)" stroke-width="1.3"/>
-<polygon points="674.56,139.0 666.56,143.2 666.56,134.8" fill="var(--ok)"/>
-<rect x="683.67" y="124" width="176.33" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-d" x="771.83" y="144" fill="var(--ok)" text-anchor="middle">đóng NGAY</text>
-<text class="sv-d" x="86.62" y="176" fill="var(--muted)">Dự đoán được, không phụ thuộc GC &#8212; kể cả khi có exception.</text>
-<text class="sv-t" x="86.62" y="224" fill="var(--probe)">GC là bộ quản lý BỘ NHỚ, không phải bộ quản lý TÀI NGUYÊN.</text>
-<text class="sv-d" x="86.62" y="250" fill="var(--ok)">Memory &#8594; GC lo.</text>
-<text class="sv-d" x="86.62" y="268" fill="var(--ok)">File &#183; socket &#183; DB connection &#183; khoá &#8594; BẠN lo, bằng with.</text>
+<section id="gc-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Reference cycle</h2></div>
+  <p class="key">Cơ chế đếm hỏng đúng một chỗ: object trỏ vòng thì bộ đếm <em>không bao giờ về 0</em>, dù không ai còn với tới.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 396" role="img" aria-label="Hai object x và y trỏ vòng vào nhau; khi xoá hết tên ngoài thì bộ đếm của mỗi object chỉ tụt từ hai xuống một chứ không về không, nên cơ chế đếm không thu hồi được" data-anim><style>@keyframes cy1{0%{animation-timing-function:ease-in-out;opacity:0}2.857%{animation-timing-function:ease-in-out;opacity:0}4.643%{animation-timing-function:ease-in-out;opacity:1}45.714%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cy2{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.071%{animation-timing-function:ease-in-out;opacity:1}48.571%{animation-timing-function:ease-in-out;opacity:1}50.357%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cy3{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy4{0%{animation-timing-function:ease-in-out;opacity:0}15.714%{animation-timing-function:ease-in-out;opacity:0}18.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy5{0%{animation-timing-function:ease-in-out;opacity:0}7.143%{animation-timing-function:ease-in-out;opacity:0}8.929%{animation-timing-function:ease-in-out;opacity:1}50.000%{animation-timing-function:ease-in-out;opacity:1}51.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cy6{0%{animation-timing-function:ease-in-out;opacity:0}7.143%{animation-timing-function:ease-in-out;opacity:0}8.929%{animation-timing-function:ease-in-out;opacity:1}50.000%{animation-timing-function:ease-in-out;opacity:1}51.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cy7{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}21.786%{animation-timing-function:ease-in-out;opacity:1}50.000%{animation-timing-function:ease-in-out;opacity:1}51.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cy8{0%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:0}48.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy9{0%{animation-timing-function:ease-in-out;opacity:0}51.429%{animation-timing-function:ease-in-out;opacity:0}53.214%{animation-timing-function:ease-in-out;opacity:1}74.286%{animation-timing-function:ease-in-out;opacity:1}76.071%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cy10{0%{animation-timing-function:ease-in-out;opacity:0}51.429%{animation-timing-function:ease-in-out;opacity:0}53.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy11{0%{animation-timing-function:ease-in-out;opacity:0}62.857%{animation-timing-function:ease-in-out;opacity:0}65.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy12{0%{animation-timing-function:ease-in-out;opacity:0}67.143%{animation-timing-function:ease-in-out;opacity:0}69.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy13{0%{animation-timing-function:ease-in-out;opacity:0}72.857%{animation-timing-function:ease-in-out;opacity:0}75.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy14{0%{animation-timing-function:ease-in-out;opacity:0}78.571%{animation-timing-function:ease-in-out;opacity:0}81.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cy15{0%{animation-timing-function:ease-in-out;opacity:0}82.857%{animation-timing-function:ease-in-out;opacity:0}85.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.cy1{animation:cy1 14.0s linear 1 forwards}.cy2{animation:cy2 14.0s linear 1 forwards}.cy3{animation:cy3 14.0s linear 1 forwards}.cy4{animation:cy4 14.0s linear 1 forwards}.cy5{animation:cy5 14.0s linear 1 forwards}.cy6{animation:cy6 14.0s linear 1 forwards}.cy7{animation:cy7 14.0s linear 1 forwards}.cy8{animation:cy8 14.0s linear 1 forwards}.cy9{animation:cy9 14.0s linear 1 forwards}.cy10{animation:cy10 14.0s linear 1 forwards}.cy11{animation:cy11 14.0s linear 1 forwards}.cy12{animation:cy12 14.0s linear 1 forwards}.cy13{animation:cy13 14.0s linear 1 forwards}.cy14{animation:cy14 14.0s linear 1 forwards}.cy15{animation:cy15 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">REFERENCE CYCLE · BỘ ĐẾM KHÔNG BAO GIỜ VỀ 0</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="cy1" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x.o = y ; y.o = x</text></g>
+<g class="cy2" opacity="0"><rect x="60" y="106" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="87.0" y="124.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><line x1="114" y1="119" x2="250" y2="112" stroke="var(--probe)" stroke-width="1.6"/><rect x="60" y="216" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="87.0" y="234.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">y</text><line x1="114" y1="229" x2="250" y2="222" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="cy3"><polyline points="370,119 410,119 410,229 370,229" fill="none" stroke="var(--clay)" stroke-width="1.8"/><polygon points="370,229 382,224 382,234" fill="var(--clay)"/><text x="420.0" y="179.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x.o = y</text></g>
+<g class="cy4"><polyline points="250,240 210,240 210,130 250,130" fill="none" stroke="var(--clay)" stroke-width="1.8"/><polygon points="250,130 238,125 238,135" fill="var(--clay)"/><text x="200.0" y="179.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="end">y.o = x</text></g>
+<g class="cy5" opacity="0"><rect x="250" y="96" width="120" height="46" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="310.0" y="116.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><text class="sv-d" x="310.0" y="134" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 2</text></g>
+<g class="cy6" opacity="0"><rect x="250" y="206" width="120" height="46" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="310.0" y="226.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">y</text><text class="sv-d" x="310.0" y="244" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 2</text></g>
+<g class="cy7" opacity="0"><text class="sv-d" x="480" y="120" fill="var(--muted)" style="fill:var(--muted)">2 = tên ngoài + object kia</text></g>
+<g class="cy8"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">del x, y</text></g>
+<g class="cy9" opacity="0"><rect x="250" y="40" width="118.2" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="261.0" y="58.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">refcnt: 2 → 1</text><line x1="309.1" y1="66.0" x2="310.0" y2="96.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="310.0" cy="96.0" r="2.8" fill="var(--tomb)"/><rect x="244.0" y="90.0" width="132.0" height="168.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="cy10"><rect x="250" y="96" width="120" height="46" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="310.0" y="116.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><text class="sv-d" x="310.0" y="134" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text><rect x="250" y="206" width="120" height="46" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="310.0" y="226.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">y</text><text class="sv-d" x="310.0" y="244" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text></g>
+<g class="cy11"><text class="sv-d" x="480" y="120" fill="var(--tomb)" style="fill:var(--tomb)">không tên nào ngoài cụm còn trỏ tới</text></g>
+<g class="cy12"><text class="sv-d" x="480" y="140" fill="var(--tomb)" style="fill:var(--tomb)">nhưng mỗi object vẫn bị object kia giữ</text></g>
+<g class="cy13"><text class="sv-d" x="480" y="230" fill="var(--tomb)" style="fill:var(--tomb)">bộ đếm dừng ở 1 · không bao giờ về 0</text><text class="sv-d" x="480" y="250" fill="var(--tomb)" style="fill:var(--tomb)">refcounting bó tay ở đúng chỗ này</text></g>
+<g class="cy14"><rect x="0" y="296" width="3" height="20" rx="1.5" fill="rgba(var(--red-a),1)" stroke="var(--tomb)" stroke-width="0"/><text class="sv-d" x="14" y="311" fill="var(--tomb)" style="fill:var(--tomb)">Rác theo mọi nghĩa · mà cơ chế đếm không dọn được</text></g>
+<g class="cy15"><text class="sv-d" x="14" y="328" fill="var(--muted)" style="fill:var(--muted)">Không cần cố tình: cây có con trỏ ngược lên cha là đã có vòng.</text><text class="sv-d" x="14" y="346" fill="var(--muted)" style="fill:var(--muted)">Đồ thị, linked list hai chiều, object giữ callback trỏ về chính nó.</text><text class="sv-d" x="14" y="364" fill="var(--faint)" style="fill:var(--faint)">gc.collect() gọi tay thu được 2 object của cụm này.</text></g>
 </svg>
-<figcaption>Cùng một file, hai cách viết. Không có <code>with</code> thì file mở tới lúc nào <b>không ai biết</b>; có <code>with</code> thì đóng ngay cuối khối, kể cả khi giữa chừng có exception.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><b>Memory</b> → GC lo, bạn không phải làm gì.</li>
-    <li><b>File · socket · DB connection · khoá</b> → bạn lo, bằng <code>with</code>.</li>
-    <li>Câu ăn điểm: <b>GC does not guarantee timely resource cleanup</b>.</li>
+    <li>Không cần cố tình: cây có con trỏ ngược lên cha là đã có vòng.</li>
+    <li>Script vài giây thì không sao. Service vài tháng thì đây là rò rỉ thật.</li>
   </ul>
 </section>
 
-<section id="memgc-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Memory leak trong Python</h2></div>
-
-  <p class="key">Cả hai cơ chế đều bó tay với đúng một thứ: <em>tham chiếu thật mà code còn cố giữ</em>. Đó là ô trên cùng của bản đồ — và là chỗ mọi rò rỉ sinh ra.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="bốn nguồn rò rỉ quen thuộc là cache không giới hạn, lru_cache trên phương thức, biến toàn cục dồn dữ liệu và callback chưa huỷ, kèm cách chữa từng cái">
-<path d="M0.0 46 H 37.12 V 96 H 71.15" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<line x1="71.15" y1="96" x2="69.6" y2="96.0" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="79.06,96.0 71.06,100.2 71.06,91.8" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22">CÓ GC MÀ VẪN LEAK &#8212; VÌ THAM CHIẾU LÀ THẬT</text>
-<rect x="86.62" y="30" width="757.91" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="45" fill="var(--tomb)">cache không giới hạn</text>
-<text class="sv-s" x="108.27" y="62" fill="var(--muted)">cứ thêm vào, không bao giờ xoá</text>
-<text class="sv-d" x="822.88" y="54" fill="var(--ok)" text-anchor="end">&#8594; maxsize &#183; TTL</text>
-<rect x="86.62" y="76" width="757.91" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="93" fill="var(--tomb)">lru_cache trên phương thức</text>
-<text class="sv-d" x="108.27" y="107" fill="var(--muted)">cache giữ luôn self</text>
-<text class="sv-d" x="822.88" y="100" fill="var(--ok)" text-anchor="end">&#8594; cached_property</text>
-<rect x="86.62" y="122" width="757.91" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="139" fill="var(--tomb)">biến toàn cục dồn dữ liệu</text>
-<text class="sv-d" x="108.27" y="153" fill="var(--muted)">list cấp module chỉ thêm</text>
-<text class="sv-d" x="822.88" y="146" fill="var(--ok)" text-anchor="end">&#8594; deque(maxlen=n)</text>
-<rect x="86.62" y="168" width="757.91" height="38" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="183" fill="var(--tomb)">callback đã hết dùng</text>
-<text class="sv-s" x="108.27" y="200" fill="var(--muted)">còn nằm trong danh sách listener</text>
-<text class="sv-d" x="822.88" y="192" fill="var(--ok)" text-anchor="end">&#8594; weakref</text>
-<text class="sv-d" x="86.62" y="234" fill="var(--probe)">Cả bốn KHÔNG phải lỗi của GC &#8212; tham chiếu là thật, giữ lại là đúng.</text>
-<text class="sv-d" x="86.62" y="262" fill="var(--muted)">Và nhớ: RSS cao ≠ rò rỉ. Python giữ lại bộ nhớ đã cấp phát để dùng</text>
-<text class="sv-d" x="86.62" y="280" fill="var(--muted)">tiếp &#8212; đo bằng tracemalloc, đừng nhìn top.</text>
+<section id="gc-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Cyclic GC</h2></div>
+  <p class="key">Nó <em>không giải phóng</em> gì cả — chỉ <em>cắt liên kết trong cụm</em> để bộ đếm tụt về 0, rồi cơ chế đếm lo nốt.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 358" role="img" aria-label="Cụm hai object trỏ vòng, mỗi cái bộ đếm bằng một; GC cắt hai liên kết bên trong cụm nên bộ đếm tụt về không, rồi cơ chế đếm thông thường thu hồi" data-anim><style>@keyframes gc1{0%{animation-timing-function:ease-in-out;opacity:0}2.857%{animation-timing-function:ease-in-out;opacity:0}5.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gc2{0%{animation-timing-function:ease-in-out;opacity:0}5.714%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}45.714%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc3{0%{animation-timing-function:ease-in-out;opacity:0}5.714%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}45.714%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc4{0%{animation-timing-function:ease-in-out;opacity:0}15.714%{animation-timing-function:ease-in-out;opacity:0}17.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gc5{0%{animation-timing-function:ease-in-out;opacity:0}21.429%{animation-timing-function:ease-in-out;opacity:0}23.214%{animation-timing-function:ease-in-out;opacity:1}45.714%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc6{0%{animation-timing-function:ease-in-out;opacity:0}28.571%{animation-timing-function:ease-in-out;opacity:0}30.357%{animation-timing-function:ease-in-out;opacity:1}60.000%{animation-timing-function:ease-in-out;opacity:1}61.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc7{0%{animation-timing-function:ease-in-out;opacity:0}31.429%{animation-timing-function:ease-in-out;opacity:0}33.214%{animation-timing-function:ease-in-out;opacity:1}60.000%{animation-timing-function:ease-in-out;opacity:1}61.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc8{0%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:0}48.929%{animation-timing-function:ease-in-out;opacity:1}67.143%{animation-timing-function:ease-in-out;opacity:1}68.929%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc9{0%{animation-timing-function:ease-in-out;opacity:0}48.571%{animation-timing-function:ease-in-out;opacity:0}50.357%{animation-timing-function:ease-in-out;opacity:1}67.143%{animation-timing-function:ease-in-out;opacity:1}68.929%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gc10{0%{animation-timing-function:ease-in-out;opacity:0}68.571%{animation-timing-function:ease-in-out;opacity:0}71.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gc11{0%{animation-timing-function:ease-in-out;opacity:0}72.857%{animation-timing-function:ease-in-out;opacity:0}75.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gc12{0%{animation-timing-function:ease-in-out;opacity:0}78.571%{animation-timing-function:ease-in-out;opacity:0}81.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gc13{0%{animation-timing-function:ease-in-out;opacity:0}82.857%{animation-timing-function:ease-in-out;opacity:0}85.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.gc1{animation:gc1 14.0s linear 1 forwards}.gc2{animation:gc2 14.0s linear 1 forwards}.gc3{animation:gc3 14.0s linear 1 forwards}.gc4{animation:gc4 14.0s linear 1 forwards}.gc5{animation:gc5 14.0s linear 1 forwards}.gc6{animation:gc6 14.0s linear 1 forwards}.gc7{animation:gc7 14.0s linear 1 forwards}.gc8{animation:gc8 14.0s linear 1 forwards}.gc9{animation:gc9 14.0s linear 1 forwards}.gc10{animation:gc10 14.0s linear 1 forwards}.gc11{animation:gc11 14.0s linear 1 forwards}.gc12{animation:gc12 14.0s linear 1 forwards}.gc13{animation:gc13 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">CYCLIC GC · CẮT LIÊN KẾT TRONG CỤM ĐỂ BỘ ĐẾM TỤT VỀ 0</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="gc1"><text class="sv-d" x="250" y="64" fill="var(--tomb)" style="fill:var(--tomb)">cụm rác: không ai ngoài cụm còn trỏ tới</text></g>
+<g class="gc2" opacity="0"><polyline points="370,113 410,113 410,213 370,213" fill="none" stroke="var(--clay)" stroke-width="1.8"/><polygon points="370,213 382,208 382,218" fill="var(--clay)"/><polyline points="250,224 210,224 210,124 250,124" fill="none" stroke="var(--clay)" stroke-width="1.8"/><polygon points="250,124 238,119 238,129" fill="var(--clay)"/></g>
+<g class="gc3" opacity="0"><rect x="250" y="90" width="120" height="46" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="310.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><text class="sv-d" x="310.0" y="128" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text><rect x="250" y="190" width="120" height="46" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="310.0" y="210.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">y</text><text class="sv-d" x="310.0" y="228" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">refcnt 1</text></g>
+<g class="gc4"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">gc.collect()</text></g>
+<g class="gc5" opacity="0"><rect x="280" y="20" width="184.8" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="291.0" y="38.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">cắt liên kết trong cụm</text><line x1="372.4" y1="46.0" x2="410.0" y2="163.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="410.0" cy="163.0" r="2.8" fill="var(--ok)"/><rect x="200.0" y="82.0" width="240.0" height="164.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="gc6" opacity="0"><line x1="396" y1="149.0" x2="424" y2="177.0" stroke="var(--ok)" stroke-width="2.6"/><line x1="424" y1="149.0" x2="396" y2="177.0" stroke="var(--ok)" stroke-width="2.6"/></g>
+<g class="gc7" opacity="0"><line x1="196" y1="149.0" x2="224" y2="177.0" stroke="var(--ok)" stroke-width="2.6"/><line x1="224" y1="149.0" x2="196" y2="177.0" stroke="var(--ok)" stroke-width="2.6"/></g>
+<g class="gc8" opacity="0"><rect x="250" y="90" width="120" height="46" rx="6" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.7"/><text x="310.0" y="110.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><text class="sv-d" x="310.0" y="128" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">refcnt 0</text><rect x="250" y="190" width="120" height="46" rx="6" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.7"/><text x="310.0" y="210.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">y</text><text class="sv-d" x="310.0" y="228" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">refcnt 0</text></g>
+<g class="gc9" opacity="0"><text class="sv-d" x="480" y="114" fill="var(--ok)" style="fill:var(--ok)">liên kết mất → bộ đếm về 0</text></g>
+<g class="gc10"><rect x="250" y="90" width="120" height="46" rx="6" fill="none" stroke="var(--tomb)" stroke-width="1.4" stroke-dasharray="4 3"/><text class="sv-d" x="310" y="118" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">thu hồi</text><rect x="250" y="190" width="120" height="46" rx="6" fill="none" stroke="var(--tomb)" stroke-width="1.4" stroke-dasharray="4 3"/><text class="sv-d" x="310" y="218" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">thu hồi</text></g>
+<g class="gc11"><text class="sv-d" x="480" y="114" fill="var(--muted)" style="fill:var(--muted)">phần giải phóng vẫn do</text><text class="sv-d" x="480" y="134" fill="var(--probe)" style="fill:var(--probe)">reference counting lo</text></g>
+<g class="gc12"><rect x="0" y="276" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="291" fill="var(--probe)" style="fill:var(--probe)">Cyclic GC không giải phóng · nó chỉ cắt liên kết để bộ đếm về 0</text></g>
+<g class="gc13"><text class="sv-d" x="14" y="308" fill="var(--muted)" style="fill:var(--muted)">Chỉ quét object tracked — thứ chứa được object khác.</text><text class="sv-d" x="14" y="326" fill="var(--muted)" style="fill:var(--muted)">Và tracked phụ thuộc NỘI DUNG, không chỉ kiểu — xem bảng dưới.</text></g>
 </svg>
-<figcaption>Bốn nguồn quen mặt. Không cái nào là lỗi của GC: tham chiếu <b>có thật</b>, nên giữ lại là đúng — máy không có cách nào biết bạn đã hết cần.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><code>weakref</code> trỏ mà <b>không tăng bộ đếm</b> — đúng thuốc cho cache và listener.</li>
-    <li>Dùng <code>weakref</code> cho con trỏ ngược lên cha là <b>cắt luôn vòng</b> ở mục 04.</li>
-    <li><b>RSS cao ≠ rò rỉ</b>: Python giữ lại bộ nhớ đã cấp phát để dùng tiếp.</li>
-    <li>Nên đo bằng <code>tracemalloc</code>, đừng kết luận từ <code>top</code>.</li>
+    <li>Chỉ quét object <b>tracked</b> — thứ chứa được object khác. <code>int</code> và <code>str</code> không bao giờ bị quét.</li>
+    <li>Tracked phụ thuộc <b>nội dung</b>: <code>(1, 2)</code> không tracked, <code>(1, [2])</code> thì có.</li>
+    <li>Chia ba thế hệ để lượt quét đắt hiếm phải chạy: gen 2 đắt gấp 32 lần gen 0.</li>
+    <li>Tài liệu Python nói "the garbage collector" là nói nhánh này.</li>
   </ul>
-
-  <details class="deep"><summary>Truy rò rỉ bằng <code>tracemalloc</code> — câu trả lời cho "service em ăn RAM tăng dần"</summary>
-  <div class="body">
-    <p>Ý tưởng là <b>chụp hai thời điểm rồi so sánh</b>, chứ không nhìn một con số tuyệt đối. Gọi <code>tracemalloc.start()</code>, lấy <code>take_snapshot()</code> trước và sau khi chạy tải, rồi <code>snap2.compare_to(snap1, "lineno")</code> — kết quả chỉ thẳng ra dòng code đang cấp phát thêm mà không nhả.</p>
-    <p>Phải so sánh vì con số tuyệt đối đã mất ý nghĩa: Python gom object nhỏ vào các vùng nhớ lớn và chỉ trả về hệ điều hành khi cả vùng rỗng sạch — một object 40 byte còn sống đủ giữ nguyên cả vùng. Đó là lý do pod xoá dữ liệu xong mà RSS gần như không nhúc nhích.</p>
-    <p>Muốn biết <em>ai đang giữ</em> một object cụ thể thì dùng <code>gc.get_referrers(obj)</code>. Còn <code>objgraph</code> (thư viện ngoài) vẽ được đồ thị tham chiếu, tiện khi chuỗi giữ dài nhiều tầng.</p>
-  </div></details>
 </section>
 
-<section id="memgc-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Hỏi đáp</h2></div>
-
-  <p class="key">Mười câu hay gặp nhất. Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
-
-  <details class="qa"><summary>Garbage collection là gì?</summary>
-  <p>Là việc runtime <b>tự động</b> tìm những object chương trình không còn với tới được rồi thu hồi ô nhớ của chúng, thay cho việc tự gọi <code>free</code> như trong C. Tiêu chuẩn máy dùng là <b>reachability</b>: xuất phát từ root set — biến toàn cục, biến cục bộ của các hàm đang chạy, vài chỗ nội bộ của interpreter — cái gì còn đường đi tới thì sống, còn lại là rác.</p></details>
-
-  <details class="qa"><summary>Python quản lý bộ nhớ thế nào?</summary>
-  <p>Câu thuộc lòng: <em>Python primarily uses reference counting, supplemented by a cyclic garbage collector to detect reference cycles.</em> Cơ chế chính là đếm tham chiếu — mỗi object giữ số tham chiếu tới nó, về 0 là giải phóng ngay. Cyclic GC chạy định kỳ chỉ để dọn nốt các cụm object trỏ lẫn nhau.</p></details>
-
-  <details class="qa"><summary>Vì sao reference counting một mình là chưa đủ?</summary>
-  <p>Vì bộ đếm không bao giờ về 0 với các object trỏ vòng vào nhau — hai list cùng chứa nhau, hoặc cây có con trỏ ngược lên cha. Xoá hết tên bên ngoài rồi thì mỗi object vẫn còn đúng một tham chiếu đến từ object kia. Đó là <b>lỗ hổng duy nhất</b>, và cũng là toàn bộ lý do cyclic GC tồn tại.</p></details>
-
-  <details class="qa"><summary>Cyclic GC biết cụm nào là rác bằng cách nào?</summary>
-  <p>Nó chép bộ đếm sang một ô tạm rồi <b>trừ đi các tham chiếu đến từ bên trong cụm</b> đang xét. Object nào còn dư nghĩa là có root ngoài giữ, nên nó và mọi thứ nó với tới đều sống. Phần còn lại là rác vòng: GC cắt các liên kết bên trong, bộ đếm tụt về 0 và cơ chế đếm thông thường giải phóng nốt.</p></details>
-
-  <details class="qa"><summary>Generational GC nghĩa là gì?</summary>
-  <p>Object mới luôn vào gen 0. Sống sót một lượt quét thì lên gen 1, rồi gen 2, càng già càng bị quét thưa. Cơ sở là <em>most objects die young</em> — phần lớn object chết rất sớm, nên quét gen 0 thường xuyên là đủ bắt hầu hết rác mà không phải đi qua toàn bộ heap. Ngưỡng mặc định <code>(700, 10, 10)</code>: số đầu là hiệu cấp phát trừ giải phóng, hai số sau là số lượt quét của thế hệ trẻ hơn.</p></details>
-
-  <details class="qa"><summary><code>del</code> có phải là gọi GC không?</summary>
-  <p>Không. <code>del x</code> chỉ xoá <b>cái tên</b> <code>x</code>, tức bớt một tham chiếu. Nếu đó tình cờ là tham chiếu cuối cùng thì bộ đếm về 0 và object được giải phóng ngay — nhưng đó là hệ quả của reference counting, không phải của <code>del</code>. Còn tên khác trỏ vào thì object vẫn sống nguyên.</p></details>
-
-  <details class="qa"><summary>Có nên gọi <code>gc.collect()</code> hay tắt GC không?</summary>
-  <p>Chỉ khi đã đo và thấy đúng nguyên nhân. Với dịch vụ độ trễ thấp mà lượt quét gây khoảng dừng thấy được thì tắt GC rồi tự gọi <code>gc.collect()</code> vào lúc rảnh là cách quen thuộc. Điểm phải nói rõ: <b>tắt GC không tắt reference counting</b> — phần lớn rác vẫn được dọn bình thường, chỉ cụm trỏ vòng là tồn lại.</p></details>
-
-  <details class="qa"><summary><code>weakref</code> dùng để làm gì?</summary>
-  <p>Để trỏ tới một object mà <b>không tăng bộ đếm</b> của nó — object vẫn được giải phóng bình thường khi hết tham chiếu thật, và weakref lúc đó trả về <code>None</code>. Ba chỗ dùng điển hình: cache không muốn giữ object sống, danh sách listener, và con trỏ ngược từ con lên cha để khỏi tạo reference cycle.</p></details>
-
-  <details class="qa"><summary>Có GC rồi thì Python còn rò rỉ bộ nhớ được không?</summary>
-  <p>Được, và đó là loại rò rỉ duy nhất còn lại: <b>tham chiếu thật mà code còn giữ</b>. Bốn nguồn quen mặt là cache không giới hạn, <code>lru_cache</code> đặt trên phương thức khiến instance không bao giờ được giải phóng vì cache giữ <code>self</code>, biến toàn cục chỉ thêm mà không xoá, và callback đã đăng ký nhưng không huỷ. Không cái nào là lỗi của GC.</p></details>
-
-  <details class="qa"><summary>Service Python ăn RAM tăng dần — bạn tìm nguyên nhân thế nào?</summary>
-  <p>Trước hết phân biệt hai chuyện: <b>RSS cao chưa chắc là rò rỉ</b>, vì Python giữ lại bộ nhớ đã cấp phát để dùng tiếp thay vì trả về hệ điều hành. Nên đo bằng <code>tracemalloc</code>: chụp bộ nhớ ở hai thời điểm rồi so sánh để biết dòng nào đang cấp phát thêm mà không nhả. Có nghi phạm rồi thì dùng <code>gc.get_referrers</code> để xem ai đang giữ.</p></details>
+<section id="gc-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Tài nguyên không phải bộ nhớ</h2></div>
+  <p class="key">GC lo <em>ô nhớ</em>. File, socket và khoá thì <em>with</em> lo — vì GC không hứa chạy lúc nào.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 354" role="img" aria-label="Hai trục thời gian: dòng trên dùng with nên thanh file đang mở kết thúc đúng tại cuối khối; dòng dưới không dùng with nên thanh file vẫn mở kéo dài với các dấu hỏi vì không biết GC chạy lúc nào" data-anim><style>@keyframes rs1{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs2{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs3{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs4{0%{animation-timing-function:ease-in-out;opacity:0}6.923%{animation-timing-function:ease-in-out;opacity:0}9.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs5{0%{animation-timing-function:ease-in-out;opacity:0}3.077%{animation-timing-function:ease-in-out;opacity:0}5.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs6{0%{animation-timing-function:ease-in-out;opacity:0}9.231%{animation-timing-function:ease-in-out;opacity:0}11.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs7{0%{animation-timing-function:ease-in-out;opacity:0}15.385%{animation-timing-function:ease-in-out;opacity:0}17.308%{animation-timing-function:ease-in-out;opacity:1}38.462%{animation-timing-function:ease-in-out;opacity:1}40.385%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rs8{0%{animation-timing-function:ease-in-out;opacity:0}23.077%{animation-timing-function:ease-in-out;opacity:0}25.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs9{0%{animation-timing-function:ease-in-out;opacity:0}33.846%{animation-timing-function:ease-in-out;opacity:0}36.538%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs10{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}41.923%{animation-timing-function:ease-in-out;opacity:1}69.231%{animation-timing-function:ease-in-out;opacity:1}71.154%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rs11{0%{animation-timing-function:ease-in-out;opacity:0}43.846%{animation-timing-function:ease-in-out;opacity:0}45.769%{animation-timing-function:ease-in-out;opacity:1}69.231%{animation-timing-function:ease-in-out;opacity:1}71.154%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rs12{0%{animation-timing-function:ease-in-out;opacity:0}47.692%{animation-timing-function:ease-in-out;opacity:0}49.615%{animation-timing-function:ease-in-out;opacity:1}69.231%{animation-timing-function:ease-in-out;opacity:1}71.154%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rs13{0%{animation-timing-function:ease-in-out;opacity:0}46.154%{animation-timing-function:ease-in-out;opacity:0}48.077%{animation-timing-function:ease-in-out;opacity:1}72.308%{animation-timing-function:ease-in-out;opacity:1}74.231%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rs14{0%{animation-timing-function:ease-in-out;opacity:0}61.538%{animation-timing-function:ease-in-out;opacity:0}64.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs15{0%{animation-timing-function:ease-in-out;opacity:0}69.231%{animation-timing-function:ease-in-out;opacity:0}71.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rs16{0%{animation-timing-function:ease-in-out;opacity:0}73.846%{animation-timing-function:ease-in-out;opacity:0}76.538%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.rs1{animation:rs1 13.0s linear 1 forwards}.rs2{animation:rs2 13.0s linear 1 forwards}.rs3{animation:rs3 13.0s linear 1 forwards}.rs4{animation:rs4 13.0s linear 1 forwards}.rs5{animation:rs5 13.0s linear 1 forwards}.rs6{animation:rs6 13.0s linear 1 forwards}.rs7{animation:rs7 13.0s linear 1 forwards}.rs8{animation:rs8 13.0s linear 1 forwards}.rs9{animation:rs9 13.0s linear 1 forwards}.rs10{animation:rs10 13.0s linear 1 forwards}.rs11{animation:rs11 13.0s linear 1 forwards}.rs12{animation:rs12 13.0s linear 1 forwards}.rs13{animation:rs13 13.0s linear 1 forwards}.rs14{animation:rs14 13.0s linear 1 forwards}.rs15{animation:rs15 13.0s linear 1 forwards}.rs16{animation:rs16 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">FILE ĐÓNG LÚC NÀO? · with BIẾT CHẮC, GC THÌ KHÔNG</text>
+<g class="rs1"><text class="sv-d" x="0" y="62" fill="var(--ok)" style="fill:var(--ok)">có with</text><text x="0.0" y="82.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">with open(f) as x:</text></g>
+<g class="rs2"><line x1="150" y1="96" x2="750" y2="96" stroke="var(--rule-hi)" stroke-width="1.4"/></g>
+<g class="rs3"><text class="sv-d" x="0" y="182" fill="var(--tomb)" style="fill:var(--tomb)">không with</text><text x="0.0" y="202.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x = open(f)</text></g>
+<g class="rs4"><line x1="150" y1="216" x2="750" y2="216" stroke="var(--rule-hi)" stroke-width="1.4"/></g>
+<g class="rs5"><text class="sv-d" x="150" y="54" fill="var(--faint)" style="fill:var(--faint)">thời gian →</text></g>
+<g class="rs6"><rect x="190" y="86" width="210" height="22" rx="4" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="198" y="102" fill="var(--ok)" style="fill:var(--ok)">file đang mở</text></g>
+<g class="rs7" opacity="0"><rect x="340" y="34" width="118.2" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="351.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">hết khối with</text><line x1="399.1" y1="60.0" x2="400.0" y2="96.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="400.0" cy="96.0" r="2.8" fill="var(--ok)"/><rect x="396.0" y="82.0" width="8.0" height="30.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="rs8"><line x1="400" y1="80" x2="400" y2="112" stroke="var(--ok)" stroke-width="2.4"/><text class="sv-d" x="410" y="102" fill="var(--ok)" style="fill:var(--ok)">đóng NGAY</text></g>
+<g class="rs9"><rect x="190" y="206" width="560" height="22" rx="4" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="198" y="222" fill="var(--tomb)" style="fill:var(--tomb)">file vẫn mở …</text></g>
+<g class="rs10" opacity="0"><text class="sv-d" x="450" y="222" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">?</text></g>
+<g class="rs11" opacity="0"><text class="sv-d" x="570" y="222" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">?</text></g>
+<g class="rs12" opacity="0"><text class="sv-d" x="690" y="222" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">?</text></g>
+<g class="rs13" opacity="0"><rect x="510" y="156" width="140.4" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="521.0" y="174.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">GC chạy lúc nào?</text><line x1="580.2" y1="182.0" x2="580.0" y2="206.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="580.0" cy="206.0" r="2.8" fill="var(--tomb)"/><rect x="450.0" y="202.0" width="340.0" height="30.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="rs14"><text class="sv-d" x="150" y="246" fill="var(--tomb)" style="fill:var(--tomb)">không hứa · có vòng thì phải đợi tới lượt gen 2</text></g>
+<g class="rs15"><rect x="0" y="290" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="305" fill="var(--probe)" style="fill:var(--probe)">GC lo Ô NHỚ · file, socket, khoá thì with lo</text></g>
+<g class="rs16"><text class="sv-d" x="14" y="322" fill="var(--muted)" style="fill:var(--muted)">Hạn mở file của hệ điều hành hữu hạn — vài nghìn file là tiến trình sập.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Đừng dựa vào <code>__del__</code> để đóng tài nguyên — nó chạy khi nào thì không hứa.</li>
+    <li><code>try / finally</code> cho trường hợp không dùng được <code>with</code>.</li>
+  </ul>
 </section>
 
-<footer>Deep dive · quản lý bộ nhớ &amp; GC · nối tiếp <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a> · kiểm trên CPython 3.12, 64-bit.</footer>
+<section id="gc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Rò rỉ trong Python</h2></div>
+  <p class="key">Gần như luôn là: <em>tham chiếu có thật, code còn giữ</em> — không phải máy dọn sót.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 400" role="img" aria-label="Bên trái bốn object không ai giữ nên rơi hết vào thùng thu hồi; bên phải một cache giữ năm object bằng tham chiếu thật nên không cái nào rơi và thùng rỗng mãi" data-anim><style>@keyframes lk1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk2{0%{animation-timing-function:ease-in-out;opacity:0}5.333%{animation-timing-function:ease-in-out;opacity:0}7.000%{animation-timing-function:ease-in-out;opacity:1}12.000%{animation-timing-function:ease-in-out;opacity:1}13.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes lk3{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}12.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}13.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}18.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}}@keyframes lk4{0%{animation-timing-function:ease-in-out;opacity:0}8.000%{animation-timing-function:ease-in-out;opacity:0}9.667%{animation-timing-function:ease-in-out;opacity:1}14.667%{animation-timing-function:ease-in-out;opacity:1}16.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes lk5{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}21.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}}@keyframes lk6{0%{animation-timing-function:ease-in-out;opacity:0}10.667%{animation-timing-function:ease-in-out;opacity:0}12.333%{animation-timing-function:ease-in-out;opacity:1}17.333%{animation-timing-function:ease-in-out;opacity:1}19.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes lk7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}}@keyframes lk8{0%{animation-timing-function:ease-in-out;opacity:0}13.333%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}20.000%{animation-timing-function:ease-in-out;opacity:1}21.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes lk9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}21.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,107px)}}@keyframes lk10{0%{animation-timing-function:ease-in-out;opacity:0}26.667%{animation-timing-function:ease-in-out;opacity:0}29.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk11{0%{animation-timing-function:ease-in-out;opacity:0}30.667%{animation-timing-function:ease-in-out;opacity:0}33.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk12{0%{animation-timing-function:ease-in-out;opacity:0}32.000%{animation-timing-function:ease-in-out;opacity:0}34.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk13{0%{animation-timing-function:ease-in-out;opacity:0}36.000%{animation-timing-function:ease-in-out;opacity:0}38.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk14{0%{animation-timing-function:ease-in-out;opacity:0}41.333%{animation-timing-function:ease-in-out;opacity:0}43.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk15{0%{animation-timing-function:ease-in-out;opacity:0}46.667%{animation-timing-function:ease-in-out;opacity:0}49.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk16{0%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:0}54.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk17{0%{animation-timing-function:ease-in-out;opacity:0}57.333%{animation-timing-function:ease-in-out;opacity:0}59.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk18{0%{animation-timing-function:ease-in-out;opacity:0}64.000%{animation-timing-function:ease-in-out;opacity:0}65.667%{animation-timing-function:ease-in-out;opacity:1}86.667%{animation-timing-function:ease-in-out;opacity:1}88.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes lk19{0%{animation-timing-function:ease-in-out;opacity:0}73.333%{animation-timing-function:ease-in-out;opacity:0}75.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk20{0%{animation-timing-function:ease-in-out;opacity:0}77.333%{animation-timing-function:ease-in-out;opacity:0}79.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk21{0%{animation-timing-function:ease-in-out;opacity:0}81.333%{animation-timing-function:ease-in-out;opacity:0}83.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk22{0%{animation-timing-function:ease-in-out;opacity:0}84.000%{animation-timing-function:ease-in-out;opacity:0}86.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk23{0%{animation-timing-function:ease-in-out;opacity:0}86.000%{animation-timing-function:ease-in-out;opacity:0}88.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk24{0%{animation-timing-function:ease-in-out;opacity:0}88.000%{animation-timing-function:ease-in-out;opacity:0}90.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes lk25{0%{animation-timing-function:ease-in-out;opacity:0}90.000%{animation-timing-function:ease-in-out;opacity:0}92.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.lk1{animation:lk1 15.0s linear 1 forwards}.lk2{animation:lk2 15.0s linear 1 forwards}.lk3{animation:lk3 15.0s linear 1 forwards}.lk4{animation:lk4 15.0s linear 1 forwards}.lk5{animation:lk5 15.0s linear 1 forwards}.lk6{animation:lk6 15.0s linear 1 forwards}.lk7{animation:lk7 15.0s linear 1 forwards}.lk8{animation:lk8 15.0s linear 1 forwards}.lk9{animation:lk9 15.0s linear 1 forwards}.lk10{animation:lk10 15.0s linear 1 forwards}.lk11{animation:lk11 15.0s linear 1 forwards}.lk12{animation:lk12 15.0s linear 1 forwards}.lk13{animation:lk13 15.0s linear 1 forwards}.lk14{animation:lk14 15.0s linear 1 forwards}.lk15{animation:lk15 15.0s linear 1 forwards}.lk16{animation:lk16 15.0s linear 1 forwards}.lk17{animation:lk17 15.0s linear 1 forwards}.lk18{animation:lk18 15.0s linear 1 forwards}.lk19{animation:lk19 15.0s linear 1 forwards}.lk20{animation:lk20 15.0s linear 1 forwards}.lk21{animation:lk21 15.0s linear 1 forwards}.lk22{animation:lk22 15.0s linear 1 forwards}.lk23{animation:lk23 15.0s linear 1 forwards}.lk24{animation:lk24 15.0s linear 1 forwards}.lk25{animation:lk25 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">RÒ RỈ: OBJECT KHÔNG RƠI ĐƯỢC VÌ CODE CÒN GIỮ</text>
+<g class="lk1"><text class="sv-d" x="0" y="58" fill="var(--ok)" style="fill:var(--ok)">không ai giữ</text><rect x="0" y="194" width="300" height="44" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4" stroke-dasharray="5 3"/><text class="sv-d" x="0" y="186" fill="var(--ok)" style="fill:var(--ok)">thu hồi</text></g>
+<g class="lk2" opacity="0"><rect x="20" y="94" width="30" height="30" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/></g>
+<g class="lk3" transform="translate(0 107)"><rect x="20" y="94" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="lk4" opacity="0"><rect x="70" y="94" width="30" height="30" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/></g>
+<g class="lk5" transform="translate(0 107)"><rect x="70" y="94" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="lk6" opacity="0"><rect x="120" y="94" width="30" height="30" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/></g>
+<g class="lk7" transform="translate(0 107)"><rect x="120" y="94" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="lk8" opacity="0"><rect x="170" y="94" width="30" height="30" rx="5" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/></g>
+<g class="lk9" transform="translate(0 107)"><rect x="170" y="94" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="lk10"><text class="sv-d" x="0" y="142" fill="var(--faint)" style="fill:var(--faint)">refcnt về 0 → rơi hết</text></g>
+<g class="lk11"><text class="sv-d" x="430" y="58" fill="var(--tomb)" style="fill:var(--tomb)">CACHE[key] = obj</text><rect x="430" y="88" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="457.0" y="106.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">CACHE</text></g>
+<g class="lk12"><rect x="430" y="194" width="300" height="44" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4" stroke-dasharray="5 3"/><text class="sv-d" x="430" y="186" fill="var(--tomb)" style="fill:var(--tomb)">thu hồi</text></g>
+<g class="lk13"><rect x="510" y="88" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><line x1="484" y1="101" x2="510" y2="103" stroke="var(--tomb)" stroke-width="1.2"/></g>
+<g class="lk14"><rect x="554" y="88" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><line x1="484" y1="101" x2="554" y2="103" stroke="var(--tomb)" stroke-width="1.2"/></g>
+<g class="lk15"><rect x="598" y="88" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><line x1="484" y1="101" x2="598" y2="103" stroke="var(--tomb)" stroke-width="1.2"/></g>
+<g class="lk16"><rect x="642" y="88" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><line x1="484" y1="101" x2="642" y2="103" stroke="var(--tomb)" stroke-width="1.2"/></g>
+<g class="lk17"><rect x="686" y="88" width="30" height="30" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><line x1="484" y1="101" x2="686" y2="103" stroke="var(--tomb)" stroke-width="1.2"/></g>
+<g class="lk18" opacity="0"><rect x="490" y="22" width="155.20000000000002" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="501.0" y="40.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">tham chiếu CÓ THẬT</text><line x1="567.6" y1="48.0" x2="610.0" y2="88.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="610.0" cy="88.0" r="2.8" fill="var(--tomb)"/><rect x="504.0" y="82.0" width="226.0" height="42.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="lk19"><text class="sv-d" x="430" y="142" fill="var(--tomb)" style="fill:var(--tomb)">refcnt ≠ 0 → không cái nào rơi</text></g>
+<g class="lk20"><text class="sv-d" x="430" y="216" fill="var(--tomb)" style="fill:var(--tomb)">thùng rỗng mãi</text></g>
+<g class="lk21"><rect x="0" y="274" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="289" fill="var(--probe)" style="fill:var(--probe)">Máy không dám đụng: nó chỉ đo &quot;còn với tới được&quot;, không đoán &quot;còn cần&quot;</text></g>
+<g class="lk22"><text class="sv-d" x="0" y="304" fill="var(--tomb)" style="fill:var(--tomb)">·</text><text class="sv-d" x="16" y="304" fill="var(--text)" style="fill:var(--text)">cache / biến toàn cục</text><text class="sv-d" x="300" y="304" fill="var(--ok)" style="fill:var(--ok)">dùng dict có giới hạn hoặc TTL</text></g>
+<g class="lk23"><text class="sv-d" x="0" y="326" fill="var(--tomb)" style="fill:var(--tomb)">·</text><text class="sv-d" x="16" y="326" fill="var(--text)" style="fill:var(--text)">list chỉ append</text><text class="sv-d" x="300" y="326" fill="var(--ok)" style="fill:var(--ok)">giới hạn độ dài, hoặc ghi ra ngoài</text></g>
+<g class="lk24"><text class="sv-d" x="0" y="348" fill="var(--tomb)" style="fill:var(--tomb)">·</text><text class="sv-d" x="16" y="348" fill="var(--text)" style="fill:var(--text)">callback giữ self</text><text class="sv-d" x="300" y="348" fill="var(--ok)" style="fill:var(--ok)">dùng weakref cho tham chiếu ngược</text></g>
+<g class="lk25"><text class="sv-d" x="0" y="370" fill="var(--tomb)" style="fill:var(--tomb)">·</text><text class="sv-d" x="16" y="370" fill="var(--text)" style="fill:var(--text)">cycle khi đã gc.disable()</text><text class="sv-d" x="300" y="370" fill="var(--ok)" style="fill:var(--ok)">bật lại, hoặc gc.collect() định kỳ</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li><b>weakref</b> là lối thoát: giữ đường tới object mà không tăng bộ đếm.</li>
+    <li>Tìm rò rỉ: <code>tracemalloc</code>, hoặc đếm object theo kiểu trước và sau.</li>
+  </ul>
+</section>
+
+<section id="gc-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
+
+  <details class="qa"><summary>Python thu hồi bộ nhớ bằng cách nào?</summary>
+  <p>Hai cơ chế, không ngang hàng.</p>
+  <p>Reference counting là chính: bộ đếm về 0 thì thu hồi ngay tại dòng đó.</p>
+  <p>Cyclic GC chỉ vá một lỗ hổng là reference cycle.</p>
+  <p>Bạn không bao giờ giải phóng bằng tay.</p></details>
+
+  <details class="qa"><summary>Reference counting hỏng ở đâu?</summary>
+  <p>Khi các object trỏ vòng vào nhau.</p>
+  <p>Xoá hết tên ngoài rồi mà mỗi object vẫn bị object kia giữ.</p>
+  <p>Bộ đếm dừng ở 1, không về 0.</p>
+  <p>Đó là lý do cần cyclic GC.</p></details>
+
+  <details class="qa"><summary>Cyclic GC làm gì khi tìm thấy cụm rác?</summary>
+  <p>Nó không giải phóng, chỉ cắt liên kết bên trong cụm.</p>
+  <p>Bộ đếm nhờ đó tụt về 0.</p>
+  <p>Rồi reference counting thu hồi như bình thường.</p>
+  <p>Chỉ object tracked mới bị quét.</p></details>
+
+  <details class="qa"><summary>Vì sao dùng with cho file mà không tin GC?</summary>
+  <p>GC không hứa chạy lúc nào.</p>
+  <p>File có thể còn mở nhiều phút sau khi dùng xong.</p>
+  <p>Hạn mở file của hệ điều hành hữu hạn.</p>
+  <p>with đóng ngay tại cuối khối.</p></details>
+
+  <details class="qa"><summary>Python rò rỉ bộ nhớ được không?</summary>
+  <p>Được, nhưng gần như luôn do code còn giữ tham chiếu.</p>
+  <p>Cache không xoá, list chỉ thêm, callback giữ chính nó.</p>
+  <p>Máy không dám đụng vì tham chiếu có thật.</p>
+  <p>weakref giữ đường tới object mà không tăng bộ đếm.</p></details>
+</section>
+
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
+
+<footer>Deep dive · Python internals · nền tảng ở <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>

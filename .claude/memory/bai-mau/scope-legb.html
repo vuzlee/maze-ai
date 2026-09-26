@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="vi" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scope &amp; LEGB — MazeAI</title>
+<meta name="description" content="Gõ một cái tên ra thì Python tra bốn tầng LEGB từ trong ra ngoài; còn gán thì luôn tạo biến ở tầng hiện tại.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#14110E">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/scope-legb/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Scope &amp; LEGB">
+<meta property="og:description" content="Gõ một cái tên ra thì Python tra bốn tầng LEGB từ trong ra ngoài; còn gán thì luôn tạo biến ở tầng hiện tại.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/scope-legb/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MazeAI — hệ thiết kế "mực ấm"
+   Nền mực ám nâu như giấy than, nhấn cam đất, tiêu đề serif.
+   Một file dùng chung cho trang thư viện, trang bài và kit.
+   ============================================================ */
+
+:root{
+  /* --- bề mặt: mực ấm, phân tầng bằng độ sáng --- */
+  --bg:#14110E; --bg2:#191512; --sunk:#0E0C0A;
+  --panel:#1C1815; --raise:#241F1A;
+  --rule:#2E2822; --rule-hi:#3D352C;
+  --glass:rgba(237,231,222,.045);
+
+  /* --- chữ: ngà → nâu nhạt, bốn mức --- */
+  --text:#EDE7DE; --dim:#C4BAAC; --muted:#9A8F81; --faint:#7A6F63;
+
+  /* --- cam đất: màu thương hiệu, KHÔNG mang nghĩa nội dung --- */
+  --clay:#E0855C; --clay-hi:#EE9E7A;
+
+  /* --- bốn màu ngữ nghĩa — ĐỪNG đổi nghĩa giữa các bài --- */
+  --filled:#8CA9F2;   /* xanh dương · dữ liệu, thứ đang xét */
+  --probe:#EDB44A;    /* vàng · con trỏ, điểm nhấn, đáp án  */
+  --tomb:#F2718A;     /* đỏ · sai, bị loại, chưa thoả       */
+  --ok:#5BCFA0;       /* xanh lá · đúng, kết quả, đã thoả   */
+
+  /* hai sắc phụ chỉ dùng cho chữ nhỏ trong hình */
+  --filled-lo:#A8BEF6; /* nhãn sv-l trên nền xanh — sáng hơn --filled một nấc */
+  --ghost:#4A423A;     /* nhãn mờ nhất, dưới cả --faint */
+
+  --clay-a:224,133,92;  --blue-a:140,169,242;
+  --amber-a:237,180,74; --red-a:242,113,138; --green-a:91,207,160;
+
+  /* --- hình khối: bo nhẹ, bóng ấm --- */
+  --r-xs:5px; --r-sm:8px; --r:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 2px 6px rgba(0,0,0,.3), 0 16px 32px -20px rgba(0,0,0,.9);
+  --ring:0 0 0 1px rgba(237,231,222,.05) inset;
+
+  --display:"Newsreader",Georgia,"Times New Roman",serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace;
+  /* font công thức: Newsreader trước, Georgia/Times đỡ mấy dấu toán
+     (‖ √ Σ ∇) mà Newsreader không có glyph */
+  --math:"Newsreader",Georgia,"Times New Roman",serif;
+
+  --bar:60px;
+  --ease:cubic-bezier(.22,.8,.28,1);
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--body);font-size:16px;line-height:1.75;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+/* ánh sáng ấm hắt từ trên xuống — như đèn đọc trên mặt giấy */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(1100px 620px at 12% -12%, rgba(var(--clay-a),.13), transparent 64%),
+    radial-gradient(820px 480px at 88% -6%, rgba(var(--amber-a),.07), transparent 62%),
+    radial-gradient(1000px 700px at 50% 114%, rgba(var(--clay-a),.04), transparent 64%);
+}
+/* thớ giấy: cực mờ, chỉ để mặt phẳng không "chết" */
+body::after{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:repeating-linear-gradient(0deg,rgba(237,231,222,.022) 0 1px,transparent 1px 3px);
+  -webkit-mask-image:linear-gradient(180deg,#000,transparent 70%);
+          mask-image:linear-gradient(180deg,#000,transparent 70%);
+}
+.wrap{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:0 22px}
+::selection{background:rgba(var(--clay-a),.32);color:#fff}
+:focus-visible{outline:2px solid var(--clay);outline-offset:3px;border-radius:3px}
+
+*{scrollbar-width:thin;scrollbar-color:var(--rule-hi) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--rule-hi);border:3px solid var(--bg);border-radius:99px}
+*::-webkit-scrollbar-track{background:transparent}
+
+/* ============================================================
+   THANH TRÊN CÙNG
+   ============================================================ */
+.topbar{
+  position:sticky;top:0;z-index:40;height:var(--bar);
+  background:color-mix(in srgb,var(--bg) 84%,transparent);
+  backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+  border-bottom:1px solid var(--rule);
+}
+.topbar .in{max-width:1240px;height:100%;margin:0 auto;padding:0 28px;display:flex;gap:20px;align-items:center}
+
+.brand{
+  display:flex;align-items:center;gap:10px;flex:none;text-decoration:none;
+  font-family:var(--display);font-weight:600;font-size:18px;letter-spacing:-.01em;color:var(--text);
+}
+.brand i{font-style:italic;font-weight:400;color:var(--clay)}
+/* dấu ◆ nhỏ: hai nét lệch nhau, gợi lối rẽ trong mê cung */
+.brand .mk{
+  width:21px;height:21px;border-radius:6px;position:relative;flex:none;
+  background:linear-gradient(145deg,var(--clay-hi),#C96A44);
+  box-shadow:0 3px 12px -3px rgba(var(--clay-a),.7),var(--ring);
+  transition:transform .3s var(--ease);
+}
+.brand .mk::before,.brand .mk::after{content:"";position:absolute;background:var(--bg);border-radius:1px}
+.brand .mk::before{left:5px;top:6px;width:11px;height:1.8px}
+.brand .mk::after{left:5px;top:11.5px;width:6px;height:1.8px;box-shadow:4px 4px 0 var(--bg)}
+.brand:hover .mk{transform:rotate(-8deg) scale(1.05)}
+
+.find{
+  flex:1;max-width:480px;display:flex;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-pill);
+  padding:0 13px;height:38px;cursor:text;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.find:hover{border-color:var(--rule-hi)}
+.find:focus-within{border-color:rgba(var(--clay-a),.65);background:var(--raise);
+  box-shadow:0 0 0 4px rgba(var(--clay-a),.11)}
+.find svg{width:15px;height:15px;flex:none;fill:none;stroke:var(--faint);stroke-width:2;stroke-linecap:round}
+.find:focus-within svg{stroke:var(--clay)}
+.topbar input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--text);
+  font-family:var(--body);font-size:13.5px;padding:0}
+.topbar input::placeholder{color:var(--faint)}
+.topbar input::-webkit-search-cancel-button{-webkit-appearance:none}
+.kbd{
+  font-family:var(--mono);font-size:10px;color:var(--muted);flex:none;
+  background:var(--raise);border:1px solid var(--rule);border-bottom-width:2px;
+  border-radius:4px;padding:1px 6px;line-height:1.7;
+}
+.navlink{
+  flex:none;text-decoration:none;color:var(--muted);font-size:13px;
+  padding:7px 13px;border-radius:var(--r-pill);transition:color .2s,background .2s;
+}
+.navlink:hover{color:var(--text);background:var(--glass)}
+@media(max-width:800px){.find .kbd,.navlink{display:none}}
+
+#prog{position:fixed;left:0;top:0;height:2px;width:0;z-index:60;
+  background:linear-gradient(90deg,var(--clay),var(--probe));
+  box-shadow:0 0 14px rgba(var(--clay-a),.7);transition:width .12s linear}
+
+/* ============================================================
+   TRANG BÌA — dateline, tiêu đề serif khổ lớn, chân trang bìa
+   ============================================================ */
+.mast{padding:58px 0 0}
+.dateline{
+  display:flex;flex-wrap:wrap;align-items:center;gap:0;margin:0 0 30px;padding:0 0 16px;
+  border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);
+}
+.dateline span+span::before{content:"·";margin:0 12px;color:var(--rule-hi)}
+.dateline .live{margin-left:auto;color:var(--clay);display:flex;align-items:center;gap:8px}
+.dateline .live::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--clay);
+  box-shadow:0 0 0 3px rgba(var(--clay-a),.2)}
+@media(max-width:700px){.dateline .live{margin-left:0;width:100%;margin-top:10px}
+  .dateline .live::after{content:none}}
+
+.mast h1{
+  font-family:var(--display);font-weight:400;font-size:clamp(38px,5.4vw,66px);
+  line-height:1.08;letter-spacing:-.02em;margin:0;color:var(--text);max-width:15ch;
+}
+.mast h1 em{font-style:italic;color:var(--clay)}
+
+.mastfoot{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);
+  gap:56px;align-items:end;margin:38px 0 0;padding:0 0 30px;
+}
+.mastfoot .lede{margin:0;max-width:56ch;color:var(--dim);font-size:16.5px;line-height:1.78}
+.mastfoot .lede b{color:var(--text);font-weight:600}
+
+/* --- cột phải: ba con số, tiến độ, hai nút --- */
+.counts{display:flex;gap:0;margin:0 0 22px;padding:0;list-style:none;border-top:1px solid var(--rule)}
+.counts li{flex:1;padding:14px 16px 0 0}
+.counts li+li{padding-left:16px;border-left:1px solid var(--rule)}
+.counts b{display:block;font-family:var(--display);font-weight:400;font-size:32px;
+  line-height:1;color:var(--text);letter-spacing:-.02em}
+.counts span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin-top:8px}
+
+.heroact{display:flex;gap:10px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:9px;text-decoration:none;cursor:pointer;
+  font-family:var(--body);font-weight:600;font-size:13.5px;
+  border-radius:var(--r-pill);padding:11px 20px;border:1px solid transparent;
+  transition:transform .2s var(--ease),box-shadow .2s,background .2s,border-color .2s,color .2s;
+}
+.btn.primary{background:var(--clay);color:#14110E;box-shadow:0 8px 22px -12px rgba(var(--clay-a),1)}
+.btn.primary:hover{background:var(--clay-hi);transform:translateY(-2px);
+  box-shadow:0 14px 28px -14px rgba(var(--clay-a),1)}
+.btn.ghost{background:transparent;color:var(--dim);border-color:var(--rule-hi)}
+.btn.ghost:hover{color:var(--text);border-color:var(--muted);background:var(--glass)}
+.btn .kbd{background:rgba(0,0,0,.22);border-color:rgba(0,0,0,.3)}
+.btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .2s var(--ease)}
+.btn.primary:hover svg{transform:translateX(3px)}
+
+/* ============================================================
+   THANH KỆ DÍNH
+   ============================================================ */
+.shelfnav{
+  position:sticky;top:var(--bar);z-index:30;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+}
+.shelfnav .in{display:flex;gap:4px;overflow-x:auto;padding:9px 0;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 30px),transparent);
+          mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 30px),transparent)}
+.shelfnav .in::-webkit-scrollbar{display:none}
+.shelfnav a{
+  flex:none;text-decoration:none;white-space:nowrap;display:flex;align-items:baseline;gap:8px;
+  font-size:12.8px;color:var(--muted);border-radius:var(--r-pill);padding:6px 13px;
+  border:1px solid transparent;transition:color .2s,background .2s,border-color .2s;
+}
+.shelfnav a i{font-style:normal;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--faint)}
+.shelfnav a em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.shelfnav a:hover{color:var(--text);background:var(--glass)}
+.shelfnav a.on{color:var(--text);background:var(--raise);border-color:var(--rule-hi)}
+.shelfnav a.on i,.shelfnav a.on em{color:var(--clay)}
+
+/* --- dải tiến độ: một hàng kẻ mảnh, không phải thẻ --- */
+.libbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:18px 0;border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+}
+.libbar b{font-family:var(--display);font-weight:400;font-size:19px;letter-spacing:0;
+  text-transform:none;color:var(--text)}
+.libbar .track{flex:1;min-width:100px;height:2px;background:var(--rule);overflow:hidden}
+.libbar .track i{display:block;height:100%;background:var(--ok);transition:width .5s var(--ease)}
+.libbar .pct{color:var(--ok);letter-spacing:.08em}
+.libbar .acts{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.libbar button{
+  background:transparent;color:var(--muted);border:1px solid var(--rule);
+  font-family:var(--body);font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;
+  border-radius:var(--r-pill);padding:6px 14px;cursor:pointer;transition:all .2s;
+}
+.libbar button:hover{color:var(--text);border-color:var(--rule-hi);background:var(--glass);filter:none}
+.libbar button.on{color:var(--clay);border-color:rgba(var(--clay-a),.5);background:rgba(var(--clay-a),.09)}
+
+/* ============================================================
+   KỆ = MỘT CHƯƠNG. Số chương treo ở lề, bài xếp thành hàng.
+   Hàng đọc nhanh hơn thẻ khi có 34 mục, và hợp với chất "kho sách".
+   ============================================================ */
+.shelf{padding:64px 0 0;scroll-margin-top:calc(var(--bar) + 58px)}
+.shelfhead{
+  display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:0 14px;
+  align-items:start;padding-bottom:22px;border-bottom:1px solid var(--rule-hi);
+}
+.shelfhead .num{
+  font-family:var(--display);font-weight:400;font-size:54px;line-height:.82;
+  color:var(--rule-hi);letter-spacing:-.03em;transition:color .3s;
+}
+.shelf:hover .shelfhead .num{color:var(--clay)}
+.shelfhead h2{
+  font-family:var(--display);font-weight:400;font-size:29px;letter-spacing:-.015em;
+  line-height:1.2;margin:0;color:var(--text);
+}
+.gnote{font-size:14.2px;color:var(--muted);margin:9px 0 0;max-width:64ch;line-height:1.65}
+.shelfstat{text-align:right;padding-top:8px;min-width:132px}
+.shelfstat b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim)}
+.shelfstat .sk{display:block;font-style:normal;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;color:var(--faint);margin-top:3px;white-space:nowrap}
+.shelfstat .track{display:block;height:2px;background:var(--rule);margin-top:9px;overflow:hidden}
+.shelfstat .track i{display:block;height:100%;background:var(--ok);transition:width .5s var(--ease)}
+
+h3.sub{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--faint);font-weight:400;margin:30px 0 2px;padding:0;border:0;
+  display:flex;align-items:center;gap:16px;
+}
+h3.sub::after{content:"";flex:1;height:1px;background:var(--rule)}
+h3.sub .gc{flex:none;color:var(--faint)}
+.cards{display:block}
+
+/* --- một bài = một hàng --- */
+.bk{
+  position:relative;display:grid;grid-template-columns:46px minmax(0,1fr) auto 22px;
+  gap:0 18px;align-items:baseline;text-decoration:none;
+  padding:19px 16px 19px 14px;border-bottom:1px solid var(--rule);
+  transition:background .22s var(--ease),padding-left .22s var(--ease);
+}
+.bk::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--clay);transform:scaleY(0);transform-origin:50% 50%;
+  transition:transform .26s var(--ease);
+}
+.bk:hover{background:var(--panel);padding-left:22px}
+.bk:hover::before{transform:scaleY(1)}
+.bk .ix{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em;transition:color .22s}
+.bk:hover .ix{color:var(--clay)}
+.bk .tt{min-width:0}
+.bk .tt b{
+  display:block;font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.012em;
+  line-height:1.3;color:var(--text);transition:color .22s;
+}
+.bk:hover .tt b{color:#fff}
+.bk .tt i{display:block;font-style:normal;font-size:13.6px;line-height:1.6;color:var(--muted);
+  margin-top:4px;max-width:74ch}
+.bk .tag{
+  font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;align-self:start;padding-top:7px;
+}
+.bk .go{
+  font-family:var(--mono);font-size:13px;color:var(--rule-hi);text-align:right;align-self:start;
+  padding-top:4px;transition:color .22s,transform .22s var(--ease);
+}
+.bk:hover .go{color:var(--clay);transform:translateX(4px)}
+
+/* đã học: dấu ✓ ở cột số, chữ dịu xuống */
+.bk.done .ix{color:var(--ok)}
+.bk.done .ix::after{content:" ✓"}
+.bk.done .tt b{color:var(--dim)}
+.bk.done .tag{color:rgba(var(--green-a),.65)}
+.bk .tag .rv{
+  display:table;margin:4px 0 0 auto;font-style:normal;
+  padding:2px 7px 3px;border-radius:5px;font-size:8.5px;
+  color:rgba(var(--green-a),.9);
+  background:rgba(var(--green-a),.09);
+  border:1px solid rgba(var(--green-a),.3);
+}
+.bk.soon{opacity:.4;pointer-events:none}
+.shelf.empty{display:none}
+.bk[hidden]{display:none}
+
+
+/* --- khung bài: đã chốt dàn ý, chưa viết nội dung --- */
+.bk.wip .tt b{color:var(--muted);font-weight:400}
+.bk.wip:hover .tt b{color:var(--dim)}
+.bk.wip .tt i{color:var(--faint)}
+.bk.wip .ix{color:var(--rule-hi)}
+.bk.wip .tag{color:var(--faint);letter-spacing:.14em}
+.bk.wip::after{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:repeating-linear-gradient(180deg,var(--rule-hi) 0 4px,transparent 4px 8px)}
+.bk.wip:hover::before{opacity:0}
+
+p.wip{
+  display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin:18px 0 0;
+  border:1px dashed var(--rule-hi);border-radius:var(--r-pill);padding:5px 14px;
+}
+p.plan{
+  color:var(--muted);font-size:14.6px;line-height:1.7;max-width:70ch;margin:0;
+  padding-left:16px;border-left:1px dashed var(--rule-hi);
+}
+
+/* ============================================================
+   KẾT QUẢ TÌM KIẾM
+   ============================================================ */
+.res{padding:48px 0 100px}
+.res h2{font-family:var(--display);font-weight:400;font-size:34px;letter-spacing:-.02em;margin:0 0 6px}
+.res h2 em{font-style:italic;color:var(--clay)}
+.res .cnt{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 8px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
+a.hit{
+  position:relative;display:block;text-decoration:none;padding:18px 16px 18px 14px;
+  border-bottom:1px solid var(--rule);transition:background .22s,padding-left .22s var(--ease);
+}
+a.hit::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--clay);
+  transform:scaleY(0);transition:transform .26s var(--ease)}
+a.hit:hover{background:var(--panel);padding-left:22px}
+a.hit:hover::before{transform:scaleY(1)}
+a.hit .src{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+a.hit h3{font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.012em;
+  color:var(--text);margin:7px 0 5px}
+a.hit:hover h3{color:#fff}
+a.hit p{color:var(--muted);font-size:13.8px;line-height:1.65;margin:0;max-width:88ch}
+a.hit mark{background:rgba(var(--amber-a),.18);color:var(--probe);padding:1px 3px;border-radius:2px}
+.empty-res{color:var(--muted);border:1px dashed var(--rule-hi);border-radius:var(--r);
+  padding:34px;text-align:center;margin-top:24px}
+
+/* ============================================================
+   TRANG BÀI
+   ============================================================ */
+.crumb{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);padding:28px 0 0;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+}
+.crumb a{color:var(--muted);text-decoration:none;transition:color .2s}
+.crumb a:hover{color:var(--clay)}
+
+.cols{display:grid;grid-template-columns:172px minmax(0,1fr);gap:26px;padding:26px 0 96px;align-items:start}
+/* màn hình rộng: kéo mục lục ra sát lề, chừa thêm chỗ cho phần đọc */
+@media(min-width:1280px){nav.toc{margin-left:-52px}}
+main{min-width:0}
+
+/* --- mục lục --- */
+nav.toc{position:sticky;top:calc(var(--bar) + 26px);max-height:calc(100vh - var(--bar) - 52px);
+  overflow:auto;padding-right:6px}
+nav.toc .head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--rule);
+}
+nav.toc .head b{letter-spacing:.06em;color:var(--dim);font-weight:400;font-size:10.5px}
+nav.toc a{
+  position:relative;display:flex;gap:9px;align-items:flex-start;text-decoration:none;
+  color:var(--muted);font-size:12.6px;line-height:1.45;padding:6px 6px 6px 11px;
+  border-left:1px solid var(--rule);margin-left:0;
+  transition:color .2s,background .2s,border-color .2s;
+}
+nav.toc a span{font-family:var(--mono);font-size:10px;color:var(--faint);flex:none;padding-top:2px;transition:color .2s}
+nav.toc a:hover{color:var(--text);background:var(--glass)}
+nav.toc a.seen{color:var(--dim);border-left-color:rgba(var(--green-a),.45)}
+nav.toc a.seen span{color:var(--ok)}
+nav.toc a.on{color:var(--text);border-left:2px solid var(--clay);padding-left:10px;background:rgba(var(--clay-a),.07)}
+nav.toc a.on span{color:var(--clay)}
+nav.toc .hint{font-family:var(--mono);font-size:10px;color:var(--faint);line-height:2.1;
+  border-top:1px solid var(--rule);margin-top:20px;padding-top:14px}
+nav.toc .hint kbd{font-family:var(--mono);color:var(--muted);background:var(--raise);
+  border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:1px 5px;margin-right:6px}
+
+/* --- đầu bài --- */
+.doc .hero{padding:4px 0 28px;margin-bottom:30px;border-bottom:1px solid var(--rule)}
+.doc .hero h1{
+  font-family:var(--display);font-weight:400;letter-spacing:-.02em;
+  font-size:clamp(34px,5.4vw,58px);line-height:1.08;margin:0;color:var(--text);
+}
+.doc .hero h1 em{font-style:italic;color:var(--clay)}
+.doc .hero .lede{font-size:16.5px;color:var(--dim);max-width:66ch;margin:18px 0 0;line-height:1.72}
+.doc .hero .lede b{color:var(--text);font-weight:600}
+/* lede tách ý: câu dẫn rồi các ý thành dòng riêng, mỗi ý một vạch màu */
+.doc .hero .ledelist{list-style:none;padding:0;margin:16px 0 0;max-width:66ch;
+  display:grid;gap:10px}
+.doc .hero .ledelist li{position:relative;padding:0 0 0 20px;font-size:15.6px;
+  color:var(--dim);line-height:1.62}
+.doc .hero .ledelist li::before{content:"";position:absolute;left:0;top:11px;
+  width:9px;height:1.5px;background:var(--clay);opacity:.85}
+.doc .hero .ledelist b{color:var(--text);font-weight:600}
+.doc .hero .ledelist em{font-style:normal;color:var(--muted)}
+.eyebrow{
+  display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--clay);margin:0 0 18px;
+}
+.doc .hero .eyebrow{margin-bottom:18px}
+
+/* --- nhịp mục --- */
+.doc section{padding-top:0;margin-bottom:44px;scroll-margin-top:calc(var(--bar) + 32px)}
+.doc section+section{border-top:1px solid var(--rule);padding-top:38px}
+section{scroll-margin-top:calc(var(--bar) + 32px)}
+
+/* --- tiêu đề mục: số treo ở lề, tên serif --- */
+.sh{display:flex;align-items:baseline;gap:16px;margin:0 0 20px;padding:0;border:0}
+.sh b{
+  flex:none;font-family:var(--mono);font-size:10.5px;font-weight:400;letter-spacing:.14em;
+  color:var(--clay);padding-top:6px;
+}
+.sh h2{font-family:var(--display);font-weight:400;font-size:31px;letter-spacing:-.018em;
+  line-height:1.22;margin:0;color:var(--text)}
+.sh .tool{
+  margin-left:auto;flex:none;font-family:var(--body);font-size:11.5px;font-weight:500;letter-spacing:0;
+  text-transform:none;background:transparent;color:var(--muted);
+  border:1px solid var(--rule);border-radius:var(--r-pill);padding:6px 14px;cursor:pointer;transition:all .2s;
+}
+.sh .tool:hover{color:var(--text);border-color:var(--rule-hi);background:var(--glass);filter:none}
+.sh .tool+.tool{margin-left:8px}
+a.tool{text-decoration:none;white-space:nowrap}
+
+/* --- chữ --- */
+h3{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em;
+  margin:34px 0 10px;color:var(--text)}
+p{margin:14px 0}
+.doc section>p,.doc section>ul,.doc section>ol,
+.doc section>h3,.doc section>.note,.doc section>details{max-width:70ch}
+main a{color:var(--clay);text-decoration:none;
+  border-bottom:1px solid rgba(var(--clay-a),.35);transition:border-color .2s,color .2s}
+main a:hover{color:var(--clay-hi);border-bottom-color:var(--clay)}
+strong{font-weight:600;color:#fff}
+ul,ol{margin:13px 0;padding-left:22px}
+li{margin:6px 0}
+li::marker{color:var(--rule-hi)}
+hr{border:0;border-top:1px solid var(--rule);margin:36px 0}
+
+code{font-family:var(--mono);font-size:.85em;background:var(--raise);
+  border:1px solid var(--rule);border-radius:var(--r-xs);padding:1.5px 6px;color:var(--dim)}
+pre{
+  font-family:var(--mono);font-size:12.8px;line-height:1.7;
+  background:var(--sunk);border:1px solid var(--rule);border-left:2px solid var(--filled);
+  border-radius:var(--r-sm);padding:17px 19px;overflow:auto;margin:20px 0;
+}
+pre code{background:none;border:0;padding:0;font-size:inherit;color:var(--dim)}
+pre.core{border-left-color:var(--ok)}
+.cm{color:var(--faint);font-style:italic}
+.kw{color:var(--probe)}
+.st{color:var(--ok)}
+
+table{width:100%;border-collapse:separate;border-spacing:0;margin:22px 0;font-size:14.2px;
+  border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);font-weight:400;background:var(--sunk)}
+tbody tr:hover td{background:var(--panel)}
+td code{font-size:12.4px}
+
+/* --- khối nhấn --- */
+.note{
+  border:1px solid var(--rule);border-left:2px solid var(--ok);
+  background:var(--panel);border-radius:var(--r-sm);
+  padding:16px 20px;margin:22px 0;font-size:14.6px;line-height:1.72;
+}
+.note.warn{border-left-color:var(--tomb)}
+.note.key{border-left-color:var(--probe)}
+.note h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 8px;font-weight:400}
+.note>*:last-child{margin-bottom:0}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-sm);padding:16px 19px}
+.card h4{font-family:var(--display);font-weight:600;font-size:16px;margin:0 0 9px;color:var(--text)}
+.card.ok{border-top:2px solid var(--ok)}
+.card.bad{border-top:2px solid var(--tomb)}
+
+/* --- hỏi đáp --- */
+.doc section>details.qa{max-width:none}
+.qa{border-bottom:1px solid var(--rule);padding:0;margin:0;background:none}
+.qa summary{cursor:pointer;font-weight:500;font-size:16px;color:var(--text);font-family:var(--display);
+  list-style:none;display:flex;gap:13px;align-items:flex-start;padding:16px 4px;transition:color .2s}
+.qa summary:hover{color:var(--clay)}
+.qa summary::-webkit-details-marker{display:none}
+.qa summary::before{content:"+";color:var(--clay);font-family:var(--mono);font-size:14px;
+  flex:none;line-height:1.5;transition:transform .22s var(--ease)}
+.qa[open] summary::before{content:"–"}
+.qa p{margin:0 4px 18px;color:var(--dim);font-size:14.8px;padding-left:27px;
+  line-height:1.72;max-width:72ch}
+.qa p b{color:#fff}
+
+/* --- đánh dấu đã học --- */
+.donebar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  border-top:1px solid var(--rule);padding-top:26px;margin-top:44px}
+.donebar span{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint)}
+.donebar button{
+  background:transparent;color:var(--dim);border:1px solid var(--rule-hi);
+  font-family:var(--body);font-size:13px;font-weight:600;
+  border-radius:var(--r-pill);padding:10px 20px;cursor:pointer;transition:all .22s var(--ease);
+}
+.donebar button:hover{color:#14110E;border-color:var(--ok);background:var(--ok);filter:none}
+.donebar button.on{background:rgba(var(--green-a),.12);border-color:rgba(var(--green-a),.5);color:var(--ok)}
+.donebar button.on:hover{background:rgba(var(--green-a),.2);color:var(--ok)}
+
+/* --- bài trước / bài sau --- */
+.nextprev{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);
+  margin-top:30px;padding:0}
+.nextprev a{
+  text-decoration:none;padding:24px 20px;transition:background .22s;border-bottom:1px solid var(--rule);
+}
+.nextprev a:first-child{border-right:1px solid var(--rule);padding-left:0}
+.nextprev a:only-child{grid-column:1/-1;border-right:0}
+.nextprev a:hover{background:var(--panel)}
+.nextprev span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+.nextprev b{color:var(--dim);font-family:var(--display);font-weight:400;font-size:19px;
+  letter-spacing:-.01em;line-height:1.3;transition:color .22s}
+.nextprev a:hover b{color:var(--clay)}
+
+footer{border-top:1px solid var(--rule);padding:28px 0 80px;margin-top:44px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--faint);line-height:1.9}
+
+/* ============================================================
+   BỘ KHUÔN BÀI HỌC — câu chốt → vì sao → đào sâu
+   ============================================================ */
+.lesson .key{
+  font-family:var(--display);font-style:italic;font-size:23px;line-height:1.48;
+  color:var(--text);font-weight:400;letter-spacing:-.012em;max-width:56ch;
+  border-left:2px solid var(--clay);padding:2px 0 2px 22px;margin:0 0 24px;
+}
+.lesson .key em{font-style:italic;color:var(--clay)}
+.lesson .hl{color:var(--clay);font-weight:600}
+
+.lesson .why{list-style:none;padding:0;margin:22px 0;max-width:70ch}
+.lesson .why li{position:relative;display:block;padding:0 0 0 24px;font-size:15.2px;
+  line-height:1.68;margin:0 0 11px}
+.lesson .why li:last-child{margin-bottom:0}
+.lesson .why li::before{content:"";position:absolute;left:4px;top:10px;
+  width:5px;height:5px;border-radius:50%;background:var(--clay)}
+.lesson .why b{color:var(--clay);font-weight:600}
+
+/* --- .steps — dãy việc làm nối tiếp: số thứ tự nối bằng một vạch dọc liền --- */
+.lesson .steps{list-style:none;padding:0;margin:22px 0;max-width:70ch;counter-reset:st}
+.lesson .steps li{position:relative;padding:0 0 20px 42px;font-size:15.2px;line-height:1.68;margin:0}
+.lesson .steps li:last-child{padding-bottom:0}
+.lesson .steps li::before{
+  counter-increment:st;content:counter(st);position:absolute;left:0;top:0;
+  width:24px;height:24px;border-radius:50%;background:var(--sunk);
+  border:1px solid var(--rule-hi);color:var(--clay);
+  font-family:var(--mono);font-size:11px;line-height:23px;text-align:center;
+}
+.lesson .steps li::after{content:"";position:absolute;left:12px;top:26px;bottom:-2px;
+  width:1px;background:var(--rule-hi)}
+.lesson .steps li:last-child::after{display:none}
+.lesson .steps b{color:#fff;font-weight:600}
+.lesson .steps .end{color:var(--muted)}
+.lesson .steps .end::before{content:"✓";color:var(--ok);font-size:12px;
+  border-color:rgba(var(--green-a),.5)}
+
+details.deep{
+  border:1px solid var(--rule);border-radius:var(--r-sm);background:var(--panel);
+  margin:24px 0;max-width:none;padding:0;transition:border-color .2s;
+}
+details.deep:hover{border-color:var(--rule-hi)}
+details.deep>summary{cursor:pointer;list-style:none;padding:13px 18px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);transition:color .2s}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{content:"+";color:var(--clay);margin-right:11px}
+details.deep[open]>summary::before{content:"–"}
+details.deep>summary:hover{color:var(--text)}
+details.deep[open]>summary{border-bottom:1px solid var(--rule)}
+details.deep .body{padding:4px 19px 18px}
+details.deep .body>*:first-child{margin-top:16px}
+
+/* ============================================================
+   KHUÔN HÌNH — vẽ bằng HTML/CSS
+   Quy ước màu dùng chung cho MỌI hình:
+     xanh dương = dữ liệu / đang xét   ·  vàng = con trỏ, điểm nhấn
+     đỏ = sai, bị loại                 ·  xanh lá = đúng, kết quả
+   Cam đất KHÔNG xuất hiện trong hình — nó là màu thương hiệu.
+   ============================================================ */
+
+/* --- .strip — dãy ô --- */
+.strip{display:flex;gap:5px;margin:22px 0 6px}
+.strip .c{
+  flex:1 1 0;min-width:0;text-align:center;font-family:var(--mono);
+  border:1px solid var(--rule);border-radius:var(--r-xs);background:var(--raise);
+  padding:8px 2px;transition:all .22s var(--ease);
+}
+.strip .c i{display:block;font-style:normal;font-size:9.5px;color:var(--faint);line-height:1.4}
+.strip .c b{display:block;font-size:13px;font-weight:500;color:var(--text);line-height:1.5}
+.strip .c u{display:block;text-decoration:none;font-size:9.5px;line-height:1.5;
+  color:var(--probe);min-height:14px;letter-spacing:.04em}
+.strip .c.f{background:rgba(var(--red-a),.1);border-color:rgba(var(--red-a),.38)}
+.strip .c.f b{color:#F79BAB}
+.strip .c.t{background:rgba(var(--green-a),.1);border-color:rgba(var(--green-a),.38)}
+.strip .c.t b{color:#8EE0BE}
+.strip .c.on{border-color:var(--probe);background:rgba(var(--amber-a),.14);
+  box-shadow:0 0 0 3px rgba(var(--amber-a),.1)}
+.strip .c.on b{color:var(--probe)}
+.strip .c.dim{opacity:.26}
+.strip .cut{flex:0 0 3px;min-width:3px;border-radius:2px;background:var(--probe);
+  align-self:stretch;padding:0;border:0;box-shadow:0 0 10px rgba(var(--amber-a),.6)}
+.stripnote{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.06em;color:var(--muted);margin:0 0 22px}
+.stripnote em{font-style:normal;color:var(--probe)}
+
+/* --- .flow — chuỗi bước --- */
+.flow{display:flex;align-items:stretch;flex-wrap:wrap;gap:0;margin:22px 0}
+.flow .n{flex:1 1 0;min-width:132px;max-width:360px;background:var(--panel);border:1px solid var(--rule);
+  border-radius:var(--r-sm);padding:13px 16px}
+.flow .n h5{margin:0 0 5px;font-family:var(--display);font-size:15px;color:var(--text);font-weight:600}
+.flow .n p{margin:0;font-size:12.8px;color:var(--muted);line-height:1.55}
+.flow .n code{font-size:11.5px;padding:0 4px}
+.flow .n.ok{border-color:rgba(var(--green-a),.38)}
+.flow .n.no{border-color:rgba(var(--red-a),.38)}
+.flow .a{flex:none;align-self:center;color:var(--rule-hi);padding:0 11px;font-size:15px}
+/* mũi tên mang tên HÀNH ĐỘNG, ô hai đầu là KẾT QUẢ — cùng ngữ pháp với hình SVG */
+.flow .a.act{display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:0 9px;color:var(--probe);line-height:1.1}
+.flow .a.act i{font-family:var(--mono);font-style:normal;font-size:10px;letter-spacing:.04em;
+  color:var(--probe);text-align:center;max-width:108px;line-height:1.4}
+
+/* --- .eq — công thức display --- */
+.eq{margin:22px 0;background:var(--sunk);border:1px solid var(--rule);overflow-x:auto;
+  border-left:2px solid var(--filled);border-radius:var(--r-sm);padding:18px 20px}
+/* Dáng LaTeX dựng bằng chính font của kho, không nạp thư viện: Newsreader là
+   serif kiểu cũ nên chữ toán đã gần Computer Modern. Luật sắp chữ của TeX:
+   BIẾN nghiêng (<var>), TÊN HÀM và toán tử ĐỨNG (min, max, log, exp), dấu
+   nhị nguyên có khoảng thở rộng hơn khoảng chữ thường. */
+/* Hai HÀNG cố định: hàng trên là công thức, hàng dưới là chú thích. Dựng bằng
+   grid chứ không phải flex — flex canh giữa từng số hạng nên số hạng nào cao
+   hơn (có phân số) sẽ đẩy chú thích của nó xuống, mỗi chú thích một cao độ. */
+.eq .line{font-family:var(--math);font-size:18.5px;line-height:1.62;color:var(--text);
+  display:grid;grid-auto-flow:column;grid-auto-columns:max-content;
+  grid-template-rows:auto auto;align-items:center;justify-content:start;
+  gap:0 .34em;font-variant-numeric:lining-nums}
+.eq .t{display:contents}
+.eq .t>span:first-child{grid-row:1}
+.eq .t em{grid-row:2;justify-self:stretch}
+.eq .op{grid-row:1}
+.eq var{font-style:italic;font-family:var(--math)}
+.eq .fn{font-style:normal;font-weight:400;padding-right:.12em}
+.eq .line+.line{margin-top:10px}
+.eq .t>span:first-child{white-space:nowrap}
+.eq .t em{font-family:var(--body);font-size:10.5px;font-style:normal;letter-spacing:.06em;
+  color:var(--muted);border-top:1px solid var(--rule-hi);padding-top:3px;margin-top:2px;
+  text-align:center;white-space:nowrap}
+.eq .op{color:var(--dim);font-style:normal;padding:0 .22em}
+.eq .t.b em{color:var(--filled);border-top-color:rgba(var(--blue-a),.5)}
+.eq .t.p em{color:var(--probe);border-top-color:rgba(var(--amber-a),.5)}
+.eq .t.g em{color:var(--ok);border-top-color:rgba(var(--green-a),.5)}
+.eq .t.r em{color:var(--tomb);border-top-color:rgba(var(--red-a),.5)}
+.eq sub,.eq sup{font-size:.62em}
+.eq .ov{border-top:1px solid currentColor;padding:.06em .18em 0 .1em;margin-left:-.06em}
+/* Ngoặc ôm phân số: cao bằng hai tầng, không thì nhìn như ngoặc ôm mỗi tử số. */
+.eq .par{font-size:2.05em;font-weight:300;color:var(--dim);padding:0 .04em}
+.eq .t>span:first-child{letter-spacing:.005em}
+/* phân số xếp tầng: <span class="frac"><i>tử</i><i>mẫu</i></span> — dùng ở mọi
+   công thức có dấu chia, để mắt không phải đọc "1 trên w" thành "1 chia w". */
+.frac{display:inline-flex;flex-direction:column;align-items:center;
+  vertical-align:middle;margin:0 .18em;line-height:1.15;font-size:.82em}
+.frac i{font-style:normal;padding:0 .3em}
+.frac i:first-child{border-bottom:1px solid currentColor;padding-bottom:.1em}
+.frac i:last-child{padding-top:.12em}
+/* Chữ đứng cạnh phân số (max, min, =) gióng theo GIỮA phân số nhờ vertical-align
+   của .frac. KHÔNG dùng inline-flex ở đây: flex biến mỗi text node thành một item
+   rồi cắt sạch dấu cách hai đầu — "từ a tới" thành "từatới". */
+.eq .t>span:first-child,.defs dt{display:inline}
+.eq dl{margin:15px 0 0;padding-top:13px;border-top:1px solid var(--rule);
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;font-size:13px}
+.eq dt{font-family:var(--mono);color:var(--dim);white-space:nowrap}
+.eq dd{margin:0;color:var(--muted);line-height:1.55}
+.eq .read{margin:13px 0 0;font-size:13px;color:var(--muted);line-height:1.6}
+.eq .read+.line{margin-top:13px}
+
+/* --- .mth — công thức NGẮN nằm trong dòng văn xuôi ---------------------------
+   Cùng luật sắp chữ với .eq, chỉ khác là inline: biến nghiêng, hàm và số đứng,
+   font serif toán. KHÔNG dùng <code> cho ký hiệu toán — <code> là mono, nó nói
+   "đây là thứ gõ vào máy", trong khi λ hay ‖w‖² là toán. <code> để dành cho tên
+   API thật: reg_lambda, RidgeCV, class_weight. */
+.mth{font-family:var(--math);font-size:1.06em;white-space:nowrap;color:var(--text)}
+.mth var{font-style:italic;font-family:var(--math)}
+.mth .fn{font-style:normal;font-weight:400;padding-right:.12em}
+.mth sub,.mth sup{font-size:.68em}
+/* Phân số HAI TẦNG luôn đội chiều cao dòng lên, chỉnh font-size hay
+   vertical-align đều không cứu được. Phân số dài thì đưa xuống .eq;
+   giữ lại đây cho phân số một ký tự trên một ký tự. */
+.mth .frac{font-size:.86em}
+
+/* --- .defs — bảng chú thích ký hiệu: ngắn, tra nhanh, không phải công thức --- */
+.defs{margin:18px 0;padding:14px 18px;background:var(--sunk);border:1px solid var(--rule);
+  border-radius:var(--r-sm);display:grid;grid-template-columns:auto minmax(0,1fr);
+  gap:7px 16px;font-size:13px}
+.defs dt{font-family:var(--mono);color:var(--probe);white-space:nowrap}
+.defs dd{margin:0;color:var(--muted);line-height:1.55}
+
+/* --- .cmp — đối chiếu hai cột --- */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+.cmp>div{border:1px solid var(--rule);border-radius:var(--r-sm);padding:15px 18px;background:var(--panel);min-width:0}
+.cmp h5{margin:0 0 11px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);font-weight:400}
+.cmp.two>div:first-child{border-top:2px solid rgba(var(--blue-a),.55)}
+.cmp.two>div:last-child{border-top:2px solid rgba(var(--amber-a),.55)}
+.cmp.two>div:first-child h5{color:var(--filled)}
+.cmp.two>div:last-child h5{color:var(--probe)}
+.cmp p{margin:6px 0;font-size:13.6px;color:var(--muted);line-height:1.6}
+.cmp p b{color:var(--text)}
+.cmp code{font-size:12px}
+
+/* --- .stack — pipeline dọc --- */
+.stack{margin:26px 0}
+.stack .s{position:relative;background:var(--panel);border:1px solid var(--rule);
+  border-left:2px solid var(--filled);border-radius:var(--r-sm);padding:13px 17px;margin-bottom:30px}
+.stack .s:last-child{margin-bottom:0}
+.stack .s b{display:block;font-family:var(--display);font-size:16px;color:var(--text);font-weight:600}
+.stack .s span{display:block;font-size:13.4px;color:var(--muted);line-height:1.58;margin-top:3px}
+.stack .s::after{content:"";position:absolute;left:50%;bottom:-24px;width:1px;height:24px;background:var(--rule-hi)}
+.stack .s::before{content:"▾";position:absolute;left:50%;bottom:-31px;transform:translateX(-50%);
+  color:var(--rule-hi);font-size:12px;line-height:1}
+.stack .s:last-child::after,.stack .s:last-child::before{display:none}
+.stack .s.ok{border-left-color:var(--ok)}
+.stack .s.warn{border-left-color:var(--tomb)}
+
+/* --- .mtx — ma trận 2×2 --- */
+.mtx{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;margin:26px 0}
+.mtx .hd{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:4px 6px}
+.mtx .hd.rl{justify-content:flex-end;text-align:right;max-width:104px}
+.mtx .q{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-sm);padding:14px 17px}
+.mtx .q b{display:block;font-family:var(--display);font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px}
+.mtx .q span{color:var(--muted);font-size:13.2px;line-height:1.58}
+.mtx .q.ok{border-color:rgba(var(--green-a),.38)}
+.mtx .q.ok b{color:var(--ok)}
+.mtx .q.bad{border-color:rgba(var(--red-a),.38)}
+.mtx .q.bad b{color:var(--tomb)}
+
+/* --- .axis — trục đánh đổi --- */
+.axis{display:flex;margin:28px 0 20px;position:relative}
+.axis::before{content:"";position:absolute;left:6%;right:6%;top:9px;height:1px;background:var(--rule-hi)}
+.axis .stop{flex:1;text-align:center;position:relative;padding-top:30px}
+.axis .stop::before{content:"";position:absolute;top:3px;left:50%;transform:translateX(-50%);
+  width:13px;height:13px;border-radius:50%;background:var(--bg);border:1px solid var(--rule-hi)}
+.axis .stop.on::before{border-color:var(--probe);background:var(--probe);
+  box-shadow:0 0 0 4px rgba(var(--amber-a),.14)}
+.axis .stop b{display:block;font-family:var(--mono);font-size:11.5px;color:var(--text)}
+.axis .stop span{display:block;font-size:12.4px;color:var(--muted);line-height:1.5;margin-top:5px}
+.axiscap{display:flex;justify-content:space-between;gap:24px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.06em;color:var(--muted);margin:-12px 0 20px}
+.axiscap span{flex:1}
+.axiscap span:nth-child(2){text-align:center}
+.axiscap span:last-child{text-align:right}
+.axiscap em{font-style:normal;color:var(--probe)}
+
+/* --- .seq — trình tự hai bên --- */
+.seq{margin:26px 0;border:1px solid var(--rule);border-radius:var(--r-sm);padding:15px 19px;background:var(--panel)}
+.seq .who{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding-bottom:11px;
+  border-bottom:1px solid var(--rule)}
+.seq .m{padding:13px 0 10px;border-bottom:1px dashed var(--rule)}
+.seq .m:last-child{border-bottom:0}
+.seq .m i{display:block;font-style:normal;font-family:var(--mono);font-size:12.4px;color:var(--text);text-align:center}
+.seq .m u{display:block;text-decoration:none;font-size:12.8px;color:var(--muted);text-align:center;margin-top:5px}
+.seq .ar{height:1px;background:rgba(var(--blue-a),.55);margin:9px 0 0;position:relative}
+.seq .ar::after{content:"";position:absolute;top:-3.5px;width:0;height:0;border:4px solid transparent}
+.seq .ar.r::after{right:0;border-left-color:var(--filled);border-right-width:0}
+.seq .ar.l::after{left:0;border-right-color:var(--filled);border-left-width:0}
+.seq .m.wait .ar{background:rgba(var(--amber-a),.55)}
+.seq .m.wait .ar.r::after{border-left-color:var(--probe)}
+.seq .m.wait .ar.l::after{border-right-color:var(--probe)}
+
+/* --- .bars — so sánh đại lượng --- */
+.bars{margin:24px 0}
+.bars .b{display:grid;grid-template-columns:132px minmax(0,1fr) auto;align-items:center;gap:14px;
+  margin:10px 0;font-family:var(--mono);font-size:12.3px}
+.bars .b i{font-style:normal;color:var(--muted);text-align:right;line-height:1.35}
+.bars .b u{text-decoration:none;height:16px;border-radius:3px;min-width:3px;display:block;
+  background:rgba(var(--blue-a),.6)}
+.bars .b b{color:var(--text);font-weight:500;white-space:nowrap}
+.bars .b.hi u{background:var(--probe)}
+.bars .b.hi b{color:var(--probe)}
+.bars .b.bad u{background:rgba(var(--red-a),.6)}
+
+/* --- .cells — lưới ô vuông --- */
+.cells{display:grid;gap:4px;margin:20px 0;max-width:300px}
+.cells div{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  border:1px solid var(--rule);border-radius:var(--r-xs);background:var(--raise)}
+.cells div.w{background:var(--sunk);border-color:var(--sunk);color:var(--rule)}
+.cells div.a{background:rgba(var(--blue-a),.18);border-color:var(--filled);color:#B9C8F7}
+.cells div.b{background:rgba(var(--green-a),.16);border-color:var(--ok);color:#8EE0BE}
+.cells div.on{background:rgba(var(--amber-a),.18);border-color:var(--probe);color:var(--probe)}
+.cellrow{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;margin:20px 0}
+.cellrow .cells{margin:0}
+.cellrow p{margin:0 0 10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted)}
+
+/* --- .rail/.slot — dãy ô có nhãn --- */
+.rail{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin:18px 0}
+.slot{min-width:0;text-align:center;font-family:var(--mono);font-size:11px;
+  border:1px solid var(--rule);border-radius:var(--r-xs);background:var(--raise);overflow:hidden}
+.slot i{display:block;font-style:normal;font-size:9.5px;color:var(--faint);background:var(--sunk);
+  border-bottom:1px solid var(--rule);padding:2px 0}
+.slot u{display:block;text-decoration:none;padding:7px 0;color:var(--muted)}
+.slot.f u{color:#14110E;background:var(--filled);font-weight:600}
+.slot.p u{color:#14110E;background:var(--probe);font-weight:600}
+.slot.t u{color:#14110E;background:var(--tomb);font-weight:600}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:10px 0 0}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+/* --- .probs — danh sách bài LeetCode --- */
+.probs{margin:18px 0 4px}
+.probs a{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:baseline;
+  text-decoration:none;padding:10px 12px;border-radius:var(--r-xs);border:0;
+  border-bottom:1px solid var(--rule);transition:background .18s,padding-left .18s var(--ease)}
+.probs a:hover{background:var(--panel);padding-left:18px}
+.probs a i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--faint);text-align:right}
+.probs a b{color:var(--dim);font-weight:500;font-size:14.4px;line-height:1.45;
+  font-family:var(--display);border:0}
+.probs a b em{font-style:normal;color:var(--muted);font-weight:400;font-size:13.2px;font-family:var(--body)}
+.probs a u{text-decoration:none;font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;white-space:nowrap}
+.probs a u.e{color:var(--ok)}
+.probs a u.m{color:var(--probe)}
+.probs a u.h{color:var(--tomb)}
+.probs a:hover b{color:var(--text)}
+.sig{font-family:var(--mono);font-size:12.5px;color:var(--probe);
+  border-left:2px solid var(--probe);padding:6px 0 6px 15px;margin:18px 0}
+
+/* ============================================================
+   LAB
+   ============================================================ */
+.lab{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);
+  padding:20px;margin:24px 0}
+.lab .bar{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.lab label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.lab input,.lab select{font-family:var(--mono);font-size:13px;background:var(--sunk);color:var(--text);
+  border:1px solid var(--rule);border-radius:var(--r-xs);padding:8px 11px;width:150px;
+  transition:border-color .2s,box-shadow .2s}
+.lab input:focus,.lab select:focus{border-color:rgba(var(--clay-a),.6);
+  box-shadow:0 0 0 3px rgba(var(--clay-a),.12);outline:none}
+.lab input[type=number]{width:104px}
+.lab input[type=checkbox]{width:auto}
+.chk{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+  color:var(--text);cursor:pointer;padding-bottom:8px}
+button{font-family:var(--body);font-weight:600;font-size:13px;cursor:pointer;
+  background:var(--clay);color:#14110E;border:0;border-radius:var(--r-pill);padding:10px 19px;
+  transition:background .2s,transform .18s var(--ease)}
+button:hover{background:var(--clay-hi)}
+button:active{transform:translateY(1px)}
+button.ghost{background:transparent;color:var(--dim);border:1px solid var(--rule-hi)}
+button.ghost:hover{color:var(--text);border-color:var(--muted);background:var(--glass)}
+.stat{display:flex;gap:28px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;margin-top:16px}
+.stat u{text-decoration:none;color:var(--muted)}
+.stat b{color:var(--text)}
+
+.lab .scen{display:flex;gap:8px;flex-wrap:wrap}
+.lab .scen button{background:transparent;color:var(--muted);border:1px solid var(--rule);
+  font-family:var(--mono);font-size:11.5px;font-weight:400;padding:8px 13px}
+.lab .scen button.on{border-color:rgba(var(--blue-a),.55);color:var(--text);background:rgba(var(--blue-a),.12)}
+.lab .labrow{margin:16px 0 6px;font-size:12.5px;color:var(--muted)}
+.lab .labrow b{color:var(--probe);font-weight:500;font-family:var(--mono)}
+.lab .labrow+.strip{margin-top:0}
+.lab .labsay{margin:12px 0 0;font-size:13.5px;line-height:1.7;color:var(--muted)}
+.lab .labsay b{color:var(--text);font-weight:600}
+
+/* --- bảng dữ liệu trong lab: rút dòng từ bảng này sang bảng kia --- */
+.lab .dtwrap{overflow-x:auto;border:1px solid var(--rule-hi);border-radius:var(--r-sm);background:var(--sunk)}
+.lab table.dt{margin:0;border:0;border-radius:0;font-size:13.4px;min-width:420px;
+  border-collapse:collapse;table-layout:fixed}
+.lab table.dt th{padding:7px 10px;background:var(--raise);font-size:9px;letter-spacing:.13em;
+  color:var(--dim);border:1px solid var(--rule-hi);text-align:center}
+.lab table.dt td{padding:8px 10px;color:var(--text);border:1px solid var(--rule-hi);
+  white-space:nowrap;line-height:1.4;text-align:center;transition:background .2s,color .2s}
+.lab table.dt tbody tr:hover td{background:transparent}
+.lab table.dt .id{color:var(--dim);text-align:left;font-size:12.6px}
+.lab table.dt th:first-child{text-align:left}
+.lab table.dt th.note,.lab table.dt .cnt{width:96px}
+.lab table.dt .y.yes{color:var(--ok)}
+.lab table.dt .y.no{color:var(--tomb)}
+.lab table.dt .cnt,.lab table.dt th.note{font-family:var(--mono);font-size:10px;
+  color:var(--faint);text-align:center;white-space:normal}
+
+/* dòng trống ở bảng mẫu · dòng bị rút trùng · dòng out-of-bag · dòng đang được rút */
+.lab table.dt tr.empty td{color:var(--rule-hi)}
+.lab table.dt tr.dup td{background:rgba(var(--amber-a),.09)}
+.lab table.dt tr.dup .id,.lab table.dt tr.dup .cnt{color:var(--probe)}
+.lab table.dt tr.oob td{background:rgba(var(--red-a),.07);color:var(--faint)}
+.lab table.dt tr.oob .id,.lab table.dt tr.oob .cnt{color:var(--tomb)}
+.lab table.dt tr.pick td{background:rgba(var(--amber-a),.16);color:var(--text)}
+.lab table.dt tr.land td{animation:rowland .44s var(--ease)}
+@keyframes rowland{0%{background:rgba(var(--amber-a),.28)}100%{background:transparent}}
+
+/* cột phần dư: số có dấu + thanh dài ngắn theo độ lớn, xanh dần khi co về 0 */
+.lab table.dt td.gr{font-family:var(--mono);color:var(--tomb)}
+.lab table.dt td.gz{font-family:var(--mono);color:var(--ok)}
+.lab table.dt td.rbar{padding:8px 10px}
+.lab table.dt td.rbar u{display:block;height:9px;border-radius:2px;min-width:2px;
+  text-decoration:none;background:rgba(var(--red-a),.55);transition:width .42s var(--ease),background .42s}
+.lab table.dt td.rbar u.ok{background:rgba(var(--green-a),.6)}
+.lab table.dt.pulse{animation:dtpulse .42s var(--ease)}
+@keyframes dtpulse{0%{opacity:.55}100%{opacity:1}}
+.lab .bars.pulse,.lab #xbars.pulse{animation:dtpulse .38s var(--ease)}
+
+/* hai cây mọc song song — mọc theo tầng vs mọc theo lá */
+.lab .lgbcmp{margin:0}
+.lab .lgbcmp svg{width:100%;height:auto;display:block;background:var(--sunk);
+  border:1px solid var(--rule);border-radius:var(--r-sm);margin:4px 0 10px}
+.lab .lgbcmp p{margin:0;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.lab .lgbcmp p b.n{color:var(--filled)}
+.lab .lgbcmp p b.p{color:var(--probe)}
+.lab .lgbcmp circle.pop{animation:leafpop .42s var(--ease)}
+@keyframes leafpop{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
+
+/* bản sao của dòng, bay từ bảng gốc xuống bảng mẫu */
+.lab{position:relative}
+.flyrow{position:absolute;z-index:5;display:flex;align-items:center;padding:0 12px;
+  font-family:var(--mono);font-size:11.5px;color:#14110E;background:var(--probe);
+  border-radius:var(--r-sm);box-shadow:0 6px 20px rgba(0,0,0,.45);pointer-events:none;
+  white-space:nowrap;overflow:hidden;
+  transition:transform .48s cubic-bezier(.36,.8,.3,1)}
+
+/* rừng cây mini */
+.lab .forest{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 4px;min-height:44px}
+.lab .forest .empty{margin:8px 0 0;font-size:13px;color:var(--faint)}
+.lab .tree{flex:0 0 128px;background:var(--sunk);border:1px solid var(--rule);
+  border-radius:var(--r-sm);padding:8px 4px 4px;text-align:center}
+.lab .tree svg{width:100%;height:auto;display:block}
+.lab .tree .tag{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  color:var(--faint);margin-bottom:4px}
+.lab .tree.new{animation:treegrow .42s var(--ease)}
+@keyframes treegrow{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
+.lab .strip{margin:18px 0 4px}
+.lab .strip .c.out{opacity:.24}
+
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;margin:20px 0 4px}
+.codebox{background:var(--sunk);border:1px solid var(--rule);border-radius:var(--r-sm);padding:13px 0;overflow-x:auto}
+.codebox .ln{font-family:var(--mono);font-size:12.4px;line-height:1.8;white-space:pre;
+  padding:0 16px;color:#A99E90;border-left:2px solid transparent;transition:background .15s}
+.codebox .ln.on{background:rgba(var(--amber-a),.1);border-left-color:var(--probe);color:#fff}
+.codebox .ln .cm{color:var(--faint)}
+.codebox .ln .kw{color:var(--probe)}
+
+.explain{background:var(--sunk);border:1px solid var(--rule);border-radius:var(--r-sm);padding:15px 18px}
+.explain h6{margin:0 0 9px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);font-weight:400}
+.explain p{margin:0 0 10px;font-size:14px;line-height:1.68}
+.explain .vals{font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  border-top:1px solid var(--rule);padding-top:11px;margin:0}
+.explain .vals b{color:var(--probe)}
+
+/* --- thanh tiến độ + chú giải màu của lab chạy từng bước --- */
+.lab .slider{height:3px;background:var(--rule);border-radius:2px;margin:9px 0 4px;overflow:hidden}
+.lab .slider i{display:block;height:100%;background:var(--probe);transition:width .25s var(--ease)}
+.lab .stripnote .idx{color:var(--faint);white-space:nowrap}
+.lab .legend{margin:16px 0 0;gap:9px 18px}
+
+.labbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.labbar span{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.labbar button[disabled]{opacity:.38;cursor:default;box-shadow:none}
+.verdict{background:rgba(var(--green-a),.08);border:1px solid rgba(var(--green-a),.35);
+  border-radius:var(--r-sm);padding:15px 18px;margin:18px 0 0;font-size:14.4px;
+  line-height:1.68;max-width:none}
+.verdict b{color:var(--ok)}
+
+.steps{font-family:var(--mono);font-size:12.5px;margin-top:16px}
+.steps div{display:flex;gap:10px;padding:4px 0;border-bottom:1px dashed var(--rule)}
+.steps span:nth-child(1){width:56px;color:var(--muted)}
+.steps span:nth-child(2){width:190px;color:var(--muted)}
+.steps span:nth-child(3){color:var(--probe)}
+
+/* --- heatmap --- */
+.hm{overflow-x:auto;margin-top:8px}
+.hm table{font-family:var(--mono);font-size:11.5px;margin:0;min-width:520px;border:0;border-radius:0}
+.hm th{color:var(--muted);font-size:10px;letter-spacing:.08em;text-align:center;border:0;padding:4px 3px;background:none}
+.hm td{text-align:center;padding:0;border:0;background:none!important}
+.hm td.rl{text-align:right;color:var(--muted);padding-right:9px;white-space:nowrap;font-size:11px}
+.hm .cell{border-radius:3px;padding:8px 4px;color:#14110E;font-weight:600;margin:1px;transition:background .15s}
+.hm .cell.mask{background:var(--sunk)!important;color:var(--rule-hi);font-weight:400}
+
+/* --- hình SVG --- */
+figure{margin:24px 0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:11px;line-height:1.6}
+.sv-l{font-family:"JetBrains Mono",monospace;font-size:11px;fill:var(--muted)}
+.sv-t{font-family:"Be Vietnam Pro",sans-serif;font-size:12.5px;fill:var(--text)}
+.sv-b{fill:#1C1815;stroke:#2E2822}
+/* công thức TRONG hình: cùng dáng LaTeX với .eq và .mth — serif toán, biến
+   nghiêng qua <tspan class="v">. Trước đây công thức trong hình dùng sv-h
+   (mono chữ hoa giãn chữ) nên "λ Σ w²" hiện ra như một nhãn máy, lệch hẳn
+   với chính công thức đó in bằng .eq ở ngay dưới. */
+.sv-m{font-family:var(--math);font-size:14px;fill:var(--text)}
+.sv-m .v{font-style:italic}
+.sv-m .fn{font-style:normal}
+/* nhãn phụ trong hình: tiêu đề vùng (sv-h), chú thích (sv-d), tên/giá trị (sv-n) */
+.sv-h{font-family:"JetBrains Mono",monospace;font-size:9.5px;letter-spacing:.16em;fill:var(--muted)}
+.sv-hv{font-family:"Be Vietnam Pro",sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.14em;fill:var(--muted)}
+/* dòng giải thích ngay dưới một nhãn: cùng họ nhưng KHÔNG mờ đi — nó mang kết luận */
+.sv-s{font-family:"Be Vietnam Pro",sans-serif;font-size:11.5px;font-weight:500;fill:var(--dim)}
+.sv-d{font-family:"Be Vietnam Pro",sans-serif;font-size:10.5px;fill:var(--muted)}
+.sv-n{font-family:"JetBrains Mono",monospace;font-size:13px;fill:var(--text)}
+/* hình quá chi tiết để co xuống mobile: cho cuộn ngang thay vì thu nhỏ chữ */
+figure.scrollx{overflow-x:auto}
+figure.scrollx svg{min-width:720px}
+/* bảng nhiều cột: cuộn ngang thay vì bóp cột đến vỡ chữ */
+figure.scrollx table{margin:0;min-width:620px}
+
+/* ============================================================
+   TRANG ÔN TẬP — quiz.html
+   Thẻ lật: mặt trước câu hỏi, mặt sau ý trả lời. Nội dung mặt sau là
+   HTML bóc nguyên từ <details class="qa"> nên dùng lại đúng kiểu chữ của .qa p.
+   ============================================================ */
+.quizmast{padding-bottom:38px;border-bottom:1px solid var(--rule)}
+.quizmast .lede{max-width:66ch;margin:0}
+.quizmast h1{margin-bottom:20px}
+
+.quizpick{padding:30px 0 70px}
+.quizpick .counts{max-width:420px;margin-bottom:26px}
+.qtop{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.qhint{font-size:13.6px;color:var(--muted);margin:0 0 26px;max-width:62ch}
+.qhint b{color:var(--dim);font-weight:500}
+
+.qshelves{display:grid;gap:0;border-top:1px solid var(--rule)}
+.qshelf{display:grid;grid-template-columns:44px minmax(0,1fr) 86px 120px;gap:0 18px;
+  align-items:center;text-align:left;width:100%;
+  padding:17px 10px 17px 12px;background:none;border:0;border-radius:0;
+  border-bottom:1px solid var(--rule);
+  cursor:pointer;color:inherit;font:inherit;position:relative;
+  transition:background .18s var(--ease),padding .18s var(--ease)}
+.qshelf::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--clay);opacity:0;transition:opacity .18s var(--ease)}
+.qshelf:hover{background:var(--panel);padding-left:20px}
+.qshelf:hover::before{opacity:1}
+.qshelf i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.qshelf b{font-family:var(--display);font-weight:400;font-size:19px;color:var(--text);line-height:1.3}
+.qshelf .qn{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
+
+.qtrack{display:block;height:3px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.qtrack i{display:block;height:100%;background:var(--clay);transition:width .3s var(--ease)}
+
+/* --- một lượt ôn --- */
+.quizrun{max-width:74ch;margin:0 auto;padding:34px 0 80px}
+.qmeta{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:9px}
+.qwhere{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qwhere em{font-style:normal;color:var(--faint);margin-right:10px}
+.qcount{color:var(--faint);white-space:nowrap}
+.quizrun .qtrack{margin-bottom:26px}
+
+.qcard{border:1px solid var(--rule);border-radius:var(--r);background:var(--panel);
+  padding:34px 32px;transition:border-color .2s var(--ease)}
+.qcard.open{border-color:var(--rule-hi)}
+.qq{font-family:var(--display);font-size:25px;line-height:1.36;color:var(--text);margin:0}
+.qa2{margin-top:24px;padding-top:22px;border-top:1px solid var(--rule)}
+.qa2 p{margin:0 0 14px;color:var(--dim);font-size:15.2px;line-height:1.72}
+.qa2 p:last-child{margin-bottom:0}
+.qa2 b{color:#fff;font-weight:500}
+.qa2 code{font-family:var(--mono);font-size:.88em;background:var(--sunk);
+  border:1px solid var(--rule);border-radius:4px;padding:1px 5px;color:var(--text)}
+.qa2 a{color:var(--clay);text-decoration:none;border-bottom:1px solid rgba(224,133,92,.35)}
+.qa2 .qlc{margin-top:18px;padding-top:14px;border-top:1px dashed var(--rule);
+  font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--muted)}
+.qa2 .qlc b{color:var(--probe);font-weight:500}
+.qflip{margin-top:26px;width:100%;padding:13px;border-radius:var(--r);
+  border:1px dashed var(--rule-hi);background:none;color:var(--muted);cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  transition:color .18s var(--ease),border-color .18s var(--ease)}
+.qflip:hover{color:var(--clay);border-color:var(--clay)}
+
+.qacts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.qacts .btn{justify-content:center}
+.qfoot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px}
+.qlink{font-family:var(--mono);font-size:11px;color:var(--muted);text-decoration:none}
+.qlink:hover{color:var(--clay)}
+.qstop{background:none;border:0;cursor:pointer;color:var(--faint);
+  font-family:var(--mono);font-size:11px;padding:0}
+.qstop:hover{color:var(--dim)}
+
+.quizdone{max-width:74ch;margin:0 auto;padding:48px 0 90px}
+.quizdone h2{font-family:var(--display);font-weight:400;font-size:34px;margin:0 0 24px;color:var(--text)}
+.quizdone h2 em{font-style:italic;color:var(--clay)}
+.quizdone .counts{max-width:420px;margin-bottom:22px}
+.quizdone p{color:var(--dim);font-size:15.2px;line-height:1.72;max-width:62ch;margin:0 0 24px}
+
+/* ============================================================
+   MÀN HÌNH HẸP
+   ============================================================ */
+@media(max-width:1060px){
+  .cols{grid-template-columns:172px minmax(0,1fr);gap:26px}
+  .mastfoot{grid-template-columns:1fr;gap:34px;align-items:start}
+  .mastfoot .lede{max-width:62ch}
+  .counts{max-width:420px}
+}
+@media(max-width:900px){
+  .wrap,.topbar .in{padding:0 17px}
+  .mast{padding:52px 0 0}
+  .cols{grid-template-columns:1fr;gap:0;padding-top:24px}
+  nav.toc{position:static;max-height:none;margin-bottom:32px;
+    border:1px solid var(--rule);border-radius:var(--r);padding:18px 18px 8px;background:var(--panel)}
+  nav.toc .list{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  nav.toc .hint{display:none}
+  .grid2,.cmp,.split{grid-template-columns:1fr}
+  .grid2>*,.split>*{min-width:0}
+  .eq{padding:14px 0 14px 13px}
+  .eq .line{font-size:13px;gap:0 .35em;flex-wrap:nowrap;
+    overflow-x:auto;padding-bottom:9px;padding-right:13px}
+  .eq dl{grid-template-columns:1fr;gap:2px 0;margin-right:13px}
+  .eq dt{margin-top:9px}
+  .eq .read{margin-right:13px}
+  .flow{gap:10px}
+  .flow .a{display:none}
+  /* nhãn hành động không được biến mất trên mobile — cho nó thành một dòng riêng */
+  .flow .n{max-width:none}
+  .flow .a.act{display:flex;flex-direction:row;align-items:center;gap:7px;
+    flex-basis:100%;padding:0 2px;justify-content:flex-start}
+  .flow .a.act i{max-width:none;text-align:left}
+  .shelfhead{grid-template-columns:52px minmax(0,1fr);gap:0 18px}
+  .shelfhead .num{font-size:38px}
+  .shelfhead h2{font-size:24px}
+  .shelfstat{grid-column:2;text-align:left;padding-top:14px;min-width:0}
+  .shelfstat .track{max-width:200px}
+  .bk{grid-template-columns:34px minmax(0,1fr) 20px;gap:0 12px;padding:16px 8px 16px 10px}
+  .bk .tag,.bk .rv{display:none}
+  .bk .tt b{font-size:17px}
+  .nextprev{grid-template-columns:1fr}
+  .nextprev a:first-child{border-right:0;padding-left:20px}
+  table{font-size:13.2px}
+  th,td{padding:9px 11px}
+  .lesson .key{font-size:20px}
+  .sh h2{font-size:24px}
+  .doc .hero h1{font-size:clamp(30px,7vw,40px)}
+}
+@media(max-width:620px){
+  .kbd{display:none}
+  .qshelf{grid-template-columns:32px minmax(0,1fr);gap:0 12px;padding:15px 8px 15px 10px}
+  .qshelf .qn{grid-column:2;font-size:10px;padding-top:7px}
+  .qshelf .qtrack{grid-column:2;margin-top:8px}
+  .qcard{padding:26px 20px}
+  .qq{font-size:21px}
+  .qacts{grid-template-columns:1fr}
+  .lab .bar{display:grid;grid-template-columns:1fr;gap:15px;align-items:stretch}
+  .lab .bar>div{min-width:0}
+  .lab select{width:100%}
+  .libbar .acts{margin-left:0;width:100%}
+  .bars .b{grid-template-columns:88px minmax(0,1fr) auto;gap:9px;font-size:11.5px}
+  .lab table.dt{font-size:12.4px;min-width:380px}
+  .lab table.dt td{padding:7px 6px}
+  .lab table.dt th{padding:6px 6px}
+  .lab table.dt th.note,.lab table.dt .cnt{width:74px}
+  nav.toc .list{grid-template-columns:1fr}
+  .strip{gap:3px}
+  .strip .c{padding:6px 1px}
+  .strip .c i,.strip .c u{overflow-wrap:anywhere}
+  .heroact .btn{flex:1;justify-content:center}
+  .counts li{padding-right:10px}
+  .counts li+li{padding-left:10px}
+  .counts b{font-size:26px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{transition:none!important;animation:none!important}
+  .bk:hover,a.hit:hover,.probs a:hover{padding-left:inherit}
+}
+@media print{
+  body::before,body::after,.topbar,.shelfnav,nav.toc,.libbar,.donebar,.nextprev,#prog{display:none!important}
+  body{background:#fff;color:#000}
+  .cols{grid-template-columns:1fr}
+}
+
+/* --- hình mở bài: một hình ngay dưới lede, đọc phát hiểu bài nói gì --- */
+figure.gist{margin:26px 0 0;padding:20px 22px 16px;background:var(--panel);
+  border:1px solid var(--rule);border-radius:var(--r);overflow-x:auto}
+figure.gist svg{min-width:640px}
+figure.gist figcaption{margin-top:14px;padding-top:13px;border-top:1px solid var(--rule);
+  font-family:var(--body);font-size:13.2px;color:var(--muted);line-height:1.65}
+figure.gist figcaption b{color:var(--text);font-weight:600}
+@media(max-width:620px){figure.gist{padding:16px 14px 13px}}
+
+</style>
+<style>.topbar,nav.toc,#results,.nextprev{display:none!important}.cols{display:block!important}</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b>Maze<i>AI</i></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Tìm trong kho: probe, softmax, KV cache…" aria-label="Tìm kiếm"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><span style="color:var(--clay)">← Tất cả bài</span> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-scope" data-title="Scope &amp; LEGB" data-tag="Python" data-blurb="Gõ một cái tên ra thì Python tra bốn tầng LEGB từ trong ra ngoài; còn gán thì luôn tạo biến ở tầng hiện tại.">
+        <header class="hero">
+  <p class="eyebrow">Python · language core</p>
+  <h1>Scope &amp; <em>LEGB</em></h1>
+  <p class="lede">Gõ một cái tên ra, Python đi tìm nó ở đâu. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>đọc thì tra bốn tầng từ trong ra ngoài, dừng ở tầng đầu tiên có</li>
+    <li>ghi thì luôn tạo biến ở tầng hiện tại</li>
+    <li>chỉ hàm, class và module tạo scope — for và if thì không</li>
+  </ul>
+</header>
+
+<section id="scope-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Gặp một cái tên, Python tra <em>L → E → G → B</em>, dừng ở tầng đầu tiên tìm thấy.</p>
+  <figure class="gist">
+    <svg viewBox="0 0 860 350" role="img" aria-label="Bốn tầng L E G B xếp dọc; viên tên x đi xuống lần lượt, hai tầng đầu không có nên xuống tiếp, tới tầng Global thì tìm thấy và dừng lại" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0}6.923%{animation-timing-function:ease-in-out;opacity:0}9.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}6.923%{animation-timing-function:ease-in-out;opacity:0}8.846%{animation-timing-function:ease-in-out;opacity:1}46.154%{animation-timing-function:ease-in-out;opacity:1}48.077%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0}46.923%{animation-timing-function:ease-in-out;opacity:0}49.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}6.923%{animation-timing-function:ease-in-out;opacity:0}8.846%{animation-timing-function:ease-in-out;opacity:1}46.154%{animation-timing-function:ease-in-out;opacity:1}48.077%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0}9.231%{animation-timing-function:ease-in-out;opacity:0}11.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}9.231%{animation-timing-function:ease-in-out;opacity:0}11.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0}9.231%{animation-timing-function:ease-in-out;opacity:0}11.154%{animation-timing-function:ease-in-out;opacity:1}46.154%{animation-timing-function:ease-in-out;opacity:1}48.077%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}12.308%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}16.923%{animation-timing-function:ease-in-out;opacity:0}18.846%{animation-timing-function:ease-in-out;opacity:1}26.923%{animation-timing-function:ease-in-out;opacity:1}28.846%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm16{0%{animation-timing-function:ease-in-out;opacity:0}18.462%{animation-timing-function:ease-in-out;opacity:0}20.385%{animation-timing-function:ease-in-out;opacity:1}26.923%{animation-timing-function:ease-in-out;opacity:1}28.846%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm17{0%{animation-timing-function:ease-in-out;opacity:0}26.923%{animation-timing-function:ease-in-out;opacity:0}28.846%{animation-timing-function:ease-in-out;opacity:1}36.923%{animation-timing-function:ease-in-out;opacity:1}38.846%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm18{0%{animation-timing-function:ease-in-out;opacity:0}28.462%{animation-timing-function:ease-in-out;opacity:0}30.385%{animation-timing-function:ease-in-out;opacity:1}36.923%{animation-timing-function:ease-in-out;opacity:1}38.846%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm19{0%{animation-timing-function:ease-in-out;opacity:0}46.923%{animation-timing-function:ease-in-out;opacity:0}49.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm20{0%{animation-timing-function:ease-in-out;opacity:0}50.769%{animation-timing-function:ease-in-out;opacity:0}53.462%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm21{0%{animation-timing-function:ease-in-out;opacity:0}56.923%{animation-timing-function:ease-in-out;opacity:0}59.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm22{0%{animation-timing-function:ease-in-out;opacity:0}63.077%{animation-timing-function:ease-in-out;opacity:0}65.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 13.0s linear 1 forwards}.mm2{animation:mm2 13.0s linear 1 forwards}.mm3{animation:mm3 13.0s linear 1 forwards}.mm4{animation:mm4 13.0s linear 1 forwards}.mm5{animation:mm5 13.0s linear 1 forwards}.mm6{animation:mm6 13.0s linear 1 forwards}.mm7{animation:mm7 13.0s linear 1 forwards}.mm8{animation:mm8 13.0s linear 1 forwards}.mm9{animation:mm9 13.0s linear 1 forwards}.mm10{animation:mm10 13.0s linear 1 forwards}.mm11{animation:mm11 13.0s linear 1 forwards}.mm12{animation:mm12 13.0s linear 1 forwards}.mm13{animation:mm13 13.0s linear 1 forwards}.mm14{animation:mm14 13.0s linear 1 forwards}.mm15{animation:mm15 13.0s linear 1 forwards}.mm16{animation:mm16 13.0s linear 1 forwards}.mm17{animation:mm17 13.0s linear 1 forwards}.mm18{animation:mm18 13.0s linear 1 forwards}.mm19{animation:mm19 13.0s linear 1 forwards}.mm20{animation:mm20 13.0s linear 1 forwards}.mm21{animation:mm21 13.0s linear 1 forwards}.mm22{animation:mm22 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">GẶP MỘT CÁI TÊN · TRA TỪ TRONG RA NGOÀI, DỪNG Ở TẦNG ĐẦU TIÊN CÓ</text>
+<g class="mm1"><text class="sv-d" x="190" y="90" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">L · Local</text></g>
+<g class="mm2"><rect x="250" y="62" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.6"/></g>
+<g class="mm3"><text class="sv-d" x="416" y="89" fill="var(--faint)" style="fill:var(--faint)">trong chính hàm đang chạy</text></g>
+<g class="mm4"><text class="sv-d" x="190" y="148" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">E · Enclosing</text></g>
+<g class="mm5"><rect x="250" y="120" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.6"/></g>
+<g class="mm6"><text class="sv-d" x="416" y="147" fill="var(--faint)" style="fill:var(--faint)">hàm bao ngoài</text></g>
+<g class="mm7"><text class="sv-d" x="190" y="206" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">G · Global</text></g>
+<g class="mm8" opacity="0"><rect x="250" y="178" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.6"/></g>
+<g class="mm9"><rect x="250" y="178" width="150" height="44" rx="6" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/></g>
+<g class="mm10" opacity="0"><text class="sv-d" x="416" y="205" fill="var(--faint)" style="fill:var(--faint)">cấp module, file .py</text></g>
+<g class="mm11"><text class="sv-d" x="190" y="264" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">B · Built-in</text></g>
+<g class="mm12"><rect x="250" y="236" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.6"/></g>
+<g class="mm13" opacity="0"><text class="sv-d" x="416" y="263" fill="var(--faint)" style="fill:var(--faint)">len, print, list …</text></g>
+<g class="mm14"><text class="sv-d" x="0" y="70" fill="var(--probe)" style="fill:var(--probe)">gõ ra tên</text><text x="0.0" y="90.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">print(x)</text></g>
+<g class="mm15" opacity="0"><rect x="204" y="69" width="30" height="30" rx="15" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="219" y="89" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">x</text></g>
+<g class="mm16" opacity="0"><text class="sv-d" x="416" y="89" fill="var(--tomb)" style="fill:var(--tomb)">không có → xuống tầng dưới</text></g>
+<g class="mm17" opacity="0"><rect x="204" y="127" width="30" height="30" rx="15" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="219" y="147" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">x</text></g>
+<g class="mm18" opacity="0"><text class="sv-d" x="416" y="147" fill="var(--tomb)" style="fill:var(--tomb)">không có → xuống tầng dưới</text></g>
+<g class="mm19"><rect x="204" y="185" width="30" height="30" rx="15" fill="rgba(var(--green-a),.35)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="219" y="205" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">x</text></g>
+<g class="mm20"><text class="sv-d" x="416" y="205" fill="var(--ok)" style="fill:var(--ok)">TÌM THẤY → dừng, không tra tiếp</text></g>
+<g class="mm21"><text class="sv-d" x="416" y="263" fill="var(--tomb)" style="fill:var(--tomb)">hết tầng → NameError</text></g>
+<g class="mm22"><rect x="0" y="310" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="325" fill="var(--probe)" style="fill:var(--probe)">Tầng gần nhất thắng · nên đặt tên biến là list hay id sẽ che mất built-in</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li><b>L</b> trong hàm đang chạy · <b>E</b> hàm bao ngoài · <b>G</b> cấp module · <b>B</b> built-in.</li>
+    <li>Hết tầng mà không thấy thì <code>NameError</code>.</li>
+    <li>Nối tiếp <span style="color:var(--clay)">Memory model &amp; mutability</span>: ở đó tên là nhãn, ở đây là tra nhãn.</li>
+  </ul>
+</section>
+
+<section id="scope-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Đọc một cái tên</h2></div>
+  <p class="key">Ba tầng cùng có tên <code>x</code> thì <em>tầng gần nhất thắng</em>. Bỏ dần từng tầng, kết quả trượt ra ngoài.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 314" role="img" aria-label="Ba ngăn Global, Enclosing, Local; giá trị bay vào ngăn của mình; viên x tra từ ngăn Local, bỏ dần từng ngăn thì nó xuống Enclosing rồi Global" data-anim><style>@keyframes rd1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd2{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd3{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd4{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}5.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}5.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}11.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,34px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,34px)}}@keyframes rd5{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}9.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}9.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}15.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,90px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,90px)}}@keyframes rd6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}13.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}13.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}19.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,146px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,146px)}}@keyframes rd7{0%{animation-timing-function:ease-in-out;opacity:0}22.667%{animation-timing-function:ease-in-out;opacity:0}24.333%{animation-timing-function:ease-in-out;opacity:1}48.000%{animation-timing-function:ease-in-out;opacity:1}49.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd8{0%{animation-timing-function:ease-in-out;opacity:0}24.000%{animation-timing-function:ease-in-out;opacity:0}25.667%{animation-timing-function:ease-in-out;opacity:1}49.333%{animation-timing-function:ease-in-out;opacity:1}51.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd9{0%{animation-timing-function:ease-in-out;opacity:0}26.667%{animation-timing-function:ease-in-out;opacity:0}28.333%{animation-timing-function:ease-in-out;opacity:1}49.333%{animation-timing-function:ease-in-out;opacity:1}51.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd10{0%{animation-timing-function:ease-in-out;opacity:0}49.333%{animation-timing-function:ease-in-out;opacity:0}51.000%{animation-timing-function:ease-in-out;opacity:1}74.667%{animation-timing-function:ease-in-out;opacity:1}76.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd11{0%{animation-timing-function:ease-in-out;opacity:0}50.667%{animation-timing-function:ease-in-out;opacity:0}52.333%{animation-timing-function:ease-in-out;opacity:1}76.000%{animation-timing-function:ease-in-out;opacity:1}77.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd12{0%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:0}53.667%{animation-timing-function:ease-in-out;opacity:1}76.000%{animation-timing-function:ease-in-out;opacity:1}77.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd13{0%{animation-timing-function:ease-in-out;opacity:0}54.667%{animation-timing-function:ease-in-out;opacity:0}56.333%{animation-timing-function:ease-in-out;opacity:1}76.000%{animation-timing-function:ease-in-out;opacity:1}77.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rd14{0%{animation-timing-function:ease-in-out;opacity:0}76.000%{animation-timing-function:ease-in-out;opacity:0}77.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd15{0%{animation-timing-function:ease-in-out;opacity:0}77.333%{animation-timing-function:ease-in-out;opacity:0}79.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd16{0%{animation-timing-function:ease-in-out;opacity:0}78.667%{animation-timing-function:ease-in-out;opacity:0}81.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd17{0%{animation-timing-function:ease-in-out;opacity:0}81.333%{animation-timing-function:ease-in-out;opacity:0}83.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rd18{0%{animation-timing-function:ease-in-out;opacity:0}86.667%{animation-timing-function:ease-in-out;opacity:0}89.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.rd1{animation:rd1 15.0s linear 1 forwards}.rd2{animation:rd2 15.0s linear 1 forwards}.rd3{animation:rd3 15.0s linear 1 forwards}.rd4{animation:rd4 15.0s linear 1 forwards}.rd5{animation:rd5 15.0s linear 1 forwards}.rd6{animation:rd6 15.0s linear 1 forwards}.rd7{animation:rd7 15.0s linear 1 forwards}.rd8{animation:rd8 15.0s linear 1 forwards}.rd9{animation:rd9 15.0s linear 1 forwards}.rd10{animation:rd10 15.0s linear 1 forwards}.rd11{animation:rd11 15.0s linear 1 forwards}.rd12{animation:rd12 15.0s linear 1 forwards}.rd13{animation:rd13 15.0s linear 1 forwards}.rd14{animation:rd14 15.0s linear 1 forwards}.rd15{animation:rd15 15.0s linear 1 forwards}.rd16{animation:rd16 15.0s linear 1 forwards}.rd17{animation:rd17 15.0s linear 1 forwards}.rd18{animation:rd18 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">BA TẦNG CÙNG CÓ TÊN x · TẦNG GẦN NHẤT THẮNG</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="rd1"><text class="sv-d" x="150" y="101" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">G · Global</text><rect x="210" y="74" width="150" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="rd2"><text class="sv-d" x="150" y="157" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">E · Enclosing</text><rect x="210" y="130" width="150" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="rd3"><text class="sv-d" x="150" y="213" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">L · Local</text><rect x="210" y="186" width="150" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="rd4" transform="translate(-410 34)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x = "global"</text></g>
+<g class="rd5" transform="translate(-410 90)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x = "enclosing"</text></g>
+<g class="rd6" transform="translate(-410 146)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x = "local"</text></g>
+<g class="rd7" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">print(x)</text></g>
+<g class="rd8" opacity="0"><rect x="166" y="193" width="30" height="30" rx="15" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="181" y="213" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">x</text></g>
+<g class="rd9" opacity="0"><rect x="206" y="182" width="158" height="52" rx="8" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3"/><text class="sv-d" x="386" y="213" fill="var(--ok)" style="fill:var(--ok)">→ local</text></g>
+<g class="rd10" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">bỏ dòng x = "local"</text></g>
+<g class="rd11" opacity="0"><rect x="210" y="186" width="150" height="44" rx="6" fill="var(--bg)" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="rd12" opacity="0"><rect x="166" y="137" width="30" height="30" rx="15" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="181" y="157" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">x</text></g>
+<g class="rd13" opacity="0"><rect x="206" y="126" width="158" height="52" rx="8" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3"/><text class="sv-d" x="386" y="157" fill="var(--ok)" style="fill:var(--ok)">→ enclosing</text></g>
+<g class="rd14"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">bỏ tiếp x = "enclosing"</text></g>
+<g class="rd15"><rect x="210" y="186" width="150" height="44" rx="6" fill="var(--bg)" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/><rect x="210" y="130" width="150" height="44" rx="6" fill="var(--bg)" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="rd16"><rect x="166" y="81" width="30" height="30" rx="15" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="181" y="101" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">x</text></g>
+<g class="rd17"><rect x="206" y="70" width="158" height="52" rx="8" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3"/><text class="sv-d" x="386" y="101" fill="var(--ok)" style="fill:var(--ok)">→ global</text></g>
+<g class="rd18"><rect x="0" y="274" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="289" fill="var(--probe)" style="fill:var(--probe)">Bỏ dần từng tầng, kết quả trượt ra tầng ngoài</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Đây là lý do đặt tên biến là <code>list</code> hay <code>id</code> làm hỏng hàm dựng sẵn: tầng G che mất tầng B.</li>
+  </ul>
+</section>
+
+<section id="scope-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Ghi một cái tên</h2></div>
+  <p class="key">Gán <em>luôn tạo biến ở tầng hiện tại</em>. Muốn ghi ra tầng ngoài thì phải khai báo.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 300" role="img" aria-label="Hai ngăn Global và Local; n bằng 0 bay vào ngăn Global; phép gán trong hàm làm một ô n chưa có giá trị bay vào ngăn Local rồi bị gạch chéo; khai báo global thì giá trị mới bay vào ngăn Global; nonlocal thì bay vào ngăn hàm bao ngoài" data-anim><style>@keyframes wr1{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}4.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr2{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}3.438%{animation-timing-function:ease-in-out;opacity:1}71.250%{animation-timing-function:ease-in-out;opacity:1}72.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr3{0%{animation-timing-function:ease-in-out;opacity:0}72.500%{animation-timing-function:ease-in-out;opacity:0}74.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr4{0%{animation-timing-function:ease-in-out;opacity:0}2.500%{animation-timing-function:ease-in-out;opacity:0}4.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr5{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}5.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}5.313%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}10.625%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,38px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,38px)}}@keyframes wr6{0%{animation-timing-function:ease-in-out;opacity:0}11.250%{animation-timing-function:ease-in-out;opacity:0}12.812%{animation-timing-function:ease-in-out;opacity:1}71.250%{animation-timing-function:ease-in-out;opacity:1}72.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr7{0%{animation-timing-function:ease-in-out;opacity:0}16.250%{animation-timing-function:ease-in-out;opacity:0}17.812%{animation-timing-function:ease-in-out;opacity:1}43.750%{animation-timing-function:ease-in-out;opacity:1}45.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr8{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.750%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}19.062%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.375%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,102px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,102px)}}@keyframes wr9{0%{animation-timing-function:ease-in-out;opacity:0}24.688%{animation-timing-function:ease-in-out;opacity:0}26.250%{animation-timing-function:ease-in-out;opacity:1}45.000%{animation-timing-function:ease-in-out;opacity:1}46.562%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr10{0%{animation-timing-function:ease-in-out;opacity:0}27.500%{animation-timing-function:ease-in-out;opacity:0}29.063%{animation-timing-function:ease-in-out;opacity:1}45.000%{animation-timing-function:ease-in-out;opacity:1}46.562%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr11{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}31.562%{animation-timing-function:ease-in-out;opacity:1}45.000%{animation-timing-function:ease-in-out;opacity:1}46.562%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr12{0%{animation-timing-function:ease-in-out;opacity:0}45.000%{animation-timing-function:ease-in-out;opacity:0}46.562%{animation-timing-function:ease-in-out;opacity:1}71.250%{animation-timing-function:ease-in-out;opacity:1}72.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr13{0%{animation-timing-function:ease-in-out;opacity:0}46.250%{animation-timing-function:ease-in-out;opacity:0}47.812%{animation-timing-function:ease-in-out;opacity:1}72.500%{animation-timing-function:ease-in-out;opacity:1}74.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr14{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}48.750%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.062%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}54.375%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,38px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,38px)}}@keyframes wr15{0%{animation-timing-function:ease-in-out;opacity:0}54.688%{animation-timing-function:ease-in-out;opacity:0}56.250%{animation-timing-function:ease-in-out;opacity:1}72.500%{animation-timing-function:ease-in-out;opacity:1}74.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes wr16{0%{animation-timing-function:ease-in-out;opacity:0}72.500%{animation-timing-function:ease-in-out;opacity:0}74.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr17{0%{animation-timing-function:ease-in-out;opacity:0}73.125%{animation-timing-function:ease-in-out;opacity:0}75.312%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr18{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}75.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}75.312%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}80.625%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,102px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-410px,102px)}}@keyframes wr19{0%{animation-timing-function:ease-in-out;opacity:0}82.500%{animation-timing-function:ease-in-out;opacity:0}84.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr20{0%{animation-timing-function:ease-in-out;opacity:0}86.250%{animation-timing-function:ease-in-out;opacity:0}88.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr21{0%{animation-timing-function:ease-in-out;opacity:0}89.375%{animation-timing-function:ease-in-out;opacity:0}91.562%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.wr1{animation:wr1 16.0s linear 1 forwards}.wr2{animation:wr2 16.0s linear 1 forwards}.wr3{animation:wr3 16.0s linear 1 forwards}.wr4{animation:wr4 16.0s linear 1 forwards}.wr5{animation:wr5 16.0s linear 1 forwards}.wr6{animation:wr6 16.0s linear 1 forwards}.wr7{animation:wr7 16.0s linear 1 forwards}.wr8{animation:wr8 16.0s linear 1 forwards}.wr9{animation:wr9 16.0s linear 1 forwards}.wr10{animation:wr10 16.0s linear 1 forwards}.wr11{animation:wr11 16.0s linear 1 forwards}.wr12{animation:wr12 16.0s linear 1 forwards}.wr13{animation:wr13 16.0s linear 1 forwards}.wr14{animation:wr14 16.0s linear 1 forwards}.wr15{animation:wr15 16.0s linear 1 forwards}.wr16{animation:wr16 16.0s linear 1 forwards}.wr17{animation:wr17 16.0s linear 1 forwards}.wr18{animation:wr18 16.0s linear 1 forwards}.wr19{animation:wr19 16.0s linear 1 forwards}.wr20{animation:wr20 16.0s linear 1 forwards}.wr21{animation:wr21 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">GÁN LUÔN TẠO BIẾN Ở TẦNG HIỆN TẠI · TRỪ KHI KHAI BÁO KHÁC</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="wr1"><text class="sv-d" x="194" y="105" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">G · Global</text><rect x="210" y="78" width="150" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr2" opacity="0"><text class="sv-d" x="194" y="169" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">L · Local</text></g>
+<g class="wr3"><text class="sv-d" x="194" y="169" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">E · Enclosing</text></g>
+<g class="wr4"><rect x="210" y="142" width="150" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr5" transform="translate(-410 38)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = 0</text></g>
+<g class="wr6" opacity="0"><rect x="210" y="78" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="222.0" y="106.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = 0</text></g>
+<g class="wr7" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def tang(): n = n + 1</text></g>
+<g class="wr8" transform="translate(-410 102)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = ?</text></g>
+<g class="wr9" opacity="0"><rect x="210" y="142" width="150" height="44" rx="6" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="222.0" y="170.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = ?</text></g>
+<g class="wr10" opacity="0"><line x1="269.0" y1="152" x2="301.0" y2="176" stroke="var(--tomb)" stroke-width="2.6"/><line x1="301.0" y1="152" x2="269.0" y2="176" stroke="var(--tomb)" stroke-width="2.6"/></g>
+<g class="wr11" opacity="0"><text class="sv-d" x="386" y="169" fill="var(--tomb)" style="fill:var(--tomb)">UnboundLocalError</text><text class="sv-d" x="386" y="105" fill="var(--muted)" style="fill:var(--muted)">không hề nhìn tới ngăn G</text></g>
+<g class="wr12" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">global n ; n = n + 1</text></g>
+<g class="wr13" opacity="0"><rect x="210" y="142" width="150" height="44" rx="6" fill="var(--bg)" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr14" transform="translate(-410 38)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--amber-a),.20)" stroke="var(--probe)" stroke-width="1.7"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = 1</text></g>
+<g class="wr15" opacity="0"><rect x="210" y="78" width="150" height="44" rx="6" fill="rgba(var(--amber-a),.20)" stroke="var(--probe)" stroke-width="1.7"/><text x="222.0" y="106.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = 1</text></g>
+<g class="wr16"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">nonlocal c  (trong hàm lồng)</text></g>
+<g class="wr17"><rect x="210" y="78" width="150" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="222.0" y="106.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">n = 1</text></g>
+<g class="wr18" transform="translate(-410 102)"><rect x="620" y="40" width="150" height="44" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.7"/><text x="632.0" y="68.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">c = 3</text></g>
+<g class="wr19"><text class="sv-d" x="386" y="169" fill="var(--ok)" style="fill:var(--ok)">gọi 3 lần → 1, 2, 3</text></g>
+<g class="wr20"><rect x="0" y="236" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="251" fill="var(--probe)" style="fill:var(--probe)">Đọc tra ngược ra ngoài · ghi thì đứng yên tại ngăn hiện tại</text></g>
+<g class="wr21"><text class="sv-d" x="14" y="268" fill="var(--muted)" style="fill:var(--muted)">Quyết định &quot;n là local&quot; lấy lúc biên dịch, dựa trên TOÀN BỘ thân hàm.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li><code>global</code> ghi vào tầng module. Hiếm khi nên dùng: trạng thái sửa được từ mọi nơi là nguồn bug khó truy.</li>
+    <li><code>nonlocal</code> ghi vào hàm bao ngoài — đây chính là cơ chế giữ trạng thái của closure và decorator.</li>
+    <li>Quyết định "n là local" lấy lúc biên dịch, dựa trên toàn bộ thân hàm, không theo thứ tự dòng chạy.</li>
+  </ul>
+</section>
+
+<section id="scope-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Cái gì tạo scope</h2></div>
+  <p class="key">Chỉ <em>hàm, class và module</em> tạo scope mới. Vòng lặp và <code>if</code> thì không — biến sống tiếp sau khi khối kết thúc.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 450" role="img" aria-label="Vòng lặp for chạy ba lần, biến i đổi từ 0 lên 2 rồi bay ra ngoài khung vòng lặp và vẫn sống; ba lambda cùng trỏ vào đúng biến i đó nên gọi ra đều bằng hai" data-anim><style>@keyframes bl1{0%{animation-timing-function:ease-in-out;opacity:0}2.857%{animation-timing-function:ease-in-out;opacity:0}5.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl2{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl3{0%{animation-timing-function:ease-in-out;opacity:0}8.571%{animation-timing-function:ease-in-out;opacity:0}11.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl4{0%{animation-timing-function:ease-in-out;opacity:0}11.429%{animation-timing-function:ease-in-out;opacity:0}13.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl5{0%{animation-timing-function:ease-in-out;opacity:0}12.143%{animation-timing-function:ease-in-out;opacity:0}14.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}14.286%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}14.643%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}20.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(120px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(120px,0px)}}@keyframes bl7{0%{animation-timing-function:ease-in-out;opacity:0}20.357%{animation-timing-function:ease-in-out;opacity:0}22.143%{animation-timing-function:ease-in-out;opacity:1}22.857%{animation-timing-function:ease-in-out;opacity:1}24.643%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes bl8{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.857%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.214%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}28.571%{animation-timing-function:ease-in-out;opacity:1;transform:translate(120px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(120px,0px)}}@keyframes bl9{0%{animation-timing-function:ease-in-out;opacity:0}28.929%{animation-timing-function:ease-in-out;opacity:0}30.714%{animation-timing-function:ease-in-out;opacity:1}31.429%{animation-timing-function:ease-in-out;opacity:1}33.214%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes bl10{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}31.429%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}31.786%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}37.143%{animation-timing-function:ease-in-out;opacity:1;transform:translate(120px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(120px,0px)}}@keyframes bl11{0%{animation-timing-function:ease-in-out;opacity:0}37.500%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl12{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}42.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl13{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}47.143%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}47.500%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.429%{animation-timing-function:ease-in-out;opacity:1;transform:translate(280px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(280px,0px)}}@keyframes bl14{0%{animation-timing-function:ease-in-out;opacity:0}57.143%{animation-timing-function:ease-in-out;opacity:0}59.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl15{0%{animation-timing-function:ease-in-out;opacity:0}54.286%{animation-timing-function:ease-in-out;opacity:0}56.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl16{0%{animation-timing-function:ease-in-out;opacity:0}56.429%{animation-timing-function:ease-in-out;opacity:0}58.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl17{0%{animation-timing-function:ease-in-out;opacity:0}58.571%{animation-timing-function:ease-in-out;opacity:0}61.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl18{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}62.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl19{0%{animation-timing-function:ease-in-out;opacity:0}60.714%{animation-timing-function:ease-in-out;opacity:0}63.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl20{0%{animation-timing-function:ease-in-out;opacity:0}62.143%{animation-timing-function:ease-in-out;opacity:0}64.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl21{0%{animation-timing-function:ease-in-out;opacity:0}62.857%{animation-timing-function:ease-in-out;opacity:0}65.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl22{0%{animation-timing-function:ease-in-out;opacity:0}64.286%{animation-timing-function:ease-in-out;opacity:0}66.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl23{0%{animation-timing-function:ease-in-out;opacity:0}68.571%{animation-timing-function:ease-in-out;opacity:0}71.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl24{0%{animation-timing-function:ease-in-out;opacity:0}74.286%{animation-timing-function:ease-in-out;opacity:0}76.071%{animation-timing-function:ease-in-out;opacity:1}97.143%{animation-timing-function:ease-in-out;opacity:1}98.929%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes bl25{0%{animation-timing-function:ease-in-out;opacity:0}81.429%{animation-timing-function:ease-in-out;opacity:0}83.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl26{0%{animation-timing-function:ease-in-out;opacity:0}87.143%{animation-timing-function:ease-in-out;opacity:0}89.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl27{0%{animation-timing-function:ease-in-out;opacity:0}91.429%{animation-timing-function:ease-in-out;opacity:0}93.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.bl1{animation:bl1 14.0s linear 1 forwards}.bl2{animation:bl2 14.0s linear 1 forwards}.bl3{animation:bl3 14.0s linear 1 forwards}.bl4{animation:bl4 14.0s linear 1 forwards}.bl5{animation:bl5 14.0s linear 1 forwards}.bl6{animation:bl6 14.0s linear 1 forwards}.bl7{animation:bl7 14.0s linear 1 forwards}.bl8{animation:bl8 14.0s linear 1 forwards}.bl9{animation:bl9 14.0s linear 1 forwards}.bl10{animation:bl10 14.0s linear 1 forwards}.bl11{animation:bl11 14.0s linear 1 forwards}.bl12{animation:bl12 14.0s linear 1 forwards}.bl13{animation:bl13 14.0s linear 1 forwards}.bl14{animation:bl14 14.0s linear 1 forwards}.bl15{animation:bl15 14.0s linear 1 forwards}.bl16{animation:bl16 14.0s linear 1 forwards}.bl17{animation:bl17 14.0s linear 1 forwards}.bl18{animation:bl18 14.0s linear 1 forwards}.bl19{animation:bl19 14.0s linear 1 forwards}.bl20{animation:bl20 14.0s linear 1 forwards}.bl21{animation:bl21 14.0s linear 1 forwards}.bl22{animation:bl22 14.0s linear 1 forwards}.bl23{animation:bl23 14.0s linear 1 forwards}.bl24{animation:bl24 14.0s linear 1 forwards}.bl25{animation:bl25 14.0s linear 1 forwards}.bl26{animation:bl26 14.0s linear 1 forwards}.bl27{animation:bl27 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">VÒNG LẶP KHÔNG TẠO SCOPE · BIẾN SỐNG TIẾP SAU KHI VÒNG KẾT THÚC</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="bl1"><rect x="140" y="66" width="420" height="102" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/><text x="154.0" y="88.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">for i in range(3):</text></g>
+<g class="bl2"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">for i in range(3): pass</text></g>
+<g class="bl3"><text x="170.0" y="125.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">range(3)</text></g>
+<g class="bl4"><text class="sv-d" x="356" y="125" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">i</text></g>
+<g class="bl5"><rect x="370" y="100" width="52" height="38" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl6" transform="translate(120 0)"><rect x="250" y="100" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="276.0" y="125.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">0</text></g>
+<g class="bl7" opacity="0"><rect x="370" y="100" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="396.0" y="125.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">0</text></g>
+<g class="bl8" transform="translate(120 0)"><rect x="250" y="100" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="276.0" y="125.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="bl9" opacity="0"><rect x="370" y="100" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="396.0" y="125.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="bl10" transform="translate(120 0)"><rect x="250" y="100" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="276.0" y="125.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="bl11"><rect x="370" y="100" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="396.0" y="125.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="bl12"><line x1="170.0" y1="144.0" x2="362.0" y2="119.0" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="362.0" cy="119.0" r="2.6" fill="var(--probe)"/><text class="sv-d" x="176" y="148" fill="var(--probe)" style="fill:var(--probe)">mỗi vòng, range đưa một giá trị vào i</text></g>
+<g class="bl13" transform="translate(280 0)"><rect x="370" y="100" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="396.0" y="125.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="bl14"><text class="sv-d" x="650" y="90" fill="var(--ok)" style="fill:var(--ok)">sau vòng lặp</text><text class="sv-d" x="650" y="156" fill="var(--ok)" style="fill:var(--ok)">i vẫn là 2</text></g>
+<g class="bl15"><text class="sv-d" x="0" y="238" fill="var(--text)" style="fill:var(--text)">Hệ quả: ba lambda cùng nhìn vào MỘT biến i</text></g>
+<g class="bl16"><text x="0.0" y="262.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">fs = [lambda: i for i in range(3)]</text></g>
+<g class="bl17"><rect x="340" y="244" width="58" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.4"/><text x="369.0" y="262.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">f0</text></g>
+<g class="bl18"><line x1="369" y1="270" x2="560" y2="286" stroke="var(--probe)" stroke-width="1.2"/></g>
+<g class="bl19"><rect x="410" y="244" width="58" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.4"/><text x="439.0" y="262.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">f1</text></g>
+<g class="bl20"><line x1="439" y1="270" x2="560" y2="286" stroke="var(--probe)" stroke-width="1.2"/></g>
+<g class="bl21"><rect x="480" y="244" width="58" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.4"/><text x="509.0" y="262.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">f2</text></g>
+<g class="bl22"><line x1="509" y1="270" x2="560" y2="286" stroke="var(--probe)" stroke-width="1.2"/></g>
+<g class="bl23"><rect x="540" y="280" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="566.0" y="305.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text><text class="sv-d" x="606" y="305" fill="var(--ok)" style="fill:var(--ok)">một biến i duy nhất, và nó đã là 2</text></g>
+<g class="bl24" opacity="0"><rect x="340" y="334" width="147.8" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="351.0" y="352.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">[f() for f in fs]</text><line x1="413.9" y1="360.0" x2="566.0" y2="318.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="566.0" cy="318.0" r="2.8" fill="var(--tomb)"/><rect x="536.0" y="276.0" width="60.0" height="46.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="bl25"><text class="sv-d" x="0" y="352" fill="var(--tomb)" style="fill:var(--tomb)">→ [2, 2, 2]</text><text class="sv-d" x="120" y="352" fill="var(--muted)" style="fill:var(--muted)">không phải [0, 1, 2]</text></g>
+<g class="bl26"><text x="0.0" y="380.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">fs = [lambda i=i: i for i in range(3)]</text><text class="sv-d" x="340" y="380" fill="var(--ok)" style="fill:var(--ok)">→ [0, 1, 2]</text><text class="sv-d" x="430" y="380" fill="var(--faint)" style="fill:var(--faint)">chốt giá trị ngay lúc tạo</text></g>
+<g class="bl27"><rect x="0" y="414" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="429" fill="var(--probe)" style="fill:var(--probe)">Chỉ hàm, class và module tạo scope · for và if thì không</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Khác hẳn C hay Java, nơi biến khai báo trong khối <code>{}</code> chết theo khối đó.</li>
+    <li>Thân <code>class</code> <b>không</b> thành tầng E của method: đọc biến của class trong method cho <code>NameError</code>.</li>
+    <li>Comprehension thì <b>có</b> scope riêng: biến chạy của nó không rò ra ngoài.</li>
+  </ul>
+</section>
+
+<section id="scope-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Đối số rơi vào ngăn nào</h2></div>
+  <p class="key">Chữ ký hàm là <em>một dãy ngăn</em>. Mỗi đối số rơi vào đúng một ngăn, phần thừa gom vào <code>*args</code> và <code>**kwargs</code>.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 420" role="img" aria-label="Chữ ký hàm có năm ngăn a, b, sao args, c và hai sao kw; bảy đối số lần lượt bay vào đúng ngăn của mình, hai giá trị thừa vào ngăn args còn hai từ khoá thừa vào ngăn kw" data-anim><style>@keyframes ag1{0%{animation-timing-function:ease-in-out;opacity:0}2.667%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag2{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag3{0%{animation-timing-function:ease-in-out;opacity:0}6.000%{animation-timing-function:ease-in-out;opacity:0}8.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag4{0%{animation-timing-function:ease-in-out;opacity:0}8.000%{animation-timing-function:ease-in-out;opacity:0}10.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag5{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag6{0%{animation-timing-function:ease-in-out;opacity:0}12.000%{animation-timing-function:ease-in-out;opacity:0}14.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag7{0%{animation-timing-function:ease-in-out;opacity:0}14.000%{animation-timing-function:ease-in-out;opacity:0}16.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag8{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}17.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}17.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-460px,51px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-460px,51px)}}@keyframes ag9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}29.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-460px,99px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-460px,99px)}}@keyframes ag10{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}28.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}28.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}34.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-474px,147px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-474px,147px)}}@keyframes ag11{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}32.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}32.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}38.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-402px,147px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-402px,147px)}}@keyframes ag12{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}37.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}37.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}44.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-460px,195px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-460px,195px)}}@keyframes ag13{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}42.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}43.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}49.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-474px,243px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-474px,243px)}}@keyframes ag14{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}46.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}47.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}53.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-402px,243px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-402px,243px)}}@keyframes ag15{0%{animation-timing-function:ease-in-out;opacity:0}69.333%{animation-timing-function:ease-in-out;opacity:0}71.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag16{0%{animation-timing-function:ease-in-out;opacity:0}72.667%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ag1{animation:ag1 15.0s linear 1 forwards}.ag2{animation:ag2 15.0s linear 1 forwards}.ag3{animation:ag3 15.0s linear 1 forwards}.ag4{animation:ag4 15.0s linear 1 forwards}.ag5{animation:ag5 15.0s linear 1 forwards}.ag6{animation:ag6 15.0s linear 1 forwards}.ag7{animation:ag7 15.0s linear 1 forwards}.ag8{animation:ag8 15.0s linear 1 forwards}.ag9{animation:ag9 15.0s linear 1 forwards}.ag10{animation:ag10 15.0s linear 1 forwards}.ag11{animation:ag11 15.0s linear 1 forwards}.ag12{animation:ag12 15.0s linear 1 forwards}.ag13{animation:ag13 15.0s linear 1 forwards}.ag14{animation:ag14 15.0s linear 1 forwards}.ag15{animation:ag15 15.0s linear 1 forwards}.ag16{animation:ag16 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">MỖI ĐỐI SỐ RƠI VÀO ĐÚNG MỘT NGĂN CỦA CHỮ KÝ</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="ag1"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">g(1, 9, 8, 7, c=3, x=4, y=5)</text></g>
+<g class="ag2"><text x="0.0" y="66.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def g(a, b=2, *args, c, **kw):</text></g>
+<g class="ag3"><text class="sv-d" x="120" y="125" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">a</text><rect x="140" y="100" width="150" height="34" rx="5" fill="none" stroke="var(--probe)" stroke-width="1.5" stroke-dasharray="4 3"/><text class="sv-d" x="306" y="125" fill="var(--faint)" style="fill:var(--faint)">vị trí thứ nhất</text></g>
+<g class="ag4"><text class="sv-d" x="120" y="173" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">b</text><rect x="140" y="148" width="150" height="34" rx="5" fill="none" stroke="var(--probe)" stroke-width="1.5" stroke-dasharray="4 3"/><text class="sv-d" x="306" y="173" fill="var(--faint)" style="fill:var(--faint)">vị trí thứ hai, có mặc định</text></g>
+<g class="ag5"><text class="sv-d" x="120" y="221" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">*args</text><rect x="140" y="196" width="150" height="34" rx="5" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="4 3"/><text class="sv-d" x="306" y="221" fill="var(--faint)" style="fill:var(--faint)">mọi vị trí thừa</text></g>
+<g class="ag6"><text class="sv-d" x="120" y="269" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">c</text><rect x="140" y="244" width="150" height="34" rx="5" fill="none" stroke="var(--probe)" stroke-width="1.5" stroke-dasharray="4 3"/><text class="sv-d" x="306" y="269" fill="var(--faint)" style="fill:var(--faint)">BẮT BUỘC gọi bằng tên</text></g>
+<g class="ag7"><text class="sv-d" x="120" y="317" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">**kw</text><rect x="140" y="292" width="150" height="34" rx="5" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="4 3"/><text class="sv-d" x="306" y="317" fill="var(--faint)" style="fill:var(--faint)">mọi từ khoá thừa</text></g>
+<g class="ag8" transform="translate(-460 51)"><rect x="620" y="52" width="110" height="28" rx="5" fill="rgba(var(--amber-a),.26)" stroke="var(--probe)" stroke-width="1.5"/><text x="675.0" y="72.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="ag9" transform="translate(-460 99)"><rect x="620" y="52" width="110" height="28" rx="5" fill="rgba(var(--amber-a),.26)" stroke="var(--probe)" stroke-width="1.5"/><text x="675.0" y="72.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text></g>
+<g class="ag10" transform="translate(-474 147)"><rect x="620" y="52" width="68" height="28" rx="5" fill="rgba(var(--green-a),.26)" stroke="var(--ok)" stroke-width="1.5"/><text x="654.0" y="72.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">8</text></g>
+<g class="ag11" transform="translate(-402 147)"><rect x="620" y="52" width="68" height="28" rx="5" fill="rgba(var(--green-a),.26)" stroke="var(--ok)" stroke-width="1.5"/><text x="654.0" y="72.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">7</text></g>
+<g class="ag12" transform="translate(-460 195)"><rect x="620" y="52" width="110" height="28" rx="5" fill="rgba(var(--amber-a),.26)" stroke="var(--probe)" stroke-width="1.5"/><text x="675.0" y="72.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="ag13" transform="translate(-474 243)"><rect x="620" y="52" width="68" height="28" rx="5" fill="rgba(var(--green-a),.26)" stroke="var(--ok)" stroke-width="1.5"/><text x="654.0" y="72.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x=4</text></g>
+<g class="ag14" transform="translate(-402 243)"><rect x="620" y="52" width="68" height="28" rx="5" fill="rgba(var(--green-a),.26)" stroke="var(--ok)" stroke-width="1.5"/><text x="654.0" y="72.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">y=5</text></g>
+<g class="ag15"><rect x="0" y="356" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="371" fill="var(--probe)" style="fill:var(--probe)">* chặn vị trí · sau nó mọi tham số buộc phải gọi bằng tên</text></g>
+<g class="ag16"><text class="sv-d" x="14" y="388" fill="var(--muted)" style="fill:var(--muted)">Gọi hàm: * trải list ra thành vị trí, ** trải dict ra thành từ khoá — cùng dấu, ngược chiều.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Dấu <code>*</code> chặn vị trí: sau nó mọi tham số buộc phải gọi bằng tên.</li>
+    <li>Lúc <b>gọi</b> hàm thì <code>*</code> trải list ra thành vị trí, <code>**</code> trải dict ra thành từ khoá — cùng dấu, ngược chiều.</li>
+    <li>Đừng để mặc định là list hay dict: nó tạo một lần lúc định nghĩa hàm, dùng chung cho mọi lời gọi.</li>
+  </ul>
+</section>
+
+<section id="scope-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
+
+  <details class="qa"><summary>LEGB là gì?</summary>
+  <p>Bốn tầng Python tra một cái tên, từ trong ra ngoài.</p>
+  <p>Local, Enclosing, Global, Built-in.</p>
+  <p>Dừng ở tầng đầu tiên tìm thấy.</p>
+  <p>Hết tầng thì NameError.</p></details>
+
+  <details class="qa"><summary>Vì sao n = n + 1 trong hàm báo UnboundLocalError?</summary>
+  <p>Trong hàm có phép gán vào n, nên n bị chốt là biến local.</p>
+  <p>Quyết định đó lấy lúc biên dịch, dựa trên toàn bộ thân hàm.</p>
+  <p>Vế phải đọc n local mà nó chưa có giá trị.</p>
+  <p>Muốn sửa biến module thì khai báo global n.</p></details>
+
+  <details class="qa"><summary>global khác nonlocal thế nào?</summary>
+  <p>global ghi vào tầng module.</p>
+  <p>nonlocal ghi vào hàm bao ngoài gần nhất.</p>
+  <p>nonlocal là cơ chế giữ trạng thái của closure.</p>
+  <p>global hiếm khi nên dùng vì ai cũng sửa được.</p></details>
+
+  <details class="qa"><summary>Vì sao ba lambda trong vòng lặp cho cùng một giá trị?</summary>
+  <p>Vòng lặp không tạo scope nên chỉ có một biến i.</p>
+  <p>Ba lambda cùng nhìn vào biến đó.</p>
+  <p>Lúc gọi thì vòng đã chạy xong, i bằng 2.</p>
+  <p>Chốt giá trị bằng tham số mặc định: lambda i=i.</p></details>
+
+  <details class="qa"><summary>*args và **kwargs nhận gì?</summary>
+  <p>*args gom mọi đối số vị trí thừa thành tuple.</p>
+  <p>**kwargs gom mọi từ khoá thừa thành dict.</p>
+  <p>Tham số sau dấu * buộc phải gọi bằng tên.</p>
+  <p>Lúc gọi hàm thì * và ** làm việc ngược lại: trải ra.</p></details>
+</section>
+
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
+
+<footer>Python · language core · nền tảng ở <span style="color:var(--clay)">Memory model &amp; mutability</span>.</footer>
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Memory model &amp; mutability — MazeAI</title>
-<meta name="description" content="Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.">
+<meta name="description" content="Tên là nhãn, object là dữ liệu: mỗi dòng code hoặc dán nhãn sang chỗ khác, hoặc sửa ruột object — mutability quyết định nhánh thứ hai có mở hay không.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/memory-model-mutability/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Memory model &amp; mutability">
-<meta property="og:description" content="Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.">
+<meta property="og:description" content="Tên là nhãn, object là dữ liệu: mỗi dòng code hoặc dán nhãn sang chỗ khác, hoặc sửa ruột object — mutability quyết định nhánh thứ hai có mở hay không.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,540 +39,432 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-memory" data-title="Memory model &amp; mutability" data-tag="Python internals" data-blurb="Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.">
+      <article class="doc" id="art-memory" data-title="Memory model &amp; mutability" data-reviewed="1" data-tag="Python internals" data-blurb="Tên là nhãn, object là dữ liệu: mỗi dòng code hoặc dán nhãn sang chỗ khác, hoặc sửa ruột object — mutability quyết định nhánh thứ hai có mở hay không.">
         <header class="hero">
   <p class="eyebrow">Deep dive · Python internals · bộ nhớ</p>
   <h1>Memory model &amp; <em>mutability</em></h1>
-  <p class="lede">Trong Python, <b>tên</b> và <b>object</b> là hai thứ khác nhau: tên chỉ là cái nhãn dán lên object. Nên mỗi dòng code bạn viết chỉ làm một trong hai việc:</p>
+  <p class="lede">Trong Python, tên và object là hai thứ khác nhau. Ba thứ cần nhớ:</p>
   <ul class="ledelist">
-    <li><b>Dán nhãn sang object khác</b> — <em>object cũ không đổi gì</em></li>
-    <li><b>Sửa ruột object đang có</b> — <em>mọi tên đang trỏ vào nó đều thấy</em></li>
+    <li>tên chỉ là cái nhãn dán lên object</li>
+    <li>mỗi dòng code hoặc dán nhãn sang chỗ khác, hoặc sửa ruột object</li>
+    <li>mutability quyết định nhánh thứ hai có mở hay không</li>
   </ul>
-  <p class="lede"><b>Mutability</b> là tính sửa được: object nào cho phép việc thứ hai.</p>
 </header>
 
-<section id="memory-s1" class="lesson">
+<section id="mm-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Nhớ đúng <em>một hình</em> này là trả lời được gần hết câu hỏi về bộ nhớ Python. Mọi mục sau chỉ phóng to một ô của nó — và biết dòng code đang động tới ô nào là biết ngay nó tốn <b>2 nanô giây hay 6,7 mili giây</b>.</p>
-
-<figure class="gist">
-<svg viewBox="0 0 860 274" role="img" aria-label="Bản đồ bốn ô: một dòng code, tên, object và ranh giới mutable; bên phải là bốn ý cốt lõi">
-<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">MỘT DÒNG CODE BẠN VIẾT</text>
-<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
-<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="95" fill="var(--probe)">TÊN</text>
-<text class="sv-d" x="14" y="112" fill="var(--dim)">a &#183; b &#183; đối số</text>
-<text class="sv-d" x="14" y="129" fill="var(--dim)">gán lại tên</text>
-<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">trỏ tới</text>
-<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
-<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="190" y="95" fill="var(--filled)">OBJECT</text>
-<text class="sv-d" x="190" y="112" fill="var(--dim)">giá trị thật</text>
-<text class="sv-d" x="190" y="129" fill="var(--dim)">sửa nội dung</text>
-<path d="M238 140 V 152" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="185" fill="var(--tomb)">MUTABLE hay không</text>
-<text class="sv-s" x="14" y="201" fill="var(--dim)">immutable &#8594; khoá nhánh sửa object</text>
-<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="233" fill="var(--ok)">SAO CHÉP</text>
-<text class="sv-s" x="14" y="249" fill="var(--dim)">cách duy nhất tách hai tên ra hai object</text>
-<text class="sv-hv" x="360" y="18" fill="var(--muted)">GIÁ CỦA MỘT DẤU BẰNG &#8212; CÙNG MỘT LIST n PHẦN TỬ</text>
-<rect x="468" y="48" width="118" height="98" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
-<rect x="594" y="48" width="134" height="98" rx="5" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-l" x="527" y="42" fill="var(--ok)" text-anchor="middle">b = a</text>
-<text class="sv-l" x="661" y="42" fill="var(--tomb)" text-anchor="middle">b = a[:]</text>
-<text class="sv-hv" x="860" y="42" fill="var(--muted)" text-anchor="end">CHÊNH</text>
-<text class="sv-d" x="360" y="72" fill="var(--dim)">n = 10</text>
-<text class="sv-l" x="527" y="72" fill="var(--ok)" text-anchor="middle">2,0 ns</text>
-<text class="sv-l" x="661" y="72" fill="var(--tomb)" text-anchor="middle">51,5 ns</text>
-<text class="sv-d" x="860" y="72" fill="var(--probe)" text-anchor="end">26 lần</text>
-<text class="sv-d" x="360" y="104" fill="var(--dim)">n = 1.000</text>
-<text class="sv-l" x="527" y="104" fill="var(--ok)" text-anchor="middle">2,1 ns</text>
-<text class="sv-l" x="661" y="104" fill="var(--tomb)" text-anchor="middle">1,41 &#181;s</text>
-<text class="sv-d" x="860" y="104" fill="var(--probe)" text-anchor="end">682 lần</text>
-<text class="sv-d" x="360" y="136" fill="var(--dim)">n = 1.000.000</text>
-<text class="sv-l" x="527" y="136" fill="var(--ok)" text-anchor="middle">2,1 ns</text>
-<text class="sv-l" x="661" y="136" fill="var(--tomb)" text-anchor="middle">6,74 ms</text>
-<text class="sv-d" x="860" y="136" fill="var(--probe)" text-anchor="end">3,2 triệu lần</text>
-<line x1="360" y1="158" x2="860" y2="158" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-d" x="360" y="182" fill="var(--dim)">bộ nhớ thêm</text>
-<text class="sv-l" x="527" y="182" fill="var(--ok)" text-anchor="middle">32 byte</text>
-<text class="sv-l" x="661" y="182" fill="var(--tomb)" text-anchor="middle">8,0 MB</text>
-<text class="sv-d" x="860" y="182" fill="var(--probe)" text-anchor="end">250.000 lần</text>
-<text class="sv-d" x="360" y="212" fill="var(--ok)">Cột xanh phẳng lì: gán chỉ chép ĐỊA CHỈ nên kích thước dữ liệu không lọt vào phép tính.</text>
-<text class="sv-d" x="360" y="232" fill="var(--tomb)">Cột đỏ mới là chép dữ liệu thật &#8212; nó phình theo n, và chỉ phình ĐÚNG MỘT TẦNG.</text>
+  <p class="key">Ba tầng, đều nằm trong RAM: <em>ô tên</em> giữ địa chỉ → <em>object</em> giữ dữ liệu → và nếu là list thì nó lại giữ <em>địa chỉ của các object con</em>.</p>
+  <figure class="gist">
+    <svg viewBox="0 0 860 468" role="img" aria-label="Khung RAM bao ngoài chứa hai khung: STACK giữ các ô tên a và b, HEAP giữ một object list; chạy lần lượt ba dòng code, dòng đầu tạo list với hai ô con trỏ trỏ xuống hai object int, dòng hai thêm tên b vào cùng object nên refcount thành 2, dòng ba thêm phần tử nên cả hai tên đều thấy" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}1.538%{animation-timing-function:ease-in-out;opacity:0}4.904%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.981%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}7.692%{animation-timing-function:ease-in-out;opacity:0}11.058%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}12.308%{animation-timing-function:ease-in-out;opacity:0}14.712%{animation-timing-function:ease-in-out;opacity:1}40.000%{animation-timing-function:ease-in-out;opacity:1}42.404%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}13.846%{animation-timing-function:ease-in-out;opacity:0}16.250%{animation-timing-function:ease-in-out;opacity:1}26.154%{animation-timing-function:ease-in-out;opacity:1}28.558%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}26.154%{animation-timing-function:ease-in-out;opacity:0}29.519%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0}15.385%{animation-timing-function:ease-in-out;opacity:0}18.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}18.462%{animation-timing-function:ease-in-out;opacity:0}21.827%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}23.365%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}17.692%{animation-timing-function:ease-in-out;opacity:0}21.058%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0}20.769%{animation-timing-function:ease-in-out;opacity:0}24.135%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}22.308%{animation-timing-function:ease-in-out;opacity:0}25.673%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0}24.615%{animation-timing-function:ease-in-out;opacity:0}27.981%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}27.692%{animation-timing-function:ease-in-out;opacity:0}31.058%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}41.538%{animation-timing-function:ease-in-out;opacity:0}43.942%{animation-timing-function:ease-in-out;opacity:1}66.154%{animation-timing-function:ease-in-out;opacity:1}68.558%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm16{0%{animation-timing-function:ease-in-out;opacity:0}44.615%{animation-timing-function:ease-in-out;opacity:0}47.981%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm17{0%{animation-timing-function:ease-in-out;opacity:0}46.154%{animation-timing-function:ease-in-out;opacity:0}48.558%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm18{0%{animation-timing-function:ease-in-out;opacity:0}49.231%{animation-timing-function:ease-in-out;opacity:0}51.635%{animation-timing-function:ease-in-out;opacity:1}66.154%{animation-timing-function:ease-in-out;opacity:1}68.558%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm19{0%{animation-timing-function:ease-in-out;opacity:0}67.692%{animation-timing-function:ease-in-out;opacity:0}70.096%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm20{0%{animation-timing-function:ease-in-out;opacity:0}70.769%{animation-timing-function:ease-in-out;opacity:0}74.135%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm21{0%{animation-timing-function:ease-in-out;opacity:0}73.846%{animation-timing-function:ease-in-out;opacity:0}77.212%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm22{0%{animation-timing-function:ease-in-out;opacity:0}76.923%{animation-timing-function:ease-in-out;opacity:0}80.288%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm23{0%{animation-timing-function:ease-in-out;opacity:0}81.538%{animation-timing-function:ease-in-out;opacity:0}84.904%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm24{0%{animation-timing-function:ease-in-out;opacity:0}86.154%{animation-timing-function:ease-in-out;opacity:0}89.519%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 10.4s linear 1 forwards}.mm2{animation:mm2 10.4s linear 1 forwards}.mm3{animation:mm3 10.4s linear 1 forwards}.mm4{animation:mm4 10.4s linear 1 forwards}.mm5{animation:mm5 10.4s linear 1 forwards}.mm6{animation:mm6 10.4s linear 1 forwards}.mm7{animation:mm7 10.4s linear 1 forwards}.mm8{animation:mm8 10.4s linear 1 forwards}.mm9{animation:mm9 10.4s linear 1 forwards}.mm10{animation:mm10 10.4s linear 1 forwards}.mm11{animation:mm11 10.4s linear 1 forwards}.mm12{animation:mm12 10.4s linear 1 forwards}.mm13{animation:mm13 10.4s linear 1 forwards}.mm14{animation:mm14 10.4s linear 1 forwards}.mm15{animation:mm15 10.4s linear 1 forwards}.mm16{animation:mm16 10.4s linear 1 forwards}.mm17{animation:mm17 10.4s linear 1 forwards}.mm18{animation:mm18 10.4s linear 1 forwards}.mm19{animation:mm19 10.4s linear 1 forwards}.mm20{animation:mm20 10.4s linear 1 forwards}.mm21{animation:mm21 10.4s linear 1 forwards}.mm22{animation:mm22 10.4s linear 1 forwards}.mm23{animation:mm23 10.4s linear 1 forwards}.mm24{animation:mm24 10.4s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">TẤT CẢ NẰM TRONG RAM · TÊN Ở STACK · OBJECT Ở HEAP</text>
+<text class="sv-d" x="470" y="28" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="mm1"><text class="sv-d" x="0" y="44" fill="var(--faint)" style="fill:var(--faint)">RAM</text><text class="sv-d" x="38" y="44" fill="var(--faint)" style="fill:var(--faint)">· tiến trình python</text><line x1="0" y1="50" x2="860" y2="50" stroke="var(--rule-hi)" stroke-width="1"/><line x1="0" y1="50" x2="0" y2="356" stroke="var(--rule-hi)" stroke-width="1"/><line x1="860" y1="50" x2="860" y2="356" stroke="var(--rule-hi)" stroke-width="1"/><line x1="0" y1="356" x2="860" y2="356" stroke="var(--rule-hi)" stroke-width="1"/></g>
+<g class="mm2"><rect x="24" y="74" width="230" height="150" rx="7" fill="none" stroke="var(--probe)" stroke-width="1.5"/><text class="sv-d" x="38" y="98" fill="var(--probe)" style="fill:var(--probe)">STACK</text><text class="sv-d" x="104" y="98" fill="var(--faint)" style="fill:var(--faint)">tên</text></g>
+<g class="mm3"><rect x="330" y="74" width="500" height="258" rx="7" fill="none" stroke="var(--clay)" stroke-width="1.5"/><text class="sv-d" x="344" y="98" fill="var(--clay)" style="fill:var(--clay)">HEAP</text><text class="sv-d" x="408" y="98" fill="var(--faint)" style="fill:var(--faint)">object</text></g>
+<g class="mm4" opacity="0"><rect x="560" y="10" width="200" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">a = [1, 2]</text></g>
+<g class="mm5" opacity="0"><rect x="356" y="120" width="356" height="150" rx="6" fill="rgba(var(--clay-a),.10)" stroke="var(--clay)" stroke-width="1.8"/><text class="sv-d" x="368" y="140" fill="var(--clay)" style="fill:var(--clay)">list</text><text x="700.0" y="140.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="end">refcnt 1</text></g>
+<g class="mm6"><rect x="356" y="120" width="356" height="150" rx="6" fill="rgba(var(--clay-a),.10)" stroke="var(--clay)" stroke-width="1.8"/><text class="sv-d" x="368" y="140" fill="var(--clay)" style="fill:var(--clay)">list</text></g>
+<g class="mm7"><rect x="372" y="158" width="96" height="26" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.3"/><text x="420.0" y="176.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">→</text></g>
+<g class="mm8"><rect x="372" y="216" width="96" height="34" rx="5" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="420.0" y="238.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="mm9"><line x1="420" y1="184" x2="420" y2="216" stroke="var(--probe)" stroke-width="1.3"/></g>
+<g class="mm10"><rect x="484" y="158" width="96" height="26" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.3"/><text x="532.0" y="176.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">→</text></g>
+<g class="mm11"><rect x="484" y="216" width="96" height="34" rx="5" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="532.0" y="238.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="mm12"><line x1="532" y1="184" x2="532" y2="216" stroke="var(--probe)" stroke-width="1.3"/></g>
+<g class="mm13"><text class="sv-d" x="372" y="204" fill="var(--faint)" style="fill:var(--faint)">mỗi ô là con trỏ · dưới là object con</text></g>
+<g class="mm14"><rect x="46" y="126" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="73.0" y="144.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><line x1="100" y1="139" x2="356" y2="160" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="mm15" opacity="0"><rect x="560" y="10" width="200" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b = a</text></g>
+<g class="mm16"><rect x="46" y="168" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="73.0" y="186.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="100" y1="181" x2="356" y2="172" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="mm17"><text x="700.0" y="140.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="end">refcnt 2</text></g>
+<g class="mm18" opacity="0"><text class="sv-d" x="46" y="208" fill="var(--probe)" style="fill:var(--probe)">hai tên, một object</text></g>
+<g class="mm19"><rect x="560" y="10" width="200" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b.append(3)</text></g>
+<g class="mm20"><rect x="596" y="158" width="96" height="26" rx="4" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.4"/><text x="644.0" y="176.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">→</text></g>
+<g class="mm21"><rect x="596" y="216" width="96" height="34" rx="5" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/><text x="644.0" y="238.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text><line x1="644" y1="184" x2="644" y2="216" stroke="var(--tomb)" stroke-width="1.3"/></g>
+<g class="mm22"><text class="sv-d" x="46" y="208" fill="var(--tomb)" style="fill:var(--tomb)">a cũng thấy phần tử mới</text></g>
+<g class="mm23"><rect x="0" y="384" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="399" fill="var(--probe)" style="fill:var(--probe)">Ba tầng: ô tên → object → object con · mỗi mũi tên là một địa chỉ</text></g>
+<g class="mm24"><text class="sv-d" x="14" y="418" fill="var(--muted)" style="fill:var(--muted)">Không có gì chạm đĩa cứng: stack và heap đều là vùng RAM của tiến trình.</text><text class="sv-d" x="14" y="436" fill="var(--muted)" style="fill:var(--muted)">Ô trong list chứa con trỏ, không chứa số — đó là lý do sao chép một tầng không tách được ruột.</text></g>
 </svg>
-<figcaption>Bản đồ bên trái lặp lại ở <b>mọi mục</b> của bài — mỗi lần chỉ sáng đúng ô đang học, phần còn lại xám đi; học cách đọc nó một lần là đọc được cả bài. Bảng bên phải là lý do bản đồ đáng nhớ: hai dòng code trông giống hệt nhau, một dòng <b>không hề</b> nhìn vào dữ liệu còn dòng kia đọc hết một triệu phần tử.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li>Đọc một dòng code thì hỏi đúng <b>một</b> câu: nó động tới <b>tên</b> hay động tới <b>object</b>? Ba ô còn lại chỉ là hệ quả của câu đó.</li>
-    <li>Ô <b>MUTABLE</b> là cái công tắc: đóng thì nhánh "sửa object" biến mất, nên <code>str</code> và <code>tuple</code> không bao giờ gây ra bẫy dùng chung.</li>
-    <li>Ô <b>SAO CHÉP</b> là chỗ duy nhất phải trả tiền — bảng trên cho biết trả bao nhiêu, và mục 06 cho biết trả tới tầng nào.</li>
+    <li>Stack và heap đều là vùng RAM của tiến trình. Không có gì chạm đĩa cứng.</li>
+    <li>Ô tên ở stack chỉ giữ 8 byte địa chỉ, object nằm ở heap.</li>
+    <li><code>refcnt</code> đếm có mấy tên đang trỏ tới object đó.</li>
+    <li>Ô trong list cũng chỉ là con trỏ, nên sao chép một tầng không tách được ruột.</li>
   </ul>
-
-  <p class="stripnote"><span>object hết được trỏ tới thì biến mất lúc nào?</span><span>ở bài sau: <a href="../memory-management-gc/index.html"><em>Memory management &amp; GC</em></a></span></p>
+  <p>Chỗ người học từ C hay Java hay nhầm: Python <b>không có primitive nằm trong stack</b>.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 314" role="img" aria-label="Bên trái mô hình C và Java: ô tên trong stack chứa thẳng giá trị năm; bên phải mô hình Python: ô tên trong stack chỉ giữ địa chỉ, còn object int năm nằm trên heap và có id, có method" data-anim><style>@keyframes pr1{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}8.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr2{0%{animation-timing-function:ease-in-out;opacity:0}7.000%{animation-timing-function:ease-in-out;opacity:0}11.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr3{0%{animation-timing-function:ease-in-out;opacity:0}12.000%{animation-timing-function:ease-in-out;opacity:0}16.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr4{0%{animation-timing-function:ease-in-out;opacity:0}18.000%{animation-timing-function:ease-in-out;opacity:0}22.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr5{0%{animation-timing-function:ease-in-out;opacity:0}34.000%{animation-timing-function:ease-in-out;opacity:0}38.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr6{0%{animation-timing-function:ease-in-out;opacity:0}37.000%{animation-timing-function:ease-in-out;opacity:0}41.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr7{0%{animation-timing-function:ease-in-out;opacity:0}42.000%{animation-timing-function:ease-in-out;opacity:0}46.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr8{0%{animation-timing-function:ease-in-out;opacity:0}44.000%{animation-timing-function:ease-in-out;opacity:0}48.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr9{0%{animation-timing-function:ease-in-out;opacity:0}48.000%{animation-timing-function:ease-in-out;opacity:0}52.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr10{0%{animation-timing-function:ease-in-out;opacity:0}54.000%{animation-timing-function:ease-in-out;opacity:0}58.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr11{0%{animation-timing-function:ease-in-out;opacity:0}72.000%{animation-timing-function:ease-in-out;opacity:0}76.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr12{0%{animation-timing-function:ease-in-out;opacity:0}78.000%{animation-timing-function:ease-in-out;opacity:0}82.550%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.pr1{animation:pr1 7.692307692307692s linear 1 forwards}.pr2{animation:pr2 7.692307692307692s linear 1 forwards}.pr3{animation:pr3 7.692307692307692s linear 1 forwards}.pr4{animation:pr4 7.692307692307692s linear 1 forwards}.pr5{animation:pr5 7.692307692307692s linear 1 forwards}.pr6{animation:pr6 7.692307692307692s linear 1 forwards}.pr7{animation:pr7 7.692307692307692s linear 1 forwards}.pr8{animation:pr8 7.692307692307692s linear 1 forwards}.pr9{animation:pr9 7.692307692307692s linear 1 forwards}.pr10{animation:pr10 7.692307692307692s linear 1 forwards}.pr11{animation:pr11 7.692307692307692s linear 1 forwards}.pr12{animation:pr12 7.692307692307692s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">C / JAVA CÓ PRIMITIVE TRONG STACK · PYTHON THÌ KHÔNG</text>
+<g class="pr1"><text class="sv-d" x="0" y="52" fill="var(--muted)" style="fill:var(--muted)">C / Java</text><text x="110.0" y="52.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">int x = 5;</text></g>
+<g class="pr2"><rect x="0" y="68" width="180" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="12" y="88" fill="var(--faint)" style="fill:var(--faint)">STACK</text></g>
+<g class="pr3"><rect x="16" y="110" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="43.0" y="128.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><rect x="80" y="106" width="84" height="26" rx="4" fill="rgba(var(--clay-a),.20)" stroke="var(--clay)" stroke-width="1.6"/><text x="122.0" y="124.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">5</text></g>
+<g class="pr4"><text class="sv-d" x="16" y="156" fill="var(--clay)" style="fill:var(--clay)">giá trị nằm THẲNG trong ô</text><text class="sv-d" x="16" y="200" fill="var(--faint)" style="fill:var(--faint)">4 byte · không id · không method</text></g>
+<g class="pr5"><text class="sv-d" x="440" y="52" fill="var(--probe)" style="fill:var(--probe)">Python</text><text x="550.0" y="52.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x = 5</text></g>
+<g class="pr6"><rect x="440" y="68" width="180" height="116" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="452" y="88" fill="var(--faint)" style="fill:var(--faint)">STACK</text></g>
+<g class="pr7"><rect x="456" y="110" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="483.0" y="128.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><rect x="520" y="106" width="84" height="26" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.4"/><text x="562.0" y="124.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">→</text></g>
+<g class="pr8"><rect x="640" y="68" width="220" height="116" rx="6" fill="none" stroke="var(--clay)" stroke-width="1.4"/><text class="sv-d" x="652" y="88" fill="var(--clay)" style="fill:var(--clay)">HEAP</text></g>
+<g class="pr9"><rect x="652" y="106" width="120" height="44" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="712.0" y="124.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">int</text><text x="712.0" y="142.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">5</text><line x1="604" y1="119" x2="652" y2="128" stroke="var(--probe)" stroke-width="1.5"/></g>
+<g class="pr10"><text class="sv-d" x="456" y="156" fill="var(--probe)" style="fill:var(--probe)">ô chỉ giữ ĐỊA CHỈ</text><text class="sv-d" x="456" y="200" fill="var(--faint)" style="fill:var(--faint)">28 byte · có id · có method</text></g>
+<g class="pr11"><rect x="0" y="232" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="247" fill="var(--probe)" style="fill:var(--probe)">Trong Python mọi thứ là object trên heap · kể cả số và chuỗi</text></g>
+<g class="pr12"><text class="sv-d" x="14" y="264" fill="var(--muted)" style="fill:var(--muted)">Nên Python không có &quot;kiểu giá trị&quot; và &quot;kiểu tham chiếu&quot; — chỉ có một cơ chế.</text><text class="sv-d" x="14" y="282" fill="var(--muted)" style="fill:var(--muted)">Cái người ta tưởng là hai kiểu, thật ra chỉ là ranh giới mutable ở mục 04.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Trong Python, <code>5</code> cũng là object trên heap: <code>sys.getsizeof(5)</code> là 28 byte, có <code>id</code>, có method.</li>
+    <li>Nên không có "kiểu giá trị" và "kiểu tham chiếu" — chỉ một cơ chế cho mọi kiểu.</li>
+    <li>Cái người ta tưởng là hai kiểu, thật ra là ranh giới mutable ở mục 04.</li>
+    <li>Object hết được trỏ tới thì biến mất lúc nào: xem <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>.</li>
+  </ul>
 </section>
 
-<section id="memory-s2" class="lesson">
+<section id="mm-s2" class="lesson">
   <div class="sh"><b>02</b><h2>Tên và object</h2></div>
-
-  <p class="key">Biến trong Python <em>không chứa</em> giá trị. Nó là một cái nhãn dán lên object — nên <code>b = a</code> chép <em>địa chỉ</em>, không chép dữ liệu.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="ba dòng code cho thấy id không đổi, gán chỉ thêm một cái tên">
-<path d="M0.0 112 H 37.12 V 100 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,100.0 69.51,95.8 69.51,104.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">BA DÒNG CODE &#183; TÊN ĐỔI, OBJECT KHÔNG ĐỔI</text>
-<rect x="86.62" y="30" width="241.29" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="207.27" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2]</text>
-<rect x="176.33" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="207.27" y="81" fill="var(--probe)" text-anchor="middle">a</text>
-<line x1="207.27" y1="88" x2="207.27" y2="92" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="207.27,100.0 203.07,92.0 211.47,92.0" fill="var(--probe)"/>
-<rect x="86.62" y="104" width="241.29" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="125" fill="var(--filled)">[1, 2]</text>
-<text class="sv-d" x="108.27" y="141" fill="var(--muted)">id 0x7f2c40</text>
-<text class="sv-d" x="86.62" y="168" fill="var(--filled)">object sinh ra</text>
-<text class="sv-d" x="86.62" y="183" fill="var(--filled)">một tên trỏ vào</text>
-<rect x="346.47" y="30" width="241.29" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="467.12" y="47" fill="var(--dim)" text-anchor="middle">b = a</text>
-<rect x="399.06" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="430.0" y="81" fill="var(--probe)" text-anchor="middle">a</text>
-<line x1="430.0" y1="88" x2="430.0" y2="92" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="430.0,100.0 425.8,92.0 434.2,92.0" fill="var(--probe)"/>
-<rect x="473.31" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="504.24" y="81" fill="var(--probe)" text-anchor="middle">b</text>
-<line x1="504.24" y1="88" x2="504.24" y2="92" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="504.24,100.0 500.04,92.0 508.44,92.0" fill="var(--probe)"/>
-<rect x="346.47" y="104" width="241.29" height="46" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="368.13" y="125" fill="var(--filled)">[1, 2]</text>
-<text class="sv-d" x="368.13" y="141" fill="var(--muted)">id 0x7f2c40</text>
-<text class="sv-d" x="346.47" y="168" fill="var(--filled)">chép ĐỊA CHỈ,</text>
-<text class="sv-d" x="346.47" y="183" fill="var(--filled)">không chép list</text>
-<rect x="606.33" y="30" width="241.29" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="726.98" y="47" fill="var(--dim)" text-anchor="middle">b.append(3)</text>
-<rect x="658.92" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="689.86" y="81" fill="var(--probe)" text-anchor="middle">a</text>
-<line x1="689.86" y1="88" x2="689.86" y2="92" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="689.86,100.0 685.66,92.0 694.06,92.0" fill="var(--probe)"/>
-<rect x="733.17" y="66" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="764.1" y="81" fill="var(--probe)" text-anchor="middle">b</text>
-<line x1="764.1" y1="88" x2="764.1" y2="92" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="764.1,100.0 759.9,92.0 768.3,92.0" fill="var(--probe)"/>
-<rect x="606.33" y="104" width="241.29" height="46" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="627.99" y="125" fill="var(--probe)">[1, 2, 3]</text>
-<text class="sv-d" x="627.99" y="141" fill="var(--muted)">id 0x7f2c40</text>
-<text class="sv-d" x="606.33" y="168" fill="var(--probe)">sửa object &#8594;</text>
-<text class="sv-d" x="606.33" y="183" fill="var(--probe)">a cũng thấy</text>
-<text class="sv-d" x="86.62" y="212" fill="var(--ok)">Cùng một id ở cả ba cột &#8212; không có object thứ hai nào được tạo ra.</text>
-<text class="sv-d" x="86.62" y="232" fill="var(--muted)">Tên sống trong namespace, object sống trên heap; tên chỉ giữ địa chỉ.</text>
-<text class="sv-d" x="86.62" y="258" fill="var(--tomb)">Vậy một dòng code động tới TÊN hay động tới OBJECT? &#8212; mục sau.</text>
+  <p class="key">Tên sống trong <em>namespace</em>, object sống trên <em>heap</em>. <em>b = a</em> chép địa chỉ, không chép dữ liệu.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 220" role="img" aria-label="Tên a trỏ vào object list một hai; thêm dòng b bằng a thì tên b trỏ vào đúng object đó, id của hai tên trùng nhau" data-anim><style>@keyframes as1{0%{animation-timing-function:ease-in-out;opacity:0}5.714%{animation-timing-function:ease-in-out;opacity:0}12.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes as2{0%{animation-timing-function:ease-in-out;opacity:0}14.286%{animation-timing-function:ease-in-out;opacity:0}20.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes as3{0%{animation-timing-function:ease-in-out;opacity:0}28.571%{animation-timing-function:ease-in-out;opacity:0}35.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes as4{0%{animation-timing-function:ease-in-out;opacity:0}37.143%{animation-timing-function:ease-in-out;opacity:0}43.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes as5{0%{animation-timing-function:ease-in-out;opacity:0}48.571%{animation-timing-function:ease-in-out;opacity:0}55.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes as6{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}66.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.as1{animation:as1 5.384615384615384s linear 1 forwards}.as2{animation:as2 5.384615384615384s linear 1 forwards}.as3{animation:as3 5.384615384615384s linear 1 forwards}.as4{animation:as4 5.384615384615384s linear 1 forwards}.as5{animation:as5 5.384615384615384s linear 1 forwards}.as6{animation:as6 5.384615384615384s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">b = a   ·   THÊM MỘT CÁI TÊN, KHÔNG THÊM OBJECT</text>
+<g class="as1"><rect x="20" y="64" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="82.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><rect x="140" y="58" width="170" height="38" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.7"/><text x="225.0" y="82.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1, 2]</text><line x1="74" y1="77" x2="140" y2="77" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="as2"><text x="330.0" y="82.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">id → 0x7f2a</text></g>
+<g class="as3"><rect x="20" y="122" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="140.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="74" y1="135" x2="140" y2="90" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="as4"><text x="330.0" y="126.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">id → 0x7f2a</text><text x="452.0" y="126.0" class="sv-d" style="fill:sv-d;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">trùng</text></g>
+<g class="as5"><text class="sv-d" x="140" y="160" fill="var(--probe)" style="fill:var(--probe)">một object · hai cái tên</text></g>
+<g class="as6"><rect x="0" y="184" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="199" fill="var(--probe)" style="fill:var(--probe)">Gán không sao chép dữ liệu, chỉ chép địa chỉ</text></g>
 </svg>
-<figcaption>Ba cột, cùng một <code>id</code>. <code>b = a</code> không tạo list mới — nó chép <b>địa chỉ</b>, nên <code>b.append(3)</code> sửa đúng cái list mà <code>a</code> đang trỏ tới.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><code>id(a) == id(b)</code> trả về <code>True</code> — đúng một object, hai cái tên.</li>
-    <li>Tên sống trong <b>namespace</b>, object sống trên <b>heap</b>; hai vùng khác nhau.</li>
-    <li><code>del a</code> chỉ gỡ <b>cái nhãn</b>, không xoá object — còn <code>b</code> trỏ vào thì object vẫn sống nguyên.</li>
+    <li><code>id(a) == id(b)</code> trả về <code>True</code>: đúng một object, hai cái tên.</li>
+    <li><code>del a</code> chỉ gỡ cái nhãn. Còn <code>b</code> trỏ vào thì object vẫn sống.</li>
+    <li>Với <code>x = 5</code> cơ chế y hệt, chỉ khác <code>int</code> là immutable.</li>
   </ul>
-
-  <details class="deep"><summary>Vì sao <code>x = 5</code> không bao giờ gây ra chuyện này?</summary>
-  <div class="body">
-    <p>Vẫn đúng cơ chế đó: <code>x</code> là tên dán lên object <code>5</code>, và <code>y = x</code> cho hai tên cùng trỏ vào nó. Khác biệt nằm ở chỗ <code>int</code> là immutable — <b>không có thao tác nào sửa được ruột nó</b>, nên hai tên không thể ảnh hưởng nhau.</p>
-    <p>Cái người ta hay gọi là "kiểu giá trị và kiểu tham chiếu" trong ngôn ngữ khác, ở Python chỉ là hệ quả của ranh giới mutable ở mục 05. Cơ chế thì đồng nhất cho mọi kiểu.</p>
-  </div></details>
 </section>
 
-<section id="memory-s3" class="lesson">
+<section id="mm-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Gán lại tên hay sửa object</h2></div>
-
-  <p class="key">Đây là <em>ngã ba</em> của cả bài. Đọc một dòng code, luôn hỏi đúng một câu: nó động tới <em>cái tên</em>, hay động tới <em>cái object</em>?</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="so sánh gán lại tên chỉ đổi chỗ tên b với sửa object làm mọi tên cùng thấy">
-<path d="M0.0 41 H 37.12 V 46 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,46.0 69.51,41.8 69.51,50.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">CÙNG MỘT CHỮ b &#8212; HAI VIỆC KHÁC HẲN NHAU</text>
-<rect x="86.62" y="30" width="371.22" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="272.23" y="47" fill="var(--probe)" text-anchor="middle">b = [9]</text>
-<text class="sv-d" x="86.62" y="74" fill="var(--probe)">GÁN LẠI TÊN &#8212; động tới tên</text>
-<rect x="105.18" y="84" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="136.12" y="99" fill="var(--probe)" text-anchor="middle">a</text>
-<rect x="105.18" y="118" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="136.12" y="133" fill="var(--probe)" text-anchor="middle">b</text>
-<line x1="170.14" y1="95" x2="225.83" y2="95" stroke="var(--filled)" stroke-width="1.2"/>
-<polygon points="235.28,95.0 227.28,90.8 227.28,99.2" fill="var(--filled)"/>
-<line x1="170.14" y1="129" x2="225.83" y2="129" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="235.28,129.0 227.28,124.8 227.28,133.2" fill="var(--probe)"/>
-<rect x="244.39" y="82" width="197.99" height="26" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="343.38" y="99" fill="var(--filled)" text-anchor="middle">[1, 2]</text>
-<rect x="244.39" y="116" width="197.99" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="343.38" y="133" fill="var(--probe)" text-anchor="middle">[9]</text>
-<text class="sv-d" x="86.62" y="164" fill="var(--muted)">chỉ b đổi chỗ &#183; object cũ nguyên vẹn</text>
-<text class="sv-d" x="86.62" y="180" fill="var(--ok)">a vẫn là [1, 2]</text>
-<rect x="482.59" y="30" width="377.41" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="671.29" y="47" fill="var(--tomb)" text-anchor="middle">b[0] = 9</text>
-<text class="sv-d" x="482.59" y="74" fill="var(--tomb)">SỬA OBJECT &#8212; động tới object</text>
-<rect x="501.15" y="84" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="532.09" y="99" fill="var(--probe)" text-anchor="middle">a</text>
-<rect x="501.15" y="118" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="532.09" y="133" fill="var(--probe)" text-anchor="middle">b</text>
-<path d="M566.12 95 H 612.52 V 112" stroke="var(--tomb)" stroke-width="1.2" fill="none"/>
-<path d="M566.12 129 H 612.52 V 112" stroke="var(--tomb)" stroke-width="1.2" fill="none"/>
-<line x1="612.52" y1="112" x2="655.83" y2="112" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="665.28,112.0 657.28,107.8 657.28,116.2" fill="var(--tomb)"/>
-<rect x="674.39" y="99" width="179.42" height="26" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="764.1" y="116" fill="var(--tomb)" text-anchor="middle">[9, 2]</text>
-<text class="sv-d" x="482.59" y="164" fill="var(--muted)">một object, hai tên cùng nhìn vào</text>
-<text class="sv-d" x="482.59" y="180" fill="var(--tomb)">a cũng thành [9, 2]</text>
-<line x1="86.62" y1="200" x2="860.0" y2="200" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-d" x="86.62" y="222" fill="var(--probe)">Toán tử += đứng đúng giữa hai cột, và đổi cột theo kiểu dữ liệu:</text>
-<text class="sv-d" x="86.62" y="242" fill="var(--muted)">list &#8594; sửa tại chỗ &#183; tuple, số, chuỗi &#8594; tạo object mới rồi gán lại tên.</text>
-<text class="sv-d" x="86.62" y="268" fill="var(--ok)">Đọc một dòng code, luôn hỏi: nó động tới TÊN hay động tới OBJECT?</text>
+  <p class="key">Ngã ba của cả bài. Đọc một dòng code thì hỏi: nó động tới <em>cái tên</em>, hay động tới <em>cái object</em>?</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 212" role="img" aria-label="Tên a và b cùng trỏ vào list một hai; sau khi gán b bằng list chín thì mũi tên của b chuyển sang một object mới, còn a vẫn trỏ vào object cũ" data-anim><style>@keyframes rb1{0%{animation-timing-function:ease-in-out;opacity:0}5.714%{animation-timing-function:ease-in-out;opacity:0}12.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rb2{0%{animation-timing-function:ease-in-out;opacity:0}14.286%{animation-timing-function:ease-in-out;opacity:0}20.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rb3{0%{animation-timing-function:ease-in-out;opacity:0}17.143%{animation-timing-function:ease-in-out;opacity:0}21.786%{animation-timing-function:ease-in-out;opacity:1}37.143%{animation-timing-function:ease-in-out;opacity:1}41.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes rb4{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}46.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rb5{0%{animation-timing-function:ease-in-out;opacity:0}51.429%{animation-timing-function:ease-in-out;opacity:0}57.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes rb6{0%{animation-timing-function:ease-in-out;opacity:0}62.857%{animation-timing-function:ease-in-out;opacity:0}69.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.rb1{animation:rb1 5.384615384615384s linear 1 forwards}.rb2{animation:rb2 5.384615384615384s linear 1 forwards}.rb3{animation:rb3 5.384615384615384s linear 1 forwards}.rb4{animation:rb4 5.384615384615384s linear 1 forwards}.rb5{animation:rb5 5.384615384615384s linear 1 forwards}.rb6{animation:rb6 5.384615384615384s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">b = [9]   ·   ĐỔI CHỖ CÁI TÊN</text>
+<g class="rb1"><rect x="20" y="64" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="82.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><rect x="140" y="58" width="150" height="34" rx="6" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.6"/><text x="215.0" y="80.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1, 2]</text><line x1="74" y1="77" x2="140" y2="75" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="rb2"><rect x="20" y="118" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="136.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text></g>
+<g class="rb3" opacity="0"><line x1="74" y1="131" x2="140" y2="86" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="rb4"><rect x="140" y="112" width="150" height="34" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="215.0" y="134.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[9]</text><line x1="74" y1="131" x2="140" y2="129" stroke="var(--ok)" stroke-width="1.6"/></g>
+<g class="rb5"><text class="sv-d" x="330" y="80" fill="var(--clay)" style="fill:var(--clay)">a giữ nguyên</text><text class="sv-d" x="330" y="134" fill="var(--ok)" style="fill:var(--ok)">b sang object mới</text></g>
+<g class="rb6"><rect x="0" y="176" width="3" height="20" rx="1.5" fill="rgba(var(--green-a),1)" stroke="var(--ok)" stroke-width="0"/><text class="sv-d" x="14" y="191" fill="var(--ok)" style="fill:var(--ok)">Chỉ tên b đổi chỗ · tên khác không hay biết</text></g>
 </svg>
-<figcaption>Cùng một chữ <code>b</code> đứng bên trái dấu bằng. <code>b = [9]</code> đổi chỗ <b>cái tên</b>; <code>b[0] = 9</code> đổi ruột <b>cái object</b> — và mọi tên trỏ vào nó đều thấy.</figcaption>
-</figure>
-
+  </figure>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 202" role="img" aria-label="Hai tên a và b cùng trỏ vào một array; badge phép gán b ngoặc không bằng chín nối xuống đúng ô đầu và khoanh ô đó, rồi ô đổi từ một sang chín" data-anim><style>@keyframes mt1{0%{animation-timing-function:ease-in-out;opacity:0}3.636%{animation-timing-function:ease-in-out;opacity:0}6.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mt2{0%{animation-timing-function:ease-in-out;opacity:0}7.273%{animation-timing-function:ease-in-out;opacity:0}10.455%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mt3{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}22.273%{animation-timing-function:ease-in-out;opacity:1}52.727%{animation-timing-function:ease-in-out;opacity:1}55.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mt4{0%{animation-timing-function:ease-in-out;opacity:0}9.091%{animation-timing-function:ease-in-out;opacity:0}11.364%{animation-timing-function:ease-in-out;opacity:1}30.909%{animation-timing-function:ease-in-out;opacity:1}33.182%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mt5{0%{animation-timing-function:ease-in-out;opacity:0}33.636%{animation-timing-function:ease-in-out;opacity:0}36.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mt6{0%{animation-timing-function:ease-in-out;opacity:0}43.636%{animation-timing-function:ease-in-out;opacity:0}46.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mt7{0%{animation-timing-function:ease-in-out;opacity:0}52.727%{animation-timing-function:ease-in-out;opacity:0}55.909%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mt1{animation:mt1 11.0s linear 1 forwards}.mt2{animation:mt2 11.0s linear 1 forwards}.mt3{animation:mt3 11.0s linear 1 forwards}.mt4{animation:mt4 11.0s linear 1 forwards}.mt5{animation:mt5 11.0s linear 1 forwards}.mt6{animation:mt6 11.0s linear 1 forwards}.mt7{animation:mt7 11.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">SỬA RUỘT OBJECT · MỌI TÊN TRỎ VÀO ĐỀU THẤY</text>
+<g class="mt1"><rect x="20" y="80" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="98.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><rect x="20" y="130" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="148.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="74" y1="93" x2="210" y2="104" stroke="var(--probe)" stroke-width="1.6"/><line x1="74" y1="143" x2="210" y2="126" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="mt2"><text class="sv-d" x="236.0" y="88" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="288.0" y="88" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><rect x="262" y="96" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="288.0" y="121.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="mt3" opacity="0"><rect x="210" y="38" width="81.2" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="221.0" y="56.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b[0] = 9</text><line x1="250.6" y1="64.0" x2="236.0" y2="96.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="236.0" cy="96.0" r="2.8" fill="var(--tomb)"/><rect x="207.0" y="93.0" width="58.0" height="44.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="mt4" opacity="0"><rect x="210" y="96" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="236.0" y="121.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="mt5"><rect x="210" y="96" width="52" height="38" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="236.0" y="121.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text></g>
+<g class="mt6"><text class="sv-d" x="344" y="121" fill="var(--tomb)" style="fill:var(--tomb)">cùng một object · a và b đều thấy</text></g>
+<g class="mt7"><rect x="0" y="166" width="3" height="20" rx="1.5" fill="rgba(var(--red-a),1)" stroke="var(--tomb)" stroke-width="0"/><text class="sv-d" x="14" y="181" fill="var(--tomb)" style="fill:var(--tomb)">Không object mới nào được tạo · chỉ ruột đổi</text></g>
+</svg>
+  </figure>
   <ul class="why">
-    <li><b>Gán lại tên</b> — <code>b = [9]</code> — chỉ tên <code>b</code> đổi chỗ, tên khác không hay biết.</li>
-    <li><b>Sửa object</b> — <code>b[0] = 9</code>, <code>b.append(9)</code> — mọi tên trỏ vào đều thấy.</li>
-    <li><code>+=</code> đổi nhánh theo kiểu: list thì sửa tại chỗ, tuple và số thì tạo object mới.</li>
+    <li>Với <code>list</code>, <code>b += [9]</code> gọi <code>__iadd__</code>: đi nhánh sửa object.</li>
+    <li>Với <code>tuple</code>, số hay chuỗi thì không có <code>__iadd__</code>: đi nhánh gán lại tên.</li>
+    <li>Đổi một list thành tuple là hành vi đổi theo, mà không lỗi nào báo.</li>
   </ul>
-
-  <details class="deep"><summary>Vì sao <code>+=</code> là chỗ tinh vi nhất</summary>
-  <div class="body">
-    <p>Với list, <code>b += [9]</code> gọi <code>__iadd__</code> và <b>sửa tại chỗ</b> — giống hệt <code>extend</code>, nên mọi tên trỏ vào cái list đó đều thấy. Với tuple, số hay chuỗi thì không có <code>__iadd__</code>, Python quay về <code>__add__</code>: tạo object mới rồi gán lại tên.</p>
-    <p>Cùng một toán tử, hai nhánh khác nhau của bản đồ, chọn theo kiểu dữ liệu. Đây là nguồn bug rất khó thấy khi tái cấu trúc code — đổi một list thành tuple là hành vi đổi theo mà không có lỗi nào báo.</p>
-  </div></details>
+  <p>Trong hàm cũng đúng hai nhánh đó. Tên gọi là <b>pass by assignment</b>:</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 404" role="img" aria-label="Khung stack có frame main giữ tên x trỏ tới array trên heap; khi gọi f1 thì một frame mới có tên lst cùng trỏ vào array đó và append sửa chính nó nên x thấy; khi gọi f2 thì gán lại tên chỉ đổi ô tên trong frame f2 sang một array mới, frame mất đi khi trả về nên y giữ nguyên" data-anim><style>@keyframes pm1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.917%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm2{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}6.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm3{0%{animation-timing-function:ease-in-out;opacity:0}6.000%{animation-timing-function:ease-in-out;opacity:0}8.917%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm4{0%{animation-timing-function:ease-in-out;opacity:0}9.333%{animation-timing-function:ease-in-out;opacity:0}12.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm5{0%{animation-timing-function:ease-in-out;opacity:0}16.000%{animation-timing-function:ease-in-out;opacity:0}18.083%{animation-timing-function:ease-in-out;opacity:1}50.667%{animation-timing-function:ease-in-out;opacity:1}52.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm6{0%{animation-timing-function:ease-in-out;opacity:0}18.667%{animation-timing-function:ease-in-out;opacity:0}20.750%{animation-timing-function:ease-in-out;opacity:1}50.667%{animation-timing-function:ease-in-out;opacity:1}52.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm7{0%{animation-timing-function:ease-in-out;opacity:0}22.667%{animation-timing-function:ease-in-out;opacity:0}24.750%{animation-timing-function:ease-in-out;opacity:1}50.667%{animation-timing-function:ease-in-out;opacity:1}52.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm8{0%{animation-timing-function:ease-in-out;opacity:0}9.333%{animation-timing-function:ease-in-out;opacity:0}11.417%{animation-timing-function:ease-in-out;opacity:1}29.333%{animation-timing-function:ease-in-out;opacity:1}31.417%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm9{0%{animation-timing-function:ease-in-out;opacity:0}30.667%{animation-timing-function:ease-in-out;opacity:0}32.750%{animation-timing-function:ease-in-out;opacity:1}50.667%{animation-timing-function:ease-in-out;opacity:1}52.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm10{0%{animation-timing-function:ease-in-out;opacity:0}34.667%{animation-timing-function:ease-in-out;opacity:0}36.750%{animation-timing-function:ease-in-out;opacity:1}50.667%{animation-timing-function:ease-in-out;opacity:1}52.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm11{0%{animation-timing-function:ease-in-out;opacity:0}44.000%{animation-timing-function:ease-in-out;opacity:0}46.083%{animation-timing-function:ease-in-out;opacity:1}50.667%{animation-timing-function:ease-in-out;opacity:1}52.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm12{0%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:0}54.083%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm13{0%{animation-timing-function:ease-in-out;opacity:0}52.667%{animation-timing-function:ease-in-out;opacity:0}55.583%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm14{0%{animation-timing-function:ease-in-out;opacity:0}54.667%{animation-timing-function:ease-in-out;opacity:0}56.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm15{0%{animation-timing-function:ease-in-out;opacity:0}56.000%{animation-timing-function:ease-in-out;opacity:0}58.083%{animation-timing-function:ease-in-out;opacity:1}66.667%{animation-timing-function:ease-in-out;opacity:1}68.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes pm16{0%{animation-timing-function:ease-in-out;opacity:0}68.000%{animation-timing-function:ease-in-out;opacity:0}70.083%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm17{0%{animation-timing-function:ease-in-out;opacity:0}72.000%{animation-timing-function:ease-in-out;opacity:0}74.083%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm18{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}62.083%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm19{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}82.083%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm20{0%{animation-timing-function:ease-in-out;opacity:0}86.667%{animation-timing-function:ease-in-out;opacity:0}89.583%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pm21{0%{animation-timing-function:ease-in-out;opacity:0}90.667%{animation-timing-function:ease-in-out;opacity:0}93.583%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.pm1{animation:pm1 12.0s linear 1 forwards}.pm2{animation:pm2 12.0s linear 1 forwards}.pm3{animation:pm3 12.0s linear 1 forwards}.pm4{animation:pm4 12.0s linear 1 forwards}.pm5{animation:pm5 12.0s linear 1 forwards}.pm6{animation:pm6 12.0s linear 1 forwards}.pm7{animation:pm7 12.0s linear 1 forwards}.pm8{animation:pm8 12.0s linear 1 forwards}.pm9{animation:pm9 12.0s linear 1 forwards}.pm10{animation:pm10 12.0s linear 1 forwards}.pm11{animation:pm11 12.0s linear 1 forwards}.pm12{animation:pm12 12.0s linear 1 forwards}.pm13{animation:pm13 12.0s linear 1 forwards}.pm14{animation:pm14 12.0s linear 1 forwards}.pm15{animation:pm15 12.0s linear 1 forwards}.pm16{animation:pm16 12.0s linear 1 forwards}.pm17{animation:pm17 12.0s linear 1 forwards}.pm18{animation:pm18 12.0s linear 1 forwards}.pm19{animation:pm19 12.0s linear 1 forwards}.pm20{animation:pm20 12.0s linear 1 forwards}.pm21{animation:pm21 12.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">TRUYỀN THAM SỐ · TÊN RIÊNG TRONG KHUNG HÀM, OBJECT THÌ CHUNG</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="pm1"><rect x="16" y="56" width="300" height="240" rx="7" fill="none" stroke="var(--probe)" stroke-width="1.5"/><text class="sv-d" x="28" y="78" fill="var(--probe)" style="fill:var(--probe)">STACK</text></g>
+<g class="pm2"><rect x="400" y="56" width="420" height="240" rx="7" fill="none" stroke="var(--clay)" stroke-width="1.5"/><text class="sv-d" x="412" y="78" fill="var(--clay)" style="fill:var(--clay)">HEAP</text></g>
+<g class="pm3"><rect x="30" y="92" width="272" height="56" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.1" stroke-dasharray="3 2"/><text class="sv-d" x="42" y="110" fill="var(--faint)" style="fill:var(--faint)">frame  main</text><rect x="42" y="116" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="69.0" y="134.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text></g>
+<g class="pm4"><text class="sv-d" x="453.0" y="102" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="499.0" y="102" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="545.0" y="102" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[2]</text><line x1="96" y1="129" x2="430" y2="124" stroke="var(--probe)" stroke-width="1.5"/></g>
+<g class="pm5" opacity="0"><rect x="560" y="10" width="240" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">f1(x): lst.append(4)</text></g>
+<g class="pm6" opacity="0"><rect x="30" y="160" width="272" height="56" rx="5" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="42" y="178" fill="var(--tomb)" style="fill:var(--tomb)">frame  f1</text><rect x="42" y="184" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="69.0" y="202.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">lst</text><line x1="96" y1="197" x2="430" y2="136" stroke="var(--tomb)" stroke-width="1.5"/></g>
+<g class="pm7" opacity="0"><text class="sv-d" x="42" y="232" fill="var(--tomb)" style="fill:var(--tomb)">tham số = tên MỚI, object CŨ</text></g>
+<g class="pm8" opacity="0"><rect x="430" y="108" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="453.0" y="129.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text><rect x="476" y="108" width="46" height="32" rx="0" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="499.0" y="129.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text><rect x="522" y="108" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="545.0" y="129.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="pm9" opacity="0"><rect x="430" y="108" width="46" height="32" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/><text x="453.0" y="129.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text><rect x="476" y="108" width="46" height="32" rx="0" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/><text x="499.0" y="129.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text><rect x="522" y="108" width="46" height="32" rx="0" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/><text x="545.0" y="129.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text><rect x="568" y="108" width="46" height="32" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/><text x="591.0" y="129.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="pm10" opacity="0"><text class="sv-d" x="430" y="174" fill="var(--tomb)" style="fill:var(--tomb)">sửa chính object đó → x thành [1, 2, 3, 4]</text></g>
+<g class="pm11" opacity="0"><text class="sv-d" x="42" y="256" fill="var(--faint)" style="fill:var(--faint)">f1 trả về → frame f1 biến mất</text></g>
+<g class="pm12"><rect x="560" y="10" width="240" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">f2(y): lst = [9, 9]</text></g>
+<g class="pm13"><rect x="430" y="108" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="453.0" y="129.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text><rect x="476" y="108" width="46" height="32" rx="0" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="499.0" y="129.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text><rect x="522" y="108" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="545.0" y="129.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="pm14"><rect x="30" y="160" width="272" height="56" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="42" y="178" fill="var(--ok)" style="fill:var(--ok)">frame  f2</text><rect x="42" y="184" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="69.0" y="202.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">lst</text></g>
+<g class="pm15" opacity="0"><line x1="96" y1="197" x2="430" y2="136" stroke="var(--ok)" stroke-width="1.5"/></g>
+<g class="pm16"><rect x="430" y="206" width="46" height="32" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.4"/><text x="453.0" y="227.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text><rect x="476" y="206" width="46" height="32" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.4"/><text x="499.0" y="227.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text><line x1="96" y1="197" x2="430" y2="222" stroke="var(--ok)" stroke-width="1.5"/></g>
+<g class="pm17"><text class="sv-d" x="430" y="256" fill="var(--ok)" style="fill:var(--ok)">object mới chỉ được frame f2 trỏ tới</text></g>
+<g class="pm18"><text class="sv-d" x="42" y="232" fill="var(--ok)" style="fill:var(--ok)">chỉ ô tên trong frame f2 đổi</text></g>
+<g class="pm19"><text class="sv-d" x="42" y="256" fill="var(--ok)" style="fill:var(--ok)">f2 trả về → frame mất → y vẫn [1, 2, 3]</text></g>
+<g class="pm20"><rect x="0" y="322" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="337" fill="var(--probe)" style="fill:var(--probe)">pass by assignment · không phải by value, cũng không phải by reference</text></g>
+<g class="pm21"><text class="sv-d" x="14" y="354" fill="var(--muted)" style="fill:var(--muted)">Tham số chỉ là một cái tên mới trong khung hàm, dán lên object cũ.</text><text class="sv-d" x="14" y="372" fill="var(--muted)" style="fill:var(--muted)">Sửa object thì người gọi thấy · gán lại tên thì không, vì cái tên đó chết theo khung hàm.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Không phải by value, cũng không phải by reference.</li>
+    <li>Tham số là một cái tên mới trong khung hàm, dán lên object cũ.</li>
+    <li>Gán lại tên chỉ đổi ô tên trong khung hàm, mà khung đó chết khi hàm trả về.</li>
+    <li>Quy ước thư viện chuẩn: hoặc trả object mới (<code>sorted</code>), hoặc sửa tại chỗ rồi trả <code>None</code> (<code>sort</code>).</li>
+  </ul>
 </section>
 
-<section id="memory-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>is và ==</h2></div>
-
-  <p class="key">Hai toán tử này hỏi hai câu khác nhau về <em>đúng ô TÊN</em> của bản đồ: <code>==</code> hỏi về nội dung, <code>is</code> hỏi về địa chỉ.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 306" role="img" aria-label="hai object nội dung giống nhau nhưng địa chỉ khác nhau, nên bằng bằng trả về True còn is trả về False">
-<path d="M0.0 107 H 37.12 V 92 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,92.0 69.51,87.8 69.51,96.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">HAI CÂU HỎI KHÁC NHAU VỀ CÙNG HAI CÁI TÊN</text>
-<rect x="86.62" y="30" width="464.03" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="318.63" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2]  ;  b = [1, 2]</text>
-<rect x="105.18" y="68" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="136.12" y="83" fill="var(--probe)" text-anchor="middle">a</text>
-<line x1="136.12" y1="90" x2="136.12" y2="94" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="136.12,102.0 131.92,94.0 140.32,94.0" fill="var(--probe)"/>
-<rect x="86.62" y="106" width="197.99" height="40" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="126" fill="var(--filled)">[1, 2]</text>
-<text class="sv-d" x="108.27" y="141" fill="var(--muted)">id 0x7f2c40</text>
-<rect x="371.22" y="68" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="402.16" y="83" fill="var(--probe)" text-anchor="middle">b</text>
-<line x1="402.16" y1="90" x2="402.16" y2="94" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="402.16,102.0 397.96,94.0 406.36,94.0" fill="var(--probe)"/>
-<rect x="352.66" y="106" width="197.99" height="40" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="374.32" y="126" fill="var(--filled)">[1, 2]</text>
-<text class="sv-d" x="374.32" y="141" fill="var(--muted)">id 0x7f9e18</text>
-<text class="sv-d" x="86.62" y="172" fill="var(--muted)">hai object khác nhau, nội dung tình cờ giống nhau</text>
-<rect x="593.96" y="62" width="266.04" height="44" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-t" x="615.61" y="82" fill="var(--ok)">a == b  &#8594;  True</text>
-<text class="sv-d" x="615.61" y="98" fill="var(--muted)">so NỘI DUNG, gọi __eq__</text>
-<rect x="593.96" y="116" width="266.04" height="44" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="615.61" y="136" fill="var(--tomb)">a is b  &#8594;  False</text>
-<text class="sv-s" x="615.61" y="152" fill="var(--muted)">so ĐỊA CHỈ, hai ô khác nhau</text>
-<line x1="86.62" y1="192" x2="860.0" y2="192" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-hv" x="86.62" y="214" fill="var(--muted)">CHỖ DUY NHẤT NÊN DÙNG is</text>
-<rect x="86.62" y="224" width="773.38" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="244" fill="var(--probe)">x is None  &#183;  x is True  &#183;  x is SENTINEL</text>
-<text class="sv-s" x="108.27" y="260" fill="var(--muted)">None chỉ có đúng một object trong cả interpreter &#8212; so địa chỉ là chính xác nhất</text>
-<text class="sv-d" x="86.62" y="290" fill="var(--tomb)">Đừng dùng is để so số hay chuỗi: có lúc đúng nhờ interning, đó là bẫy.</text>
+<section id="mm-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Mutable hay không</h2></div>
+  <p class="key">Ranh giới này quyết định nhánh "sửa object" có mở hay không.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 218" role="img" aria-label="Array x có hai ô; khi gọi append một ô trống hiện ra ở cuối rồi phần tử ba bay vào đúng ô đó, id vẫn là 0x41" data-anim><style>@keyframes mb1{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}6.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mb2{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}9.583%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mb3{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}8.750%{animation-timing-function:ease-in-out;opacity:1}21.667%{animation-timing-function:ease-in-out;opacity:1}23.750%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mb4{0%{animation-timing-function:ease-in-out;opacity:0}16.667%{animation-timing-function:ease-in-out;opacity:0}18.750%{animation-timing-function:ease-in-out;opacity:1}50.000%{animation-timing-function:ease-in-out;opacity:1}52.083%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mb5{0%{animation-timing-function:ease-in-out;opacity:0}23.333%{animation-timing-function:ease-in-out;opacity:0}26.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mb6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}30.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}30.417%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}40.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,70px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,70px)}}@keyframes mb7{0%{animation-timing-function:ease-in-out;opacity:0}40.833%{animation-timing-function:ease-in-out;opacity:0}43.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mb8{0%{animation-timing-function:ease-in-out;opacity:0}48.333%{animation-timing-function:ease-in-out;opacity:0}51.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mb9{0%{animation-timing-function:ease-in-out;opacity:0}55.000%{animation-timing-function:ease-in-out;opacity:0}57.917%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mb10{0%{animation-timing-function:ease-in-out;opacity:0}61.667%{animation-timing-function:ease-in-out;opacity:0}64.583%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mb1{animation:mb1 12.0s linear 1 forwards}.mb2{animation:mb2 12.0s linear 1 forwards}.mb3{animation:mb3 12.0s linear 1 forwards}.mb4{animation:mb4 12.0s linear 1 forwards}.mb5{animation:mb5 12.0s linear 1 forwards}.mb6{animation:mb6 12.0s linear 1 forwards}.mb7{animation:mb7 12.0s linear 1 forwards}.mb8{animation:mb8 12.0s linear 1 forwards}.mb9{animation:mb9 12.0s linear 1 forwards}.mb10{animation:mb10 12.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">MUTABLE · list dict set · SỬA ĐƯỢC NÊN Ở NGUYÊN VÙNG NHỚ CŨ</text>
+<g class="mb1"><rect x="60" y="92" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="87.0" y="110.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">x</text><line x1="114" y1="105" x2="180" y2="105" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="206.0" y="78" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="258.0" y="78" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text></g>
+<g class="mb2"><rect x="180" y="86" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="206.0" y="111.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text><rect x="232" y="86" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="258.0" y="111.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="mb3" opacity="0"><text x="308.0" y="111.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">id 0x41</text></g>
+<g class="mb4" opacity="0"><rect x="180" y="30" width="103.4" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="191.0" y="48.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x.append(3)</text><line x1="231.7" y1="56.0" x2="310.0" y2="86.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="310.0" cy="86.0" r="2.8" fill="var(--ok)"/><rect x="281.0" y="83.0" width="58.0" height="44.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="mb5"><rect x="284" y="86" width="52" height="38" rx="4" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="4 3"/><text class="sv-d" x="310.0" y="78" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[2]</text></g>
+<g class="mb6" transform="translate(0 70)"><rect x="284" y="16" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="310.0" y="41.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="mb7"><rect x="284" y="86" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="310.0" y="111.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="mb8"><text class="sv-d" x="180" y="150" fill="var(--ok)" style="fill:var(--ok)">phần tử mới vào đúng ô cuối · array không phải dọn đi đâu</text></g>
+<g class="mb9"><text class="sv-d" x="360" y="111" fill="var(--ok)" style="fill:var(--ok)">id 0x41</text><text class="sv-d" x="360" y="130" fill="var(--faint)" style="fill:var(--faint)">vẫn vùng nhớ cũ</text></g>
+<g class="mb10"><rect x="0" y="182" width="3" height="20" rx="1.5" fill="rgba(var(--green-a),1)" stroke="var(--ok)" stroke-width="0"/><text class="sv-d" x="14" y="197" fill="var(--ok)" style="fill:var(--ok)">Sửa tại chỗ · mọi tên trỏ vào object đó đều thấy</text></g>
 </svg>
-<figcaption>Hai list nội dung giống hệt vẫn là <b>hai object</b>. <code>==</code> hỏi về nội dung, <code>is</code> hỏi về địa chỉ — nên chỉ <code>None</code> và sentinel mới hợp với <code>is</code>.</figcaption>
-</figure>
-
+  </figure>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 362" role="img" aria-label="Chuỗi ab ở id 0x41; ký tự c bay tới ô cuối nhưng bị gạch chéo vì không chen được; nên toàn bộ ký tự phải chép sang một vùng nhớ khác ở id 0x77 rồi mới thêm được c" data-anim><style>@keyframes im1{0%{animation-timing-function:ease-in-out;opacity:0}2.500%{animation-timing-function:ease-in-out;opacity:0}4.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im2{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.312%{animation-timing-function:ease-in-out;opacity:1}56.250%{animation-timing-function:ease-in-out;opacity:1}57.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes im3{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}56.250%{animation-timing-function:ease-in-out;opacity:1}57.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes im4{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}59.687%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im5{0%{animation-timing-function:ease-in-out;opacity:0}12.500%{animation-timing-function:ease-in-out;opacity:0}14.062%{animation-timing-function:ease-in-out;opacity:1}38.750%{animation-timing-function:ease-in-out;opacity:1}40.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes im6{0%{animation-timing-function:ease-in-out;opacity:0}17.500%{animation-timing-function:ease-in-out;opacity:0}19.062%{animation-timing-function:ease-in-out;opacity:1}56.250%{animation-timing-function:ease-in-out;opacity:1}57.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes im7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}21.250%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}21.562%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}27.500%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,64px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,64px)}}@keyframes im8{0%{animation-timing-function:ease-in-out;opacity:0}27.500%{animation-timing-function:ease-in-out;opacity:0}29.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im9{0%{animation-timing-function:ease-in-out;opacity:0}28.750%{animation-timing-function:ease-in-out;opacity:0}30.937%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im10{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}32.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im11{0%{animation-timing-function:ease-in-out;opacity:0}46.250%{animation-timing-function:ease-in-out;opacity:0}48.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im12{0%{animation-timing-function:ease-in-out;opacity:0}47.500%{animation-timing-function:ease-in-out;opacity:0}49.687%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im13{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}50.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}50.313%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.875%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,150px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,150px)}}@keyframes im14{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}59.687%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im15{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.125%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.438%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}60.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,150px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,150px)}}@keyframes im16{0%{animation-timing-function:ease-in-out;opacity:0}60.625%{animation-timing-function:ease-in-out;opacity:0}62.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im17{0%{animation-timing-function:ease-in-out;opacity:0}65.000%{animation-timing-function:ease-in-out;opacity:0}67.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im18{0%{animation-timing-function:ease-in-out;opacity:0}67.500%{animation-timing-function:ease-in-out;opacity:0}69.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im19{0%{animation-timing-function:ease-in-out;opacity:0}71.250%{animation-timing-function:ease-in-out;opacity:0}73.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im20{0%{animation-timing-function:ease-in-out;opacity:0}73.750%{animation-timing-function:ease-in-out;opacity:0}75.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes im21{0%{animation-timing-function:ease-in-out;opacity:0}78.750%{animation-timing-function:ease-in-out;opacity:0}80.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.im1{animation:im1 16.0s linear 1 forwards}.im2{animation:im2 16.0s linear 1 forwards}.im3{animation:im3 16.0s linear 1 forwards}.im4{animation:im4 16.0s linear 1 forwards}.im5{animation:im5 16.0s linear 1 forwards}.im6{animation:im6 16.0s linear 1 forwards}.im7{animation:im7 16.0s linear 1 forwards}.im8{animation:im8 16.0s linear 1 forwards}.im9{animation:im9 16.0s linear 1 forwards}.im10{animation:im10 16.0s linear 1 forwards}.im11{animation:im11 16.0s linear 1 forwards}.im12{animation:im12 16.0s linear 1 forwards}.im13{animation:im13 16.0s linear 1 forwards}.im14{animation:im14 16.0s linear 1 forwards}.im15{animation:im15 16.0s linear 1 forwards}.im16{animation:im16 16.0s linear 1 forwards}.im17{animation:im17 16.0s linear 1 forwards}.im18{animation:im18 16.0s linear 1 forwards}.im19{animation:im19 16.0s linear 1 forwards}.im20{animation:im20 16.0s linear 1 forwards}.im21{animation:im21 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">IMMUTABLE · int str tuple · KHÔNG CHEN ĐƯỢC NÊN PHẢI DỌN SANG VÙNG NHỚ KHÁC</text>
+<g class="im1"><rect x="60" y="92" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="87.0" y="110.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">s</text><text class="sv-d" x="206.0" y="78" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="258.0" y="78" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text></g>
+<g class="im2" opacity="0"><line x1="114" y1="105" x2="180" y2="105" stroke="var(--probe)" stroke-width="1.6"/></g>
+<g class="im3" opacity="0"><rect x="180" y="86" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="206.0" y="111.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><rect x="232" y="86" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="258.0" y="111.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><text x="360.0" y="111.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">id 0x41</text></g>
+<g class="im4"><g opacity=".3"><rect x="180" y="86" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="206.0" y="111.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><rect x="232" y="86" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="258.0" y="111.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><text x="360.0" y="111.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">id 0x41</text></g></g>
+<g class="im5" opacity="0"><rect x="180" y="30" width="81.2" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="191.0" y="48.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">s += "c"</text><line x1="220.6" y1="56.0" x2="310.0" y2="80.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="310.0" cy="80.0" r="2.8" fill="var(--tomb)"/><rect x="177.0" y="83.0" width="110.0" height="44.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="im6" opacity="0"><rect x="284" y="86" width="52" height="38" rx="4" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="im7" transform="translate(0 64)"><rect x="284" y="16" width="52" height="38" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="310.0" y="41.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">c</text></g>
+<g class="im8"><rect x="284" y="80" width="52" height="38" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="310.0" y="105.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">c</text></g>
+<g class="im9"><line x1="290" y1="86" x2="330" y2="112" stroke="var(--tomb)" stroke-width="2.4"/><line x1="330" y1="86" x2="290" y2="112" stroke="var(--tomb)" stroke-width="2.4"/></g>
+<g class="im10"><text class="sv-d" x="352" y="105" fill="var(--tomb)" style="fill:var(--tomb)">không chen được</text></g>
+<g class="im11"><text class="sv-d" x="60" y="206" fill="var(--ok)" style="fill:var(--ok)">phải cấp vùng nhớ khác, rồi chép TOÀN BỘ sang:</text></g>
+<g class="im12"><text class="sv-d" x="206.0" y="228" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="258.0" y="228" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="310.0" y="228" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[2]</text></g>
+<g class="im13" transform="translate(0 150)"><rect x="180" y="86" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="206.0" y="111.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text></g>
+<g class="im14"><rect x="180" y="236" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="206.0" y="261.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text></g>
+<g class="im15" transform="translate(0 150)"><rect x="232" y="86" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="258.0" y="111.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text></g>
+<g class="im16"><rect x="232" y="236" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="258.0" y="261.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text></g>
+<g class="im17"><rect x="284" y="236" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="310.0" y="261.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">c</text></g>
+<g class="im18"><rect x="60" y="242" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="87.0" y="260.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">s</text><line x1="114" y1="255" x2="180" y2="255" stroke="var(--ok)" stroke-width="1.6"/></g>
+<g class="im19"><text x="360.0" y="261.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">id 0x77</text><text class="sv-d" x="360" y="280" fill="var(--ok)" style="fill:var(--ok)">vùng nhớ KHÁC</text></g>
+<g class="im20"><text class="sv-d" x="180" y="148" fill="var(--faint)" style="fill:var(--faint)">object cũ bỏ lại, sẽ bị thu hồi</text></g>
+<g class="im21"><rect x="0" y="326" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="341" fill="var(--probe)" style="fill:var(--probe)">Mỗi lần &quot;đổi&quot; là chép cả chuỗi sang chỗ mới · đó là cái giá của immutable</text></g>
+</svg>
+  </figure>
   <ul class="why">
-    <li><code>==</code> gọi <code>__eq__</code> — dùng cho gần như mọi so sánh.</li>
-    <li><code>is</code> so địa chỉ — chỉ dùng với <code>None</code>, <code>True</code>, <code>False</code>, sentinel.</li>
-    <li><code>None</code> là object <b>duy nhất</b> trong cả interpreter, nên so địa chỉ là chính xác nhất.</li>
+    <li>Immutable là <b>nông</b>: <code>tuple</code> khoá danh sách địa chỉ, không khoá object bên trong.</li>
+    <li>Nên <code>tp = (1, [2, 3])</code> vẫn cho <code>tp[1].append(4)</code>, và <code>hash</code> ném <code>TypeError</code>.</li>
+  </ul>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 348" role="img" aria-label="Bảng ba cách viết với tỉ lệ chậm đi khi n gấp đôi: s cộng bằng chậm gấp khoảng hai lần nên tuyến tính, s cộng bằng khi còn giữ chuỗi cũ chậm gấp hơn năm lần nên bậc hai, còn join gấp hai lần và nhanh nhất" data-anim><style>@keyframes sc1{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}8.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc2{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}11.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc3{0%{animation-timing-function:ease-in-out;opacity:0}11.111%{animation-timing-function:ease-in-out;opacity:0}15.778%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc4{0%{animation-timing-function:ease-in-out;opacity:0}15.556%{animation-timing-function:ease-in-out;opacity:0}20.222%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc5{0%{animation-timing-function:ease-in-out;opacity:0}16.667%{animation-timing-function:ease-in-out;opacity:0}21.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc6{0%{animation-timing-function:ease-in-out;opacity:0}21.111%{animation-timing-function:ease-in-out;opacity:0}25.778%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc7{0%{animation-timing-function:ease-in-out;opacity:0}25.556%{animation-timing-function:ease-in-out;opacity:0}30.222%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc8{0%{animation-timing-function:ease-in-out;opacity:0}26.667%{animation-timing-function:ease-in-out;opacity:0}31.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc9{0%{animation-timing-function:ease-in-out;opacity:0}31.111%{animation-timing-function:ease-in-out;opacity:0}35.778%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc10{0%{animation-timing-function:ease-in-out;opacity:0}35.556%{animation-timing-function:ease-in-out;opacity:0}40.222%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc11{0%{animation-timing-function:ease-in-out;opacity:0}51.111%{animation-timing-function:ease-in-out;opacity:0}55.778%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc12{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}64.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.sc1{animation:sc1 7.5s linear 1 forwards}.sc2{animation:sc2 7.5s linear 1 forwards}.sc3{animation:sc3 7.5s linear 1 forwards}.sc4{animation:sc4 7.5s linear 1 forwards}.sc5{animation:sc5 7.5s linear 1 forwards}.sc6{animation:sc6 7.5s linear 1 forwards}.sc7{animation:sc7 7.5s linear 1 forwards}.sc8{animation:sc8 7.5s linear 1 forwards}.sc9{animation:sc9 7.5s linear 1 forwards}.sc10{animation:sc10 7.5s linear 1 forwards}.sc11{animation:sc11 7.5s linear 1 forwards}.sc12{animation:sc12 7.5s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">HỆ QUẢ: NỐI CHUỖI TRONG VÒNG LẶP · n GẤP ĐÔI THÌ CHẬM GẤP MẤY?</text>
+<g class="sc1"><text class="sv-d" x="0" y="56" fill="var(--muted)" style="fill:var(--muted)">cách viết</text><text class="sv-d" x="430" y="56" fill="var(--muted)" style="fill:var(--muted)">n gấp đôi →</text><text class="sv-d" x="560" y="56" fill="var(--muted)" style="fill:var(--muted)">kết luận</text></g>
+<g class="sc2"><rect x="0" y="78" width="300" height="34" rx="5" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.5"/><text x="12.0" y="100.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">s += ch</text></g>
+<g class="sc3"><rect x="430" y="78" width="96" height="34" rx="5" fill="rgba(var(--green-a),.20)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="478" y="100" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">× 1,9</text></g>
+<g class="sc4"><text class="sv-d" x="560" y="100" fill="var(--muted)" style="fill:var(--muted)">tuyến tính · CPython nối tại chỗ được</text></g>
+<g class="sc5"><rect x="0" y="130" width="300" height="34" rx="5" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.5"/><text x="12.0" y="152.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">s += ch  (còn giữ chuỗi cũ ở chỗ khác)</text></g>
+<g class="sc6"><rect x="430" y="130" width="96" height="34" rx="5" fill="rgba(var(--red-a),.20)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="478" y="152" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">× 5,4</text></g>
+<g class="sc7"><text class="sv-d" x="560" y="152" fill="var(--muted)" style="fill:var(--muted)">BẬC HAI · phải chép lại cả chuỗi mỗi vòng</text></g>
+<g class="sc8"><rect x="0" y="182" width="300" height="34" rx="5" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.5"/><text x="12.0" y="204.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">''.join(parts)</text></g>
+<g class="sc9"><rect x="430" y="182" width="96" height="34" rx="5" fill="rgba(var(--amber-a),.20)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="478" y="204" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">× 2,1</text></g>
+<g class="sc10"><text class="sv-d" x="560" y="204" fill="var(--muted)" style="fill:var(--muted)">tuyến tính · nhanh nhất, luôn ổn định</text></g>
+<g class="sc11"><rect x="0" y="248" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="263" fill="var(--probe)" style="fill:var(--probe)">× 2 là tuyến tính · × 4 trở lên là bậc hai</text></g>
+<g class="sc12"><text class="sv-d" x="14" y="280" fill="var(--muted)" style="fill:var(--muted)">CPython có tối ưu nối tại chỗ, nhưng chỉ khi chuỗi đó không còn ai giữ nữa.</text><text class="sv-d" x="14" y="298" fill="var(--muted)" style="fill:var(--muted)">Lưu chuỗi trung gian vào list hay truyền đi nơi khác là tối ưu mất hiệu lực.</text><text class="sv-d" x="14" y="316" fill="var(--muted)" style="fill:var(--muted)">Đây là chi tiết cài đặt CPython — cứ dùng join cho chắc.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Cột giữa gấp 1,93 lần khi <var>n</var> gấp đôi — tuyến tính, không phải O(n²).</li>
+    <li>CPython tối ưu nối tại chỗ khi chuỗi chỉ còn <b>một tham chiếu</b>.</li>
+    <li>Giữ thêm tham chiếu là tối ưu mất hiệu lực: tỉ lệ thành 5,37 lần.</li>
+    <li>Đây là chi tiết cài đặt CPython — đừng dựa vào nó, cứ dùng <code>join</code>.</li>
+  </ul>
+</section>
+
+<section id="mm-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Gán, shallow copy, deep copy</h2></div>
+  <p class="key">Gán không bao giờ chép. Chép tới tầng nào thì <em>độc lập tới tầng đó</em>.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 196" role="img" aria-label="Một array bốn ô với hai tên a và b cùng trỏ vào; phép gán b ngoặc không bằng chín hiện ngay phía trên ô đầu rồi ô đó đổi từ một sang chín, cả hai tên đều thấy" data-anim><style>@keyframes c11{0%{animation-timing-function:ease-in-out;opacity:0}3.636%{animation-timing-function:ease-in-out;opacity:0}6.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c12{0%{animation-timing-function:ease-in-out;opacity:0}7.273%{animation-timing-function:ease-in-out;opacity:0}10.455%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c13{0%{animation-timing-function:ease-in-out;opacity:0}9.091%{animation-timing-function:ease-in-out;opacity:0}12.273%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c14{0%{animation-timing-function:ease-in-out;opacity:0}10.909%{animation-timing-function:ease-in-out;opacity:0}14.091%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c15{0%{animation-timing-function:ease-in-out;opacity:0}12.727%{animation-timing-function:ease-in-out;opacity:0}15.909%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c16{0%{animation-timing-function:ease-in-out;opacity:0}21.818%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c17{0%{animation-timing-function:ease-in-out;opacity:0}27.273%{animation-timing-function:ease-in-out;opacity:0}29.545%{animation-timing-function:ease-in-out;opacity:1}47.273%{animation-timing-function:ease-in-out;opacity:1}49.545%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes c18{0%{animation-timing-function:ease-in-out;opacity:0}45.455%{animation-timing-function:ease-in-out;opacity:0}47.727%{animation-timing-function:ease-in-out;opacity:1}74.545%{animation-timing-function:ease-in-out;opacity:1}76.818%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes c19{0%{animation-timing-function:ease-in-out;opacity:0}9.091%{animation-timing-function:ease-in-out;opacity:0}11.364%{animation-timing-function:ease-in-out;opacity:1}59.545%{animation-timing-function:ease-in-out;opacity:1}61.818%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes c110{0%{animation-timing-function:ease-in-out;opacity:0}60.909%{animation-timing-function:ease-in-out;opacity:0}64.091%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c111{0%{animation-timing-function:ease-in-out;opacity:0}69.091%{animation-timing-function:ease-in-out;opacity:0}72.273%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes c112{0%{animation-timing-function:ease-in-out;opacity:0}76.364%{animation-timing-function:ease-in-out;opacity:0}79.545%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.c11{animation:c11 11.0s linear 1 forwards}.c12{animation:c12 11.0s linear 1 forwards}.c13{animation:c13 11.0s linear 1 forwards}.c14{animation:c14 11.0s linear 1 forwards}.c15{animation:c15 11.0s linear 1 forwards}.c16{animation:c16 11.0s linear 1 forwards}.c17{animation:c17 11.0s linear 1 forwards}.c18{animation:c18 11.0s linear 1 forwards}.c19{animation:c19 11.0s linear 1 forwards}.c110{animation:c110 11.0s linear 1 forwards}.c111{animation:c111 11.0s linear 1 forwards}.c112{animation:c112 11.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">b = a   ·   CHÉP 0 TẦNG</text>
+<g class="c11"><rect x="20" y="78" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="47.0" y="96.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><line x1="74" y1="91" x2="150" y2="90" stroke="var(--probe)" stroke-width="1.5"/></g>
+<g class="c12"><text class="sv-d" x="173.0" y="68" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="219.0" y="68" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="265.0" y="68" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[2]</text><text class="sv-d" x="311.0" y="68" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[3]</text></g>
+<g class="c13"><rect x="196" y="74" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="219.0" y="95.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="c14"><rect x="242" y="74" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="265.0" y="95.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="c15"><rect x="288" y="74" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="311.0" y="95.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="c16"><rect x="20" y="130" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="47.0" y="148.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="74" y1="143" x2="150" y2="104" stroke="var(--ok)" stroke-width="1.5"/></g>
+<g class="c17" opacity="0"><text class="sv-d" x="380" y="95" fill="var(--probe)" style="fill:var(--probe)">một array · hai tên</text></g>
+<g class="c18" opacity="0"><rect x="150" y="28" width="81.2" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="161.0" y="46.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b[0] = 9</text><line x1="190.6" y1="54.0" x2="173.0" y2="74.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="173.0" cy="74.0" r="2.8" fill="var(--tomb)"/><rect x="147.0" y="71.0" width="52.0" height="38.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="c19" opacity="0"><rect x="150" y="74" width="46" height="32" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="173.0" y="95.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="c110"><rect x="150" y="74" width="46" height="32" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.4"/><text x="173.0" y="95.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text></g>
+<g class="c111"><text class="sv-d" x="380" y="95" fill="var(--tomb)" style="fill:var(--tomb)">a cũng thành [9, 2, 3, 4]</text></g>
+<g class="c112"><rect x="0" y="160" width="3" height="20" rx="1.5" fill="rgba(var(--red-a),1)" stroke="var(--tomb)" stroke-width="0"/><text class="sv-d" x="14" y="175" fill="var(--tomb)" style="fill:var(--tomb)">Không có bản sao nào · sửa qua b là sửa của a</text></g>
+</svg>
+  </figure>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 282" role="img" aria-label="Hai ma trận a và b; sửa một ô qua b thì ô tương ứng của a cũng đổi vì hai bên dùng chung hàng; nhưng thay cả hàng qua b thì chỉ ma trận b đổi" data-anim><style>@keyframes cpsh1{0%{animation-timing-function:ease-in-out;opacity:0}2.500%{animation-timing-function:ease-in-out;opacity:0}4.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh2{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}7.187%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh3{0%{animation-timing-function:ease-in-out;opacity:0}12.500%{animation-timing-function:ease-in-out;opacity:0}14.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh4{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.312%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}21.250%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpsh5{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}17.812%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.125%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.062%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpsh6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.625%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.937%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.875%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpsh7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.438%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.750%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}29.688%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpsh8{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}32.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh9{0%{animation-timing-function:ease-in-out;opacity:0}31.250%{animation-timing-function:ease-in-out;opacity:0}33.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh10{0%{animation-timing-function:ease-in-out;opacity:0}33.750%{animation-timing-function:ease-in-out;opacity:0}35.312%{animation-timing-function:ease-in-out;opacity:1}61.250%{animation-timing-function:ease-in-out;opacity:1}62.813%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh11{0%{animation-timing-function:ease-in-out;opacity:0}38.750%{animation-timing-function:ease-in-out;opacity:0}40.312%{animation-timing-function:ease-in-out;opacity:1}58.750%{animation-timing-function:ease-in-out;opacity:1}60.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh12{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:1}49.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh13{0%{animation-timing-function:ease-in-out;opacity:0}27.500%{animation-timing-function:ease-in-out;opacity:0}29.063%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:1}49.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh14{0%{animation-timing-function:ease-in-out;opacity:0}48.750%{animation-timing-function:ease-in-out;opacity:0}50.313%{animation-timing-function:ease-in-out;opacity:1}61.250%{animation-timing-function:ease-in-out;opacity:1}62.813%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh15{0%{animation-timing-function:ease-in-out;opacity:0}48.750%{animation-timing-function:ease-in-out;opacity:0}50.313%{animation-timing-function:ease-in-out;opacity:1}61.250%{animation-timing-function:ease-in-out;opacity:1}62.813%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh16{0%{animation-timing-function:ease-in-out;opacity:0}62.500%{animation-timing-function:ease-in-out;opacity:0}64.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh17{0%{animation-timing-function:ease-in-out;opacity:0}62.500%{animation-timing-function:ease-in-out;opacity:0}64.062%{animation-timing-function:ease-in-out;opacity:1}73.750%{animation-timing-function:ease-in-out;opacity:1}75.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh18{0%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:0}77.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh19{0%{animation-timing-function:ease-in-out;opacity:0}28.750%{animation-timing-function:ease-in-out;opacity:0}30.312%{animation-timing-function:ease-in-out;opacity:1}73.750%{animation-timing-function:ease-in-out;opacity:1}75.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh20{0%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:0}77.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh21{0%{animation-timing-function:ease-in-out;opacity:0}52.500%{animation-timing-function:ease-in-out;opacity:0}54.062%{animation-timing-function:ease-in-out;opacity:1}61.250%{animation-timing-function:ease-in-out;opacity:1}62.813%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh22{0%{animation-timing-function:ease-in-out;opacity:0}65.000%{animation-timing-function:ease-in-out;opacity:0}66.562%{animation-timing-function:ease-in-out;opacity:1}86.250%{animation-timing-function:ease-in-out;opacity:1}87.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpsh23{0%{animation-timing-function:ease-in-out;opacity:0}77.500%{animation-timing-function:ease-in-out;opacity:0}79.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpsh24{0%{animation-timing-function:ease-in-out;opacity:0}83.750%{animation-timing-function:ease-in-out;opacity:0}85.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.cpsh1{animation:cpsh1 16.0s linear 1 forwards}.cpsh2{animation:cpsh2 16.0s linear 1 forwards}.cpsh3{animation:cpsh3 16.0s linear 1 forwards}.cpsh4{animation:cpsh4 16.0s linear 1 forwards}.cpsh5{animation:cpsh5 16.0s linear 1 forwards}.cpsh6{animation:cpsh6 16.0s linear 1 forwards}.cpsh7{animation:cpsh7 16.0s linear 1 forwards}.cpsh8{animation:cpsh8 16.0s linear 1 forwards}.cpsh9{animation:cpsh9 16.0s linear 1 forwards}.cpsh10{animation:cpsh10 16.0s linear 1 forwards}.cpsh11{animation:cpsh11 16.0s linear 1 forwards}.cpsh12{animation:cpsh12 16.0s linear 1 forwards}.cpsh13{animation:cpsh13 16.0s linear 1 forwards}.cpsh14{animation:cpsh14 16.0s linear 1 forwards}.cpsh15{animation:cpsh15 16.0s linear 1 forwards}.cpsh16{animation:cpsh16 16.0s linear 1 forwards}.cpsh17{animation:cpsh17 16.0s linear 1 forwards}.cpsh18{animation:cpsh18 16.0s linear 1 forwards}.cpsh19{animation:cpsh19 16.0s linear 1 forwards}.cpsh20{animation:cpsh20 16.0s linear 1 forwards}.cpsh21{animation:cpsh21 16.0s linear 1 forwards}.cpsh22{animation:cpsh22 16.0s linear 1 forwards}.cpsh23{animation:cpsh23 16.0s linear 1 forwards}.cpsh24{animation:cpsh24 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">b = a[:]   ·   CHÉP 1 TẦNG</text>
+<g class="cpsh1"><rect x="50" y="100" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="77.0" y="118.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><line x1="104" y1="113" x2="170" y2="113" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="196.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="248.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="160" y="105" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[0]</text><text class="sv-d" x="160" y="143" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[1]</text></g>
+<g class="cpsh2"><rect x="222" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="248.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text><rect x="170" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="196.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text><rect x="222" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="248.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="cpsh3"><rect x="440" y="100" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="467.0" y="118.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="494" y1="113" x2="560" y2="113" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="586.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="638.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="550" y="105" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[0]</text><text class="sv-d" x="550" y="143" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[1]</text></g>
+<g class="cpsh4" transform="translate(390 0)"><rect x="170" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/></g>
+<g class="cpsh5" transform="translate(390 0)"><rect x="222" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/></g>
+<g class="cpsh6" transform="translate(390 0)"><rect x="170" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="196.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="cpsh7" transform="translate(390 0)"><rect x="222" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="248.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="cpsh8"><rect x="560" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="586.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="cpsh9"><rect x="612" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="638.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="cpsh10" opacity="0"><text class="sv-d" x="170" y="186" fill="var(--tomb)" style="fill:var(--tomb)">hai ma trận · nhưng CÙNG các hàng bên trong</text></g>
+<g class="cpsh11" opacity="0"><rect x="560" y="28" width="103.4" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="571.0" y="46.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b[0][0] = 9</text><line x1="611.7" y1="54.0" x2="586.0" y2="80.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="586.0" cy="80.0" r="2.8" fill="var(--tomb)"/><rect x="557.0" y="77.0" width="58.0" height="44.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="cpsh12" opacity="0"><rect x="170" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="196.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cpsh13" opacity="0"><rect x="560" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="586.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cpsh14" opacity="0"><rect x="170" y="80" width="52" height="38" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="196.0" y="105.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text></g>
+<g class="cpsh15" opacity="0"><rect x="560" y="80" width="52" height="38" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="586.0" y="105.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text></g>
+<g class="cpsh16"><rect x="170" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="196.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cpsh17" opacity="0"><rect x="560" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="586.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cpsh18"><rect x="560" y="80" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="586.0" y="105.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">7</text></g>
+<g class="cpsh19" opacity="0"><rect x="612" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="638.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="cpsh20"><rect x="612" y="80" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="638.0" y="105.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">7</text></g>
+<g class="cpsh21" opacity="0"><text class="sv-d" x="170" y="212" fill="var(--tomb)" style="fill:var(--tomb)">a → [[9, 2], [3, 4]]   a CŨNG ĐỔI</text></g>
+<g class="cpsh22" opacity="0"><rect x="560" y="28" width="118.2" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="571.0" y="46.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b[0] = [7, 7]</text><line x1="619.1" y1="54.0" x2="612.0" y2="80.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="612.0" cy="80.0" r="2.8" fill="var(--ok)"/><rect x="557.0" y="77.0" width="110.0" height="44.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="cpsh23"><text class="sv-d" x="170" y="186" fill="var(--ok)" style="fill:var(--ok)">a → [[1, 2], [3, 4]]   a KHÔNG đổi</text></g>
+<g class="cpsh24"><rect x="0" y="246" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="261" fill="var(--probe)" style="fill:var(--probe)">Sửa Ô trong hàng thì cả hai đổi · thay CẢ HÀNG thì chỉ b đổi</text></g>
+</svg>
+  </figure>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 282" role="img" aria-label="Hai ma trận a và b hoàn toàn riêng; sửa một ô qua b thì ma trận a giữ nguyên" data-anim><style>@keyframes cpde1{0%{animation-timing-function:ease-in-out;opacity:0}3.077%{animation-timing-function:ease-in-out;opacity:0}5.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde2{0%{animation-timing-function:ease-in-out;opacity:0}6.154%{animation-timing-function:ease-in-out;opacity:0}8.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde3{0%{animation-timing-function:ease-in-out;opacity:0}15.385%{animation-timing-function:ease-in-out;opacity:0}18.077%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde4{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.462%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.846%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.154%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpde5{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}21.923%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.308%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}29.615%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpde6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}25.385%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}25.769%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}33.077%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpde7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}28.846%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}29.231%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}36.538%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(390px,0px)}}@keyframes cpde8{0%{animation-timing-function:ease-in-out;opacity:0}35.385%{animation-timing-function:ease-in-out;opacity:0}38.077%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde9{0%{animation-timing-function:ease-in-out;opacity:0}36.923%{animation-timing-function:ease-in-out;opacity:0}39.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde10{0%{animation-timing-function:ease-in-out;opacity:0}38.462%{animation-timing-function:ease-in-out;opacity:0}41.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde11{0%{animation-timing-function:ease-in-out;opacity:0}41.538%{animation-timing-function:ease-in-out;opacity:0}44.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde12{0%{animation-timing-function:ease-in-out;opacity:0}47.692%{animation-timing-function:ease-in-out;opacity:0}49.615%{animation-timing-function:ease-in-out;opacity:1}72.308%{animation-timing-function:ease-in-out;opacity:1}74.231%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpde13{0%{animation-timing-function:ease-in-out;opacity:0}33.846%{animation-timing-function:ease-in-out;opacity:0}35.769%{animation-timing-function:ease-in-out;opacity:1}58.462%{animation-timing-function:ease-in-out;opacity:1}60.385%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cpde14{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}62.692%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde15{0%{animation-timing-function:ease-in-out;opacity:0}66.154%{animation-timing-function:ease-in-out;opacity:0}68.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cpde16{0%{animation-timing-function:ease-in-out;opacity:0}72.308%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.cpde1{animation:cpde1 13.0s linear 1 forwards}.cpde2{animation:cpde2 13.0s linear 1 forwards}.cpde3{animation:cpde3 13.0s linear 1 forwards}.cpde4{animation:cpde4 13.0s linear 1 forwards}.cpde5{animation:cpde5 13.0s linear 1 forwards}.cpde6{animation:cpde6 13.0s linear 1 forwards}.cpde7{animation:cpde7 13.0s linear 1 forwards}.cpde8{animation:cpde8 13.0s linear 1 forwards}.cpde9{animation:cpde9 13.0s linear 1 forwards}.cpde10{animation:cpde10 13.0s linear 1 forwards}.cpde11{animation:cpde11 13.0s linear 1 forwards}.cpde12{animation:cpde12 13.0s linear 1 forwards}.cpde13{animation:cpde13 13.0s linear 1 forwards}.cpde14{animation:cpde14 13.0s linear 1 forwards}.cpde15{animation:cpde15 13.0s linear 1 forwards}.cpde16{animation:cpde16 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">b = copy.deepcopy(a)   ·   CHÉP TỚI ĐÁY</text>
+<g class="cpde1"><rect x="50" y="100" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.5"/><text x="77.0" y="118.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">a</text><line x1="104" y1="113" x2="170" y2="113" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="196.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="248.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="160" y="105" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[0]</text><text class="sv-d" x="160" y="143" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[1]</text></g>
+<g class="cpde2"><rect x="170" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="196.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text><rect x="222" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="248.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text><rect x="170" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="196.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text><rect x="222" y="118" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="248.0" y="143.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="cpde3"><rect x="440" y="100" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="467.0" y="118.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">b</text><line x1="494" y1="113" x2="560" y2="113" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="586.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[0]</text><text class="sv-d" x="638.0" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">[1]</text><text class="sv-d" x="550" y="105" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[0]</text><text class="sv-d" x="550" y="143" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">[1]</text></g>
+<g class="cpde4" transform="translate(390 0)"><rect x="170" y="80" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/></g>
+<g class="cpde5" transform="translate(390 0)"><rect x="222" y="80" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="248.0" y="105.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="cpde6" transform="translate(390 0)"><rect x="170" y="118" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="196.0" y="143.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="cpde7" transform="translate(390 0)"><rect x="222" y="118" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="248.0" y="143.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="cpde8"><rect x="612" y="80" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="638.0" y="105.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="cpde9"><rect x="560" y="118" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="586.0" y="143.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="cpde10"><rect x="612" y="118" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="638.0" y="143.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="cpde11"><text class="sv-d" x="170" y="186" fill="var(--ok)" style="fill:var(--ok)">hai ma trận hoàn toàn riêng</text></g>
+<g class="cpde12" opacity="0"><rect x="560" y="28" width="103.4" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="571.0" y="46.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b[0][0] = 9</text><line x1="611.7" y1="54.0" x2="586.0" y2="80.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="586.0" cy="80.0" r="2.8" fill="var(--ok)"/><rect x="557.0" y="77.0" width="58.0" height="44.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="5"/></g>
+<g class="cpde13" opacity="0"><rect x="560" y="80" width="52" height="38" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.5"/><text x="586.0" y="105.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cpde14"><rect x="560" y="80" width="52" height="38" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="586.0" y="105.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">9</text></g>
+<g class="cpde15"><text class="sv-d" x="170" y="212" fill="var(--ok)" style="fill:var(--ok)">a → [[1, 2], [3, 4]]   a KHÔNG đổi</text></g>
+<g class="cpde16"><rect x="0" y="246" width="3" height="20" rx="1.5" fill="rgba(var(--green-a),1)" stroke="var(--ok)" stroke-width="0"/><text class="sv-d" x="14" y="261" fill="var(--ok)" style="fill:var(--ok)">Mọi tầng đều là bản riêng · nhưng chậm hơn shallow 914 lần</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Chỗ hay sập là hình giữa: vỏ đã là hai, nhưng ruột vẫn dùng chung.</li>
+    <li>Dữ liệu phẳng thì shallow copy là đủ: 2,2 µs so với 2024,7 µs.</li>
+    <li><code>deepcopy</code> còn ném <code>TypeError</code> với socket, khoá, kết nối đang mở.</li>
+    <li>Tốt hơn nữa là thiết kế bất biến, để không ai cần chép tự vệ.</li>
+  </ul>
+</section>
+
+<section id="mm-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>is và ==</h2></div>
+  <p class="key"><em>==</em> hỏi về nội dung, <em>is</em> hỏi về địa chỉ. Hai list nội dung giống hệt vẫn là hai object.</p>
+  <table>
+    <tr><th>Toán tử</th><th>Hỏi gì</th><th>Dùng khi</th></tr>
+    <tr><td><code>==</code></td><td>nội dung, gọi <code>__eq__</code></td><td>gần như mọi so sánh</td></tr>
+    <tr><td><code>is</code></td><td>địa chỉ, cùng một object hay không</td><td>chỉ <code>None</code>, <code>True</code>, <code>False</code>, sentinel</td></tr>
+  </table>
+  <ul class="why">
+    <li><code>None</code> là object duy nhất trong cả interpreter, nên so địa chỉ là chính xác nhất.</li>
     <li><code>arr == None</code> với NumPy trả về một mảng boolean, làm <code>if</code> ném lỗi.</li>
   </ul>
-
-  <details class="deep"><summary>Interning — vì sao <code>a is b</code> có lúc trả về True với số và chuỗi</summary>
-  <div class="body">
-    <p>CPython cache sẵn các số nguyên từ &#8722;5 tới 256 và intern những chuỗi trông giống tên biến, để tiết kiệm bộ nhớ và tăng tốc so sánh. Nên <code>a = 256; b = 256</code> cho <code>a is b</code> là <code>True</code>, còn <code>257</code> thì thường <code>False</code>; <code>"hello"</code> thì <code>True</code>, <code>"hello world"</code> có dấu cách nên thường không.</p>
-    <p>Đây là <b>chi tiết cài đặt</b>, không phải đặc tả ngôn ngữ: nó đổi theo phiên bản, và đổi theo việc code nằm trong một hàm hay ở cấp module. Bài học duy nhất cần rút ra là <b>đừng bao giờ dùng <code>is</code> để so giá trị</b> — nó có thể đúng lúc test rồi sai trên production.</p>
-  </div></details>
+  <p><b>Interning</b> — vì sao <code>a is b</code> có lúc trả về <code>True</code> với số và chuỗi. Đo trên CPython 3.12:</p>
+  <table>
+    <tr><th>Biểu thức</th><th><code>is</code> trả về</th><th>Vì sao</th></tr>
+    <tr><td><code>a = 257; b = 257</code> trong cùng một hàm</td><td><code>True</code></td><td>gộp hằng lúc biên dịch, cùng một code object</td></tr>
+    <tr><td><code>int("257") is int("257")</code></td><td><code>False</code></td><td>tạo lúc chạy, ngoài dải cache</td></tr>
+    <tr><td><code>int("100") is int("100")</code></td><td><code>True</code></td><td>CPython cache số nguyên −5 tới 256</td></tr>
+    <tr><td><code>"hello" is "".join(["hel","lo"])</code></td><td><code>False</code></td><td>chuỗi ghép lúc chạy không được intern sẵn</td></tr>
+  </table>
+  <ul class="why">
+    <li>Kết quả đổi theo phiên bản, và đổi theo việc code nằm trong một hàm hay ở cấp module.</li>
+    <li>Bài học duy nhất: <b>đừng bao giờ dùng <code>is</code> để so giá trị</b> — nó có thể đúng lúc test rồi sai trên production.</li>
+  </ul>
 </section>
 
-<section id="memory-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Mutable hay không</h2></div>
-
-  <p class="key">Ranh giới này quyết định nhánh <em>sửa object</em> ở mục 03 có mở hay không. Đóng nhánh đó là đóng luôn cả một họ bug.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 288" role="img" aria-label="hai hàng immutable và mutable, và ví dụ tuple chứa list cho thấy immutable chỉ nông">
-<path d="M0.0 184 H 37.12 V 96 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,96.0 69.51,91.8 69.51,100.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">RANH GIỚI NÀY QUYẾT ĐỊNH NHÁNH &quot;SỬA OBJECT&quot; CÓ MỞ KHÔNG</text>
-<rect x="86.62" y="32" width="773.38" height="60" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="52" fill="var(--ok)">IMMUTABLE</text>
-<text class="sv-l" x="256.76" y="52" fill="var(--muted)">int  float  bool  str  bytes  tuple  frozenset  None</text>
-<text class="sv-s" x="108.27" y="72" fill="var(--muted)">nhánh sửa object ĐÓNG &#8212; s[0] = &quot;x&quot; ném TypeError</text>
-<text class="sv-d" x="108.27" y="86" fill="var(--ok)">chỉ còn một cách: tạo object MỚI rồi gán lại tên</text>
-<rect x="86.62" y="100" width="773.38" height="60" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="120" fill="var(--tomb)">MUTABLE</text>
-<text class="sv-l" x="241.29" y="120" fill="var(--muted)">list  dict  set  bytearray, và phần lớn class tự viết</text>
-<text class="sv-s" x="108.27" y="140" fill="var(--muted)">nhánh sửa object MỞ &#8212; append, [i] =, update sửa tại chỗ</text>
-<text class="sv-d" x="108.27" y="154" fill="var(--tomb)">nên mọi tên trỏ vào đều thấy thay đổi</text>
-<line x1="86.62" y1="178" x2="860.0" y2="178" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-hv" x="86.62" y="200" fill="var(--muted)">IMMUTABLE LÀ NÔNG, KHÔNG PHẢI ĐÓNG BĂNG</text>
-<rect x="86.62" y="210" width="773.38" height="62" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="230" fill="var(--probe)">t = (1, [2, 3])</text>
-<text class="sv-d" x="303.17" y="230" fill="var(--muted)">tuple khoá DANH SÁCH tham chiếu&#8230;</text>
-<text class="sv-l" x="108.27" y="250" fill="var(--probe)">t[1].append(4)</text>
-<text class="sv-d" x="303.17" y="250" fill="var(--muted)">&#8230;không khoá object được trỏ tới</text>
-<text class="sv-d" x="108.27" y="266" fill="var(--tomb)">nên hash(t) ném TypeError: unhashable &#8212; có list bên trong</text>
+<section id="mm-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Bốn bẫy hay gặp</h2></div>
+  <p class="key">Cả bốn mọc ra từ đúng một câu ở mục 01: <em>gán là dán tên, không phải sao chép</em>.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 552" role="img" aria-label="Bốn bẫy thường gặp với cách viết đúng bên cạnh; hình dưới so hai cách tạo ma trận ba nhân ba: cách nhân cho một object dòng được trỏ ba lần nên sửa một ô đổi cả ba dòng, cách dùng comprehension cho ba object riêng" data-anim><style>@keyframes tr1{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}7.271%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr2{0%{animation-timing-function:ease-in-out;opacity:0}16.667%{animation-timing-function:ease-in-out;opacity:0}20.604%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr3{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}33.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr4{0%{animation-timing-function:ease-in-out;opacity:0}43.333%{animation-timing-function:ease-in-out;opacity:0}47.271%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr5{0%{animation-timing-function:ease-in-out;opacity:0}61.667%{animation-timing-function:ease-in-out;opacity:0}65.604%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr6{0%{animation-timing-function:ease-in-out;opacity:0}65.000%{animation-timing-function:ease-in-out;opacity:0}68.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr7{0%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:0}78.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.tr1{animation:tr1 8.888888888888888s linear 1 forwards}.tr2{animation:tr2 8.888888888888888s linear 1 forwards}.tr3{animation:tr3 8.888888888888888s linear 1 forwards}.tr4{animation:tr4 8.888888888888888s linear 1 forwards}.tr5{animation:tr5 8.888888888888888s linear 1 forwards}.tr6{animation:tr6 8.888888888888888s linear 1 forwards}.tr7{animation:tr7 8.888888888888888s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="20" fill="var(--muted)" style="fill:var(--muted)">BỐN BẪY · ĐỀU MỌC TỪ MỘT CÂU: GÁN LÀ DÁN TÊN, KHÔNG PHẢI SAO CHÉP</text>
+<g class="tr1"><rect x="0" y="54" width="250" height="32" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.5"/><text x="10.0" y="75.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def add(x, out=[])</text><text class="sv-d" x="266" y="67" fill="var(--muted)" style="fill:var(--muted)">list mặc định tạo MỘT lần lúc định nghĩa hàm</text><text class="sv-d" x="266" y="87" fill="var(--faint)" style="fill:var(--faint)">cách viết đúng:</text><text x="366.0" y="87.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">out=None rồi tạo trong thân hàm</text></g>
+<g class="tr2"><rect x="0" y="128" width="250" height="32" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.5"/><text x="10.0" y="149.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">grid = [[0]*3]*3</text><text class="sv-d" x="266" y="141" fill="var(--muted)" style="fill:var(--muted)">1 dòng thật, được trỏ 3 lần → sửa 1 ô đổi cả 3</text><text class="sv-d" x="266" y="161" fill="var(--faint)" style="fill:var(--faint)">cách viết đúng:</text><text x="366.0" y="161.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">[[0]*3 for _ in range(3)]</text></g>
+<g class="tr3"><rect x="0" y="202" width="250" height="32" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.5"/><text x="10.0" y="223.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">for x in a: a.remove(x)</text><text class="sv-d" x="266" y="215" fill="var(--muted)" style="fill:var(--muted)">chỉ số nhảy cóc: 1.000 phần tử còn 500, không lỗi nào báo</text><text class="sv-d" x="266" y="235" fill="var(--faint)" style="fill:var(--faint)">cách viết đúng:</text><text x="366.0" y="235.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">dùng comprehension lọc ra list mới</text></g>
+<g class="tr4"><rect x="0" y="276" width="250" height="32" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.5"/><text x="10.0" y="297.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">d[[1, 2]] = "x"</text><text class="sv-d" x="266" y="289" fill="var(--muted)" style="fill:var(--muted)">khoá đổi thì hash đổi, dict đi tìm nhầm ô</text><text class="sv-d" x="266" y="309" fill="var(--faint)" style="fill:var(--faint)">cách viết đúng:</text><text x="366.0" y="309.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">dùng tuple làm khoá</text></g>
+<g class="tr5"><text class="sv-d" x="0" y="360" fill="var(--text)" style="fill:var(--text)">Bẫy 2 nhìn bằng hình:</text></g>
+<g class="tr6"><text x="0.0" y="394.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">[[0]*3]*3</text><text class="sv-d" x="0" y="414" fill="var(--tomb)" style="fill:var(--tomb)">1 object dòng thật</text><rect x="0" y="430" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="27.0" y="448.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[0]</text><rect x="0" y="460" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="27.0" y="478.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1]</text><rect x="0" y="490" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--tomb)" stroke-width="1.5"/><text x="27.0" y="508.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[2]</text><rect x="80" y="454" width="120" height="30" rx="5" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="140.0" y="474.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[9, 0, 0]</text><line x1="54" y1="443" x2="80" y2="469" stroke="var(--tomb)" stroke-width="1.3"/><line x1="54" y1="473" x2="80" y2="469" stroke="var(--tomb)" stroke-width="1.3"/><line x1="54" y1="503" x2="80" y2="469" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="0" y="532" fill="var(--tomb)" style="fill:var(--tomb)">grid[0][0] = 9  →  cả 3 dòng đổi</text></g>
+<g class="tr7"><text x="430.0" y="394.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">[[0]*3 for _ in range(3)]</text><text class="sv-d" x="430" y="414" fill="var(--ok)" style="fill:var(--ok)">3 object dòng thật</text><rect x="430" y="430" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="457.0" y="448.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[0]</text><rect x="430" y="460" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="457.0" y="478.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[1]</text><rect x="430" y="490" width="54" height="26" rx="13" fill="rgba(var(--amber-a),.16)" stroke="var(--ok)" stroke-width="1.5"/><text x="457.0" y="508.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[2]</text><rect x="510" y="430" width="120" height="24" rx="5" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="447.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[9, 0, 0]</text><line x1="484" y1="443" x2="510" y2="442" stroke="var(--ok)" stroke-width="1.3"/><rect x="510" y="460" width="120" height="24" rx="5" fill="rgba(var(--green-a),.16)" stroke="var(--rule-hi)" stroke-width="1.6"/><text x="570.0" y="477.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[0, 0, 0]</text><line x1="484" y1="473" x2="510" y2="472" stroke="var(--ok)" stroke-width="1.3"/><rect x="510" y="490" width="120" height="24" rx="5" fill="rgba(var(--green-a),.16)" stroke="var(--rule-hi)" stroke-width="1.6"/><text x="570.0" y="507.0" class="sv-d" style="fill:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">[0, 0, 0]</text><line x1="484" y1="503" x2="510" y2="502" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="430" y="532" fill="var(--ok)" style="fill:var(--ok)">grid[0][0] = 9  →  chỉ dòng 0 đổi</text></g>
 </svg>
-<figcaption>Immutable không phải &quot;an toàn tuyệt đối&quot; — <code>tuple</code> chỉ khoá <b>danh sách địa chỉ</b> nó giữ, còn cái list nằm bên trong thì vẫn sửa được như thường.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><b>Immutable</b> — <code>int</code> <code>float</code> <code>bool</code> <code>str</code> <code>bytes</code> <code>tuple</code> <code>frozenset</code> <code>None</code>.</li>
-    <li><b>Mutable</b> — <code>list</code> <code>dict</code> <code>set</code> <code>bytearray</code>, và phần lớn class tự viết.</li>
-    <li>Immutable là <b>nông</b>: <code>tuple</code> khoá danh sách địa chỉ, không khoá object bên trong.</li>
-    <li>Nên <code>hash((1, [2, 3]))</code> vẫn ném <code>TypeError</code> — có list bên trong.</li>
-  </ul>
-
-  <details class="deep"><summary>Vì sao nối chuỗi trong vòng lặp là <code>O(n²)</code></summary>
-  <div class="body">
-    <p><code>str</code> immutable nên <code>s += ch</code> <b>không</b> nối thêm vào chỗ cũ được: mỗi vòng cấp một chuỗi hoàn toàn mới rồi chép toàn bộ ký tự cũ sang. Vòng thứ <em>k</em> chép <em>k</em> ký tự, cộng lại thành <code>1 + 2 + &#8230; + n</code>, tức <code>O(n²)</code>.</p>
-    <p>Cách đúng là gom vào list rồi <code>"".join(parts)</code> — <code>join</code> đo tổng độ dài trước, cấp một lần, chép một lần: <code>O(n)</code>. Đây là ví dụ rõ nhất cho thấy ranh giới mutable không chỉ là chuyện đúng sai, mà còn là chuyện tốc độ.</p>
-  </div></details>
-</section>
-
-<section id="memory-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Gán, shallow copy, deep copy</h2></div>
-
-  <p class="key">Gán không bao giờ chép, nên muốn hai tên rời hẳn nhau chỉ có một đường: <em>sao chép</em>. Chép tới tầng nào thì độc lập tới tầng đó.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 278" role="img" aria-label="ba mức sao chép với list lồng nhau, cho thấy shallow copy vẫn dùng chung tầng trong">
-<path d="M0.0 107 H 37.12 V 100 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,100.0 69.51,95.8 69.51,104.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">a = [[1,2],[3,4]] &#8212; CHÉP TỚI TẦNG NÀO ĐỘC LẬP TỚI TẦNG ĐÓ</text>
-<text class="sv-hv" x="86.62" y="84" fill="var(--muted)">VỎ</text>
-<text class="sv-hv" x="86.62" y="132" fill="var(--muted)">RUỘT</text>
-<rect x="136.12" y="30" width="241.29" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="256.76" y="47" fill="var(--dim)" text-anchor="middle">b = a</text>
-<rect x="188.71" y="68" width="136.12" height="24" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="256.76" y="84" fill="var(--tomb)" text-anchor="middle">a  b</text>
-<line x1="256.76" y1="92" x2="256.76" y2="100" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="256.76,108.0 252.56,100.0 260.96,100.0" fill="var(--tomb)"/>
-<rect x="136.12" y="112" width="241.29" height="30" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="256.76" y="132" fill="var(--filled)" text-anchor="middle">[1, 2]   [3, 4]</text>
-<text class="sv-d" x="256.76" y="160" fill="var(--tomb)" text-anchor="middle">MỘT BẢN, DÙNG CHUNG</text>
-<text class="sv-d" x="136.12" y="184" fill="var(--tomb)">chép 0 tầng</text>
-<text class="sv-d" x="136.12" y="199" fill="var(--muted)">chỉ thêm một cái tên</text>
-<rect x="377.41" y="30" width="241.29" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="498.06" y="47" fill="var(--dim)" text-anchor="middle">b = a[:]</text>
-<rect x="389.78" y="68" width="95.9" height="24" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="437.73" y="84" fill="var(--probe)" text-anchor="middle">a</text>
-<rect x="510.43" y="68" width="95.9" height="24" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="558.38" y="84" fill="var(--probe)" text-anchor="middle">b</text>
-<path d="M437.73 92 V 100 H 498.06 V 104" stroke="var(--probe)" stroke-width="1.2" fill="none"/>
-<path d="M558.38 92 V 100 H 498.06 V 104" stroke="var(--probe)" stroke-width="1.2" fill="none"/>
-<line x1="498.06" y1="104" x2="498.06" y2="104" stroke="var(--probe)" stroke-width="1.2"/>
-<polygon points="498.06,112.0 493.86,104.0 502.26,104.0" fill="var(--probe)"/>
-<rect x="377.41" y="112" width="241.29" height="30" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="498.06" y="132" fill="var(--filled)" text-anchor="middle">[1, 2]   [3, 4]</text>
-<text class="sv-d" x="498.06" y="160" fill="var(--tomb)" text-anchor="middle">MỘT BẢN, DÙNG CHUNG</text>
-<text class="sv-d" x="377.41" y="184" fill="var(--probe)">chép 1 tầng</text>
-<text class="sv-d" x="377.41" y="199" fill="var(--muted)">list(a) &#183; copy.copy(a)</text>
-<rect x="618.71" y="30" width="241.29" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="739.35" y="47" fill="var(--dim)" text-anchor="middle">copy.deepcopy(a)</text>
-<rect x="631.08" y="68" width="95.9" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="679.03" y="84" fill="var(--ok)" text-anchor="middle">a</text>
-<rect x="751.73" y="68" width="95.9" height="24" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="799.68" y="84" fill="var(--ok)" text-anchor="middle">b</text>
-<line x1="679.03" y1="92" x2="679.03" y2="100" stroke="var(--ok)" stroke-width="1.2"/>
-<polygon points="679.03,108.0 674.83,100.0 683.23,100.0" fill="var(--ok)"/>
-<line x1="799.68" y1="92" x2="799.68" y2="100" stroke="var(--ok)" stroke-width="1.2"/>
-<polygon points="799.68,108.0 795.48,100.0 803.88,100.0" fill="var(--ok)"/>
-<rect x="618.71" y="112" width="111.37" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="674.39" y="132" fill="var(--ok)" text-anchor="middle">[1, 2]</text>
-<rect x="748.63" y="112" width="111.37" height="30" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="804.32" y="132" fill="var(--ok)" text-anchor="middle">[1, 2]</text>
-<text class="sv-d" x="739.35" y="160" fill="var(--ok)" text-anchor="middle">HAI BẢN RIÊNG</text>
-<text class="sv-d" x="618.71" y="184" fill="var(--ok)">chép mọi tầng</text>
-<text class="sv-d" x="618.71" y="199" fill="var(--muted)">đệ quy xuống tận đáy</text>
-<line x1="86.62" y1="218" x2="860.0" y2="218" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-d" x="86.62" y="240" fill="var(--probe)">Cột giữa là chỗ sập bẫy: b[0].append(99) vẫn đổi cả a, vì tầng trong chưa được chép.</text>
-<text class="sv-d" x="86.62" y="260" fill="var(--muted)">Giá cột phải, đo trên list 1.000 dòng: 0,01 &#181;s &#183; 1,7 &#181;s &#183; <tspan fill="var(--tomb)">1.181 &#181;s</tspan> &#8212; chậm gấp 695 lần.</text>
-</svg>
-<figcaption>Ba mức chép, cùng một dữ liệu lồng nhau. Chỗ hay sập là cột giữa: vỏ ngoài đã là hai, nhưng <b>ruột vẫn dùng chung</b>.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li><b>Gán</b> — <code>b = a</code> — chép 0 tầng, chỉ thêm một cái tên.</li>
-    <li><b>Shallow copy</b> — <code>a[:]</code>, <code>list(a)</code>, <code>copy.copy(a)</code> — chép đúng một tầng.</li>
-    <li><b>Deep copy</b> — <code>copy.deepcopy(a)</code> — chép đệ quy xuống tận đáy.</li>
-    <li>Dữ liệu <b>phẳng</b> thì shallow copy là đủ — nó rẻ hơn <code>deepcopy</code> <b>695 lần</b>, và <code>deepcopy</code> còn ném <code>TypeError</code> với khoá, socket, kết nối đang mở.</li>
-  </ul>
-
-  <details class="deep"><summary>Khi nào <code>deepcopy</code> là lựa chọn sai</summary>
-  <div class="body">
-    <p>Nó chậm và tốn bộ nhớ, ném lỗi với object không sao chép được — kết nối đang mở, khoá, socket — và nó chép cả những thứ bạn <em>muốn</em> dùng chung, chẳng hạn một config toàn cục hay một model đã nạp.</p>
-    <p>Với dữ liệu lồng nhau, thường tốt hơn là thiết kế bất biến: dùng <code>tuple</code>, dataclass đóng băng, hoặc trả về object mới thay vì sửa tại chỗ. Khi ô MUTABLE của bản đồ đã đóng thì không còn ai cần chép để tự vệ nữa.</p>
-  </div></details>
-</section>
-
-<section id="memory-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Truyền tham số</h2></div>
-
-  <p class="key">Không phải <em>by value</em>, cũng không phải <em>by reference</em>. Tham số chỉ là một cái tên mới dán lên object cũ — nên mục 03 lặp lại nguyên vẹn bên trong thân hàm.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 252" role="img" aria-label="f1 sửa object nên người gọi thấy, f2 gán lại tên cục bộ nên người gọi không thấy">
-<path d="M0.0 112 H 37.12 V 100 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,100.0 69.51,95.8 69.51,104.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">THAM SỐ CHỈ LÀ MỘT CÁI TÊN MỚI DÁN LÊN OBJECT CŨ</text>
-<rect x="86.62" y="30" width="773.38" height="26" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="473.31" y="47" fill="var(--dim)" text-anchor="middle">a = [1, 2, 3]</text>
-<rect x="86.62" y="68" width="371.22" height="118" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="88" fill="var(--tomb)">def f1(lst): lst.append(4)</text>
-<text class="sv-d" x="108.27" y="108" fill="var(--muted)">SỬA object</text>
-<rect x="108.27" y="118" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="139.21" y="133" fill="var(--probe)" text-anchor="middle">a</text>
-<rect x="194.89" y="118" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="225.83" y="133" fill="var(--probe)" text-anchor="middle">lst</text>
-<line x1="259.86" y1="129" x2="303.17" y2="129" stroke="var(--tomb)" stroke-width="1.2"/>
-<polygon points="312.62,129.0 304.62,124.8 304.62,133.2" fill="var(--tomb)"/>
-<rect x="321.73" y="118" width="117.55" height="22" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="380.5" y="133" fill="var(--tomb)" text-anchor="middle">[1,2,3,4]</text>
-<text class="sv-d" x="108.27" y="160" fill="var(--tomb)">người gọi THẤY thay đổi</text>
-<text class="sv-d" x="108.27" y="176" fill="var(--muted)">by value thì việc này không xảy ra được</text>
-<rect x="488.78" y="68" width="371.22" height="118" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="510.43" y="88" fill="var(--ok)">def f2(lst): lst = [9, 9]</text>
-<text class="sv-d" x="510.43" y="108" fill="var(--muted)">GÁN LẠI tên cục bộ</text>
-<rect x="510.43" y="118" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="541.37" y="133" fill="var(--probe)" text-anchor="middle">a</text>
-<rect x="597.05" y="118" width="61.87" height="22" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="627.99" y="133" fill="var(--probe)" text-anchor="middle">lst</text>
-<line x1="662.01" y1="129" x2="699.14" y2="129" stroke="var(--ok)" stroke-width="1.2"/>
-<polygon points="708.59,129.0 700.59,124.8 700.59,133.2" fill="var(--ok)"/>
-<rect x="717.7" y="118" width="117.55" height="22" rx="4" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="776.47" y="133" fill="var(--ok)" text-anchor="middle">[9, 9]</text>
-<text class="sv-d" x="510.43" y="160" fill="var(--ok)">người gọi KHÔNG thấy gì</text>
-<text class="sv-d" x="510.43" y="176" fill="var(--muted)">by reference thật thì phải đổi được a</text>
-<text class="sv-d" x="86.62" y="214" fill="var(--probe)">Không phải by value, cũng không phải by reference &#8212; tên gọi đúng là PASS BY ASSIGNMENT.</text>
-<text class="sv-d" x="86.62" y="234" fill="var(--muted)">Đúng hai thao tác ở mục 03, lặp lại nguyên vẹn bên trong thân hàm.</text>
-</svg>
-<figcaption>Hai hàm, cùng một đối số. <code>f1</code> đi theo nhánh <b>sửa object</b> nên người gọi thấy; <code>f2</code> đi theo nhánh <b>gán lại tên</b> nên không.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li>Hàm <b>sửa object</b> thì người gọi thấy — <code>lst.append(4)</code>.</li>
-    <li>Hàm <b>gán lại tên</b> thì người gọi không thấy — <code>lst = [9, 9]</code>.</li>
-    <li>Tên đúng của cơ chế này là <b>pass by assignment</b>.</li>
-  </ul>
-
-  <details class="deep"><summary>Quy tắc thực dụng khi viết hàm</summary>
-  <div class="body">
-    <p>Chọn <b>một</b> trong hai nhánh và ghi rõ vào tên hàm: hoặc trả về object mới — <code>sorted(x)</code>, <code>x.upper()</code> — hoặc sửa tại chỗ rồi trả <code>None</code> — <code>x.sort()</code>, <code>x.append()</code>. Đừng làm cả hai trong một hàm.</p>
-    <p>Thư viện chuẩn tuân theo quy ước này rất nhất quán, và đó là chủ ý: hàm sửa tại chỗ không trả về gì để bạn <b>không viết được</b> <code>y = x.sort()</code> rồi tưởng mình có bản mới. Lỗi bị chặn ngay lúc viết thay vì lúc chạy.</p>
-  </div></details>
-</section>
-
-<section id="memory-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Lab: theo dõi tham chiếu</h2></div>
-
-  <p class="key">Chạy từng dòng và xem tên nào trỏ tới object nào. Hai tên <em>cùng màu</em> là cùng một object.</p>
-
-  <div class="lab">
-    <div class="bar">
-      <div><label>kịch bản</label>
-        <select id="mscen">
-          <option value="assign" selected>gán và sửa</option>
-          <option value="copy">shallow copy so với deep copy</option>
-          <option value="func">truyền vào hàm</option>
-          <option value="mul">nhân bản list</option>
-        </select>
-      </div>
-      <button id="mstep2">Chạy dòng tiếp</button>
-      <button class="ghost" id="mauto2">Tự chạy</button>
-      <button class="ghost" id="mrst2">Đặt lại</button>
-    </div>
-    <div id="mview2"></div>
-    <div class="steps" id="mlog2"></div>
-  </div>
-
-  <ul class="why">
-    <li>Bốn kịch bản là bốn ô của bản đồ, chạy thật thay vì đọc.</li>
-    <li>Đáng chạy nhất là <b>nhân bản list</b>: <code>[[0]*3]*3</code> trông như ma trận 3&#215;3.</li>
-    <li>Thật ra chỉ có <b>một</b> dòng, được trỏ tới ba lần — sửa một ô là ba dòng cùng đổi.</li>
+    <li>Đối số mặc định lượng giá <b>một lần lúc định nghĩa hàm</b>, không phải mỗi lần gọi.</li>
+    <li><code>[[0]*3]*3</code> nhân <b>tham chiếu</b>, không nhân dữ liệu: chỉ có 1 dòng thật.</li>
+    <li>Xoá trong lúc duyệt: <code>dict</code> ném <code>RuntimeError</code> ngay.</li>
+    <li>Còn <code>list</code> âm thầm bỏ sót đúng một nửa: 1.000 phần tử còn 500.</li>
+    <li>Khoá phải hashable, vì khoá đổi thì hash đổi và dict đi tìm nhầm ô: xem <a href="../../03-builtin-structures/dict-hash-table/index.html">Python dict &amp; hash table</a>.</li>
   </ul>
 </section>
 
-<section id="memory-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
-
-  <p class="key">Bốn bẫy dưới đây <em>đều mọc ra từ đúng một câu</em> ở mục 01: gán chỉ dán tên, không sao chép.</p>
-
-<div class="grid2">
-  <div class="card bad"><h4><code>def add(x, out=[])</code></h4><p>List mặc định chỉ tạo <b>một lần</b> lúc định nghĩa hàm, nên mọi lời gọi dùng chung nó — viết <code>out=None</code> rồi tạo trong thân hàm.</p></div>
-  <div class="card bad"><h4><code>grid = [[0] * 3] * 3</code></h4><p>Ba tham chiếu trỏ tới <b>cùng một</b> dòng, sửa một dòng là đổi cả ba — viết <code>[[0]*3 for _ in range(3)]</code>.</p></div>
-  <div class="card bad"><h4><code>for x in a: a.remove(x)</code></h4><p>Xoá trong lúc duyệt làm chỉ số nhảy cóc: định xoá 1.000 phần tử thì còn lại 500, không lỗi nào báo — dùng comprehension.</p></div>
-  <div class="card bad"><h4><code>d[[1, 2]] = "x"</code></h4><p>Khoá đổi thì hash đổi theo nên không tìm lại được; <code>dict</code> chỉ nhận khoá immutable — dùng <code>tuple</code>.</p></div>
-</div>
-
-<p>Cả bốn mọc ra từ đúng một câu: <b>gán là dán tên, không phải sao chép</b>.</p>
-
-  <ul class="why">
-    <li>Đối số mặc định lượng giá <b>một lần</b> lúc định nghĩa hàm, không phải mỗi lần gọi.</li>
-    <li><code>[[0]*3]*3</code> nhân <b>tham chiếu</b>, không nhân dữ liệu.</li>
-    <li>Xoá trong lúc duyệt: <code>dict</code> ném <code>RuntimeError</code> ngay, <code>list</code> <b>âm thầm bỏ sót đúng một nửa</b> — im lặng mới là cái nguy.</li>
-    <li>Khoá phải immutable, vì khoá đổi thì hash đổi và dict đi tìm nhầm ô.</li>
-  </ul>
-
-  <p class="stripnote"><span>vì sao dict bắt khoá phải hashable</span><span>đọc <a href="../../03-builtin-structures/dict-hash-table/index.html"><em>Python dict &amp; hash table</em></a></span></p>
-</section>
-
-<section id="memory-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Hỏi đáp</h2></div>
-
-  <p class="key">Tám câu hay gặp nhất. Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
+<section id="mm-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
   <details class="qa"><summary>Biến trong Python là gì?</summary>
-  <p>Là một <b>cái tên</b> nằm trong namespace, giữ địa chỉ của một object trên heap — không phải một ô nhớ chứa giá trị. Nên <code>b = a</code> chỉ chép địa chỉ: hai tên, một object, <code>id(a) == id(b)</code> trả về <code>True</code>. Toàn bộ hành vi còn lại của bài suy ra từ đúng câu này.</p></details>
+  <p>Là một cái tên trong namespace, giữ địa chỉ của object trên heap.</p>
+  <p>Không phải một ô nhớ chứa giá trị.</p>
+  <p>Nên <code>b = a</code> chỉ chép địa chỉ: hai tên, một object.</p>
+  <p><code>id(a) == id(b)</code> trả về <code>True</code>.</p></details>
 
-  <details class="qa"><summary>Python truyền tham số theo giá trị hay theo tham chiếu?</summary>
-  <p>Cả hai đều không chính xác. Tên gọi đúng là <em>pass by assignment</em>: tham số trong hàm là một tên mới được dán lên cùng object mà người gọi truyền vào. Nên nếu hàm <b>sửa</b> object khả biến thì người gọi thấy; nếu hàm <b>gán lại</b> tên đó thì người gọi không thấy. Đó là lý do <code>lst.append(4)</code> ảnh hưởng ra ngoài còn <code>lst = [9]</code> thì không.</p></details>
+  <details class="qa"><summary>Gán lại tên khác sửa object thế nào?</summary>
+  <p>Gán lại tên chỉ đổi chỗ cái nhãn, tên khác không hay biết.</p>
+  <p>Sửa object đổi ruột, nên mọi tên trỏ vào đều thấy.</p>
+  <p><code>+=</code> đi nhánh nào là tuỳ kiểu: list sửa tại chỗ, tuple tạo object mới.</p>
+  <p>Đổi một list thành tuple là hành vi đổi theo mà không lỗi nào báo.</p></details>
 
-  <details class="qa"><summary>Mutable và immutable khác nhau thế nào?</summary>
-  <p>Mutable là object <b>sửa được ruột tại chỗ</b> — <code>list</code>, <code>dict</code>, <code>set</code>, <code>bytearray</code>. Immutable thì không: <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>bytes</code>, <code>tuple</code>, <code>frozenset</code>, <code>None</code>. Với immutable, mọi thao tác trông như "sửa" thật ra tạo object mới rồi gán lại tên, nên các tên khác không bao giờ bị ảnh hưởng.</p></details>
+  <details class="qa"><summary>Python truyền tham số kiểu gì?</summary>
+  <p>Không phải by value, cũng không phải by reference.</p>
+  <p>Tên đúng là pass by assignment: tham số là tên mới dán lên object cũ.</p>
+  <p>Hàm sửa object thì người gọi thấy.</p>
+  <p>Hàm gán lại tên thì người gọi không thấy.</p></details>
 
-  <details class="qa"><summary><code>tuple</code> là immutable, vậy sao <code>t[1].append(4)</code> vẫn chạy?</summary>
-  <p>Vì immutable ở đây là <b>nông</b>. Tuple chỉ đảm bảo <em>danh sách tham chiếu</em> nó giữ không đổi — không thể thay phần tử thứ <em>i</em> sang object khác. Nhưng bản thân các object được trỏ tới thì nó không quản, nên list nằm bên trong vẫn sửa được như thường. Hệ quả trực tiếp: <code>hash(t)</code> ném <code>TypeError</code> vì tuple đó không thật sự bất biến.</p></details>
+  <details class="qa"><summary>Khi nào cần deepcopy?</summary>
+  <p>Chỉ khi dữ liệu lồng nhau và cần độc lập tới tận đáy.</p>
+  <p>Shallow copy tách vỏ ngoài nhưng ruột vẫn dùng chung.</p>
+  <p>deepcopy chậm hơn nhiều lần và ném lỗi với socket, khoá, kết nối.</p>
+  <p>Thường tốt hơn là thiết kế bất biến để không ai cần chép tự vệ.</p></details>
 
-  <details class="qa"><summary>Khác biệt giữa shallow copy và deep copy?</summary>
-  <p>Shallow copy — <code>a[:]</code>, <code>list(a)</code>, <code>copy.copy</code> — tạo container mới nhưng các object bên trong vẫn dùng chung, nên sửa một list lồng bên trong vẫn ảnh hưởng bản gốc. Deep copy chép đệ quy toàn bộ nên hoàn toàn độc lập, đổi lại chậm hơn, tốn bộ nhớ hơn, và có thể lỗi với object không sao chép được như socket hay khoá.</p></details>
-
-  <details class="qa"><summary>Vì sao không nên dùng list làm giá trị mặc định của tham số?</summary>
-  <p>Vì giá trị mặc định được lượng giá <b>một lần duy nhất khi hàm được định nghĩa</b>, không phải mỗi lần gọi. Nên mọi lần gọi đều dùng lại cùng một list và dữ liệu tích luỹ giữa các lần gọi — một bug rất khó tìm vì hàm trông hoàn toàn bình thường. Cách chuẩn là mặc định <code>None</code> rồi khởi tạo trong thân hàm.</p></details>
-
-  <details class="qa"><summary><code>is</code> và <code>==</code> khác nhau thế nào, khi nào dùng <code>is</code>?</summary>
-  <p><code>==</code> so giá trị qua <code>__eq__</code>; <code>is</code> so danh tính, tức có phải cùng một object trong bộ nhớ. Chỉ dùng <code>is</code> cho <code>None</code>, <code>True</code>, <code>False</code> và sentinel do mình tạo — vì đó là những object duy nhất. Không dùng <code>is</code> để so số hay chuỗi: nó có thể trả về <code>True</code> nhờ interning của CPython nhưng đó là chi tiết cài đặt, thay đổi theo phiên bản và theo ngữ cảnh code.</p></details>
-
-  <details class="qa"><summary><code>+=</code> trên list và trên tuple khác nhau chỗ nào?</summary>
-  <p>Với list, <code>b += [9]</code> gọi <code>__iadd__</code> và sửa tại chỗ — giống <code>extend</code>, nên mọi tên trỏ vào cái list đó đều thấy thay đổi. Với tuple, số hay chuỗi thì không có <code>__iadd__</code>, Python quay về <code>__add__</code>: tạo object mới rồi gán lại tên, các tên khác không đổi. Cùng một toán tử, hai nhánh khác nhau, chọn theo kiểu dữ liệu.</p></details>
+  <details class="qa"><summary>Vì sao không dùng <code>is</code> để so giá trị?</summary>
+  <p><code>is</code> so địa chỉ, <code>==</code> so nội dung.</p>
+  <p>Số nhỏ và chuỗi ngắn được cache nên <code>is</code> có lúc trả về <code>True</code>.</p>
+  <p>Đó là chi tiết cài đặt, đổi theo phiên bản và theo ngữ cảnh code.</p>
+  <p>Chỉ dùng <code>is</code> với <code>None</code>, <code>True</code>, <code>False</code> và sentinel.</p></details>
 </section>
 
-<footer>Deep dive · memory model &amp; mutability · bài tiếp theo: <a href="../memory-management-gc/index.html">Memory management &amp; GC</a> · kiểm trên CPython 3.12, 64-bit.</footer>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
+<footer>Deep dive · Python internals · object hết được trỏ tới thì biến mất lúc nào: <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>
@@ -584,6 +476,5 @@
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
-<script src="lab.js"></script>
 </body>
 </html>

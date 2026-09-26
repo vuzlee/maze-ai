@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Logistic regression — MazeAI</title>
-<meta name="description" content="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
+<meta name="description" content="Xác suất thay vì nhãn: sigmoid ép điểm số về (0,1), log loss thay MSE, cách đọc odds ratio và ngưỡng là quyết định nghiệp vụ.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/05-machine-learning/05-classical-ml/logistic-regression/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Logistic regression">
-<meta property="og:description" content="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
+<meta property="og:description" content="Xác suất thay vì nhãn: sigmoid ép điểm số về (0,1), log loss thay MSE, cách đọc odds ratio và ngưỡng là quyết định nghiệp vụ.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,520 +39,301 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-logreg" data-title="Logistic regression" data-tag="ML" data-reviewed="1" data-blurb="Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.">
+      <article class="doc" id="art-logreg" data-title="Logistic regression" data-tag="ML" data-reviewed="1" data-blurb="Xác suất thay vì nhãn: sigmoid ép điểm số về (0,1), log loss thay MSE, cách đọc odds ratio và ngưỡng là quyết định nghiệp vụ.">
         <header class="hero">
   <p class="eyebrow">Machine learning · Classical models</p>
   <h1>Logistic <em>regression</em></h1>
-  <p class="lede">Model phân loại nhị phân trả về <b>xác suất</b>, không trả về nhãn. Nó lấy đường thẳng của linear regression rồi đổi hai thứ:</p>
+  <p class="lede">Lấy đường thẳng của linear regression rồi đổi hai thứ. Ba thứ cần nhớ:</p>
   <ul class="ledelist">
-    <li><b>Hàm bọc</b> <em>— sigmoid ép điểm số về khoảng 0–1.</em></li>
-    <li><b>Loss function</b> <em>— log loss thay cho MSE.</em></li>
+    <li>sigmoid ép điểm số về khoảng 0 tới 1</li>
+    <li>log loss thay cho MSE</li>
+    <li>model trả về xác suất, không trả về nhãn</li>
   </ul>
 </header>
+
 <section id="logreg-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-  <p class="key">Một mẫu đi qua ba chặng: <span class="mth"><var>x</var></span> → <span class="mth"><var>z</var></span> → <span class="mth"><var>p</var></span>, <em>rồi mới tới nhãn</em>.</p>
-
+  <p class="key">Một mẫu đi ba chặng: <em>x → z → p</em>, rồi mới tới nhãn. Model dừng ở p.</p>
   <figure class="gist">
-  <svg viewBox="0 0 860 372" role="img" aria-label="Luồng của một khách hàng qua logistic regression, mỗi chặng một đồ thị: dữ liệu x là các giá trị đặc trưng, đường thẳng z bằng w nhân x cộng b cho 0,85 và không bị chặn, đường cong sigmoid ép z thành xác suất p bằng 0,70 nằm trong khoảng 0 tới 1, trục xác suất có ngưỡng 0,5 cắt ra nhãn 1; rẽ từ p có đường cong log loss cho 0,36 dùng lúc học và cặp thanh odds bằng 2,33 dùng để đọc hệ số">
-  <text class="sv-hv" x="0" y="16">MỘT KHÁCH HÀNG ĐI QUA MODEL</text>
-
-  <text class="sv-d" x="0" y="46" fill="var(--muted)">dữ liệu vào</text>
-  <rect x="0" y="56" width="186" height="160" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/>
-  <text class="sv-m" x="93" y="80" text-anchor="middle" fill="var(--text)"><tspan class="v">x</tspan></text>
-  <text class="sv-d" x="18" y="106" fill="var(--muted)">tuổi</text>
-  <rect x="18" y="112" width="100" height="13" rx="2" fill="var(--filled)"/>
-  <text class="sv-d" x="18" y="146" fill="var(--muted)">số đơn đã mua</text>
-  <rect x="18" y="152" width="52" height="13" rx="2" fill="rgba(var(--blue-a),.5)"/>
-  <text class="sv-m" x="93" y="194" text-anchor="middle" fill="var(--text)"><tspan class="v">x</tspan> = (34, 3)</text>
-
-  <line x1="190" y1="136" x2="214" y2="136" stroke="var(--rule-hi)" stroke-width="1.4"/>
-  <polygon points="222,136 212,131 212,141" fill="var(--rule-hi)"/>
-
-  <text class="sv-d" x="224" y="46" fill="var(--tomb)">① điểm số</text>
-  <rect x="224" y="56" width="186" height="160" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
-  <text class="sv-m" x="317" y="80" text-anchor="middle" fill="var(--text)"><tspan class="v">z</tspan> = <tspan class="v">w</tspan>·<tspan class="v">x</tspan> + <tspan class="v">b</tspan></text>
-  <line x1="244" y1="152" x2="392" y2="152" stroke="var(--rule-hi)" stroke-width="1"/>
-  <text class="sv-d" x="240" y="156" text-anchor="end" fill="var(--faint)">0</text>
-  <line x1="248" y1="176" x2="388" y2="110" stroke="var(--tomb)" stroke-width="2"/>
-  <line x1="356" y1="127" x2="356" y2="152" stroke="var(--probe)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="356" cy="127" r="4.4" fill="var(--probe)"/>
-  <text class="sv-m" x="317" y="194" text-anchor="middle" fill="var(--tomb)">= 0,85</text>
-  <text class="sv-d" x="317" y="209" text-anchor="middle" fill="var(--muted)">−∞ … +∞</text>
-
-  <line x1="414" y1="136" x2="438" y2="136" stroke="var(--rule-hi)" stroke-width="1.4"/>
-  <polygon points="446,136 436,131 436,141" fill="var(--rule-hi)"/>
-
-  <text class="sv-d" x="448" y="46" fill="var(--ok)">② xác suất</text>
-  <rect x="448" y="56" width="186" height="160" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
-  <text class="sv-m" x="541" y="80" text-anchor="middle" fill="var(--text)"><tspan class="v">p</tspan> = 1 / (1 + <tspan class="v">e</tspan><tspan dy="-5" font-size="10">−z</tspan><tspan dy="5">)</tspan></text>
-  <line x1="468" y1="112" x2="616" y2="112" stroke="var(--rule)" stroke-dasharray="4 4"/>
-  <line x1="468" y1="172" x2="616" y2="172" stroke="var(--rule)" stroke-dasharray="4 4"/>
-  <text class="sv-d" x="464" y="116" text-anchor="end" fill="var(--faint)">1</text>
-  <text class="sv-d" x="464" y="176" text-anchor="end" fill="var(--faint)">0</text>
-  <path d="M 470 170 C 510 169 528 162 542 142 C 556 122 574 115 614 114" fill="none" stroke="var(--ok)" stroke-width="2.2"/>
-  <line x1="553" y1="130" x2="553" y2="172" stroke="var(--probe)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="553" cy="130" r="4.4" fill="var(--probe)"/>
-  <text class="sv-m" x="541" y="194" text-anchor="middle" fill="var(--ok)">= 0,70</text>
-  <text class="sv-d" x="541" y="209" text-anchor="middle" fill="var(--muted)">0 … 1</text>
-
-  <line x1="638" y1="136" x2="662" y2="136" stroke="var(--rule-hi)" stroke-width="1.4"/>
-  <polygon points="670,136 660,131 660,141" fill="var(--rule-hi)"/>
-
-  <text class="sv-d" x="672" y="46" fill="var(--probe)">⑤ ngưỡng</text>
-  <rect x="672" y="56" width="186" height="160" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
-  <text class="sv-m" x="765" y="80" text-anchor="middle" fill="var(--text)"><tspan class="v">p</tspan> &gt; 0,5 ?</text>
-  <line x1="692" y1="150" x2="765" y2="150" stroke="var(--rule-hi)" stroke-width="2.4"/>
-  <line x1="765" y1="150" x2="838" y2="150" stroke="var(--ok)" stroke-width="2.4"/>
-  <line x1="765" y1="122" x2="765" y2="162" stroke="var(--probe)" stroke-width="1.4" stroke-dasharray="4 3"/>
-  <text class="sv-d" x="692" y="118" fill="var(--muted)">nhãn 0</text>
-  <text class="sv-d" x="838" y="118" text-anchor="end" fill="var(--ok)">nhãn 1</text>
-  <circle cx="796" cy="150" r="4.4" fill="var(--probe)"/>
-  <text class="sv-d" x="692" y="176" fill="var(--faint)">0</text>
-  <text class="sv-d" x="765" y="176" text-anchor="middle" fill="var(--probe)">0,5</text>
-  <text class="sv-d" x="838" y="176" text-anchor="end" fill="var(--faint)">1</text>
-  <text class="sv-m" x="765" y="196" text-anchor="middle" fill="var(--probe)">nhãn = 1</text>
-
-  <path d="M 541 216 V 236 H 317 V 252" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
-  <polygon points="317,260 312,250 322,250" fill="var(--rule-hi)"/>
-  <path d="M 541 236 V 252" fill="none" stroke="var(--rule-hi)" stroke-width="1.4"/>
-  <polygon points="541,260 536,250 546,250" fill="var(--rule-hi)"/>
-
-  <text class="sv-d" x="224" y="278" fill="var(--probe)">③ lúc học</text>
-  <rect x="224" y="286" width="186" height="86" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
-  <text class="sv-m" x="317" y="308" text-anchor="middle" fill="var(--text)"><tspan class="v">L</tspan> = −log <tspan class="v">p</tspan></text>
-  <line x1="244" y1="356" x2="392" y2="356" stroke="var(--rule-hi)" stroke-width="1"/>
-  <polyline points="258.8,318 273.6,330 288.4,337 318,346 347.6,352 392,356" fill="none" stroke="var(--probe)" stroke-width="2.2"/>
-  <circle cx="347.6" cy="352" r="4.4" fill="var(--probe)"/>
-  <text class="sv-d" x="244" y="352" fill="var(--muted)">L cao</text>
-  <text class="sv-d" x="392" y="368" text-anchor="end" fill="var(--faint)">p = 1</text>
-
-  <text class="sv-d" x="448" y="278" fill="var(--filled)">④ đọc hệ số</text>
-  <rect x="448" y="286" width="186" height="86" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
-  <text class="sv-m" x="541" y="308" text-anchor="middle" fill="var(--text)">odds = <tspan class="v">p</tspan> / (1 − <tspan class="v">p</tspan>)</text>
-  <rect x="468" y="322" width="104" height="13" rx="2" fill="var(--ok)"/>
-  <text class="sv-d" x="578" y="332" fill="var(--muted)">0,70</text>
-  <rect x="468" y="342" width="44" height="13" rx="2" fill="var(--rule-hi)"/>
-  <text class="sv-d" x="518" y="352" fill="var(--muted)">0,30</text>
-  <text class="sv-m" x="541" y="368" text-anchor="middle" fill="var(--filled)">= 2,33</text>
-  </svg>
-    <figcaption>Mỗi ô một đồ thị: <b>công thức</b> ở trên, <b>số ra</b> ở dưới. Hai ô cuối rẽ từ <span class="mth"><var>p</var></span> — một để <b>học</b>, một để <b>đọc</b>.</figcaption>
-    </figure>
-    ul class="why">
-    <li><b>Model dừng ở <span class="mth"><var>p</var></span>.</b> Bước ra nhãn là ngưỡng do người dùng chọn.</li>
-    <li>Mỗi mục sau bóc một ô, theo đúng số ① tới ⑤ trên hình.</li>
-    <li>Đường thẳng và gradient là thứ đã có ở <a href="../linear-regression/index.html">Linear regression</a>. Sigmoid và log loss là thứ mới.</li>
+    <svg viewBox="0 0 860 322" role="img" aria-label="Trục z chạy từ âm vô cùng tới dương vô cùng với sáu khách; sigmoid đưa chúng về thang xác suất từ 0 tới 1; vạch threshold ở 0,5 chia thành nhãn mua hoặc không mua" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}9.167%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}11.111%{animation-timing-function:ease-in-out;opacity:0}16.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}12.444%{animation-timing-function:ease-in-out;opacity:0}18.278%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}13.778%{animation-timing-function:ease-in-out;opacity:0}19.611%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}15.111%{animation-timing-function:ease-in-out;opacity:0}20.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}16.444%{animation-timing-function:ease-in-out;opacity:0}22.278%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0}17.778%{animation-timing-function:ease-in-out;opacity:0}23.611%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}26.667%{animation-timing-function:ease-in-out;opacity:0}32.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0}31.111%{animation-timing-function:ease-in-out;opacity:0}36.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}35.556%{animation-timing-function:ease-in-out;opacity:0}41.389%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0}37.333%{animation-timing-function:ease-in-out;opacity:0}43.167%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}39.111%{animation-timing-function:ease-in-out;opacity:0}44.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0}40.889%{animation-timing-function:ease-in-out;opacity:0}46.722%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}42.667%{animation-timing-function:ease-in-out;opacity:0}48.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}44.444%{animation-timing-function:ease-in-out;opacity:0}50.278%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm16{0%{animation-timing-function:ease-in-out;opacity:0}51.111%{animation-timing-function:ease-in-out;opacity:0}56.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm17{0%{animation-timing-function:ease-in-out;opacity:0}57.778%{animation-timing-function:ease-in-out;opacity:0}63.611%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm18{0%{animation-timing-function:ease-in-out;opacity:0}62.222%{animation-timing-function:ease-in-out;opacity:0}68.056%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm19{0%{animation-timing-function:ease-in-out;opacity:0}71.111%{animation-timing-function:ease-in-out;opacity:0}76.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm20{0%{animation-timing-function:ease-in-out;opacity:0}77.778%{animation-timing-function:ease-in-out;opacity:0}83.611%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 6.0s linear 1 forwards}.mm2{animation:mm2 6.0s linear 1 forwards}.mm3{animation:mm3 6.0s linear 1 forwards}.mm4{animation:mm4 6.0s linear 1 forwards}.mm5{animation:mm5 6.0s linear 1 forwards}.mm6{animation:mm6 6.0s linear 1 forwards}.mm7{animation:mm7 6.0s linear 1 forwards}.mm8{animation:mm8 6.0s linear 1 forwards}.mm9{animation:mm9 6.0s linear 1 forwards}.mm10{animation:mm10 6.0s linear 1 forwards}.mm11{animation:mm11 6.0s linear 1 forwards}.mm12{animation:mm12 6.0s linear 1 forwards}.mm13{animation:mm13 6.0s linear 1 forwards}.mm14{animation:mm14 6.0s linear 1 forwards}.mm15{animation:mm15 6.0s linear 1 forwards}.mm16{animation:mm16 6.0s linear 1 forwards}.mm17{animation:mm17 6.0s linear 1 forwards}.mm18{animation:mm18 6.0s linear 1 forwards}.mm19{animation:mm19 6.0s linear 1 forwards}.mm20{animation:mm20 6.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="22" fill="var(--muted)" style="fill:var(--muted)">LOGISTIC REGRESSION: ĐƯA ĐIỂM SỐ KHÔNG CHẶN VỀ XÁC SUẤT 0–1</text>
+<g class="mm1"><text class="sv-d" x="0" y="44" fill="var(--filled)" style="fill:var(--filled)">z = w·x + b</text><text class="sv-d" x="0" y="62" fill="var(--faint)" style="fill:var(--faint)">linear score</text><line x1="40" y1="127.0" x2="310" y2="127.0" stroke="var(--filled)" stroke-width="2"/><text class="sv-d" x="34" y="131.0" fill="var(--filled)" style="fill:var(--filled)" text-anchor="end">−∞</text><text class="sv-d" x="318" y="131.0" fill="var(--filled)" style="fill:var(--filled)">+∞</text><text class="sv-d" x="175.0" y="87.0" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">không bị chặn</text></g>
+<g class="mm2"><circle cx="105.0" cy="127.0" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="104.96668040665949" y="149.0" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">A</text><text class="sv-d" x="104.96668040665949" y="103.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">−1,2</text></g>
+<g class="mm3"><circle cx="122.8" cy="127.0" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="122.7645554506283" y="149.0" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">B</text><text class="sv-d" x="122.7645554506283" y="103.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">−0,9</text></g>
+<g class="mm4"><circle cx="153.9" cy="127.0" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="153.91083677757373" y="149.0" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">C</text><text class="sv-d" x="153.91083677757373" y="103.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">−0,3</text></g>
+<g class="mm5"><circle cx="180.6" cy="127.0" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="180.60764934352693" y="149.0" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">D</text><text class="sv-d" x="180.60764934352693" y="103.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">+0,1</text></g>
+<g class="mm6"><circle cx="229.6" cy="127.0" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="229.55180571444117" y="149.0" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">E</text><text class="sv-d" x="229.55180571444117" y="103.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">+0,9</text></g>
+<g class="mm7"><circle cx="265.1" cy="127.0" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="265.14755580237875" y="149.0" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">F</text><text class="sv-d" x="265.14755580237875" y="103.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">+1,5</text></g>
+<g class="mm8"><line x1="350" y1="127.0" x2="398" y2="127.0" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="406,127.0 398,122.8 398,131.2" fill="var(--rule-hi)"/><text class="sv-d" x="378" y="115.0" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">sigmoid</text><text class="sv-d" x="378" y="149.0" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">σ(z)</text></g>
+<g class="mm9"><text class="sv-d" x="440" y="44" fill="var(--probe)" style="fill:var(--probe)">p = σ(z)</text><text class="sv-d" x="440" y="62" fill="var(--faint)" style="fill:var(--faint)">probability</text><rect x="440" y="52" width="110" height="150" rx="5" fill="rgba(var(--amber-a),.06)" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="432" y="56" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">1</text><text class="sv-d" x="432" y="206" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">0</text><text class="sv-d" x="432" y="131.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">0,5</text></g>
+<g class="mm10"><circle cx="495.0" cy="166.1" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="509.0" y="170.13378455135975" fill="var(--tomb)" style="fill:var(--tomb)">A 0,24</text></g>
+<g class="mm11"><circle cx="495.0" cy="157.5" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="481.0" y="161.505446153323" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">B 0,30</text></g>
+<g class="mm12"><circle cx="495.0" cy="139.9" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="509.0" y="143.9410225818865" fill="var(--ok)" style="fill:var(--ok)">C 0,41</text></g>
+<g class="mm13"><circle cx="495.0" cy="123.5" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="481.0" y="113.5266705910243" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">D 0,52</text></g>
+<g class="mm14"><circle cx="495.0" cy="95.3" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="509.0" y="99.30572251480676" fill="var(--tomb)" style="fill:var(--tomb)">E 0,71</text></g>
+<g class="mm15"><circle cx="495.0" cy="79.6" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="481.0" y="83.58730802162806" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">F 0,82</text></g>
+<g class="mm16"><line x1="434" y1="127.0" x2="556" y2="127.0" stroke="var(--probe)" stroke-width="1.8" stroke-dasharray="4 3"/><polyline points="554.0,46.0 552.0,46.0 552.0,127.0" fill="none" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".75"/><circle cx="552.0" cy="127.0" r="2.6" fill="var(--probe)"/><text class="sv-d" x="560" y="50" fill="var(--probe)" style="fill:var(--probe)">threshold = 0,5</text></g>
+<g class="mm17"><line x1="584" y1="127.0" x2="662" y2="127.0" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="670,127.0 662,122.8 662,131.2" fill="var(--rule-hi)"/><text class="sv-d" x="627" y="115.0" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">so ngưỡng</text></g>
+<g class="mm18"><text class="sv-d" x="680" y="44" fill="var(--ok)" style="fill:var(--ok)">nhãn</text><rect x="680" y="66" width="110" height="32" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text class="sv-d" x="735" y="87" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua (1)</text><rect x="680" y="124" width="110" height="32" rx="6" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="735" y="145" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không (0)</text></g>
+<g class="mm19"><rect x="0" y="256" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="271" fill="var(--probe)" style="fill:var(--probe)">Model dừng ở p · bước ra nhãn là threshold do người dùng chọn</text></g>
+<g class="mm20"><text class="sv-d" x="14" y="294" fill="var(--muted)" style="fill:var(--muted)">Ba chặng: x → z (linear score) → p (probability). Ký hiệu này dùng suốt bài.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Ví dụ chạy suốt bài: 6 khách A–F, x là tuổi, nhãn là mua hoặc không.</li>
+    <li>Đường thẳng và gradient đã có ở <a href="../linear-regression/index.html">Linear regression</a>. Sigmoid và log loss là thứ mới.</li>
+    <li>Bước từ p ra nhãn là ngưỡng do người dùng chọn, xem mục 06.</li>
   </ul>
 </section>
 
 <section id="logreg-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Đường thẳng không dừng ở 0 và 1</h2></div>
-  <p class="key">Gán nhãn 0 và 1 rồi kẻ một đường thẳng qua chúng — <em>đường thẳng không biết dừng ở đâu</em>.</p>
-  <p>Đường thẳng đó là <span class="mth"><var>z</var> = <var>w</var>·<var>x</var> + <var>b</var></span> của <a href="../linear-regression/index.html">linear regression</a>. Ở đó nó là số đoán nên gọi <span class="mth"><var>ŷ</var></span>; ở đây nó chưa phải xác suất nên gọi là <b>điểm số</b> <span class="mth"><var>z</var></span>.</p>
-
-  <figure>
-      <svg viewBox="0 0 900 240" role="img" aria-label="Đường thẳng vượt khỏi khoảng 0 tới 1, và bị một điểm xa kéo lệch">
-        <g>
-          <line x1="60" y1="40" x2="60" y2="180" stroke="var(--rule-hi)"></line>
-          <line x1="60" y1="180" x2="400" y2="180" stroke="var(--rule-hi)"></line>
-          <line x1="56" y1="60" x2="400" y2="60" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-          <text class="sv-l" x="46" y="64" text-anchor="end">1</text>
-          <text class="sv-l" x="46" y="184" text-anchor="end">0</text>
-          <line x1="80" y1="212" x2="392" y2="30" stroke="var(--filled)" stroke-width="2"></line>
-          <circle cx="110" cy="180" r="4" fill="var(--filled)"></circle><circle cx="150" cy="180" r="4" fill="var(--filled)"></circle>
-          <circle cx="190" cy="180" r="4" fill="var(--filled)"></circle>
-          <circle cx="270" cy="60" r="4" fill="var(--filled)"></circle><circle cx="320" cy="60" r="4" fill="var(--filled)"></circle>
-          <circle cx="360" cy="60" r="4" fill="var(--filled)"></circle>
-          <text class="sv-m" x="392" y="26" fill="var(--tomb)"><tspan class="v">z</tspan> = 1,7 — đọc thành xác suất 170%?</text>
-          <text class="sv-m" x="84" y="226" fill="var(--tomb)"><tspan class="v">z</tspan> = −0,4 — xác suất âm?</text>
-        </g>
-        <g>
-          <line x1="530" y1="40" x2="530" y2="180" stroke="var(--rule-hi)"></line>
-          <line x1="530" y1="180" x2="870" y2="180" stroke="var(--rule-hi)"></line>
-          <line x1="526" y1="60" x2="870" y2="60" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-          <text class="sv-l" x="516" y="64" text-anchor="end">1</text>
-          <text class="sv-l" x="516" y="184" text-anchor="end">0</text>
-          <line x1="546" y1="176" x2="800" y2="52" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 4"></line>
-          <line x1="546" y1="188" x2="860" y2="86" stroke="var(--probe)" stroke-width="2"></line>
-          <circle cx="570" cy="180" r="4" fill="var(--filled)"></circle><circle cx="610" cy="180" r="4" fill="var(--filled)"></circle>
-          <circle cx="700" cy="60" r="4" fill="var(--filled)"></circle><circle cx="740" cy="60" r="4" fill="var(--filled)"></circle>
-          <circle cx="856" cy="60" r="6" fill="var(--probe)"></circle>
-          <text class="sv-d" x="850" y="42" text-anchor="end" fill="var(--probe)">thêm một điểm ở rất xa</text>
-          <text class="sv-d" x="700" y="212" text-anchor="middle" fill="var(--probe)">cả đường bị kéo nghiêng → ranh giới ở giữa đổi theo</text>
-        </g>
-      </svg>
-      <figcaption>Điểm bên phải ngoài cùng là điểm <strong>dễ phân loại nhất</strong>, vậy mà nó lại lay chuyển ranh giới nhiều nhất.</figcaption>
-    </figure>
-
+  <div class="sh"><b>02</b><h2>Công thức tổng quát</h2></div>
+  <p class="key">Điểm số z là <em>phần tuyến tính</em>. Sigmoid đổi z thành xác suất. Log loss đo <em>mức chắc chắn đặt nhầm chỗ</em>.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><var>z</var></span></span>
+      <span class="op">=</span>
+      <span class="t b"><span><var>w</var>·<var>x</var> + <var>b</var></span><em>điểm số, chạy từ −∞ tới +∞</em></span>
+      <span class="op">,</span>
+      <span class="t"><span><var>p</var></span></span>
+      <span class="op">=</span>
+      <span class="t p"><span><span class="frac"><i>1</i><i>1 + <var>e</var><sup>−<var>z</var></sup></i></span></span><em>sigmoid: ép về khoảng (0, 1)</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span><var>L</var></span></span>
+      <span class="op">=</span>
+      <span class="t r"><span>− <span class="frac"><i>1</i><i><var>n</var></i></span> Σ [ <var>y</var><sub>i</sub> log <var>p</var><sub>i</sub> + (1 − <var>y</var><sub>i</sub>) log (1 − <var>p</var><sub>i</sub>) ]</span><em>log loss: chỉ một trong hai số hạng sống</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span><span class="frac"><i>∂ <var>L</var></i><i>∂ <var>w</var><sub>j</sub></i></span></span></span>
+      <span class="op">=</span>
+      <span class="t g"><span><span class="frac"><i>1</i><i><var>n</var></i></span> Σ (<var>p</var><sub>i</sub> − <var>y</var><sub>i</sub>) · <var>x</var><sub>ij</sub></span><em>giống linear regression, thay ŷ bằng p</em></span>
+    </div>
+  </div>
+  <dl class="defs">
+    <dt><var>z</var></dt><dd>linear score: điểm số tuyến tính, chưa phải xác suất</dd>
+    <dt><var>p</var></dt><dd>xác suất model đoán, sau khi bọc sigmoid</dd>
+    <dt><var>y</var></dt><dd>nhãn thật, chỉ nhận 0 hoặc 1</dd>
+    <dt><var>L</var></dt><dd>log loss trung bình, còn gọi binary cross-entropy</dd>
+  </dl>
   <ul class="why">
-    <li><b><span class="mth"><var>z</var></span> chạy từ −∞ tới +∞</b>, không bị chặn trong [0, 1], nên không đọc thẳng thành xác suất được.</li>
-    <li><b>MSE giả định phần dư phân phối chuẩn</b>. Nhãn nhị phân lại theo Bernoulli.</li>
-    <li>Nên phải đổi hai thứ: <b>hàm bọc</b> ép <span class="mth"><var>z</var></span> về xác suất ở mục sau, rồi <b>loss</b> ở mục kế tiếp.</li>
+    <li>Gradient có dạng (p − y)·x, giống hệt linear regression với MSE.</li>
+    <li>Không phải trùng hợp: đó là tính chất chung của họ hàm mũ khi dùng hàm liên kết chuẩn.</li>
   </ul>
 </section>
 
 <section id="logreg-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Sigmoid ép mọi điểm số về (0, 1)</h2></div>
-  <p class="key">Sigmoid nhận <em>điểm số <span class="mth"><var>z</var></span> ở mục trước và trả về xác suất <span class="mth"><var>p</var></span> trong khoảng 0–1</em>.</p>
-
-  <figure>
-      <svg viewBox="0 0 900 210" role="img" aria-label="Đường cong sigmoid, bằng 0,5 tại z bằng 0 và bão hoà ở hai đầu">
-        <line x1="90" y1="30" x2="90" y2="170" stroke="var(--rule-hi)"></line>
-        <line x1="90" y1="170" x2="780" y2="170" stroke="var(--rule-hi)"></line>
-        <line x1="86" y1="40" x2="780" y2="40" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-        <line x1="86" y1="105" x2="780" y2="105" stroke="var(--rule)" stroke-dasharray="4 4"></line>
-        <text class="sv-m" x="76" y="44" text-anchor="end"><tspan class="v">p</tspan> = 1</text>
-        <text class="sv-m" x="76" y="109" text-anchor="end"><tspan class="v">p</tspan> = 0,5</text>
-        <text class="sv-m" x="76" y="174" text-anchor="end"><tspan class="v">p</tspan> = 0</text>
-        <path d="M100 166 C260 164 340 150 435 105 C530 60 610 46 770 44" fill="none" stroke="var(--filled)" stroke-width="2.5"></path>
-        <line x1="435" y1="30" x2="435" y2="182" stroke="var(--probe)" stroke-dasharray="4 4"></line>
-        <circle cx="435" cy="105" r="5.5" fill="var(--probe)"></circle>
-        <text class="sv-m" x="435" y="198" text-anchor="middle" fill="var(--probe)"><tspan class="v">z</tspan> = 0 · ranh giới quyết định</text>
-        <text class="sv-m" x="160" y="146" fill="var(--filled)"><tspan class="v">z</tspan> = −2 → <tspan class="v">p</tspan> ≈ 0,12</text>
-        <text class="sv-m" x="620" y="70" fill="var(--filled)"><tspan class="v">z</tspan> = 2 → <tspan class="v">p</tspan> ≈ 0,88</text>
-        <text class="sv-m" x="760" y="188" text-anchor="end"><tspan class="v">z</tspan> = <tspan class="v">w</tspan>·<tspan class="v">x</tspan> + <tspan class="v">b</tspan>  →</text>
-      </svg>
-      <figcaption>Hai đầu <strong>bẹt ra</strong>: <span class="mth"><var>z</var></span> đổi nhiều mà <span class="mth"><var>p</var></span> gần như đứng yên.</figcaption>
-    </figure>
-
-  <div class="eq">
-      <p class="read"><b>Sigmoid</b> đổi <span class="mth"><var>z</var></span> thành <span class="mth"><var>p</var></span>:</p>
-      <div class="line">
-        <span class="t"><span><var>p</var></span></span>
-        <span class="op">=</span>
-        <span class="t b"><span><span class="frac"><i>1</i><i>1 + <b class="fn">e</b><sup>−<var>z</var></sup></i></span></span><em>z càng lớn, mẫu số càng gần 1, nên p càng gần 1</em></span>
-      </div>
-    </div>
-
-  <dl class="defs">
-    <dt>z</dt><dd>điểm số tuyến tính <span class="mth"><var>w</var>·<var>x</var> + <var>b</var></span>, chưa phải xác suất</dd>
-    <dt>p</dt><dd>xác suất model đoán, sau khi bọc sigmoid</dd>
-  </dl>
-
+  <div class="sh"><b>03</b><h2>Từ bảng tới xác suất</h2></div>
+  <p class="key">Mỗi dòng đi qua ba cột: <em>z, rồi p, rồi log loss</em>. Loss là trung bình cột cuối.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 416" role="img" aria-label="Bảng sáu khách với cột tuổi là x, cột z bằng w nhân x cộng b, cột p bằng sigmoid của z, và cột log loss; đồ thị sigmoid bên phải có sáu điểm, khách E được chỉ dẫn vì p bằng 0,71 nhưng nhãn là không mua nên log loss cao nhất 1,24" data-anim><style>@keyframes tb1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}5.267%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb2{0%{animation-timing-function:ease-in-out;opacity:0}9.333%{animation-timing-function:ease-in-out;opacity:0}12.600%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb3{0%{animation-timing-function:ease-in-out;opacity:0}17.333%{animation-timing-function:ease-in-out;opacity:0}20.600%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb4{0%{animation-timing-function:ease-in-out;opacity:0}25.333%{animation-timing-function:ease-in-out;opacity:0}28.600%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb5{0%{animation-timing-function:ease-in-out;opacity:0}9.333%{animation-timing-function:ease-in-out;opacity:0}12.600%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb6{0%{animation-timing-function:ease-in-out;opacity:0}14.667%{animation-timing-function:ease-in-out;opacity:0}17.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb7{0%{animation-timing-function:ease-in-out;opacity:0}18.667%{animation-timing-function:ease-in-out;opacity:0}21.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb8{0%{animation-timing-function:ease-in-out;opacity:0}19.867%{animation-timing-function:ease-in-out;opacity:0}23.133%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb9{0%{animation-timing-function:ease-in-out;opacity:0}21.067%{animation-timing-function:ease-in-out;opacity:0}24.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb10{0%{animation-timing-function:ease-in-out;opacity:0}22.267%{animation-timing-function:ease-in-out;opacity:0}25.533%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb11{0%{animation-timing-function:ease-in-out;opacity:0}23.467%{animation-timing-function:ease-in-out;opacity:0}26.733%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb12{0%{animation-timing-function:ease-in-out;opacity:0}24.667%{animation-timing-function:ease-in-out;opacity:0}27.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb13{0%{animation-timing-function:ease-in-out;opacity:0}30.667%{animation-timing-function:ease-in-out;opacity:0}33.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb14{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}43.267%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb15{0%{animation-timing-function:ease-in-out;opacity:0}46.667%{animation-timing-function:ease-in-out;opacity:0}49.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb16{0%{animation-timing-function:ease-in-out;opacity:0}50.667%{animation-timing-function:ease-in-out;opacity:0}53.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb17{0%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:0}55.267%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb18{0%{animation-timing-function:ease-in-out;opacity:0}57.333%{animation-timing-function:ease-in-out;opacity:0}60.600%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb19{0%{animation-timing-function:ease-in-out;opacity:0}62.667%{animation-timing-function:ease-in-out;opacity:0}65.933%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb20{0%{animation-timing-function:ease-in-out;opacity:0}68.000%{animation-timing-function:ease-in-out;opacity:0}71.267%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tb21{0%{animation-timing-function:ease-in-out;opacity:0}73.333%{animation-timing-function:ease-in-out;opacity:0}76.600%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.tb1{animation:tb1 10.714285714285715s linear 1 forwards}.tb2{animation:tb2 10.714285714285715s linear 1 forwards}.tb3{animation:tb3 10.714285714285715s linear 1 forwards}.tb4{animation:tb4 10.714285714285715s linear 1 forwards}.tb5{animation:tb5 10.714285714285715s linear 1 forwards}.tb6{animation:tb6 10.714285714285715s linear 1 forwards}.tb7{animation:tb7 10.714285714285715s linear 1 forwards}.tb8{animation:tb8 10.714285714285715s linear 1 forwards}.tb9{animation:tb9 10.714285714285715s linear 1 forwards}.tb10{animation:tb10 10.714285714285715s linear 1 forwards}.tb11{animation:tb11 10.714285714285715s linear 1 forwards}.tb12{animation:tb12 10.714285714285715s linear 1 forwards}.tb13{animation:tb13 10.714285714285715s linear 1 forwards}.tb14{animation:tb14 10.714285714285715s linear 1 forwards}.tb15{animation:tb15 10.714285714285715s linear 1 forwards}.tb16{animation:tb16 10.714285714285715s linear 1 forwards}.tb17{animation:tb17 10.714285714285715s linear 1 forwards}.tb18{animation:tb18 10.714285714285715s linear 1 forwards}.tb19{animation:tb19 10.714285714285715s linear 1 forwards}.tb20{animation:tb20 10.714285714285715s linear 1 forwards}.tb21{animation:tb21 10.714285714285715s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="22" fill="var(--muted)" style="fill:var(--muted)">MỖI DÒNG ĐI QUA BA PHÉP TÍNH · CỘT NÀO CŨNG GHI CÔNG THỨC CỦA NÓ</text>
+<g class="tb1"><rect x="0" y="99" width="392" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="127" width="392" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="155" width="392" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="183" width="392" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="211" width="392" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><rect x="0" y="239" width="392" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="16.0" y="74" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">id</text><text class="sv-d" x="61.0" y="74" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">tuổi</text><text class="sv-d" x="61.0" y="90" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">x</text><text class="sv-d" x="121.0" y="74" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">nhãn</text><text class="sv-d" x="121.0" y="90" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">y</text><text class="sv-d" x="188.0" y="74" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">z</text><text class="sv-d" x="188.0" y="90" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">w·x + b</text><text class="sv-d" x="258.0" y="74" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">p</text><text class="sv-d" x="258.0" y="90" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">σ(z)</text><text class="sv-d" x="342.0" y="74" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">log loss</text><text class="sv-d" x="342.0" y="90" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">−log p(đúng)</text><line x1="0" y1="96" x2="392" y2="96" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="16.0" y="116" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text><text class="sv-d" x="61.0" y="116" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">24</text><text class="sv-d" x="121.0" y="116" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="16.0" y="144" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text><text class="sv-d" x="61.0" y="144" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">28</text><text class="sv-d" x="121.0" y="144" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="16.0" y="172" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text><text class="sv-d" x="61.0" y="172" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">35</text><text class="sv-d" x="121.0" y="172" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="16.0" y="200" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text><text class="sv-d" x="61.0" y="200" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">41</text><text class="sv-d" x="121.0" y="200" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="16.0" y="228" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text><text class="sv-d" x="61.0" y="228" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">52</text><text class="sv-d" x="121.0" y="228" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="16.0" y="256" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text><text class="sv-d" x="61.0" y="256" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">60</text><text class="sv-d" x="121.0" y="256" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text></g>
+<g class="tb2"><text class="sv-d" x="188.0" y="116" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−1,16</text><text class="sv-d" x="188.0" y="144" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,86</text><text class="sv-d" x="188.0" y="172" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">−0,35</text><text class="sv-d" x="188.0" y="200" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,09</text><text class="sv-d" x="188.0" y="228" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,90</text><text class="sv-d" x="188.0" y="256" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+1,49</text></g>
+<g class="tb3"><text class="sv-d" x="258.0" y="116" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,24</text><text class="sv-d" x="258.0" y="144" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,30</text><text class="sv-d" x="258.0" y="172" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,41</text><text class="sv-d" x="258.0" y="200" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,52</text><text class="sv-d" x="258.0" y="228" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,71</text><text class="sv-d" x="258.0" y="256" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,82</text></g>
+<g class="tb4"><rect x="298" y="105" width="9.678118425270787" height="12" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.1"/><text class="sv-d" x="386" y="116" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">0,27</text><rect x="298" y="133" width="12.462183246851108" height="12" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.1"/><text class="sv-d" x="386" y="144" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">0,35</text><rect x="298" y="161" width="31.257044366319896" height="12" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.1"/><text class="sv-d" x="386" y="172" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">0,88</text><rect x="298" y="189" width="22.94567026316583" height="12" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.1"/><text class="sv-d" x="386" y="200" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">0,65</text><rect x="298" y="217" width="44.0" height="12" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.1"/><text class="sv-d" x="386" y="228" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">1,24</text><rect x="298" y="245" width="7.197999565305195" height="12" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.1"/><text class="sv-d" x="386" y="256" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">0,20</text></g>
+<g class="tb5"><line x1="470" y1="240" x2="830" y2="240" stroke="var(--rule-hi)" stroke-width="1"/><line x1="470" y1="240" x2="470" y2="64" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="830" y="256" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">z</text><text class="sv-d" x="464" y="70" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">p</text><text class="sv-d" x="464" y="68" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">1</text><text class="sv-d" x="464" y="156.0" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">0,5</text></g>
+<g class="tb6"><path d="M470.0 222.4 L476.0 221.3 L482.0 220.0 L488.0 218.6 L494.0 217.2 L500.0 215.7 L506.0 214.2 L512.0 212.5 L518.0 210.8 L524.0 208.9 L530.0 207.0 L536.0 205.0 L542.0 202.9 L548.0 200.7 L554.0 198.4 L560.0 196.0 L566.0 193.6 L572.0 191.0 L578.0 188.4 L584.0 185.7 L590.0 182.9 L596.0 180.0 L602.0 177.1 L608.0 174.1 L614.0 171.1 L620.0 168.0 L626.0 164.8 L632.0 161.6 L638.0 158.4 L644.0 155.2 L650.0 152.0 L656.0 148.8 L662.0 145.6 L668.0 142.4 L674.0 139.2 L680.0 136.0 L686.0 132.9 L692.0 129.9 L698.0 126.9 L704.0 124.0 L710.0 121.1 L716.0 118.3 L722.0 115.6 L728.0 113.0 L734.0 110.4 L740.0 108.0 L746.0 105.6 L752.0 103.3 L758.0 101.1 L764.0 99.0 L770.0 97.0 L776.0 95.1 L782.0 93.2 L788.0 91.5 L794.0 89.8 L800.0 88.3 L806.0 86.8 L812.0 85.4 L818.0 84.0 L824.0 82.7 L830.0 81.6" fill="none" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="826" y="76.32" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">p = σ(z)</text></g>
+<g class="tb7"><circle cx="555.3" cy="197.9" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="564.2892747798551" y="201.91697387359545" fill="var(--tomb)" style="fill:var(--tomb)">A</text></g>
+<g class="tb8"><circle cx="579.4" cy="187.8" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="570.3585272810901" y="191.793056819899" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">B</text></g>
+<g class="tb9"><circle cx="621.5" cy="167.2" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.5"/><text class="sv-d" x="630.4797191582514" y="171.18413316274683" fill="var(--ok)" style="fill:var(--ok)">C</text></g>
+<g class="tb10"><circle cx="657.6" cy="147.9" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.5"/><text class="sv-d" x="648.5835979101041" y="151.92462682680184" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">D</text></g>
+<g class="tb11"><circle cx="723.8" cy="114.8" r="5.5" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="732.7740422885005" y="118.8120477507066" fill="var(--tomb)" style="fill:var(--tomb)">E</text></g>
+<g class="tb12"><circle cx="771.9" cy="96.4" r="5.5" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.5"/><text class="sv-d" x="762.9125472909705" y="100.36910807871027" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">F</text></g>
+<g class="tb13"><line x1="470" y1="152.0" x2="830" y2="152.0" stroke="var(--rule-hi)" stroke-width="1.2" stroke-dasharray="4 3"/></g>
+<g class="tb14"><polyline points="510.0,82.0 510.0,114.8 723.8,114.8" fill="none" stroke="var(--tomb)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".75"/><circle cx="723.8" cy="114.8" r="2.6" fill="var(--tomb)"/><text class="sv-d" x="516" y="86" fill="var(--tomb)" style="fill:var(--tomb)">E: p = 0,71 nhưng nhãn là không mua</text></g>
+<g class="tb15"><polyline points="322.0,292.0 328.0,292.0 328.0,224.0" fill="none" stroke="var(--tomb)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".75"/><circle cx="328.0" cy="224.0" r="2.6" fill="var(--tomb)"/><text class="sv-d" x="328" y="296" fill="var(--tomb)" style="fill:var(--tomb)">log loss cao nhất: 1,24</text></g>
+<g class="tb16"><text class="sv-d" x="0" y="290" fill="var(--muted)" style="fill:var(--muted)">Thứ tự tính · lấy khách E (52 tuổi, nhãn không mua)</text></g>
+<g class="tb17"><rect x="0.0" y="300" width="142.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="71.0" y="318" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">x (tuổi)</text><text class="sv-d" x="71.0" y="336" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">52</text></g>
+<g class="tb18"><rect x="160.0" y="300" width="142.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="231.0" y="318" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">z = w·x + b</text><text class="sv-d" x="231.0" y="336" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">+0,90</text><line x1="144.0" y1="323" x2="150.0" y2="323" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="158.0,323 150.0,318.8 150.0,327.2" fill="var(--rule-hi)"/></g>
+<g class="tb19"><rect x="320.0" y="300" width="142.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="391.0" y="318" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">p = σ(z)</text><text class="sv-d" x="391.0" y="336" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">0,71</text><line x1="304.0" y1="323" x2="310.0" y2="323" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="318.0,323 310.0,318.8 310.0,327.2" fill="var(--rule-hi)"/></g>
+<g class="tb20"><rect x="480.0" y="300" width="142.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="551.0" y="318" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">nhãn thật</text><text class="sv-d" x="551.0" y="336" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">không (y = 0)</text><line x1="464.0" y1="323" x2="470.0" y2="323" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="478.0,323 470.0,318.8 470.0,327.2" fill="var(--rule-hi)"/></g>
+<g class="tb21"><rect x="640.0" y="300" width="142.0" height="46" rx="5" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="711.0" y="318" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">L = −log(1−p)</text><text class="sv-d" x="711.0" y="336" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">1,24</text><line x1="624.0" y1="323" x2="630.0" y2="323" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="638.0,323 630.0,318.8 630.0,327.2" fill="var(--rule-hi)"/></g>
+</svg>
+  </figure>
   <ul class="why">
-    <li><b>Ranh giới quyết định vẫn là một mặt phẳng.</b> Sigmoid chỉ đổi thang đo của điểm số.</li>
-    <li>Nó không làm model phi tuyến.</li>
+    <li>Ranh giới quyết định vẫn là một mặt phẳng, nên model không tách được khách E.</li>
     <li>Muốn ranh giới cong thì phải tự thêm đặc trưng bậc cao hoặc đặc trưng tương tác.</li>
   </ul>
 </section>
 
 <section id="logreg-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Log loss — phạt nặng khi sai mà chắc</h2></div>
-  <p class="key">Đã có xác suất thì đo sai bằng <em>mức chắc chắn đặt nhầm chỗ</em>, không đo bằng khoảng cách.</p>
-
+  <div class="sh"><b>04</b><h2>Vì sao sigmoid và log loss</h2></div>
+  <p class="key">Đường thẳng <em>không dừng ở 0 và 1</em>. Và MSE ghép với sigmoid thì <em>tắt tín hiệu học</em> ở đúng mẫu sai nặng nhất.</p>
   <figure class="scrollx">
-  <svg viewBox="0 0 900 340" role="img" aria-label="Hai trường hợp của log loss trên một mẫu: khi nhãn thật là 1 thì p càng gần 1 loss càng nhỏ, khi nhãn thật là 0 thì p càng gần 0 loss càng nhỏ; ở cả hai, đoán sai mà rất chắc thì loss vọt lên">
-  <text class="sv-hv" x="0" y="18">MỘT MẪU — LOSS PHỤ THUỘC p VÀ NHÃN THẬT</text>
-  <text class="sv-hv" x="40" y="44" fill="var(--ok)">① Nhãn thật y = 1</text>
-  <rect x="40" y="60" width="380" height="210" rx="6" fill="rgba(var(--green-a),.05)" stroke="var(--ok)" stroke-width="1.4"/>
-  <line x1="48" y1="236" x2="390" y2="236" stroke="var(--rule-hi)" stroke-width="1"/>
-  <text class="sv-d" x="48" y="82" fill="var(--muted)">L cao</text>
-  <text class="sv-hv" x="480" y="44" fill="var(--tomb)">② Nhãn thật y = 0</text>
-  <rect x="480" y="60" width="380" height="210" rx="6" fill="rgba(var(--red-a),.05)" stroke="var(--tomb)" stroke-width="1.4"/>
-  <line x1="488" y1="236" x2="830" y2="236" stroke="var(--rule-hi)" stroke-width="1"/>
-  <text class="sv-d" x="488" y="82" fill="var(--muted)">L cao</text>
-  <polyline points="61.4,110.0 63.0,113.3 64.7,116.8 66.4,119.9 68.0,122.8 69.7,125.5 71.4,127.9 73.0,130.2 74.7,132.3 76.4,134.3 78.1,136.2 79.7,138.0 81.4,139.7 83.1,141.3 84.7,142.9 86.4,144.4 88.1,145.8 89.8,147.1 91.4,148.4 93.1,149.7 94.8,150.9 96.4,152.0 98.1,153.2 99.8,154.2 101.4,155.3 103.1,156.3 104.8,157.3 106.4,158.3 108.1,159.2 109.8,160.1 111.5,161.0 113.1,161.8 114.8,162.7 116.5,163.5 118.1,164.3 119.8,165.1 121.5,165.8 123.2,166.6 124.8,167.3 126.5,168.0 128.2,168.7 129.8,169.4 131.5,170.1 133.2,170.7 134.8,171.4 136.5,172.0 138.2,172.6 139.9,173.2 141.5,173.8 143.2,174.4 144.9,175.0 146.5,175.6 148.2,176.1 149.9,176.7 151.5,177.2 153.2,177.7 154.9,178.3 156.6,178.8 158.2,179.3 159.9,179.8 161.6,180.3 163.2,180.7 164.9,181.2 166.6,181.7 168.2,182.2 169.9,182.6 171.6,183.1 173.2,183.5 174.9,183.9 176.6,184.4 178.3,184.8 179.9,185.2 181.6,185.6 183.3,186.1 184.9,186.5 186.6,186.9 188.3,187.3 189.9,187.7 191.6,188.0 193.3,188.4 195.0,188.8 196.6,189.2 198.3,189.5 200.0,189.9 201.6,190.3 203.3,190.6 205.0,191.0 206.7,191.3 208.3,191.7 210.0,192.0 211.7,192.4 213.3,192.7 215.0,193.0 216.7,193.4 218.3,193.7 220.0,194.0 221.7,194.3 223.3,194.7 225.0,195.0 226.7,195.3 228.4,195.6 230.0,195.9 231.7,196.2 233.4,196.5 235.0,196.8 236.7,197.1 238.4,197.4 240.0,197.7 241.7,198.0 243.4,198.2 245.1,198.5 246.7,198.8 248.4,199.1 250.1,199.4 251.7,199.6 253.4,199.9 255.1,200.2 256.8,200.4 258.4,200.7 260.1,201.0 261.8,201.2 263.4,201.5 265.1,201.7 266.8,202.0 268.4,202.2 270.1,202.5 271.8,202.7 273.5,203.0 275.1,203.2 276.8,203.5 278.5,203.7 280.1,203.9 281.8,204.2 283.5,204.4 285.1,204.7 286.8,204.9 288.5,205.1 290.1,205.3 291.8,205.6 293.5,205.8 295.2,206.0 296.8,206.2 298.5,206.5 300.2,206.7 301.8,206.9 303.5,207.1 305.2,207.3 306.9,207.6 308.5,207.8 310.2,208.0 311.9,208.2 313.5,208.4 315.2,208.6 316.9,208.8 318.5,209.0 320.2,209.2 321.9,209.4 323.6,209.6 325.2,209.8 326.9,210.0 328.6,210.2 330.2,210.4 331.9,210.6 333.6,210.8 335.2,211.0 336.9,211.2 338.6,211.4 340.2,211.6 341.9,211.8 343.6,212.0 345.3,212.1 346.9,212.3 348.6,212.5 350.3,212.7 351.9,212.9 353.6,213.1 355.3,213.2 356.9,213.4 358.6,213.6 360.3,213.8 362.0,214.0 363.6,214.1 365.3,214.3 367.0,214.5 368.6,214.6 370.3,214.8 372.0,215.0 373.6,215.2 375.3,215.3 377.0,215.5 378.7,215.7 380.3,215.8" fill="none" stroke="var(--ok)" stroke-width="2.2"/>
-  <polyline points="489.7,215.8 491.3,215.7 493.0,215.5 494.7,215.3 496.4,215.2 498.0,215.0 499.7,214.8 501.4,214.6 503.0,214.5 504.7,214.3 506.4,214.1 508.0,214.0 509.7,213.8 511.4,213.6 513.0,213.4 514.7,213.2 516.4,213.1 518.1,212.9 519.7,212.7 521.4,212.5 523.1,212.3 524.7,212.1 526.4,212.0 528.1,211.8 529.8,211.6 531.4,211.4 533.1,211.2 534.8,211.0 536.4,210.8 538.1,210.6 539.8,210.4 541.4,210.2 543.1,210.0 544.8,209.8 546.5,209.6 548.1,209.4 549.8,209.2 551.5,209.0 553.1,208.8 554.8,208.6 556.5,208.4 558.1,208.2 559.8,208.0 561.5,207.8 563.1,207.6 564.8,207.3 566.5,207.1 568.2,206.9 569.8,206.7 571.5,206.5 573.2,206.2 574.8,206.0 576.5,205.8 578.2,205.6 579.9,205.3 581.5,205.1 583.2,204.9 584.9,204.7 586.5,204.4 588.2,204.2 589.9,203.9 591.5,203.7 593.2,203.5 594.9,203.2 596.5,203.0 598.2,202.7 599.9,202.5 601.6,202.2 603.2,202.0 604.9,201.7 606.6,201.5 608.2,201.2 609.9,201.0 611.6,200.7 613.2,200.4 614.9,200.2 616.6,199.9 618.3,199.6 619.9,199.4 621.6,199.1 623.3,198.8 624.9,198.5 626.6,198.2 628.3,198.0 630.0,197.7 631.6,197.4 633.3,197.1 635.0,196.8 636.6,196.5 638.3,196.2 640.0,195.9 641.6,195.6 643.3,195.3 645.0,195.0 646.6,194.7 648.3,194.3 650.0,194.0 651.7,193.7 653.3,193.4 655.0,193.0 656.7,192.7 658.3,192.4 660.0,192.0 661.7,191.7 663.4,191.3 665.0,191.0 666.7,190.6 668.4,190.3 670.0,189.9 671.7,189.5 673.4,189.2 675.0,188.8 676.7,188.4 678.4,188.0 680.0,187.7 681.7,187.3 683.4,186.9 685.1,186.5 686.7,186.1 688.4,185.6 690.1,185.2 691.7,184.8 693.4,184.4 695.1,183.9 696.8,183.5 698.4,183.1 700.1,182.6 701.8,182.2 703.4,181.7 705.1,181.2 706.8,180.7 708.4,180.3 710.1,179.8 711.8,179.3 713.5,178.8 715.1,178.3 716.8,177.7 718.5,177.2 720.1,176.7 721.8,176.1 723.5,175.6 725.1,175.0 726.8,174.4 728.5,173.8 730.1,173.2 731.8,172.6 733.5,172.0 735.2,171.4 736.8,170.7 738.5,170.1 740.2,169.4 741.8,168.7 743.5,168.0 745.2,167.3 746.9,166.6 748.5,165.8 750.2,165.1 751.9,164.3 753.5,163.5 755.2,162.7 756.9,161.8 758.5,161.0 760.2,160.1 761.9,159.2 763.5,158.3 765.2,157.3 766.9,156.3 768.6,155.3 770.2,154.2 771.9,153.2 773.6,152.0 775.2,150.9 776.9,149.7 778.6,148.4 780.2,147.1 781.9,145.8 783.6,144.4 785.3,142.9 786.9,141.3 788.6,139.7 790.3,138.0 791.9,136.2 793.6,134.3 795.3,132.3 797.0,130.2 798.6,127.9 800.3,125.5 802.0,122.8 803.6,119.9 805.3,116.8 807.0,113.3 808.6,110.0" fill="none" stroke="var(--tomb)" stroke-width="2.2"/>
-  <line x1="348.6" y1="219.5" x2="348.6" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="348.6" cy="212.5" r="4.6" fill="var(--probe)"/>
-  <text class="sv-m" x="348.6" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,9</text>
-  <text class="sv-m" x="335.6" y="203.5" text-anchor="end" fill="var(--probe)"><tspan class="v">L</tspan> = 0,11</text>
-  <line x1="215.0" y1="200.0" x2="215.0" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="215.0" cy="193.0" r="4.6" fill="var(--probe)"/>
-  <text class="sv-m" x="215.0" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,5</text>
-  <text class="sv-m" x="228.0" y="184.0" text-anchor="start" fill="var(--probe)"><tspan class="v">L</tspan> = 0,69</text>
-  <line x1="81.4" y1="146.7" x2="81.4" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="81.4" cy="139.7" r="4.6" fill="var(--probe)"/>
-  <text class="sv-m" x="81.4" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,1</text>
-  <text class="sv-m" x="94.4" y="130.7" text-anchor="start" fill="var(--probe)"><tspan class="v">L</tspan> = 2,30</text>
-  <line x1="521.4" y1="219.5" x2="521.4" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="521.4" cy="212.5" r="4.6" fill="var(--probe)"/>
-  <text class="sv-m" x="521.4" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,1</text>
-  <text class="sv-m" x="534.4" y="203.5" text-anchor="start" fill="var(--probe)"><tspan class="v">L</tspan> = 0,11</text>
-  <line x1="655.0" y1="200.0" x2="655.0" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="655.0" cy="193.0" r="4.6" fill="var(--probe)"/>
-  <text class="sv-m" x="655.0" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,5</text>
-  <text class="sv-m" x="642.0" y="184.0" text-anchor="end" fill="var(--probe)"><tspan class="v">L</tspan> = 0,69</text>
-  <line x1="788.6" y1="146.7" x2="788.6" y2="236" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/>
-  <circle cx="788.6" cy="139.7" r="4.6" fill="var(--probe)"/>
-  <text class="sv-m" x="788.6" y="252" text-anchor="middle" fill="var(--faint)"><tspan class="v">p</tspan> = 0,9</text>
-  <text class="sv-m" x="775.6" y="130.7" text-anchor="end" fill="var(--probe)"><tspan class="v">L</tspan> = 2,30</text>
-  <text class="sv-d" x="40" y="312" fill="var(--muted)">nhãn là 1, nên p càng gần 1 thì loss càng nhỏ</text>
-  <text class="sv-d" x="480" y="312" fill="var(--muted)">nhãn là 0, nên p càng gần 0 thì loss càng nhỏ</text>
-  </svg>
-    <figcaption>Một mẫu duy nhất, hai trường hợp nhãn. Đoán đúng và chắc thì <span class="mth"><var>L</var></span> gần 0. Lưỡng lự ở 0,5 thì <span class="mth"><var>L</var></span> = 0,69. Sai mà rất chắc thì <span class="mth"><var>L</var></span> vọt lên.</figcaption>
-    </figure>
-
-  <div class="eq">
-      <p class="read"><b>Log loss</b> là <b>trung bình</b> của <span class="mth"><var>L</var></span> vừa vẽ, lấy trên cả <span class="mth"><var>n</var></span> mẫu (còn gọi binary cross-entropy):</p>
-      <div class="line">
-        <span class="t"><span><var>L</var></span></span>
-        <span class="op">=</span>
-        <span class="t p"><span>− <span class="frac"><i>1</i><i><var>n</var></i></span> Σ [ <var>y</var><sub><var>i</var></sub>·<b class="fn">log</b>(<var>p</var><sub><var>i</var></sub>) + (1−<var>y</var><sub><var>i</var></sub>)·<b class="fn">log</b>(1−<var>p</var><sub><var>i</var></sub>) ]</span><em>chỉ một trong hai số hạng sống, tuỳ nhãn 0 hay 1</em></span>
-      </div>
-      <p class="read">Đi ngược lại để biết chỉnh <span class="mth"><var>w</var></span> theo hướng nào — <b>gradient</b>, kết quả rất gọn:</p>
-      <div class="line">
-        <span class="t"><span><span class="frac"><i>∂<var>L</var></i><i>∂<var>w</var><sub><var>j</var></sub></i></span></span></span>
-        <span class="op">=</span>
-        <span class="t g"><span><span class="frac"><i>1</i><i><var>n</var></i></span> Σ (<var>p</var><sub><var>i</var></sub> − <var>y</var><sub><var>i</var></sub>) · <var>x</var><sub><var>ij</var></sub></span><em>giống hệt dạng của linear regression</em></span>
-      </div>
-    </div>
-
-  <dl class="defs">
-    <dt>y</dt><dd>nhãn thật, chỉ nhận 0 hoặc 1</dd>
-    <dt>n</dt><dd>số mẫu trong tập huấn luyện</dd>
-    <dt>L</dt><dd>loss trung bình trên cả tập</dd>
-  </dl>
-
+    <svg viewBox="0 0 860 386" role="img" aria-label="Ba đồ thị: đường thẳng vượt quá 1 và dưới 0, sigmoid ép mọi z về khoảng 0 tới 1 với hai đầu bẹt, log loss tăng vọt khi đoán sai mà chắc" data-anim><style>@keyframes wh1{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}8.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh2{0%{animation-timing-function:ease-in-out;opacity:0}26.000%{animation-timing-function:ease-in-out;opacity:0}30.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh3{0%{animation-timing-function:ease-in-out;opacity:0}48.000%{animation-timing-function:ease-in-out;opacity:0}52.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh4{0%{animation-timing-function:ease-in-out;opacity:0}66.000%{animation-timing-function:ease-in-out;opacity:0}70.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh5{0%{animation-timing-function:ease-in-out;opacity:0}74.000%{animation-timing-function:ease-in-out;opacity:0}78.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh6{0%{animation-timing-function:ease-in-out;opacity:0}77.000%{animation-timing-function:ease-in-out;opacity:0}81.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh7{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}84.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh8{0%{animation-timing-function:ease-in-out;opacity:0}83.000%{animation-timing-function:ease-in-out;opacity:0}87.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.wh1{animation:wh1 7.142857142857143s linear 1 forwards}.wh2{animation:wh2 7.142857142857143s linear 1 forwards}.wh3{animation:wh3 7.142857142857143s linear 1 forwards}.wh4{animation:wh4 7.142857142857143s linear 1 forwards}.wh5{animation:wh5 7.142857142857143s linear 1 forwards}.wh6{animation:wh6 7.142857142857143s linear 1 forwards}.wh7{animation:wh7 7.142857142857143s linear 1 forwards}.wh8{animation:wh8 7.142857142857143s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<g class="wh1"><text class="sv-d" x="16" y="32" fill="var(--text)" style="fill:var(--text)">Đường thẳng</text><text class="sv-d" x="16" y="226" fill="var(--muted)" style="fill:var(--muted)">z không bị chặn</text><line x1="16" y1="169.11764705882354" x2="244" y2="169.11764705882354" stroke="var(--rule-hi)" stroke-width="1"/><line x1="16" y1="80.88235294117646" x2="244" y2="80.88235294117646" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/><text class="sv-d" x="10" y="84.88235294117646" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">1</text><text class="sv-d" x="10" y="173.11764705882354" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">0</text><path d="M16.0 202.6 L21.7 198.8 L27.4 194.9 L33.1 191.0 L38.8 187.1 L44.5 183.2 L50.2 179.4 L55.9 175.5 L61.6 171.6 L67.3 167.7 L73.0 163.8 L78.7 159.9 L84.4 156.1 L90.1 152.2 L95.8 148.3 L101.5 144.4 L107.2 140.5 L112.9 136.6 L118.6 132.8 L124.3 128.9 L130.0 125.0 L135.7 121.1 L141.4 117.2 L147.1 113.4 L152.8 109.5 L158.5 105.6 L164.2 101.7 L169.9 97.8 L175.6 93.9 L181.3 90.1 L187.0 86.2 L192.7 82.3 L198.4 78.4 L204.1 74.5 L209.8 70.6 L215.5 66.8 L221.2 62.9 L226.9 59.0 L232.6 55.1 L238.3 51.2 L244.0 47.4" fill="none" stroke="var(--tomb)" stroke-width="2.4"/><text class="sv-d" x="244" y="37.35294117647061" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">vượt 1</text><text class="sv-d" x="244" y="216.64705882352942" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">dưới 0</text></g>
+<g class="wh2"><text class="sv-d" x="306" y="32" fill="var(--text)" style="fill:var(--text)">Sigmoid</text><text class="sv-d" x="306" y="226" fill="var(--muted)" style="fill:var(--muted)">ép mọi z về (0, 1)</text><line x1="306" y1="169.11764705882354" x2="534" y2="169.11764705882354" stroke="var(--rule-hi)" stroke-width="1"/><line x1="306" y1="80.88235294117646" x2="534" y2="80.88235294117646" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/><text class="sv-d" x="300" y="84.88235294117646" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">1</text><text class="sv-d" x="300" y="173.11764705882354" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">0</text><path d="M306.0 167.5 L309.8 167.3 L313.6 167.1 L317.4 166.8 L321.2 166.4 L325.0 166.1 L328.8 165.7 L332.6 165.2 L336.4 164.7 L340.2 164.1 L344.0 163.4 L347.8 162.6 L351.6 161.8 L355.4 160.8 L359.2 159.8 L363.0 158.6 L366.8 157.3 L370.6 155.9 L374.4 154.3 L378.2 152.6 L382.0 150.7 L385.8 148.7 L389.6 146.5 L393.4 144.2 L397.2 141.8 L401.0 139.2 L404.8 136.5 L408.6 133.7 L412.4 130.8 L416.2 127.9 L420.0 125.0 L423.8 122.1 L427.6 119.2 L431.4 116.3 L435.2 113.5 L439.0 110.8 L442.8 108.2 L446.6 105.8 L450.4 103.5 L454.2 101.3 L458.0 99.3 L461.8 97.4 L465.6 95.7 L469.4 94.1 L473.2 92.7 L477.0 91.4 L480.8 90.2 L484.6 89.2 L488.4 88.2 L492.2 87.4 L496.0 86.6 L499.8 85.9 L503.6 85.3 L507.4 84.8 L511.2 84.3 L515.0 83.9 L518.8 83.6 L522.6 83.2 L526.4 82.9 L530.2 82.7 L534.0 82.5" fill="none" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="534" y="77.29411764705883" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">bẹt ra</text></g>
+<g class="wh3"><text class="sv-d" x="596" y="32" fill="var(--text)" style="fill:var(--text)">Log loss</text><text class="sv-d" x="596" y="226" fill="var(--muted)" style="fill:var(--muted)">phạt nặng khi sai mà chắc</text><line x1="596" y1="169.11764705882354" x2="824" y2="169.11764705882354" stroke="var(--rule-hi)" stroke-width="1"/><line x1="596" y1="80.88235294117646" x2="824" y2="80.88235294117646" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 3"/><text class="sv-d" x="590" y="84.88235294117646" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">1</text><text class="sv-d" x="590" y="173.11764705882354" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">0</text><path d="M599.8 66.5 L603.6 89.1 L607.4 102.3 L611.2 111.7 L615.0 119.0 L618.8 124.9 L622.6 129.9 L626.4 134.3 L630.2 138.1 L634.0 141.6 L637.8 144.7 L641.6 147.5 L645.4 150.1 L649.2 152.5 L653.0 154.8 L656.8 156.9 L660.6 158.9 L664.4 160.7 L668.2 162.5 L672.0 164.2 L675.8 165.8 L679.6 167.3 L683.4 168.7 L687.2 170.1 L691.0 171.5 L694.8 172.7 L698.6 174.0 L702.4 175.1 L706.2 176.3 L710.0 177.4 L713.8 178.5 L717.6 179.5 L721.4 180.5 L725.2 181.5 L729.0 182.4 L732.8 183.3 L736.6 184.2 L740.4 185.1 L744.2 186.0 L748.0 186.8 L751.8 187.6 L755.6 188.4 L759.4 189.1 L763.2 189.9 L767.0 190.6 L770.8 191.3 L774.6 192.0 L778.4 192.7 L782.2 193.4 L786.0 194.1 L789.8 194.7 L793.6 195.3 L797.4 196.0 L801.2 196.6 L805.0 197.2 L808.8 197.8 L812.6 198.3 L816.4 198.9 L820.2 199.5 L824.0 200.0" fill="none" stroke="var(--ok)" stroke-width="2.4"/><path d="M596.0 200.0 L599.8 199.5 L603.6 198.9 L607.4 198.3 L611.2 197.8 L615.0 197.2 L618.8 196.6 L622.6 196.0 L626.4 195.3 L630.2 194.7 L634.0 194.1 L637.8 193.4 L641.6 192.7 L645.4 192.0 L649.2 191.3 L653.0 190.6 L656.8 189.9 L660.6 189.1 L664.4 188.4 L668.2 187.6 L672.0 186.8 L675.8 186.0 L679.6 185.1 L683.4 184.2 L687.2 183.3 L691.0 182.4 L694.8 181.5 L698.6 180.5 L702.4 179.5 L706.2 178.5 L710.0 177.4 L713.8 176.3 L717.6 175.1 L721.4 174.0 L725.2 172.7 L729.0 171.5 L732.8 170.1 L736.6 168.7 L740.4 167.3 L744.2 165.8 L748.0 164.2 L751.8 162.5 L755.6 160.7 L759.4 158.9 L763.2 156.9 L767.0 154.8 L770.8 152.5 L774.6 150.1 L778.4 147.5 L782.2 144.7 L786.0 141.6 L789.8 138.1 L793.6 134.3 L797.4 129.9 L801.2 124.9 L805.0 119.0 L808.8 111.7 L812.6 102.3 L816.4 89.1 L820.2 66.5" fill="none" stroke="var(--tomb)" stroke-width="2.4"/><text class="sv-d" x="596" y="48" fill="var(--ok)" style="fill:var(--ok)">nhãn = mua</text><text class="sv-d" x="824" y="190" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">nhãn = không</text><text class="sv-d" x="710.0" y="208" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">p</text></g>
+<g class="wh4"><rect x="0" y="250" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="265" fill="var(--probe)" style="fill:var(--probe)">Sigmoid chỉ đổi thang đo của z, không làm model phi tuyến</text></g>
+<g class="wh5"><text class="sv-d" x="0" y="282" fill="var(--text)" style="fill:var(--text)">Ranh giới quyết định</text><text class="sv-d" x="210" y="282" fill="var(--muted)" style="fill:var(--muted)">vẫn là một mặt phẳng · muốn cong thì phải tự thêm đặc trưng</text></g>
+<g class="wh6"><text class="sv-d" x="0" y="304" fill="var(--text)" style="fill:var(--text)">Vì sao không giữ MSE</text><text class="sv-d" x="210" y="304" fill="var(--muted)" style="fill:var(--muted)">gradient của MSE mang thêm nhân tử p(1 − p)</text></g>
+<g class="wh7"><text class="sv-d" x="0" y="326" fill="var(--text)" style="fill:var(--text)"></text><text class="sv-d" x="210" y="326" fill="var(--muted)" style="fill:var(--muted)">mẫu sai nặng có p sát 0 hoặc 1 nên nhân tử đó gần 0: 0,02 × 0,98 = 0,0196</text></g>
+<g class="wh8"><text class="sv-d" x="0" y="348" fill="var(--text)" style="fill:var(--text)"></text><text class="sv-d" x="210" y="348" fill="var(--muted)" style="fill:var(--muted)">log loss được dựng để khử đúng nhân tử đó, nên tín hiệu học không tắt</text></g>
+</svg>
+  </figure>
   <ul class="why">
-    <li>Gradient có dạng <span class="mth">(<var>p</var> − <var>y</var>)·<var>x</var></span>, <b>giống hệt</b> gradient của linear regression với MSE.</li>
-    <li>Chỉ thay số đoán <span class="mth"><var>ŷ</var></span> của linear regression bằng xác suất <span class="mth"><var>p</var></span>.</li>
-    <li>Không phải trùng hợp: đó là tính chất chung của họ hàm mũ khi dùng hàm liên kết chuẩn.</li>
+    <li>MSE không sai về nguyên tắc, nó chỉ tắt tín hiệu học ở chỗ cần học nhất.</li>
+    <li>MSE ghép sigmoid còn cho mặt mất mát nhiều đáy, nên dừng ở đâu là tuỳ chỗ bắt đầu.</li>
   </ul>
 </section>
 
 <section id="logreg-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Vì sao không giữ MSE</h2></div>
-  <p class="key">MSE ghép với sigmoid hỏng ở hai chỗ: <em>mặt mất mát có nhiều đáy, và gradient tắt ở đúng mẫu sai nặng nhất</em>.</p>
-
-  <figure class="scrollx">
-  <svg viewBox="0 0 900 300" role="img" aria-label="Hai chỗ MSE hỏng khi ghép với sigmoid: mặt mất mát của MSE có hai đáy còn log loss chỉ một đáy; và ở một mẫu sai nặng thì gradient của MSE gần bằng không trong khi gradient của log loss vẫn lớn">
-  <text class="sv-hv" x="0" y="18">HAI CHỖ MSE HỎNG KHI GHÉP VỚI SIGMOID</text>
-  <text class="sv-hv" x="30" y="44" fill="var(--tomb)">① Mặt mất mát — cắt dọc theo một hệ số</text>
-  <rect x="30" y="62" width="400" height="210" rx="6" fill="rgba(var(--red-a),.05)" stroke="var(--tomb)" stroke-width="1.4"/>
-  <text class="sv-hv" x="480" y="44" fill="var(--probe)">② Tín hiệu học ở một mẫu sai nặng</text>
-  <rect x="480" y="62" width="400" height="210" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
-  <text class="sv-d" x="46" y="88" fill="var(--tomb)">MSE + sigmoid</text>
-  <polyline points="46.0,109.4 49.1,109.6 52.1,109.8 55.2,110.2 58.3,110.6 61.3,111.1 64.4,111.7 67.5,112.5 70.5,113.3 73.6,114.3 76.7,115.4 79.7,116.7 82.8,118.0 85.9,119.5 88.9,121.1 92.0,122.8 95.1,124.6 98.1,126.4 101.2,128.2 104.3,130.1 107.3,131.8 110.4,133.6 113.5,135.2 116.5,136.6 119.6,137.9 122.7,138.9 125.7,139.8 128.8,140.3 131.9,140.6 134.9,140.6 138.0,140.3 141.1,139.7 144.1,138.8 147.2,137.7 150.3,136.4 153.3,134.9 156.4,133.2 159.5,131.4 162.5,129.5 165.6,127.6 168.7,125.6 171.7,123.7 174.8,121.8 177.9,120.1 180.9,118.4 184.0,116.9 187.1,115.6 190.1,114.5 193.2,113.5 196.3,112.8 199.3,112.3 202.4,112.0 205.5,112.0 208.5,112.1 211.6,112.5 214.7,113.1 217.7,113.9 220.8,115.0 223.9,116.2 226.9,117.6 230.0,119.3 233.1,121.1 236.1,123.0 239.2,125.1 242.3,127.2 245.3,129.5 248.4,131.8 251.5,134.2 254.5,136.5 257.6,138.8 260.7,141.0 263.7,143.1 266.8,145.1 269.9,146.8 272.9,148.4 276.0,149.7 279.1,150.7 282.1,151.4 285.2,151.9 288.3,152.0 291.3,151.8 294.4,151.3 297.5,150.4 300.5,149.3 303.6,147.9 306.7,146.2 309.7,144.4 312.8,142.3 315.9,140.0 318.9,137.6 322.0,135.1 325.1,132.6 328.1,130.0 331.2,127.4 334.3,124.9 337.3,122.4 340.4,120.0 343.5,117.7 346.5,115.5 349.6,113.4 352.7,111.5 355.7,109.7 358.8,108.0 361.9,106.5 364.9,105.2 368.0,103.9 371.1,102.8 374.1,101.8 377.2,101.0 380.3,100.2 383.3,99.5 386.4,98.9 389.5,98.4 392.5,98.0 395.6,97.6 398.7,97.2 401.7,96.9 404.8,96.6 407.9,96.4 410.9,96.2 414.0,96.0" fill="none" stroke="var(--tomb)" stroke-width="2"/>
-  <circle cx="133.2" cy="140.6" r="4.4" fill="var(--tomb)"/>
-  <circle cx="288.0" cy="152.0" r="4.4" fill="var(--tomb)"/>
-  <line x1="46" y1="156" x2="414" y2="156" stroke="var(--rule-hi)" stroke-width="1"/>
-  <text class="sv-d" x="414" y="171" text-anchor="end" fill="var(--muted)">hai đáy · dừng ở đâu là tuỳ nơi bắt đầu</text>
-  <text class="sv-d" x="46" y="186" fill="var(--ok)">log loss</text>
-  <polyline points="46.0,194.0 49.1,195.8 52.1,197.5 55.2,199.3 58.3,200.9 61.3,202.6 64.4,204.3 67.5,205.9 70.5,207.4 73.6,209.0 76.7,210.5 79.7,212.0 82.8,213.5 85.9,214.9 88.9,216.3 92.0,217.7 95.1,219.0 98.1,220.4 101.2,221.6 104.3,222.9 107.3,224.1 110.4,225.4 113.5,226.5 116.5,227.7 119.6,228.8 122.7,229.9 125.7,230.9 128.8,232.0 131.9,233.0 134.9,234.0 138.0,234.9 141.1,235.8 144.1,236.7 147.2,237.6 150.3,238.4 153.3,239.2 156.4,240.0 159.5,240.7 162.5,241.4 165.6,242.1 168.7,242.8 171.7,243.4 174.8,244.0 177.9,244.6 180.9,245.1 184.0,245.6 187.1,246.1 190.1,246.6 193.2,247.0 196.3,247.4 199.3,247.8 202.4,248.1 205.5,248.4 208.5,248.7 211.6,249.0 214.7,249.2 217.7,249.4 220.8,249.6 223.9,249.7 226.9,249.8 230.0,249.9 233.1,250.0 236.1,250.0 239.2,250.0 242.3,250.0 245.3,249.9 248.4,249.8 251.5,249.7 254.5,249.6 257.6,249.4 260.7,249.2 263.7,248.9 266.8,248.7 269.9,248.4 272.9,248.1 276.0,247.7 279.1,247.3 282.1,246.9 285.2,246.5 288.3,246.0 291.3,245.5 294.4,245.0 297.5,244.5 300.5,243.9 303.6,243.3 306.7,242.7 309.7,242.0 312.8,241.3 315.9,240.6 318.9,239.8 322.0,239.0 325.1,238.2 328.1,237.4 331.2,236.5 334.3,235.6 337.3,234.7 340.4,233.8 343.5,232.8 346.5,231.8 349.6,230.7 352.7,229.7 355.7,228.6 358.8,227.4 361.9,226.3 364.9,225.1 368.0,223.9 371.1,222.7 374.1,221.4 377.2,220.1 380.3,218.8 383.3,217.4 386.4,216.0 389.5,214.6 392.5,213.2 395.6,211.7 398.7,210.2 401.7,208.7 404.8,207.1 407.9,205.5 410.9,203.9 414.0,202.3" fill="none" stroke="var(--ok)" stroke-width="2"/>
-  <circle cx="237.4" cy="250.0" r="4.4" fill="var(--ok)"/>
-  <line x1="46" y1="254" x2="414" y2="254" stroke="var(--rule-hi)" stroke-width="1"/>
-  <text class="sv-d" x="414" y="269" text-anchor="end" fill="var(--muted)">một đáy duy nhất · chắc chắn tới</text>
-  <text class="sv-d" x="502" y="82" fill="var(--muted)">sigmoid — hai đầu bẹt</text>
-  <path d="M 502.0 171.8 L 507.7 171.7 L 513.3 171.7 L 519.0 171.6 L 524.7 171.5 L 530.3 171.4 L 536.0 171.3 L 541.7 171.2 L 547.3 171.0 L 553.0 170.8 L 558.7 170.5 L 564.3 170.2 L 570.0 169.8 L 575.7 169.3 L 581.3 168.7 L 587.0 168.0 L 592.7 167.2 L 598.3 166.2 L 604.0 165.0 L 609.7 163.6 L 615.3 162.0 L 621.0 160.1 L 626.7 157.9 L 632.3 155.4 L 638.0 152.6 L 643.7 149.4 L 649.3 146.0 L 655.0 142.2 L 660.7 138.3 L 666.3 134.2 L 672.0 130.0 L 677.7 125.8 L 683.3 121.7 L 689.0 117.8 L 694.7 114.0 L 700.3 110.6 L 706.0 107.4 L 711.7 104.6 L 717.3 102.1 L 723.0 99.9 L 728.7 98.0 L 734.3 96.4 L 740.0 95.0 L 745.7 93.8 L 751.3 92.8 L 757.0 92.0 L 762.7 91.3 L 768.3 90.7 L 774.0 90.2 L 779.7 89.8 L 785.3 89.5 L 791.0 89.2 L 796.7 89.0 L 802.3 88.8 L 808.0 88.7 L 813.7 88.6 L 819.3 88.5 L 825.0 88.4 L 830.7 88.3 L 836.3 88.3 L 842.0 88.2" fill="none" stroke="var(--filled)" stroke-width="2"/>
-  <line x1="502" y1="172" x2="842" y2="172" stroke="var(--rule-hi)" stroke-width="1"/>
-  <circle cx="818.2" cy="88.8" r="5" fill="var(--tomb)"/>
-  <text class="sv-m" x="808.2" y="80.8" text-anchor="end" fill="var(--tomb)"><tspan class="v">p</tspan> = 0,999 · <tspan class="v">y</tspan> = 0</text>
-  <text class="sv-d" x="842" y="188" text-anchor="end" fill="var(--muted)">đuôi bẹt — sigmoid gần như không đổi</text>
-  <text class="sv-d" x="502" y="212" fill="var(--muted)">gradient nhận được ở đúng mẫu đó</text>
-  <text class="sv-d" x="502" y="235" fill="var(--tomb)">MSE</text>
-  <rect x="576" y="226" width="4" height="12" rx="2" fill="var(--tomb)"/>
-  <text class="sv-d" x="588" y="235" fill="var(--muted)">≈ 0,0003 — gần như không học</text>
-  <text class="sv-d" x="502" y="257" fill="var(--ok)">log loss</text>
-  <rect x="576" y="248" width="200" height="12" rx="2" fill="var(--ok)"/>
-  <text class="sv-d" x="784" y="257" fill="var(--muted)">≈ 1 — học mạnh</text>
-  </svg>
-      <figcaption>Cùng một tập dữ liệu, chỉ đổi công thức loss.</figcaption>
-    </figure>
-
-  <ul class="why">
-    <li><b>Đáy.</b> Gradient descent dừng ở đáy đầu tiên gặp. MSE có nhiều đáy nên dừng ở đâu là tuỳ nơi bắt đầu.</li>
-    <li><b>Tín hiệu.</b> Gradient của MSE mang thêm nhân tử <span class="mth"><var>p</var>(1−<var>p</var>)</span>. Mẫu sai nặng có <span class="mth"><var>p</var></span> sát 0 hoặc sát 1, nhân tử đó gần 0.</li>
-    <li>Công thức log loss ở mục trước được dựng để khử đúng nhân tử đó.</li>
-    <li>MSE không sai về nguyên tắc. Nó chỉ <b class="hl">tắt tín hiệu học ở chỗ cần học nhất</b>.</li>
-  </ul>
-
-  <figure>
-      <table>
-        <tr><th>Khởi tạo</th><th>Loss</th><th>Sau 2.000 vòng</th></tr>
-        <tr><td rowspan="2">gần 0</td><td>log loss</td><td>0,2738</td></tr>
-        <tr><td>MSE</td><td>0,2747</td></tr>
-        <tr><td rowspan="2">xa — <span class="mth"><var>w</var> = ±8</span></td><td>log loss</td><td><b>0,2738</b></td></tr>
-        <tr><td>MSE</td><td><b>1,0357</b></td></tr>
-      </table>
-      <figcaption>800 mẫu, cùng learning rate. Khởi tạo gần 0 thì hai loss ngang nhau, độ chính xác đều 88%. Khởi tạo xa thì sigmoid bão hoà và MSE không ra nổi.</figcaption>
-    </figure>
-</section>
-
-<section id="logreg-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Odds ratio — cách đọc hệ số</h2></div>
-  <p class="key">Phần tuyến tính <span class="mth"><var>w</var>·<var>x</var> + <var>b</var></span> <em>chính là log-odds</em>. Nên tăng một đơn vị của <span class="mth"><var>x</var></span> thì odds được <b>nhân</b>, không phải cộng.</p>
-
-  <figure class="scrollx">
-  <svg viewBox="0 0 900 278" role="img" aria-label="Odds là số người mua chia số người không mua, khác với xác suất là số người mua chia tổng; và cùng một odds ratio bằng hai thì xác suất nền càng cao càng tăng ít">
-  <text class="sv-hv" x="0" y="18">ODDS LÀ GÌ · CÙNG MỘT ODDS RATIO NHƯNG XÁC SUẤT ĐỔI KHÁC NHAU</text>
-  <text class="sv-hv" x="30" y="40" fill="var(--filled)">① 100 khách · 30 người mua lại</text>
-  <rect x="30" y="56" width="400" height="212" rx="6" fill="rgba(var(--blue-a),.05)" stroke="var(--filled)" stroke-width="1.4"/>
-  <text class="sv-hv" x="480" y="40" fill="var(--probe)">② Odds nhân đôi — xác suất tăng bao nhiêu</text>
-  <rect x="480" y="56" width="400" height="212" rx="6" fill="rgba(var(--amber-a),.05)" stroke="var(--probe)" stroke-width="1.4"/>
-  <rect x="54" y="86" width="105.6" height="30" rx="3" fill="var(--ok)"/>
-  <rect x="159.6" y="86" width="246.4" height="30" rx="3" fill="var(--rule-hi)"/>
-  <text class="sv-m" x="106.8" y="106" text-anchor="middle" fill="#14110E">30</text>
-  <text class="sv-m" x="282.8" y="106" text-anchor="middle" fill="var(--muted)">70</text>
-  <text class="sv-d" x="54" y="78" fill="var(--ok)">mua lại</text>
-  <text class="sv-d" x="406" y="78" text-anchor="end" fill="var(--muted)">không mua lại</text>
-  <path d="M 54 132 v 8 H 406 v -8" fill="none" stroke="var(--filled)" stroke-width="1.4"/>
-  <text class="sv-m" x="230" y="158" text-anchor="middle" fill="var(--filled)">xác suất = 30 trên cả 100 = 0,30</text>
-  <path d="M 54 176 v 8 H 159.6 v -8" fill="none" stroke="var(--probe)" stroke-width="1.4"/>
-  <path d="M 159.6 176 v 8 H 406 v -8" fill="none" stroke="var(--probe)" stroke-width="1.4"/>
-  <text class="sv-m" x="230" y="202" text-anchor="middle" fill="var(--probe)">odds = 30 so với 70 = 0,43</text>
-  <text class="sv-d" x="230" y="220" text-anchor="middle" fill="var(--muted)">odds so hai phần với nhau, không so với tổng</text>
-  <text class="sv-m" x="502" y="91" fill="var(--muted)">0,10</text>
-  <rect x="540" y="82" width="25.0" height="11" rx="2" fill="var(--rule-hi)"/>
-  <rect x="540" y="97" width="45.0" height="11" rx="2" fill="var(--probe)"/>
-  <text class="sv-m" x="593.0" y="106" fill="var(--probe)">0,18</text>
-  <text class="sv-m" x="502" y="139" fill="var(--muted)">0,50</text>
-  <rect x="540" y="130" width="125.0" height="11" rx="2" fill="var(--rule-hi)"/>
-  <rect x="540" y="145" width="167.5" height="11" rx="2" fill="var(--probe)"/>
-  <text class="sv-m" x="715.5" y="154" fill="var(--probe)">0,67</text>
-  <text class="sv-m" x="502" y="187" fill="var(--muted)">0,90</text>
-  <rect x="540" y="178" width="225.0" height="11" rx="2" fill="var(--rule-hi)"/>
-  <rect x="540" y="193" width="237.5" height="11" rx="2" fill="var(--probe)"/>
-  <text class="sv-m" x="785.5" y="202" fill="var(--probe)">0,95</text>
-  <text class="sv-d" x="502" y="254" fill="var(--muted)">nền càng cao càng đụng trần 1, tăng càng ít</text>
-  </svg>
-      <figcaption>Xác suất so với tổng. Odds so hai phần với nhau.</figcaption>
-    </figure>
-
+  <div class="sh"><b>05</b><h2>Odds ratio: cách đọc hệ số</h2></div>
+  <p class="key">Phần tuyến tính chính là <em>log-odds</em>. Nên tăng một đơn vị của x thì odds được <em>nhân</em>, không phải cộng.</p>
   <div class="eq">
-      <div class="line">
-        <span class="t"><span><b class="fn">log</b> <b class="par">(</b></span></span>
-        <span class="t b"><span><span class="frac"><i><var>p</var></i><i>1 − <var>p</var></i></span></span><em>odds</em></span>
-        <span class="t"><span><b class="par">)</b></span></span>
-        <span class="op">=</span>
-        <span class="t p"><span><var>w</var>·<var>x</var> + <var>b</var></span><em>log-odds</em></span>
-      </div>
-      <div class="line">
-        <span class="t g"><span><b class="fn">e</b><sup><var>w</var></sup></span><em>odds ratio</em></span>
-        <span class="op">=</span>
-        <span class="t"><span>odds nhân lên mấy lần khi <var>x</var> tăng 1</span></span>
-      </div>
+    <div class="line">
+      <span class="t"><span>log <span class="frac"><i><var>p</var></i><i>1 − <var>p</var></i></span></span><em>log-odds</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span><var>w</var>·<var>x</var> + <var>b</var></span><em>đúng bằng phần tuyến tính</em></span>
+      <span class="op">,</span>
+      <span class="t"><span><var>e</var><sup><var>w</var></sup></span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>odds ratio</span><em>odds nhân lên mấy lần khi x tăng 1</em></span>
     </div>
-
+  </div>
   <dl class="defs">
     <dt>odds</dt><dd>số ca xảy ra chia số ca không xảy ra</dd>
     <dt>log-odds</dt><dd>logarit của odds, đúng bằng phần tuyến tính</dd>
-    <dt>odds ratio</dt><dd>odds bị nhân lên mấy lần khi <span class="mth"><var>x</var></span> tăng một đơn vị</dd>
+    <dt>odds ratio</dt><dd>odds bị nhân lên mấy lần khi x tăng một đơn vị</dd>
   </dl>
+  <p>Ví dụ với hệ số <var>w</var> = 0,7 của biến "đã từng mua hàng". Khách này chưa từng mua, xác suất mua lại <var>p</var> = 0,30. Giờ biết khách đã từng mua:</p>
+  <table>
+    <tr><th>Thang</th><th>Trước</th><th>Sau</th><th>Phép gì</th></tr>
+    <tr><td>xác suất <var>p</var></td><td>0,30</td><td>0,46</td><td>không có phép nào gọn</td></tr>
+    <tr><td>odds</td><td>0,43</td><td>0,86</td><td>nhân với e<sup>w</sup> ≈ 2,0</td></tr>
+    <tr><td>log-odds</td><td>−0,85</td><td>−0,15</td><td>cộng <var>w</var> = 0,7</td></tr>
+  </table>
+  <ul class="why">
+    <li>Cộng ở thang log-odds, nhân ở thang odds, còn ở thang xác suất thì không có phép nào gọn cả.</li>
+    <li>Odds gấp đôi nhưng xác suất chỉ lên 0,46.</li>
+    <li>Nói với người không chuyên thì bỏ hai thang đầu, chỉ nói "từ 30% lên 46%".</li>
+  </ul>
+</section>
 
-  <div class="note">
-      <h4>Ví dụ — vẫn khách hàng đó</h4>
-      <p>Biến "có tiền sử mua hàng" có hệ số <span class="mth"><var>w</var> = 0,7</span>. Khách này chưa từng mua, xác suất mua lại <span class="mth"><var>p</var> = 0,30</span>. Giờ biết khách <b>đã từng mua</b>.</p>
-      <div class="flow">
-        <div class="n"><h5>log-odds = −0,85</h5><p>vế phải công thức, tính từ <span class="mth"><var>p</var> = 0,30</span></p></div>
-        <div class="a act"><i>cộng w = 0,7</i>→</div>
-        <div class="n"><h5>log-odds = −0,15</h5><p>bên log-odds thì hệ số <b>cộng</b> vào</p></div>
-      </div>
-      <div class="flow">
-        <div class="n"><h5>odds 0,43 → 0,86</h5><p>bỏ log ra thì thành <b>nhân</b> với <span class="mth"><b class="fn">e</b><sup>0,7</sup> ≈ 2</span> — đúng odds ratio</p></div>
-        <div class="a act"><i>đổi về xác suất</i>→</div>
-        <div class="n ok"><h5>p = 0,30 → 0,46</h5><p>odds gấp đôi nhưng xác suất chỉ lên 0,46</p></div>
-      </div>
-      <p>Cộng ở thang log-odds, nhân ở thang odds, và ở thang xác suất thì không có phép nào gọn cả. Nói với người không chuyên thì bỏ hai thang đầu, chỉ nói <b>"từ 30% lên 46%"</b>.</p>
-    </div>
+<section id="logreg-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Ngưỡng quyết định</h2></div>
+  <p class="key">Model dừng lại ở xác suất. Ngưỡng là <em>quyết định nghiệp vụ</em>, không phải tham số của model.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 302" role="img" aria-label="Sáu khách xếp theo xác suất từ 0,24 tới 0,82; vạch ngưỡng chạy qua 0,3 rồi 0,5 rồi 0,7; ngưỡng 0,3 đúng năm trên sáu và recall 1,00, ngưỡng 0,7 chỉ đúng ba trên sáu và recall 0,33" data-anim><style>@keyframes th1{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}8.750%{animation-timing-function:ease-in-out;opacity:1}35.000%{animation-timing-function:ease-in-out;opacity:1}37.083%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes th2{0%{animation-timing-function:ease-in-out;opacity:0}35.000%{animation-timing-function:ease-in-out;opacity:0}37.083%{animation-timing-function:ease-in-out;opacity:1}63.333%{animation-timing-function:ease-in-out;opacity:1}65.417%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes th3{0%{animation-timing-function:ease-in-out;opacity:0}63.333%{animation-timing-function:ease-in-out;opacity:0}65.417%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th4{0%{animation-timing-function:ease-in-out;opacity:0}94.167%{animation-timing-function:ease-in-out;opacity:0}97.083%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.th1{animation:th1 12.0s linear 1 forwards}.th2{animation:th2 12.0s linear 1 forwards}.th3{animation:th3 12.0s linear 1 forwards}.th4{animation:th4 12.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-d" x="0" y="28" fill="var(--muted)" style="fill:var(--muted)">6 khách xếp theo p tăng dần · vạch vàng là ngưỡng</text>
+<line x1="40" y1="104" x2="740" y2="104" stroke="var(--rule-hi)" stroke-width="1"/>
+<text class="sv-d" x="40" y="124" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,00</text>
+<text class="sv-d" x="215.0" y="124" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,25</text>
+<text class="sv-d" x="390.0" y="124" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,50</text>
+<text class="sv-d" x="565.0" y="124" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,75</text>
+<text class="sv-d" x="740" y="124" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">1,00</text>
+<circle cx="207.4" cy="104" r="7" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="207.3756720936545" y="86" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">A</text><text class="sv-d" x="207.3756720936545" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,24</text>
+<circle cx="247.6" cy="104" r="7" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="247.64125128449268" y="86" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">B</text><text class="sv-d" x="247.64125128449268" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,30</text>
+<circle cx="329.6" cy="104" r="7" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="329.6085612845297" y="86" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">C</text><text class="sv-d" x="329.6085612845297" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,41</text>
+<circle cx="406.2" cy="104" r="7" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="406.2088705752199" y="86" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">D</text><text class="sv-d" x="406.2088705752199" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,52</text>
+<circle cx="537.9" cy="104" r="7" fill="rgba(var(--red-a),.5)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="537.9066282642351" y="86" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">E</text><text class="sv-d" x="537.9066282642351" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,71</text>
+<circle cx="611.3" cy="104" r="7" fill="rgba(var(--green-a),.5)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="611.2592292324024" y="86" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">F</text><text class="sv-d" x="611.2592292324024" y="72" fill="var(--faint)" style="fill:var(--faint)" text-anchor="middle">0,82</text>
+<text class="sv-d" x="40" y="148" fill="var(--muted)" style="fill:var(--muted)">xanh = nhãn mua · đỏ = nhãn không</text>
+<g class="th1" opacity="0"><line x1="250.0" y1="68" x2="250.0" y2="136" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="250.0" y="156" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">ngưỡng 0,3</text><text class="sv-d" x="0" y="190" fill="var(--probe)" style="fill:var(--probe)">ngưỡng 0,3</text><text class="sv-d" x="150" y="190" fill="var(--text)" style="fill:var(--text)">đúng 5/6</text><text class="sv-d" x="260" y="190" fill="var(--ok)" style="fill:var(--ok)">bắt được 3/3 ca mua</text><text class="sv-d" x="450" y="190" fill="var(--tomb)" style="fill:var(--tomb)">báo sai 1</text><text class="sv-d" x="560" y="190" fill="var(--tomb)" style="fill:var(--tomb)">bỏ sót 0</text><text class="sv-d" x="0" y="214" fill="var(--muted)" style="fill:var(--muted)">precision 0,75</text><text class="sv-d" x="150" y="214" fill="var(--muted)" style="fill:var(--muted)">recall 1,00</text><text class="sv-d" x="0" y="242" fill="var(--muted)" style="fill:var(--muted)">hạ ngưỡng: bắt gần hết ca mua, nhưng báo sai nhiều</text></g>
+<g class="th2" opacity="0"><line x1="390.0" y1="68" x2="390.0" y2="136" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="390.0" y="156" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">ngưỡng 0,5</text><text class="sv-d" x="0" y="190" fill="var(--probe)" style="fill:var(--probe)">ngưỡng 0,5</text><text class="sv-d" x="150" y="190" fill="var(--text)" style="fill:var(--text)">đúng 4/6</text><text class="sv-d" x="260" y="190" fill="var(--ok)" style="fill:var(--ok)">bắt được 2/3 ca mua</text><text class="sv-d" x="450" y="190" fill="var(--tomb)" style="fill:var(--tomb)">báo sai 1</text><text class="sv-d" x="560" y="190" fill="var(--tomb)" style="fill:var(--tomb)">bỏ sót 1</text><text class="sv-d" x="0" y="214" fill="var(--muted)" style="fill:var(--muted)">precision 0,67</text><text class="sv-d" x="150" y="214" fill="var(--muted)" style="fill:var(--muted)">recall 0,67</text><text class="sv-d" x="0" y="242" fill="var(--muted)" style="fill:var(--muted)">mặc định 0,5 không có gì đặc biệt</text></g>
+<g class="th3"><line x1="530.0" y1="68" x2="530.0" y2="136" stroke="var(--probe)" stroke-width="2.4"/><text class="sv-d" x="530.0" y="156" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">ngưỡng 0,7</text><text class="sv-d" x="0" y="190" fill="var(--probe)" style="fill:var(--probe)">ngưỡng 0,7</text><text class="sv-d" x="150" y="190" fill="var(--text)" style="fill:var(--text)">đúng 3/6</text><text class="sv-d" x="260" y="190" fill="var(--ok)" style="fill:var(--ok)">bắt được 1/3 ca mua</text><text class="sv-d" x="450" y="190" fill="var(--tomb)" style="fill:var(--tomb)">báo sai 1</text><text class="sv-d" x="560" y="190" fill="var(--tomb)" style="fill:var(--tomb)">bỏ sót 2</text><text class="sv-d" x="0" y="214" fill="var(--muted)" style="fill:var(--muted)">precision 0,50</text><text class="sv-d" x="150" y="214" fill="var(--muted)" style="fill:var(--muted)">recall 0,33</text><text class="sv-d" x="0" y="242" fill="var(--muted)" style="fill:var(--muted)">nâng ngưỡng: chỉ báo khi rất chắc, bỏ sót nhiều</text></g>
+<g class="th4"><rect x="0" y="268" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="283" fill="var(--probe)" style="fill:var(--probe)">Không có ngưỡng nào đúng sẵn · chọn theo chi phí của hai loại lỗi</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Hạ ngưỡng xuống 0,3: bắt được cả 3/3 ca mua nhưng báo sai 1.</li>
+    <li>Nâng lên 0,7: chỉ báo khi rất chắc, bỏ sót 2/3 ca mua.</li>
+    <li>Mặc định 0,5 không có gì đặc biệt. Chọn theo chi phí của hai loại lỗi.</li>
+    <li>Cách đo precision và recall: <a href="../../09-evaluation/metrics-confusion-matrix/index.html">Classification metrics</a>.</li>
+  </ul>
 </section>
 
 <section id="logreg-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lab: ngưỡng quyết định</h2></div>
-  <p class="key">Model dừng lại ở xác suất. <em>Ngưỡng là quyết định nghiệp vụ, không phải tham số của model</em>.</p>
-  <p>Cùng một bộ xác suất, chỉ đổi ngưỡng cắt. Xem precision và recall đánh đổi nhau.</p>
-  <div class="lab">
-      <div class="bar">
-        <div><label>ngưỡng cắt</label><input type="number" id="thr" value="0.5" step="0.05" min="0" max="1"></div>
-      </div>
-      <div id="thrview"></div>
-    </div>
-
+  <div class="sh"><b>07</b><h2>Ưu và nhược</h2></div>
+  <p class="key">Mọi ưu điểm đến từ <em>một đường thẳng ép qua sigmoid</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
+  <table>
+    <tr><th>Mặt</th><th>Được gì</th><th>Mất gì</th></tr>
+    <tr><td>Đầu ra</td><td>Xác suất có ý nghĩa, calibrate tốt sẵn</td><td>Phải tự chọn ngưỡng</td></tr>
+    <tr><td>Đọc model</td><td>Mỗi hệ số là một odds ratio</td><td>Phải đọc ở thang odds, không phải xác suất</td></tr>
+    <tr><td>Ranh giới</td><td>Ổn định, ít overfit</td><td>Luôn là mặt phẳng, quan hệ cong thì phải tự thêm đặc trưng</td></tr>
+    <tr><td>Huấn luyện</td><td>Loss lồi nên một đáy duy nhất</td><td>Không có nghiệm đóng, phải giải lặp</td></tr>
+    <tr><td>Dữ liệu</td><td>Ít mẫu vẫn chạy</td><td>Cần chuẩn hoá, và lớp rất lệch thì phải xử lý riêng</td></tr>
+  </table>
   <ul class="why">
-    <li><b>Hạ xuống 0,2</b> — bắt gần hết ca dương, recall cao, nhưng báo sai nhiều.</li>
-    <li><b>Nâng lên 0,8</b> — chỉ báo khi rất chắc, hợp khi báo sai gây tốn kém.</li>
-    <li>Không có ngưỡng nào đúng sẵn. Chọn theo <b class="hl">chi phí của hai loại lỗi</b>.</li>
+    <li><b>Chọn logistic regression</b> khi cần xác suất đáng tin, cần đọc được hệ số, hoặc làm baseline.</li>
+    <li><b>Chọn gradient boosting</b> khi chỉ cần chính xác nhất trên dữ liệu bảng.</li>
+    <li>Regularization L1 và L2 giữ nguyên cơ chế từ <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso</a>, chỉ đổi loss nền.</li>
+    <li>Trong scikit-learn, <code>C</code> nghịch đảo với λ: tăng C là giảm regularization.</li>
   </ul>
 </section>
 
 <section id="logreg-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Regularization</h2></div>
-  <p class="key">Cơ chế L1 và L2 giữ nguyên từ Ridge và Lasso, <em>chỉ đổi loss nền từ MSE sang log loss</em>.</p>
+  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <div class="cmp two">
-    <div><h5>Giữ nguyên từ Ridge &amp; Lasso</h5>
-      <p>Vùng phạt hình thoi ép hệ số về đúng 0.</p>
-      <p>Hình tròn thì chỉ co nhỏ lại.</p>
-      <p>Vẫn phải chuẩn hoá thang đo trước khi fit.</p>
-      <p>Chi tiết ở <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>.</p></div>
-    <div><h5>Chỉ gặp ở logistic</h5>
-      <p><code>LogisticRegression</code> bật sẵn L2.</p>
-      <p>Tham số là <span class="mth"><var>C</var></span>, nghịch đảo của <span class="mth"><var>λ</var></span>.</p>
-      <p>Nên <span class="mth"><var>C</var></span> càng nhỏ thì phạt càng mạnh.</p>
-      <p>Một đặc trưng tách hai lớp tuyệt đối thì hệ số chạy ra vô cực. Chỉ regularization chặn được.</p></div>
-  </div>
-</section>
+  <details class="qa"><summary>Kể các bước từ bảng tới xác suất.</summary>
+  <p>Tính điểm số z bằng w nhân x cộng b.</p>
+  <p>Ép z về xác suất p bằng sigmoid.</p>
+  <p>So p với nhãn thật ra log loss từng dòng.</p>
+  <p>Lấy trung bình ra loss, rồi gradient descent sửa w và b.</p>
+  <p>Model dừng ở p. Bước ra nhãn là ngưỡng do người dùng chọn.</p></details>
 
-<section id="logreg-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Ưu và nhược</h2></div>
-  <p class="key">Mọi ưu điểm của logistic regression đến từ <em>một đường thẳng ép qua sigmoid</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
+  <details class="qa"><summary>Vì sao dùng log loss chứ không phải MSE?</summary>
+  <p>Gradient của MSE ghép sigmoid mang thêm nhân tử p(1 − p).</p>
+  <p>Mẫu sai nặng có p sát 0 hoặc 1 nên nhân tử đó gần 0, tín hiệu học tắt.</p>
+  <p>Log loss được dựng để khử đúng nhân tử đó.</p>
+  <p>MSE ghép sigmoid còn cho mặt mất mát nhiều đáy, còn log loss thì lồi.</p></details>
 
-  <table>
-      <tr><th>Mặt</th><th>Ưu</th><th>Nhược</th></tr>
-      <tr><td>Đầu ra</td><td>Xác suất đã hiệu chỉnh sẵn, dùng thẳng để xếp hạng hay đặt ngưỡng</td><td>&#8212;</td></tr>
-      <tr><td>Diễn giải</td><td>Mỗi hệ số là một odds ratio, nói được thành lời</td><td>&#8212;</td></tr>
-      <tr><td>Huấn luyện</td><td>Loss lồi nên chỉ có một đáy, chạy nhanh trên triệu dòng thưa</td><td>&#8212;</td></tr>
-      <tr><td>Ranh giới</td><td>&#8212;</td><td>Chỉ là một hyperplane &#8212; quan hệ cong phải tự tạo đặc trưng</td></tr>
-      <tr><td>Tương tác</td><td>&#8212;</td><td>Không tự bắt được, phải khai bằng tay</td></tr>
-      <tr><td>Chuẩn bị</td><td>&#8212;</td><td>Cần chuẩn hoá thang đo và mã hoá biến phân loại</td></tr>
-    </table>
-
-  <ul class="why">
-    <li>Chọn logistic regression khi cần <b>xác suất tin được</b> hoặc phải <b>giải thích từng đặc trưng</b>: chấm điểm tín dụng, đánh giá rủi ro.</li>
-    <li>Nó cũng là <b>baseline luôn chạy đầu tiên</b> — model phức tạp không thắng nổi mốc này thì vấn đề nằm ở dữ liệu.</li>
-    <li>Cần chính xác hơn trên dữ liệu bảng thì sang <a href="../../06-tree-models/xgboost/index.html">boosting</a>, rồi <a href="../../09-evaluation/calibration/index.html">hiệu chỉnh</a> xác suất của nó lại.</li>
-  </ul>
-</section>
-
-<section id="logreg-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Lỗi hay gặp</h2></div>
-  <div class="grid2">
-    <div class="card bad"><h4>Diễn giải odds ratio thành xác suất</h4><p>"Odds gấp đôi" không phải "xác suất gấp đôi" — chênh lệch rất lớn khi p đã cao.</p></div>
-    <div class="card bad"><h4>Coi ngưỡng 0.5 là mặc định đúng</h4><p>Ngưỡng là quyết định nghiệp vụ. Với dữ liệu lệch thì 0.5 gần như luôn sai.</p></div>
-    <div class="card bad"><h4>Tưởng sigmoid làm model phi tuyến</h4><p>Ranh giới quyết định vẫn là mặt phẳng. Muốn cong thì phải tự thêm đặc trưng bậc cao.</p></div>
-    <div class="card bad"><h4>Quên rằng thư viện đã bật L2 sẵn</h4><p>Báo cáo hệ số "thuần" trong khi chúng đã bị co lại. Và <span class="mth"><var>C</var></span> là nghịch đảo của <span class="mth"><var>λ</var></span>.</p></div>
-    <div class="card bad"><h4>Nói hệ số là nhân quả</h4><p>Nó là quan hệ trong dữ liệu quan sát được, không phải hiệu quả của can thiệp.</p></div>
-    <div class="card bad"><h4>Quên chuẩn hoá thang đo</h4><p>Hình phạt tính trên độ lớn hệ số, mà hệ số phụ thuộc đơn vị của đặc trưng.</p></div>
-  </div>
-</section>
-
-<section id="logreg-s11" class="lesson">
-  <div class="sh"><b>11</b><h2>Hỏi đáp</h2></div>
-  <details class="qa"><summary>Vì sao logistic regression dùng log loss chứ không phải MSE?</summary>
-  <p>Hai lý do.</p>
-  <p>Thứ nhất là mặt mất mát. MSE ghép với sigmoid cho mặt không lồi, gradient descent mắc ở cực tiểu địa phương. Log loss thì lồi.</p>
-  <p>Thứ hai quan trọng hơn, là tín hiệu học. Gradient của MSE có nhân tử <span class="mth"><var>σ</var>′(<var>z</var>) = <var>p</var>(1−<var>p</var>)</span>.</p>
-  <p>Nhân tử đó gần 0 khi model đoán rất sai. Nên ở đúng mẫu sai nặng nhất thì tín hiệu học bị triệt tiêu.</p>
-  <p>Log loss được dựng để khử chính nhân tử đó, cho gradient gọn là <span class="mth">(<var>p</var> − <var>y</var>)·<var>x</var></span>.</p>
-  <p>Nhìn từ góc thống kê, log loss là âm log-likelihood của Bernoulli. Tối thiểu hoá nó chính là MLE.</p></details>
-
-  <details class="qa"><summary>Giải thích hệ số logistic regression cho người không chuyên.</summary>
-  <p>Phần tuyến tính <span class="mth"><var>w</var>·<var>x</var> + <var>b</var></span> chính là log-odds.</p>
-  <p>Nên tăng một đơn vị của biến làm odds được <b>nhân</b> với <span class="mth"><b class="fn">e</b><sup><var>w</var></sup></span>, không phải cộng.</p>
-  <p>Với <span class="mth"><var>w</var> = 0,7</span> thì <span class="mth"><b class="fn">e</b><sup>0,7</sup> ≈ 2</span>, tức odds gấp đôi khi giữ nguyên các biến khác.</p>
-  <p>Điểm phải cẩn thận là odds không phải xác suất.</p>
-  <p>Cùng odds ratio bằng 2 làm xác suất từ 0,1 lên 0,18, nhưng chỉ từ 0,9 lên 0,95.</p>
-  <p>Nên với người không chuyên thì quy về xác suất tại một mức nền cụ thể, đừng nói odds ratio trần trụi.</p></details>
+  <details class="qa"><summary>Giải thích hệ số cho người không chuyên.</summary>
+  <p>Phần tuyến tính là log-odds, nên hệ số cộng vào log-odds.</p>
+  <p>Ở thang odds thì hệ số thành phép nhân: odds nhân e mũ w.</p>
+  <p>Ở thang xác suất thì không có phép nào gọn.</p>
+  <p>Nên chỉ nói con số cuối, ví dụ từ 30% lên 46%.</p></details>
 
   <details class="qa"><summary>Chọn ngưỡng thế nào?</summary>
-  <p>Ngưỡng <b>không phải tham số của model</b>. Model chỉ cho xác suất.</p>
-  <p>Ngưỡng là quyết định nghiệp vụ, dựa trên chi phí của hai loại lỗi.</p>
-  <p>Sàng lọc bệnh thì bỏ sót nặng hơn báo nhầm, nên hạ ngưỡng để được recall cao.</p>
-  <p>Chặn giao dịch thì báo nhầm làm phiền khách, nên nâng ngưỡng.</p>
-  <p>Cách làm là quét ngưỡng trên tập validation, vẽ precision–recall, chọn điểm khớp chi phí thật.</p>
-  <p>Với lớp dương hiếm thì accuracy vô nghĩa, phải nhìn PR-AUC.</p></details>
+  <p>Không có ngưỡng nào đúng sẵn, 0,5 không đặc biệt.</p>
+  <p>Hạ ngưỡng thì bắt được nhiều ca dương hơn nhưng báo sai nhiều.</p>
+  <p>Nâng ngưỡng thì chỉ báo khi rất chắc nhưng bỏ sót nhiều.</p>
+  <p>Chọn theo chi phí của hai loại lỗi trong bài toán thật.</p></details>
 
-  <details class="qa"><summary>Vì sao vẫn dùng logistic regression khi đã có boosting và deep learning?</summary>
-  <p>Vì bốn thứ nó vẫn thắng.</p>
-  <p>Diễn giải được từng hệ số. Tài chính và y tế có yêu cầu pháp lý phải giải thích quyết định.</p>
-  <p>Xác suất được hiệu chỉnh tốt sẵn, không cần bước calibration.</p>
-  <p>Suy luận chỉ là một phép nhân vector, hợp với ràng buộc độ trễ rất thấp.</p>
-  <p>Và nó là mốc so sánh. Model phức tạp không thắng nổi nó thì vấn đề nằm ở dữ liệu, không ở model.</p>
-  <p>Nên luôn dựng nó làm baseline trước khi thử gì phức tạp hơn.</p></details>
+  <details class="qa"><summary>Vì sao vẫn dùng khi đã có boosting và deep learning?</summary>
+  <p>Xác suất của nó calibrate tốt sẵn, không cần hiệu chỉnh thêm.</p>
+  <p>Mỗi hệ số đọc ra được thành odds ratio, quan trọng ở y tế và tín dụng.</p>
+  <p>Huấn luyện nhanh, ít overfit, dễ triển khai.</p>
+  <p>Là baseline để biết model phức tạp có thật sự hơn không.</p></details>
 </section>
 
-<footer>Machine learning · Classical models · công thức viết theo quy ước một mẫu, bỏ chỉ số batch cho gọn. Phần dự đoán số nằm ở bài <a href="../linear-regression/index.html">Linear regression</a>.</footer>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
+<footer>Machine learning · Classical models · đường thẳng và gradient nằm ở <a href="../linear-regression/index.html">Linear regression</a>.</footer>
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>
       </article>
       <div class="nextprev" id="np"></div>
     </main>
@@ -564,6 +345,5 @@
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
-<script src="lab.js"></script>
 </body>
 </html>

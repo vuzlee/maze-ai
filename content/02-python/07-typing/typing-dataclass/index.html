@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Type hints & dataclass — MazeAI</title>
-<meta name="description" content="Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.">
+<meta name="description" content="Type hint không đổi runtime — nó viết cho type checker, IDE và người đọc code.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/07-typing/typing-dataclass/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Type hints &amp; dataclass">
-<meta property="og:description" content="Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.">
+<meta property="og:description" content="Type hint không đổi runtime — nó viết cho type checker, IDE và người đọc code.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,361 +39,185 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-typing" data-title="Type hints &amp; dataclass" data-tag="Typing" data-blurb="Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.">
+<article class="doc" id="art-typing" data-title="Type hints &amp; dataclass" data-reviewed="1" data-tag="Typing" data-blurb="Type hint không đổi runtime — nó viết cho type checker, IDE và người đọc code.">
         <header class="hero">
   <p class="eyebrow">Python · typing</p>
   <h1>Type hints &amp; <em>dataclass</em></h1>
-  <p class="lede">Python <b>không kiểm tra</b> type hint lúc chạy. Chúng viết cho <b>người đọc và công cụ</b> — hiểu đúng điều này là dùng đúng.</p>
+  <p class="lede">Hint viết cho công cụ đọc, không cho máy chạy. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>hint <b>không</b> kiểm tra gì lúc chạy</li>
+    <li><code>Protocol</code> là duck typing ghi thành văn bản</li>
+    <li><code>dataclass</code> sinh sẵn <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code></li>
+  </ul>
 </header>
 
-<section id="typing-dataclass-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Type hint <em>không chạy</em> — nên mọi lựa chọn trong bài đều là chọn cho người đọc và công cụ đọc, không phải chọn cho máy thi hành.</p>
-
+<section id="typ-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Ai đọc type hint</h2></div>
+  <p class="key">Ba bên đọc nó, và <em>Python lúc chạy không nằm trong đó</em>.</p>
   <figure class="gist">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ai đọc hint, bốn cú pháp, Generic và Protocol, ba cách gom dữ liệu">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ai đọc type hint</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">Python lúc chạy thì không</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn cú pháp</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">phủ phần lớn nhu cầu hằng ngày</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Generic &#183; Protocol</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cho thứ cú pháp cơ bản không tả được</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Gom dữ liệu</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">dataclass · NamedTuple · dict</text>
-<text class="sv-hv" x="372" y="18">HINT KHÔNG CHẠY — VIẾT CHO NGƯỜI ĐỌC VÀ CÔNG CỤ ĐỌC</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">&#9312; ai đọc</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">mypy, IDE, người bảo trì — không phải máy thi hành</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">&#9313; viết thế nào</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">kiểu cơ bản, container, Optional, Union</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">&#9314; khi cơ bản không đủ</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">Generic khi ra phụ thuộc vào, Protocol khi cần có gì</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">&#9315; gom lại thành gì</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">dataclass mặc định, NamedTuple bất biến, dict khi khoá động</text>
+    <svg viewBox="0 0 860 524" role="img" aria-label="Một hàm có type hint, bốn người đọc bên dưới: type checker, IDE và người đọc code đều dùng được, riêng Python lúc chạy thì không đọc; gọi hàm với hai chuỗi vẫn trả về chuỗi ghép" data-anim><style>@keyframes wh1{0%{animation-timing-function:ease-in-out;opacity:0}2.143%{animation-timing-function:ease-in-out;opacity:0}4.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh2{0%{animation-timing-function:ease-in-out;opacity:0}5.714%{animation-timing-function:ease-in-out;opacity:0}8.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh3{0%{animation-timing-function:ease-in-out;opacity:0}8.571%{animation-timing-function:ease-in-out;opacity:0}11.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh4{0%{animation-timing-function:ease-in-out;opacity:0}11.429%{animation-timing-function:ease-in-out;opacity:0}13.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh5{0%{animation-timing-function:ease-in-out;opacity:0}14.286%{animation-timing-function:ease-in-out;opacity:0}16.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh6{0%{animation-timing-function:ease-in-out;opacity:0}21.429%{animation-timing-function:ease-in-out;opacity:0}23.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh7{0%{animation-timing-function:ease-in-out;opacity:0}22.857%{animation-timing-function:ease-in-out;opacity:0}25.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh8{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}25.714%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}26.071%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}32.143%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-100px,292px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-100px,292px)}}@keyframes wh9{0%{animation-timing-function:ease-in-out;opacity:0}35.714%{animation-timing-function:ease-in-out;opacity:0}38.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh10{0%{animation-timing-function:ease-in-out;opacity:0}42.857%{animation-timing-function:ease-in-out;opacity:0}45.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wh11{0%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:0}49.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.wh1{animation:wh1 14.0s linear 1 forwards}.wh2{animation:wh2 14.0s linear 1 forwards}.wh3{animation:wh3 14.0s linear 1 forwards}.wh4{animation:wh4 14.0s linear 1 forwards}.wh5{animation:wh5 14.0s linear 1 forwards}.wh6{animation:wh6 14.0s linear 1 forwards}.wh7{animation:wh7 14.0s linear 1 forwards}.wh8{animation:wh8 14.0s linear 1 forwards}.wh9{animation:wh9 14.0s linear 1 forwards}.wh10{animation:wh10 14.0s linear 1 forwards}.wh11{animation:wh11 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">TYPE HINT KHÔNG ĐỔI RUNTIME · CHỈ CÔNG CỤ VÀ NGƯỜI ĐỌC NÓ</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="wh1"><text x="0.0" y="80.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def add(a: int, b: int) -> int: ...</text></g>
+<g class="wh2"><rect x="40" y="120" width="210" height="44" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="145.0" y="146.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">type checker</text><text class="sv-d" x="266" y="140" fill="var(--faint)" style="fill:var(--faint)">mypy · pyright</text><text class="sv-d" x="266" y="158" fill="var(--ok)" style="fill:var(--ok)">BẮT LỖI trước khi chạy</text></g>
+<g class="wh3"><rect x="40" y="186" width="210" height="44" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="145.0" y="212.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">IDE</text><text class="sv-d" x="266" y="206" fill="var(--faint)" style="fill:var(--faint)">gợi ý · đổi tên an toàn</text><text class="sv-d" x="266" y="224" fill="var(--ok)" style="fill:var(--ok)">đọc để hiểu code</text></g>
+<g class="wh4"><rect x="40" y="252" width="210" height="44" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="145.0" y="278.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">người đọc code</text><text class="sv-d" x="266" y="272" fill="var(--faint)" style="fill:var(--faint)">đồng đội · chính bạn 6 tháng sau</text><text class="sv-d" x="266" y="290" fill="var(--ok)" style="fill:var(--ok)">đọc để hiểu code</text></g>
+<g class="wh5"><rect x="40" y="318" width="210" height="44" rx="6" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="145.0" y="344.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">Python lúc chạy</text><text class="sv-d" x="266" y="338" fill="var(--faint)" style="fill:var(--faint)">interpreter</text><text class="sv-d" x="266" y="356" fill="var(--tomb)" style="fill:var(--tomb)">KHÔNG đọc · không kiểm tra</text></g>
+<g class="wh6"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">add('x', 'y')</text></g>
+<g class="wh7"><rect x="600" y="318" width="180" height="44" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wh8" transform="translate(-100 292)"><rect x="700" y="26" width="180" height="44" rx="6" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="790.0" y="52.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">'xy'</text></g>
+<g class="wh9"><line x1="600.0" y1="398.0" x2="690.0" y2="362.0" stroke="var(--tomb)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="690.0" cy="362.0" r="2.6" fill="var(--tomb)"/><text class="sv-d" x="606" y="402" fill="var(--tomb)" style="fill:var(--tomb)">chạy bình thường, không lỗi</text></g>
+<g class="wh10"><rect x="0" y="424" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="439" fill="var(--probe)" style="fill:var(--probe)">Hint là chú thích cho công cụ · không phải ràng buộc lúc chạy</text></g>
+<g class="wh11"><text class="sv-d" x="14" y="456" fill="var(--muted)" style="fill:var(--muted)">Đo thật: có hint 25,9 ns, không hint 25,8 ns — gần như bằng nhau.</text><text class="sv-d" x="14" y="474" fill="var(--muted)" style="fill:var(--muted)">Hint vẫn lưu được ở __annotations__: {&#x27;a&#x27;: &quot;&lt;class &#x27;int&#x27;&gt;&quot;, &#x27;b&#x27;: &quot;&lt;class &#x27;int&#x27;&gt;&quot;, &#x27;return&#x27;: &quot;&lt;class &#x27;int&#x27;&gt;&quot;}</text><text class="sv-d" x="14" y="492" fill="var(--muted)" style="fill:var(--muted)">Muốn kiểm tra lúc chạy thì cần pydantic hoặc typeguard.</text></g>
 </svg>
-  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
   </figure>
-</section>
-
-<section id="typing-dataclass-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Ai đọc type hint</h2></div>
-
-  <p class="key">Chúng là <em>chú thích</em>, không phải ràng buộc. Chạy vẫn chạy dù truyền sai kiểu.</p>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ai đọc hint, bốn cú pháp, Generic và Protocol, ba cách gom dữ liệu">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="46" fill="var(--filled)">&#9312; Ai đọc type hint</text>
-<text class="sv-d" x="13" y="64" fill="var(--muted)">Python lúc chạy thì không</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn cú pháp</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">phủ phần lớn nhu cầu hằng ngày</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Generic &#183; Protocol</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cho thứ cú pháp cơ bản không tả được</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Gom dữ liệu</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">dataclass · NamedTuple · dict</text>
-<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9312; AI ĐỌC TYPE HINT</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--tomb)">Python lúc chạy — KHÔNG đọc</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">chia("x","y") vẫn chạy, lỗi chỉ nổ ở phép chia</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--ok)">mypy / pyright · IDE</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">báo ngay lúc kiểm tra, gợi ý lúc gõ</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">người bảo trì</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">lợi ích lớn nhất: hàm tự mô tả nhận gì trả gì</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--probe)">pydantic</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">đọc hint rồi sinh code kiểm tra — chặn thật lúc chạy</text>
-</svg>
-  <figcaption>Ô &#9312; sáng lên. Python lúc chạy bỏ qua hoàn toàn.</figcaption>
-  </figure>
-
-<pre class="core"><code><span class="kw">def</span> chia(a: <span class="kw">int</span>, b: <span class="kw">int</span>) -&gt; <span class="kw">float</span>:
-    <span class="kw">return</span> a / b
-
-chia(<span class="st">"x"</span>, <span class="st">"y"</span>)      <span class="cm"># Python KHÔNG chặn — lỗi chỉ nổ ở phép chia</span>
-                     <span class="cm"># mypy / pyright thì báo ngay lúc kiểm tra</span></code></pre>
-
   <ul class="why">
-    <li>Ai đọc: <b>static checker</b> (mypy, pyright), <b>IDE</b> để gợi ý, và <b>người bảo trì</b> sau bạn.</li>
-    <li>Muốn kiểm tra thật lúc chạy thì phải dùng thư viện như <b>pydantic</b> — nó đọc hint rồi tự sinh code kiểm tra.</li>
-    <li>Lợi ích lớn nhất không phải bắt lỗi mà là <b>hàm tự mô tả nó nhận gì trả gì</b>, khỏi phải đọc thân hàm.</li>
+    <li>Đo thật: <code>add('x','y')</code> với hint <code>int</code> vẫn trả 'xy' — không lỗi nào.</li>
+    <li>Chi phí gần như bằng không: 25.9 ns so với 25.8 ns mỗi lời gọi.</li>
+    <li>Hint vẫn lưu ở <code>__annotations__</code> nên thư viện đọc được lúc chạy nếu muốn.</li>
+    <li>Cần kiểm tra thật lúc chạy thì dùng <b>pydantic</b> hoặc <b>typeguard</b>.</li>
   </ul>
 </section>
 
-<section id="typing-dataclass-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Cú pháp cơ bản</h2></div>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 262" role="img" aria-label="Bản đồ bài: ai đọc hint, bốn cú pháp, Generic và Protocol, ba cách gom dữ liệu">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ai đọc type hint</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">Python lúc chạy thì không</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="109" fill="var(--probe)">&#9313; Bốn cú pháp</text>
-<text class="sv-d" x="13" y="127" fill="var(--muted)">phủ phần lớn nhu cầu hằng ngày</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Generic &#183; Protocol</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cho thứ cú pháp cơ bản không tả được</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Gom dữ liệu</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">dataclass · NamedTuple · dict</text>
-<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9313; BỐN CÚ PHÁP PHỦ PHẦN LỚN NHU CẦU</text>
-<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">kiểu cơ bản · tên: str</text>
-<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="92" fill="var(--filled)">container · list[float], dict[str, int]</text>
-<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="134" fill="var(--filled)">Optional · User | None</text>
-<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="176" fill="var(--filled)">Union · int | str</text>
-<rect x="372" y="196" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="218" fill="var(--tomb)">bỏ trống ≠ trả về None</text>
-<text class="sv-s" x="388" y="236" fill="var(--dim)">nghĩa là chưa chú thích — checker bỏ qua cả hàm</text>
-</svg>
-  <figcaption>Ô &#9313; sáng lên. Bốn cú pháp này đủ cho gần như mọi hàm hằng ngày.</figcaption>
-  </figure>
-
-  <p class="key">Bốn thứ phủ 90% nhu cầu: <em>kiểu cơ bản · container · Optional · Union</em>.</p>
-
-<pre class="core"><code>tên: <span class="kw">str</span> = <span class="st">"Mai"</span>
-điểm: <span class="kw">list</span>[<span class="kw">float</span>] = []                <span class="cm"># Python 3.9+: dùng list, không phải List</span>
-bảng: <span class="kw">dict</span>[<span class="kw">str</span>, <span class="kw">int</span>] = {}
-
-<span class="kw">def</span> tìm(id: <span class="kw">int</span>) -&gt; User | <span class="kw">None</span>:        <span class="cm"># 3.10+: | thay cho Optional[User]</span>
-    ...
-
-<span class="kw">def</span> xử_lý(x: <span class="kw">int</span> | <span class="kw">str</span>) -&gt; <span class="kw">None</span>:         <span class="cm"># nhận một trong hai kiểu</span>
-    ...</code></pre>
-
-  <p class="stripnote"><span>trả về <code>None</code> thì ghi <code>-&gt; None</code></span><span><em>bỏ trống nghĩa là "chưa chú thích", checker sẽ không kiểm tra hàm đó</em></span></p>
-</section>
-
-<section id="typing-dataclass-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Generic</h2></div>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ai đọc hint, bốn cú pháp, Generic và Protocol, ba cách gom dữ liệu">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ai đọc type hint</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">Python lúc chạy thì không</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn cú pháp</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">phủ phần lớn nhu cầu hằng ngày</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="172" fill="var(--ok)">&#9314; Generic &#183; Protocol</text>
-<text class="sv-d" x="13" y="190" fill="var(--muted)">cho thứ cú pháp cơ bản không tả được</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Gom dữ liệu</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">dataclass · NamedTuple · dict</text>
-<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9314;a GENERIC — KIỂU RA PHỤ THUỘC KIỂU VÀO</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--probe)">def đầu_tiên[T](xs: list[T]) -&gt; T | None</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">một chữ T nối đầu vào với đầu ra</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--ok)">checker suy được</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">đầu_tiên([1,2]) là int | None, không phải Any</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--tomb)">không có nó</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">phải trả Any và mất sạch thông tin kiểu</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--muted)">chỉ dùng khi quan hệ vào–ra là thứ đáng ghi</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">ngoài ra thì kiểu cụ thể dễ đọc hơn</text>
-</svg>
-  <figcaption>Ô &#9314; sáng lên — nửa Generic.</figcaption>
-  </figure>
-
-  <p class="key">Dùng khi kiểu trả về <em>phụ thuộc kiểu đầu vào</em>. Không có nó thì phải trả về <code>Any</code> và mất hết thông tin.</p>
-
-<pre class="core"><code><span class="kw">def</span> đầu_tiên(xs: <span class="kw">list</span>[T]) -&gt; T | <span class="kw">None</span>:      <span class="cm"># Python 3.12+: def đầu_tiên[T](...)</span>
-    <span class="kw">return</span> xs[<span class="st">0</span>] <span class="kw">if</span> xs <span class="kw">else</span> <span class="kw">None</span>
-
-<span class="cm"># checker biết: đầu_tiên([1,2]) là int | None</span>
-<span class="cm">#              đầu_tiên(["a"]) là str | None</span></code></pre>
-
+<section id="typ-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Cú pháp hay dùng</h2></div>
+  <p class="key">Chỉ vài dạng là đủ cho phần lớn code.</p>
+  <table>
+    <tr><th>Viết</th><th>Nghĩa</th></tr>
+    <tr><td><code>list[int]</code> · <code>dict[str, int]</code></td><td>container và kiểu bên trong</td></tr>
+    <tr><td><code>int | None</code></td><td>có thể là <code>None</code> (trước 3.10: <code>Optional[int]</code>)</td></tr>
+    <tr><td><code>Callable[[int], str]</code></td><td>hàm nhận <code>int</code>, trả <code>str</code></td></tr>
+    <tr><td><code>TypeVar</code> + <code>Generic[T]</code></td><td>lớp dùng được với nhiều kiểu</td></tr>
+    <tr><td><code>Any</code></td><td>tắt kiểm tra — dùng càng ít càng tốt</td></tr>
+  </table>
   <ul class="why">
-    <li>Trước 3.12 thì khai báo <code>T = TypeVar("T")</code> ở đầu file; từ 3.12 viết thẳng <code>def f[T](...)</code>.</li>
-    <li>Dùng generic khi <b>quan hệ giữa vào và ra</b> mới là thứ đáng ghi. Không có quan hệ đó thì đừng.</li>
+    <li>Từ 3.9 dùng thẳng <code>list[int]</code>, không cần <code>typing.List</code>.</li>
+    <li><b>Generic</b> giữ được kiểu bên trong: <code>Box[int].get()</code> thì checker biết trả <code>int</code>.</li>
+    <li>Đừng ép hint mọi chỗ — ưu tiên biên giới public: tham số hàm và giá trị trả về.</li>
   </ul>
 </section>
 
-<section id="typing-dataclass-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Protocol</h2></div>
-
+<section id="typ-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Protocol</h2></div>
+  <p class="key"><b>ABC</b> là <em>nominal typing</em>: phải khai báo quan hệ. <b>Protocol</b> là <em>structural typing</em>: chỉ nhìn hình dạng.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ai đọc hint, bốn cú pháp, Generic và Protocol, ba cách gom dữ liệu">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ai đọc type hint</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">Python lúc chạy thì không</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn cú pháp</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">phủ phần lớn nhu cầu hằng ngày</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="172" fill="var(--ok)">&#9314; Generic &#183; Protocol</text>
-<text class="sv-d" x="13" y="190" fill="var(--muted)">cho thứ cú pháp cơ bản không tả được</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Gom dữ liệu</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">dataclass · NamedTuple · dict</text>
-<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9314;b PROTOCOL — CẦN OBJECT CÓ GÌ, KHÔNG CẦN NÓ LÀ GÌ</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--ok)">structural typing</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">có đúng phương thức là hợp lệ, không cần kế thừa</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">ABC thì nominal</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">phải kế thừa mới tính</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">áp được lên class thư viện</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">thứ mình không sửa được vẫn khớp Protocol</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">cái giá</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">chỉ checker thấy — lúc chạy vẫn là duck typing như cũ</text>
+    <svg viewBox="0 0 860 436" role="img" aria-label="Hàng trên dùng ABC nên lớp F phải nối vào Closable; hàng dưới dùng Protocol nên F không nối gì mà vẫn dùng được, cả hai lời gọi đều trả OK" data-anim><style>@keyframes pr1{0%{animation-timing-function:ease-in-out;opacity:0}1.538%{animation-timing-function:ease-in-out;opacity:0}4.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr2{0%{animation-timing-function:ease-in-out;opacity:0}3.077%{animation-timing-function:ease-in-out;opacity:0}5.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr3{0%{animation-timing-function:ease-in-out;opacity:0}7.692%{animation-timing-function:ease-in-out;opacity:0}10.385%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr4{0%{animation-timing-function:ease-in-out;opacity:0}9.231%{animation-timing-function:ease-in-out;opacity:0}11.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr5{0%{animation-timing-function:ease-in-out;opacity:0}24.615%{animation-timing-function:ease-in-out;opacity:0}27.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr6{0%{animation-timing-function:ease-in-out;opacity:0}26.154%{animation-timing-function:ease-in-out;opacity:0}28.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr7{0%{animation-timing-function:ease-in-out;opacity:0}30.769%{animation-timing-function:ease-in-out;opacity:0}33.462%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr8{0%{animation-timing-function:ease-in-out;opacity:0}32.308%{animation-timing-function:ease-in-out;opacity:0}35.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr9{0%{animation-timing-function:ease-in-out;opacity:0}18.462%{animation-timing-function:ease-in-out;opacity:0}21.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr10{0%{animation-timing-function:ease-in-out;opacity:0}18.462%{animation-timing-function:ease-in-out;opacity:0}21.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr11{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.385%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.923%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-160px,134px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-160px,134px)}}@keyframes pr12{0%{animation-timing-function:ease-in-out;opacity:0}44.615%{animation-timing-function:ease-in-out;opacity:0}47.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr13{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}46.154%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}46.538%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}53.077%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-160px,264px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-160px,264px)}}@keyframes pr14{0%{animation-timing-function:ease-in-out;opacity:0}55.385%{animation-timing-function:ease-in-out;opacity:0}58.077%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes pr15{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}62.692%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.pr1{animation:pr1 13.0s linear 1 forwards}.pr2{animation:pr2 13.0s linear 1 forwards}.pr3{animation:pr3 13.0s linear 1 forwards}.pr4{animation:pr4 13.0s linear 1 forwards}.pr5{animation:pr5 13.0s linear 1 forwards}.pr6{animation:pr6 13.0s linear 1 forwards}.pr7{animation:pr7 13.0s linear 1 forwards}.pr8{animation:pr8 13.0s linear 1 forwards}.pr9{animation:pr9 13.0s linear 1 forwards}.pr10{animation:pr10 13.0s linear 1 forwards}.pr11{animation:pr11 13.0s linear 1 forwards}.pr12{animation:pr12 13.0s linear 1 forwards}.pr13{animation:pr13 13.0s linear 1 forwards}.pr14{animation:pr14 13.0s linear 1 forwards}.pr15{animation:pr15 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">PROTOCOL · GHI RÕ CẦN METHOD GÌ MÀ KHÔNG ÉP KẾ THỪA</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="pr1"><text class="sv-d" x="0" y="70" fill="var(--probe)" style="fill:var(--probe)">ABC</text><text class="sv-d" x="90" y="70" fill="var(--faint)" style="fill:var(--faint)">lớp con PHẢI kế thừa</text></g>
+<g class="pr2"><rect x="0" y="84" width="250" height="42" rx="6" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="125.0" y="110.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">class Closable(ABC)</text><text x="270.0" y="111.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def close(): ...</text></g>
+<g class="pr3"><rect x="0" y="140" width="250" height="42" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="125.0" y="166.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">class F(Closable)</text></g>
+<g class="pr4"><line x1="125" y1="126" x2="125" y2="140" stroke="var(--rule-hi)" stroke-width="1.4"/><text class="sv-d" x="270" y="167" fill="var(--probe)" style="fill:var(--probe)">bắt buộc nối vào</text></g>
+<g class="pr5"><text class="sv-d" x="0" y="200" fill="var(--ok)" style="fill:var(--ok)">Protocol</text><text class="sv-d" x="90" y="200" fill="var(--faint)" style="fill:var(--faint)">chỉ cần CÓ method đúng tên</text></g>
+<g class="pr6"><rect x="0" y="214" width="250" height="42" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="125.0" y="240.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">class Closable(Protocol)</text><text x="270.0" y="241.0" class="sv-d" style="fill:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def close(): ...</text></g>
+<g class="pr7"><rect x="0" y="270" width="250" height="42" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="125.0" y="296.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">class F</text></g>
+<g class="pr8"><text class="sv-d" x="270" y="297" fill="var(--ok)" style="fill:var(--ok)">KHÔNG nối gì · chỉ cần có close()</text></g>
+<g class="pr9"><text class="sv-d" x="560" y="140" fill="var(--muted)" style="fill:var(--muted)">shut(F())</text><text class="sv-d" x="560" y="270" fill="var(--muted)" style="fill:var(--muted)">shut(F())</text></g>
+<g class="pr10"><rect x="560" y="160" width="180" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="pr11" transform="translate(-160 134)"><rect x="720" y="26" width="180" height="42" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="810.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">OK</text></g>
+<g class="pr12"><rect x="560" y="290" width="180" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="pr13" transform="translate(-160 264)"><rect x="720" y="26" width="180" height="42" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="810.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">OK</text></g>
+<g class="pr14"><rect x="0" y="354" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="369" fill="var(--probe)" style="fill:var(--probe)">Protocol là duck typing có ghi thành văn bản · structural typing</text></g>
+<g class="pr15"><text class="sv-d" x="14" y="386" fill="var(--muted)" style="fill:var(--muted)">ABC là nominal typing: phải khai báo quan hệ. Protocol chỉ nhìn hình dạng.</text><text class="sv-d" x="14" y="404" fill="var(--muted)" style="fill:var(--muted)">Dùng Protocol khi không sửa được lớp của bên thứ ba mà vẫn muốn type checker hiểu.</text></g>
 </svg>
-  <figcaption>Ô &#9314; sáng lên — nửa Protocol.</figcaption>
   </figure>
-
-  <p class="key">Ghi rõ <em>cần object có phương thức gì</em>, mà object đó <em>không phải kế thừa từ đâu cả</em>.</p>
-
-  <div class="cmp two">
-    <div>
-      <h5>Interface kiểu Java</h5>
-      <p>Lớp phải <b>khai báo</b> mình implement interface.</p>
-      <p>Không sửa được thư viện của người khác cho hợp interface của bạn.</p>
-    </div>
-    <div>
-      <h5>Protocol trong Python</h5>
-      <p>Chỉ cần <b>có đúng phương thức</b> là hợp lệ — duck typing nhưng checker hiểu được.</p>
-      <p>Áp được lên cả class có sẵn mà bạn không sửa được.</p>
-    </div>
-  </div>
-
-<pre class="core"><code><span class="kw">from</span> typing <span class="kw">import</span> Protocol
-
-<span class="kw">class</span> CóDiệnTích(Protocol):
-    <span class="kw">def</span> diện_tích(self) -&gt; <span class="kw">float</span>: ...
-
-<span class="kw">def</span> tổng(xs: <span class="kw">list</span>[CóDiệnTích]) -&gt; <span class="kw">float</span>:    <span class="cm"># nhận mọi object có .diện_tích()</span>
-    <span class="kw">return</span> <span class="kw">sum</span>(x.diện_tích() <span class="kw">for</span> x <span class="kw">in</span> xs)</code></pre>
+  <ul class="why">
+    <li>Lớp không kế thừa gì vẫn hợp lệ, miễn có đúng method — chạy được, F không kế thừa Protocol.</li>
+    <li>Dùng khi không sửa được lớp của bên thứ ba mà vẫn muốn type checker hiểu.</li>
+    <li>Đây chính là duck typing của <a href="../../06-oop/oop-python/index.html">OOP</a>, viết ra thành văn bản.</li>
+  </ul>
 </section>
 
-<section id="typing-dataclass-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Dataclass</h2></div>
-
+<section id="typ-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Dataclass</h2></div>
+  <p class="key">Khai báo field, nhận sẵn <em>bốn thứ</em> mà lớp thường phải viết tay.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: ai đọc hint, bốn cú pháp, Generic và Protocol, ba cách gom dữ liệu">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Ai đọc type hint</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">Python lúc chạy thì không</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn cú pháp</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">phủ phần lớn nhu cầu hằng ngày</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Generic &#183; Protocol</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cho thứ cú pháp cơ bản không tả được</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="235" fill="var(--tomb)">&#9315; Gom dữ liệu</text>
-<text class="sv-d" x="13" y="253" fill="var(--muted)">dataclass · NamedTuple · dict</text>
-<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9315; GOM DỮ LIỆU — CHỌN THEO BẤT BIẾN VÀ CÁCH TRUY CẬP</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--ok)">dataclass — MẶC ĐỊNH</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">sửa được (trừ frozen), p.x, sinh sẵn __init__ __repr__ __eq__</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--filled)">NamedTuple</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">bất biến, truy cập cả p.x lẫn p[0], làm khoá dict được</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--muted)">dict</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">chỉ hợp khi khoá KHÔNG biết trước</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">trong dataclass viết = [] là lỗi NGAY</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">phải field(default_factory=list) để mỗi instance có list riêng</text>
+    <svg viewBox="0 0 860 496" role="img" aria-label="Khai báo dataclass với hai field bên trái; bốn thứ sinh sẵn là init, repr, eq và fields lần lượt bay vào các ngăn bên phải; phần dưới cho thấy lớp thường không có repr đẹp và so sánh theo địa chỉ" data-anim><style>@keyframes dc1{0%{animation-timing-function:ease-in-out;opacity:0}2.857%{animation-timing-function:ease-in-out;opacity:0}5.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc2{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc3{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}10.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}10.357%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}16.429%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,46px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,46px)}}@keyframes dc4{0%{animation-timing-function:ease-in-out;opacity:0}15.714%{animation-timing-function:ease-in-out;opacity:0}18.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc5{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.357%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}21.429%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,98px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,98px)}}@keyframes dc7{0%{animation-timing-function:ease-in-out;opacity:0}20.714%{animation-timing-function:ease-in-out;opacity:0}23.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc8{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.357%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.429%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,150px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,150px)}}@keyframes dc10{0%{animation-timing-function:ease-in-out;opacity:0}25.714%{animation-timing-function:ease-in-out;opacity:0}28.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc11{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc12{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}25.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}25.357%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}31.429%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,202px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-390px,202px)}}@keyframes dc13{0%{animation-timing-function:ease-in-out;opacity:0}30.714%{animation-timing-function:ease-in-out;opacity:0}33.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc14{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}42.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc15{0%{animation-timing-function:ease-in-out;opacity:0}42.857%{animation-timing-function:ease-in-out;opacity:0}45.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc16{0%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:0}49.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc17{0%{animation-timing-function:ease-in-out;opacity:0}54.286%{animation-timing-function:ease-in-out;opacity:0}56.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc18{0%{animation-timing-function:ease-in-out;opacity:0}58.571%{animation-timing-function:ease-in-out;opacity:0}61.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.dc1{animation:dc1 14.0s linear 1 forwards}.dc2{animation:dc2 14.0s linear 1 forwards}.dc3{animation:dc3 14.0s linear 1 forwards}.dc4{animation:dc4 14.0s linear 1 forwards}.dc5{animation:dc5 14.0s linear 1 forwards}.dc6{animation:dc6 14.0s linear 1 forwards}.dc7{animation:dc7 14.0s linear 1 forwards}.dc8{animation:dc8 14.0s linear 1 forwards}.dc9{animation:dc9 14.0s linear 1 forwards}.dc10{animation:dc10 14.0s linear 1 forwards}.dc11{animation:dc11 14.0s linear 1 forwards}.dc12{animation:dc12 14.0s linear 1 forwards}.dc13{animation:dc13 14.0s linear 1 forwards}.dc14{animation:dc14 14.0s linear 1 forwards}.dc15{animation:dc15 14.0s linear 1 forwards}.dc16{animation:dc16 14.0s linear 1 forwards}.dc17{animation:dc17 14.0s linear 1 forwards}.dc18{animation:dc18 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">DATACLASS · KHAI BÁO FIELD, NHẬN SẴN BỐN THỨ</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="dc1"><text x="0.0" y="82.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">@dataclass</text><text x="0.0" y="104.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">class P:</text><text x="26.0" y="126.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">x: int</text><text x="26.0" y="148.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">y: int = 0</text></g>
+<g class="dc2"><rect x="330" y="72" width="180" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="dc3" transform="translate(-390 46)"><rect x="720" y="26" width="180" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="810.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">__init__</text></g>
+<g class="dc4"><text class="sv-d" x="526" y="98" fill="var(--faint)" style="fill:var(--faint)">P(1, 2)</text></g>
+<g class="dc5"><rect x="330" y="124" width="180" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="dc6" transform="translate(-390 98)"><rect x="720" y="26" width="180" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="810.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">__repr__</text></g>
+<g class="dc7"><text class="sv-d" x="526" y="150" fill="var(--faint)" style="fill:var(--faint)">P(x=1, y=2)</text></g>
+<g class="dc8"><rect x="330" y="176" width="180" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="dc9" transform="translate(-390 150)"><rect x="720" y="26" width="180" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="810.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">__eq__</text></g>
+<g class="dc10"><text class="sv-d" x="526" y="202" fill="var(--faint)" style="fill:var(--faint)">P(1,2) == P(1,2) → True</text></g>
+<g class="dc11"><rect x="330" y="228" width="180" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="dc12" transform="translate(-390 202)"><rect x="720" y="26" width="180" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="810.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">fields()</text></g>
+<g class="dc13"><text class="sv-d" x="526" y="254" fill="var(--faint)" style="fill:var(--faint)">[&#x27;x&#x27;, &#x27;y&#x27;]</text></g>
+<g class="dc14"><text class="sv-d" x="0" y="310" fill="var(--text)" style="fill:var(--text)">Lớp thường viết tay:</text></g>
+<g class="dc15"><text x="0.0" y="334.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">repr → &lt;__main__.Plain object at 0x7f0a50...</text><text x="0.0" y="356.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">P(1,2) == P(1,2) → False</text></g>
+<g class="dc16"><text class="sv-d" x="420" y="334" fill="var(--tomb)" style="fill:var(--tomb)">phải tự viết __repr__ và __eq__</text><text class="sv-d" x="420" y="356" fill="var(--tomb)" style="fill:var(--tomb)">quên là so sánh theo địa chỉ</text></g>
+<g class="dc17"><rect x="0" y="396" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="411" fill="var(--probe)" style="fill:var(--probe)">frozen=True thì bất biến và băm được → set gộp còn 1 phần tử</text></g>
+<g class="dc18"><text class="sv-d" x="14" y="428" fill="var(--muted)" style="fill:var(--muted)">Sửa field của frozen dataclass thì ném FrozenInstanceError.</text><text class="sv-d" x="14" y="446" fill="var(--muted)" style="fill:var(--muted)">Đó cũng là cách an toàn nhất để có __eq__ đi cùng __hash__ — xem bài OOP.</text><text class="sv-d" x="14" y="464" fill="var(--muted)" style="fill:var(--muted)">Cần kiểm tra kiểu lúc chạy thì dùng pydantic, không phải dataclass.</text></g>
 </svg>
-  <figcaption>Ô &#9315; sáng lên. Chọn theo bất biến hay không, và truy cập kiểu gì.</figcaption>
   </figure>
-
-  <p class="key">Một dòng decorator thay cho <em><code>__init__</code>, <code>__repr__</code>, <code>__eq__</code></em> viết tay.</p>
-
-<pre class="core"><code><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, field
-
-<span class="kw">@dataclass</span>(frozen=<span class="kw">True</span>)          <span class="cm"># frozen → bất biến VÀ hashable</span>
-<span class="kw">class</span> Điểm:
-    x: <span class="kw">int</span>
-    y: <span class="kw">int</span> = <span class="st">0</span>
-    nhãn: <span class="kw">list</span>[<span class="kw">str</span>] = field(default_factory=<span class="kw">list</span>)   <span class="cm"># KHÔNG viết = []</span>
-
-Điểm(<span class="st">1</span>, <span class="st">2</span>) == Điểm(<span class="st">1</span>, <span class="st">2</span>)     <span class="cm"># True — __eq__ được sinh sẵn</span></code></pre>
-
-  <div class="stack">
-    <div class="s ok"><b>dataclass — <b>mặc định nên dùng</b></b><span>sửa được (trừ <code>frozen</code>) · truy cập <code>p.x</code> · làm khoá dict chỉ khi <code>frozen=True</code> · hợp khi có phương thức, có giá trị mặc định</span></div>
-    <div class="s"><b>NamedTuple</b><span>bất biến · truy cập cả <code>p.x</code> lẫn <code>p[0]</code> · <b>làm khoá dict được</b> · hợp với bản ghi nhỏ, bất biến</span></div>
-    <div class="s"><b>dict</b><span>sửa được · truy cập <code>p["x"]</code> · không làm khoá dict được · chỉ hợp khi <b>khoá không biết trước</b></span></div>
-  </div>
+  <ul class="why">
+    <li>Lớp thường: <code>repr</code> ra &lt;__main__.Plain object at 0x7f0a50... và <code>==</code> cho False vì so theo địa chỉ.</li>
+    <li><code>frozen=True</code> thì bất biến và <b>băm được</b> — set gộp hai object bằng nhau còn 1.</li>
+    <li>Sửa field của frozen dataclass thì ném <code>FrozenInstanceError</code>.</li>
+    <li>Đó là cách an toàn nhất để có <code>__eq__</code> đi cùng <code>__hash__</code>.</li>
+    <li>Mặc định mutable vẫn là bẫy: dùng <code>field(default_factory=list)</code>, không dùng <code>= []</code>.</li>
+  </ul>
 </section>
 
-<section id="typing-dataclass-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
+<section id="typ-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <p class="key">Lỗi đầu tiên đến từ hiểu sai <em>bản chất</em> của type hint.</p>
+  <details class="qa"><summary>Type hint có làm code chậm không?</summary>
+  <p>Gần như không, đo ra chênh chưa tới một nano giây.</p>
+  <p>Vì Python không kiểm tra gì lúc chạy.</p>
+  <p>Hint chỉ lưu vào __annotations__.</p>
+  <p>Truyền sai kiểu vẫn chạy bình thường.</p></details>
 
-  <div class="grid2">
-    <div class="card bad"><h4>Tưởng hint là kiểm tra runtime</h4><p>Python <b>không chặn gì cả</b>. Cần chặn thật thì dùng pydantic hoặc tự kiểm tra.</p></div>
-    <div class="card bad"><h4><code>= []</code> trong dataclass</h4><p>Python báo lỗi ngay vì mutable default. Dùng <code>field(default_factory=list)</code>.</p></div>
-    <div class="card bad"><h4>Generic phức tạp không ai đọc nổi</h4><p>Hint tồn tại để <b>dễ đọc hơn</b>. Chú thích dài hơn thân hàm là đã đi quá xa — dùng alias hoặc đơn giản hoá.</p></div>
-  </div>
+  <details class="qa"><summary>Protocol khác ABC thế nào?</summary>
+  <p>ABC là nominal typing: lớp con phải kế thừa.</p>
+  <p>Protocol là structural typing: chỉ cần có đúng method.</p>
+  <p>Nên dùng được với lớp của bên thứ ba.</p>
+  <p>Nó là duck typing viết thành văn bản.</p></details>
+
+  <details class="qa"><summary>dataclass sinh sẵn những gì?</summary>
+  <p>__init__, __repr__, __eq__ và fields().</p>
+  <p>Lớp thường phải viết tay, quên thì so sánh theo địa chỉ.</p>
+  <p>frozen=True cho bất biến và băm được.</p>
+  <p>Mặc định mutable thì dùng field(default_factory=list).</p></details>
+
+  <details class="qa"><summary>Khi nào cần pydantic thay vì dataclass?</summary>
+  <p>Khi cần kiểm tra kiểu thật lúc chạy.</p>
+  <p>Ví dụ dữ liệu vào từ API hay file cấu hình.</p>
+  <p>dataclass không kiểm tra gì cả.</p>
+  <p>Đổi lại pydantic nặng hơn và chậm hơn.</p></details>
 </section>
 
-<section id="typing-dataclass-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
-
-  <details class="qa"><summary>Type hints có ảnh hưởng runtime không?</summary>
-  <p><b>Không.</b> Python bỏ qua chúng khi chạy. Chúng dành cho static checker, IDE và người đọc.</p></details>
-
-  <details class="qa"><summary>Protocol khác abstract base class ở đâu?</summary>
-  <p>Protocol là <b>structural</b>: có đúng phương thức là hợp lệ, không cần kế thừa. ABC là <b>nominal</b>: phải kế thừa mới tính.</p></details>
-
-  <details class="qa"><summary>Dataclass hay NamedTuple?</summary>
-  <p><b>NamedTuple</b> cho bản ghi nhỏ, bất biến, cần dùng như tuple. <b>Dataclass</b> cho mọi trường hợp còn lại — sửa được và có phương thức.</p></details>
-
-  <details class="qa"><summary>Vì sao <code>field(default_factory=list)</code>?</summary>
-  <p>Vì <code>= []</code> tạo <b>một list dùng chung cho mọi instance</b>. Factory tạo list mới mỗi lần khởi tạo.</p></details>
-</section>
-
-<footer>Python · type hints &amp; dataclass · mọi đoạn code chạy được nguyên trạng trên Python 3.10+.</footer>
-
+<footer>Python · typing · nền tảng ở <a href="../../06-oop/oop-python/index.html">OOP trong Python</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>

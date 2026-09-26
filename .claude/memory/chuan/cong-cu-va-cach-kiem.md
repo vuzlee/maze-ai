@@ -3,7 +3,7 @@ name: cong-cu-va-cach-kiem
 description: "Bộ công cụ kiểm (soat.py 8 phép, svgkit) + luật kiểm lại chính cái thước + cách kiểm hình động bằng mắt + bẫy khi sửa .eq + chạy bao nhiêu vòng cho mỗi loại sửa"
 metadata:
   type: reference
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 Gộp từ `soat-tu-dong-8-phep` + `bo-ve-hinh-svgkit` + `kiem-lai-chinh-cai-thuoc` + `sua-nhanh-it-vong-kiem`.
@@ -124,13 +124,13 @@ Gộp về đây 2026-09-24 khi bỏ ghi chú `bai-mau-svm-knn` — đây là ph
 
 ## Kiểm hình động
 
-Hoạt hoạ nằm trong `<style>` của từng `<svg>` ([[chuan-bai-mau]]), nên `check.py` và `getBBox`
-**không thấy nó** — chúng đo hình ở trạng thái cuối. Hai phép phải làm bằng mắt:
+Hoạt hoạ nằm trong `<style>` của từng `<svg>`, nên `check.py` và `getBBox` **không thấy nó** —
+chúng đo hình ở trạng thái cuối. Đó là lý do phép kiểm hình động có **bốn tầng** chứ không phải
+một, và hai tầng cuối làm bằng mắt: xem đủ bốn tầng ở [[hinh-dong]].
 
-1. **Tắt hoạt hoạ rồi xem lại.** Trình duyệt bật "giảm chuyển động", hoặc tạm bỏ khối `@media` —
-   hình phải đọc được đầy đủ. Thiếu chi tiết nào tức là chi tiết đó chỉ sống trong keyframe, sai.
-2. **Xem một vòng trọn chu kỳ.** Lượt cuối phải hiện xong trước mốc 87%; quá mốc thì nó bị tắt
-   ngay khi vừa hiện.
+Riêng phần thuộc về công cụ: `check.py` chỉ là **tầng 2** (hình học). Bẫy lặp được ở tầng 1 (số)
+hay tầng 3 (bản tĩnh) mà máy bắt được thì **vá vào `check.py`**, rồi chạy lại toàn bộ `.svg` của
+những bài đã xong — đúng luật gốc ở đầu file này.
 
 ## Ba phép đo tay — chép nguyên, đừng viết lại từ trí nhớ
 

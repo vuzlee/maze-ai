@@ -119,9 +119,9 @@ Hai lá cùng cấp vẫn ra hai kết quả khác nhau: dưới *Retrieval*, `T
 
 | Kệ | Đã viết | Khung | Đã quyết gì |
 |---|---:|---:|---|
-| 01 · DSA | 23 | — | ✅ xong trọn |
-| 02 · Python | 14 | — | ✅ `oop-python` + `typing-dataclass` là hai lỗ thật, đã viết · `performance-profiling` tách riêng khỏi `leetcode-toolkit` · Testing/Logging/Packaging **cố ý bỏ**, để bên MLOps |
-| 03 · CS fundamentals | 14 | — | ✅ thêm `cap-theorem-consistency`, `consensus-leader-election`, `messaging-queue-pubsub` · Concurrency giữ một bài `lock-deadlock-race` |
+| 01 · DSA | 24 | — | ✅ xong trọn · `leetcode-toolkit` chuyển từ kệ Python sang đây 2026-09-26: nó là bộ công cụ **giải bài**, chủ phải là kệ dùng nó |
+| 02 · Python | 16 | — | ✅ `oop-python` + `typing-dataclass` là hai lỗ thật, đã viết · `performance-profiling` tách riêng khỏi `leetcode-toolkit` (bài đó giờ ở kệ DSA) · Testing/Logging/Packaging **cố ý bỏ**, để bên MLOps |
+| 03 · CS fundamentals | 13 | — | ✅ thêm `cap-theorem-consistency`, `consensus-leader-election`, `messaging-queue-pubsub` · Concurrency giữ một bài `lock-deadlock-race` · `process-thread-scheduling` đã gộp vào `thread-process-gil` bên kệ Python 2026-09-26 |
 | 04 · Database | 21 | 2 | nhóm mới *Data systems* chặn ở đúng 6 khái niệm · còn `er-modeling`, `data-quality` |
 | 05 · Machine learning | 10 | 28 | cây đã khớp sẵn · Data leakage + Distribution shift làm mục thêm, không tách bài |
 | 06 · Deep learning | 4 | 14 | *Generative models* ba bài **cố ý ngắn** · GPU/FLOPs/distributed **không tạo mới** |

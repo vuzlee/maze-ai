@@ -63,8 +63,10 @@ t = re.sub(r'<svg.*?</svg>', '', s, flags=re.S); t = re.sub(r'<[^>]+>', ' ', t)
 ratio = len(t.split()) / max(v, 1)
 ```
 
-Mốc mới 2026-09-24 theo [[chuan-bai-mau]]: **57 chữ/hình**. Trên **100 là còn phải cắt chữ**;
-trên **250** thì bài đang là một bài viết chứ không phải bài ôn.
+Mốc mới 2026-09-24 theo [[chuan-bai-mau]]: **57 chữ/hình** (bài mẫu random-forest). Bài nhiều
+bước tính (khung B) thì nới tới **92–140** — ba bài mẫu boosting 2026-09-25 đo 92 · 115 · 140
+và đều được chốt. Ngoài khung B thì trên **100 là còn phải cắt chữ**; trên **250** thì bài
+đang là một bài viết chứ không phải bài ôn.
 Thứ tự chữa: bảng so sánh văn xuôi → khuôn hình · `<ol>`/`ul.why` dài → `.stack` · đoạn văn lẽ ra
 nên là hình → vẽ mới · bảng Hỏi đáp → `details.qa`. **Bảng tra thật thì để yên** — đó là bảng
 đúng chỗ. `.axiscap`/`.stripnote` là flex ba `<span>` (nhãn · `<em>` · nhãn), viết câu trơn vào

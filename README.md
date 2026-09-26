@@ -35,8 +35,8 @@ gửi đi đâu cả.
 
 | # | Kệ | Đã viết | Khung | Nội dung |
 |---|---|---|---|---|
-| 01 | DSA — data structures & algorithms | 11 | 12 | Big-O · array/string, linked list, hash map, stack, heap, tree/BST, trie, union-find · sorting, two pointers, sliding window, binary search, greedy, interval, graph, shortest path, dynamic programming |
-| 02 | Python | 6 | 5 | Language core & data model · built-in types · thread/GIL & asyncio · LeetCode toolkit |
+| 01 | DSA — data structures & algorithms | 11 | 12 | Big-O · array/string, linked list, hash map, stack, heap, tree/BST, trie, union-find · sorting, two pointers, sliding window, binary search, greedy, interval, graph, shortest path, dynamic programming · LeetCode toolkit |
+| 02 | Python | 6 | 5 | Language core & data model · built-in types · thread/GIL & asyncio · OOP, type hints, profiling |
 | 03 | CS fundamentals | 2 | 9 | Operating system (process, virtual memory, lock) · networking (DNS/TLS, TCP/HTTP, caching, REST, load balancing) |
 | 04 | Database & SQL | 3 | 15 | Relational model, constraints, normalization, schema design · SQL basics · index, transaction, query tuning · NoSQL, sharding |
 | 05 | Machine learning | 10 | 28 | Math foundations · bias–variance, cross-validation · linear/logistic, Ridge–Lasso, SVM, KNN, Naive Bayes · decision tree → random forest → gradient boosting → XGBoost → LightGBM · k-means, DBSCAN, HDBSCAN · PCA · evaluation & calibration · statistics, A/B testing |

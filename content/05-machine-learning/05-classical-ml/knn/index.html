@@ -43,424 +43,286 @@
         <header class="hero">
   <p class="eyebrow">Machine learning · Classical models</p>
   <h1>KNN — <em>k nearest neighbors</em></h1>
-  <p class="lede">Model đơn giản nhất trong cả kệ: <b>không học gì, chỉ nhớ</b>. Đáng học không phải vì hay dùng mà vì nó là chỗ ba khái niệm hiện ra rõ nhất — variance cao, tầm quan trọng của thang đo, và curse of dimensionality.</p>
+  <p class="lede">Không học gì, chỉ nhớ. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>tìm k dòng gần nhất rồi lấy theo đa số</li>
+    <li>không có tham số nào được học</li>
+    <li>bắt buộc chuẩn hoá, nếu không cột thang lớn át hết</li>
+  </ul>
 </header>
 
 <section id="knn-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Muốn đoán một điểm mới: <em>tìm k điểm giống nó nhất trong dữ liệu đã có, rồi lấy theo đa số</em>.</p>
-
+  <p class="key">Muốn đoán một dòng mới: tìm <em>k dòng giống nó nhất</em> trong dữ liệu đã có, rồi gộp lại.</p>
   <figure class="gist">
-    <svg viewBox="0 0 860 352" role="img" aria-label="Bốn ô của KNN: nhớ toàn bộ dữ liệu, chọn k, chọn thước đo khoảng cách, và số chiều làm khái niệm gần sụp đổ">
-    <text class="sv-hv" x="0" y="18">KNN KHÔNG HỌC THAM SỐ NÀO — BA LỰA CHỌN NÀY CHÍNH LÀ MODEL</text>
-    <text class="sv-hv" x="0" y="42" fill="var(--filled)">① Nhớ, không học</text>
-    <rect x="0" y="62" width="190" height="176" rx="6" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1.4"/>
-    <text class="sv-hv" x="218" y="42" fill="var(--probe)">② Chọn k</text>
-    <rect x="218" y="62" width="190" height="176" rx="6" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1.4"/>
-    <text class="sv-hv" x="436" y="42" fill="var(--ok)">③ Thước đo</text>
-    <rect x="436" y="62" width="190" height="176" rx="6" fill="rgba(var(--green-a),.06)" stroke="var(--ok)" stroke-width="1.4"/>
-    <text class="sv-hv" x="654" y="42" fill="var(--tomb)">④ Số chiều</text>
-    <rect x="654" y="62" width="190" height="176" rx="6" fill="rgba(var(--red-a),.06)" stroke="var(--tomb)" stroke-width="1.4"/>
-    <circle cx="40" cy="102" r="4.2" fill="var(--filled)"/>
-    <circle cx="66" cy="128" r="4.2" fill="var(--filled)"/>
-    <circle cx="34" cy="152" r="4.2" fill="var(--filled)"/>
-    <circle cx="72" cy="166" r="4.2" fill="var(--filled)"/>
-    <circle cx="52" cy="194" r="4.2" fill="var(--filled)"/>
-    <circle cx="126" cy="112" r="4.2" fill="var(--ok)"/>
-    <circle cx="150" cy="142" r="4.2" fill="var(--ok)"/>
-    <circle cx="120" cy="166" r="4.2" fill="var(--ok)"/>
-    <circle cx="158" cy="186" r="4.2" fill="var(--ok)"/>
-    <circle cx="134" cy="210" r="4.2" fill="var(--ok)"/>
-    <circle cx="96" cy="156" r="34" fill="none" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="4 3"/>
-    <path d="M96 148 l0 16 M88 156 l16 0" stroke="var(--probe)" stroke-width="2.2"/>
-    <text class="sv-d" x="12" y="228" fill="var(--muted)">✛ = điểm mới · vòng = k gần nhất</text>
-    <text class="sv-d" x="0" y="256" fill="var(--muted)">huấn luyện = chép dữ liệu vào</text>
-    <text class="sv-d" x="0" y="272" fill="var(--muted)">bộ nhớ; mỗi lần đoán tốn O(n·d)</text>
-    <text class="sv-t" x="230" y="86" fill="var(--text)">k</text>
-    <text class="sv-d" x="248" y="86" fill="var(--dim)">err train</text>
-    <text class="sv-d" x="328" y="86" fill="var(--dim)">err test</text>
-    <text class="sv-l" x="230" y="110" fill="var(--tomb)">1</text>
-    <text class="sv-l" x="258" y="110" fill="var(--muted)">0,000</text>
-    <text class="sv-l" x="330" y="110" fill="var(--tomb)">23,3%</text>
-    <text class="sv-l" x="230" y="136" fill="var(--muted)">5</text>
-    <text class="sv-l" x="258" y="136" fill="var(--muted)">0,147</text>
-    <text class="sv-l" x="330" y="136" fill="var(--muted)">16,9%</text>
-    <text class="sv-l" x="230" y="162" fill="var(--ok)">25</text>
-    <text class="sv-l" x="258" y="162" fill="var(--muted)">0,172</text>
-    <text class="sv-l" x="330" y="162" fill="var(--ok)">15,1%</text>
-    <text class="sv-l" x="230" y="188" fill="var(--tomb)">400</text>
-    <text class="sv-l" x="258" y="188" fill="var(--muted)">0,495</text>
-    <text class="sv-l" x="330" y="188" fill="var(--tomb)">50,0%</text>
-    <text class="sv-d" x="230" y="220" fill="var(--tomb)">k=1: train 0 mà test tệ nhất</text>
-    <text class="sv-d" x="218" y="256" fill="var(--muted)">k nhỏ bám nhiễu, k lớn hoá</text>
-    <text class="sv-d" x="218" y="272" fill="var(--muted)">thành "đoán lớp đa số"</text>
-    <text class="sv-l" x="448" y="88" fill="var(--ok)">Euclidean</text>
-    <text class="sv-d" x="540" y="88" fill="var(--muted)">số liên tục</text>
-    <text class="sv-l" x="448" y="112" fill="var(--text)">Manhattan</text>
-    <text class="sv-d" x="540" y="112" fill="var(--muted)">nhiều chiều</text>
-    <text class="sv-l" x="448" y="136" fill="var(--text)">Cosine</text>
-    <text class="sv-d" x="540" y="136" fill="var(--muted)">embedding</text>
-    <text class="sv-l" x="448" y="160" fill="var(--text)">Hamming</text>
-    <text class="sv-d" x="540" y="160" fill="var(--muted)">nhị phân</text>
-    <rect x="446" y="190" width="170" height="42" rx="4" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.3"/>
-    <text class="sv-d" x="456" y="208" fill="var(--tomb)">quên co giãn:</text>
-    <text class="sv-l" x="456" y="224" fill="var(--tomb)">test 15,1% → 27,9%</text>
-    <text class="sv-d" x="436" y="256" fill="var(--muted)">chọn thước đo là chọn nghĩa</text>
-    <text class="sv-d" x="436" y="272" fill="var(--muted)">của chữ "giống nhau"</text>
-    <text class="sv-d" x="666" y="86" fill="var(--dim)">gần nhất / xa nhất</text>
-    <text class="sv-d" x="666" y="110" fill="var(--ok)">2 chiều</text>
-    <rect x="738" y="101" width="3" height="11" rx="2" fill="rgba(var(--green-a),.40)" stroke="var(--ok)" stroke-width="1"/>
-    <text class="sv-l" x="830" y="110" fill="var(--muted)" text-anchor="end">0,03</text>
-    <text class="sv-d" x="666" y="136" fill="var(--text)">20 chiều</text>
-    <rect x="738" y="127" width="25.419999999999998" height="11" rx="2" fill="rgba(var(--blue-a),.40)" stroke="var(--text)" stroke-width="1"/>
-    <text class="sv-l" x="830" y="136" fill="var(--muted)" text-anchor="end">0,41</text>
-    <text class="sv-d" x="666" y="162" fill="var(--text)">100 chiều</text>
-    <rect x="738" y="153" width="43.4" height="11" rx="2" fill="rgba(var(--blue-a),.40)" stroke="var(--text)" stroke-width="1"/>
-    <text class="sv-l" x="830" y="162" fill="var(--muted)" text-anchor="end">0,70</text>
-    <text class="sv-d" x="666" y="188" fill="var(--tomb)">500 chiều</text>
-    <rect x="738" y="179" width="52.08" height="11" rx="2" fill="rgba(var(--red-a),.40)" stroke="var(--tomb)" stroke-width="1"/>
-    <text class="sv-l" x="830" y="188" fill="var(--muted)" text-anchor="end">0,84</text>
-    <text class="sv-d" x="666" y="218" fill="var(--tomb)">tỉ số → 1: "gần" hết nghĩa</text>
-    <text class="sv-d" x="654" y="256" fill="var(--muted)">thêm 98 cột nhiễu vào 2 cột có</text>
-    <text class="sv-d" x="654" y="272" fill="var(--muted)">ích: test 15,1% → 23,9%</text>
-    <line x1="0" y1="294" x2="860" y2="294" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-    <text class="sv-s" x="0" y="318" fill="var(--dim)">Ba ô ②③④ đều là quyết định của người dùng, không phải thứ model tự tìm ra — đó là nghĩa của "phi tham số"</text>
-    <text class="sv-s" x="0" y="336" fill="var(--dim)">Cả ba đều hỏng theo cùng một kiểu: khoảng cách sai thì mọi thứ dựng trên nó sai theo, mà không báo lỗi gì</text>
-    </svg>
-    <figcaption>Không có tham số nào được học, nên <strong>ba lựa chọn ②③④ chính là model</strong> — và cả ba đều hỏng âm thầm: sai thì kết quả vẫn ra, chỉ là sai.</figcaption>
+    <svg viewBox="0 0 860 396" role="img" aria-label="Đồ thị hai chiều tuổi và thu nhập đã chuẩn hoá với sáu khách và khách mới X; vòng nét đứt gom ba khách gần nhất là D, B và E; classification gộp bằng vote còn regression gộp bằng mean" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}5.556%{animation-timing-function:ease-in-out;opacity:0}11.389%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}11.111%{animation-timing-function:ease-in-out;opacity:0}16.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}8.889%{animation-timing-function:ease-in-out;opacity:0}14.722%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}15.833%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}11.111%{animation-timing-function:ease-in-out;opacity:0}16.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}12.222%{animation-timing-function:ease-in-out;opacity:0}18.056%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0}13.333%{animation-timing-function:ease-in-out;opacity:0}19.167%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}14.444%{animation-timing-function:ease-in-out;opacity:0}20.278%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0}8.889%{animation-timing-function:ease-in-out;opacity:0}14.722%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}18.889%{animation-timing-function:ease-in-out;opacity:0}24.722%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0}8.889%{animation-timing-function:ease-in-out;opacity:0}14.722%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}24.444%{animation-timing-function:ease-in-out;opacity:0}30.278%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0}33.333%{animation-timing-function:ease-in-out;opacity:0}39.167%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}42.222%{animation-timing-function:ease-in-out;opacity:0}48.056%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}51.111%{animation-timing-function:ease-in-out;opacity:0}56.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm16{0%{animation-timing-function:ease-in-out;opacity:0}55.556%{animation-timing-function:ease-in-out;opacity:0}61.389%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm17{0%{animation-timing-function:ease-in-out;opacity:0}62.222%{animation-timing-function:ease-in-out;opacity:0}68.056%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm18{0%{animation-timing-function:ease-in-out;opacity:0}71.111%{animation-timing-function:ease-in-out;opacity:0}76.944%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm19{0%{animation-timing-function:ease-in-out;opacity:0}77.778%{animation-timing-function:ease-in-out;opacity:0}83.611%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 6.0s linear 1 forwards}.mm2{animation:mm2 6.0s linear 1 forwards}.mm3{animation:mm3 6.0s linear 1 forwards}.mm4{animation:mm4 6.0s linear 1 forwards}.mm5{animation:mm5 6.0s linear 1 forwards}.mm6{animation:mm6 6.0s linear 1 forwards}.mm7{animation:mm7 6.0s linear 1 forwards}.mm8{animation:mm8 6.0s linear 1 forwards}.mm9{animation:mm9 6.0s linear 1 forwards}.mm10{animation:mm10 6.0s linear 1 forwards}.mm11{animation:mm11 6.0s linear 1 forwards}.mm12{animation:mm12 6.0s linear 1 forwards}.mm13{animation:mm13 6.0s linear 1 forwards}.mm14{animation:mm14 6.0s linear 1 forwards}.mm15{animation:mm15 6.0s linear 1 forwards}.mm16{animation:mm16 6.0s linear 1 forwards}.mm17{animation:mm17 6.0s linear 1 forwards}.mm18{animation:mm18 6.0s linear 1 forwards}.mm19{animation:mm19 6.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="20" fill="var(--muted)" style="fill:var(--muted)">KNN: TÌM k ĐIỂM GẦN NHẤT RỒI GỘP NHÃN CỦA CHÚNG</text>
+<g class="mm1"><line x1="14" y1="290" x2="376" y2="290" stroke="var(--rule-hi)" stroke-width="1"/><line x1="14" y1="290" x2="14" y2="54" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="376" y="306" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">tuổi (chuẩn hoá)</text><text class="sv-d" x="16" y="48" fill="var(--muted)" style="fill:var(--muted)">thu nhập (chuẩn hoá)</text></g>
+<g class="mm2"><circle cx="185.9" cy="155.5" r="88.0" fill="rgba(var(--amber-a),.07)" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="4 3"/></g>
+<g class="mm3"><circle cx="234.5" cy="202.9" r="7" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="2.2"/><text class="sv-d" x="218.45666795413223" y="192.86377417261005" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">D</text></g>
+<g class="mm4"><circle cx="195.0" cy="223.9" r="7" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="2.2"/><text class="sv-d" x="178.9857825794079" y="213.89933690761" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">B</text></g>
+<g class="mm5"><circle cx="267.9" cy="181.8" r="7" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="2.2"/><text class="sv-d" x="267.8551094250528" y="203.8282114376101" fill="var(--tomb)" style="fill:var(--tomb)">E</text></g>
+<g class="mm6"><circle cx="216.2" cy="244.9" r="5.5" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="232.23933624272098" y="262.93489964260993" fill="var(--ok)" style="fill:var(--ok)">C</text></g>
+<g class="mm7"><circle cx="292.1" cy="160.8" r="5.5" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="308.14488504026775" y="150.79264870261017" fill="var(--ok)" style="fill:var(--ok)">F</text></g>
+<g class="mm8"><circle cx="182.8" cy="276.5" r="5.5" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="166.8408947718004" y="294.4882437451099" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">A</text></g>
+<g class="mm9"><rect x="179.9" y="149.5" width="12" height="12" fill="rgba(var(--amber-a),.55)" stroke="var(--probe)" stroke-width="2"/><text class="sv-d" x="197.87711672370227" y="149.53375801886017" fill="var(--probe)" style="fill:var(--probe)">X</text></g>
+<g class="mm10"><line x1="128.5" y1="72.6" x2="120.5" y2="96.6" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="120.5" cy="96.6" r="2.6" fill="var(--probe)"/><text class="sv-d" x="134.46402158464588" y="76.63554260561438" fill="var(--probe)" style="fill:var(--probe)">vòng gom k = 3 neighbor</text></g>
+<g class="mm11"><text class="sv-d" x="452" y="60" fill="var(--text)" style="fill:var(--text)">Không có bước huấn luyện</text><text class="sv-d" x="452" y="80" fill="var(--muted)" style="fill:var(--muted)">training = lưu lại toàn bộ dữ liệu</text></g>
+<g class="mm12"><text class="sv-d" x="452" y="118" fill="var(--probe)" style="fill:var(--probe)">distance</text><text class="sv-d" x="532" y="118" fill="var(--muted)" style="fill:var(--muted)">đo từ X tới từng dòng đã có</text></g>
+<g class="mm13"><text class="sv-d" x="452" y="146" fill="var(--probe)" style="fill:var(--probe)">k</text><text class="sv-d" x="532" y="146" fill="var(--muted)" style="fill:var(--muted)">lấy bao nhiêu dòng gần nhất</text></g>
+<g class="mm14"><text class="sv-d" x="452" y="174" fill="var(--probe)" style="fill:var(--probe)">neighbor</text><text class="sv-d" x="532" y="174" fill="var(--muted)" style="fill:var(--muted)">k = 3 → D B E (vòng nét đứt)</text></g>
+<g class="mm15"><text class="sv-d" x="452" y="214" fill="var(--text)" style="fill:var(--text)">Gộp nhãn của k neighbor:</text></g>
+<g class="mm16"><text class="sv-d" x="452" y="240" fill="var(--ok)" style="fill:var(--ok)">classification</text><text class="sv-d" x="562" y="240" fill="var(--muted)" style="fill:var(--muted)">→ vote: lớp nhiều phiếu nhất</text></g>
+<g class="mm17"><text class="sv-d" x="452" y="264" fill="var(--filled)" style="fill:var(--filled)">regression</text><text class="sv-d" x="562" y="264" fill="var(--muted)" style="fill:var(--muted)">→ mean: trung bình k neighbor</text></g>
+<g class="mm18"><rect x="0" y="330" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="345" fill="var(--probe)" style="fill:var(--probe)">Ba lựa chọn của người dùng chính là model: k, distance, cách gộp</text></g>
+<g class="mm19"><text class="sv-d" x="14" y="368" fill="var(--muted)" style="fill:var(--muted)">Không có tham số nào được học, nên cũng không có loss function để tối thiểu hoá.</text></g>
+</svg>
   </figure>
-
-  <p>Nó đảo ngược chi phí so với mọi model khác: <b>huấn luyện gần như miễn phí, suy luận rất đắt</b>.</p>
-  <p>Không có tham số nào được học, nên người ta gọi nó là model <em>phi tham số</em> hay <em>lazy learner</em> — mọi tính toán bị hoãn tới lúc phải trả lời.</p>
-
+  <p>Cách gộp k neighbor, tuỳ bài toán:</p>
+  <table>
+    <tr><th>Bài toán</th><th>Cách gộp</th><th>Dùng khi</th></tr>
+    <tr><td>Phân loại</td><td>lớp nhiều phiếu nhất</td><td>nhãn rời rạc</td></tr>
+    <tr><td>Hồi quy</td><td>trung bình k neighbor</td><td>giá trị liên tục</td></tr>
+    <tr><td>Hồi quy có ngoại lai</td><td>trung vị k neighbor</td><td>dữ liệu đuôi dài</td></tr>
+  </table>
   <ul class="why">
-    <li>Ranh giới quyết định không có hình dạng cố định, nó bám theo dữ liệu: mạnh khi quan hệ thật ngoằn ngoèo, yếu khi nhiễu.</li>
-    <li>Mỗi lần dự đoán tốn O(n·d). Tập lớn phải dựng chỉ mục — KD-tree ở ít chiều, hoặc <b>xấp xỉ</b> kiểu HNSW trong vector database.</li>
+    <li>Không có tham số nào được học, nên gọi là model phi tham số hay lazy learner.</li>
+    <li>Cũng vì thế KNN <b>không có hàm mục tiêu toàn cục</b>: không gradient, không early stopping.</li>
+    <li>Nó đảo ngược chi phí so với mọi model khác: huấn luyện gần như không tốn gì, dự đoán tốn nhiều.</li>
+    <li>Mỗi lần dự đoán tốn O(n·d). Tập lớn phải dựng chỉ mục, ví dụ KD-tree hoặc HNSW trong vector database.</li>
   </ul>
 </section>
 
 <section id="knn-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Chọn k</h2></div>
-
-  <p class="key">k là <em>toàn bộ</em> núm điều chỉnh của model, và nó nằm đúng trên trục bias–variance.</p>
-
-  <div class="axis">
-    <div class="stop"><b>k = 1</b><span>bám từng điểm · học thuộc cả nhiễu</span></div>
-    <div class="stop on"><b>k vừa</b><span>chọn bằng cross-validation</span></div>
-    <div class="stop"><b>k lớn</b><span>ranh giới mượt dần</span></div>
-    <div class="stop"><b>k = n</b><span>luôn đoán lớp đa số</span></div>
-  </div>
-  <p class="axiscap"><span>variance cao, bias thấp</span><span><em>đổi độ chi tiết lấy độ ổn định</em></span><span>bias cao, variance thấp</span></p>
-
-  <p>Với <code>k = 1</code>, sai số trên tập train bằng <b>0</b> — mỗi điểm là nearest neighbor của chính nó.</p>
-  <p>Con số đẹp đó hoàn toàn vô nghĩa, và nó là ví dụ sạch nhất cho lý do phải đo trên tập riêng: xem <a href="../../04-core-concepts/train-val-test-cv/index.html">Train, validation &amp; test</a>.</p>
-
+  <div class="sh"><b>02</b><h2>Từ bảng tới dự đoán</h2></div>
+  <p class="key">Chỉ là <em>xếp hàng theo khoảng cách</em>, rồi lấy k dòng đầu và đếm phiếu.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 582" role="img" aria-label="Bảng sáu khách hiện cột khoảng cách tới khách mới X rồi tự xếp lại theo khoảng cách tăng dần, ba hàng đầu được khoanh vàng; k bằng 1 cho không mua, k bằng 3 cho mua, k bằng 5 cho không mua" data-anim><style>@keyframes so1{0%{animation-timing-function:ease-in-out;opacity:0}1.765%{animation-timing-function:ease-in-out;opacity:0}3.897%{animation-timing-function:ease-in-out;opacity:1}20.000%{animation-timing-function:ease-in-out;opacity:1}22.132%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes so2{0%{animation-timing-function:ease-in-out;opacity:0}8.235%{animation-timing-function:ease-in-out;opacity:0}10.368%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so3{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}22.132%{animation-timing-function:ease-in-out;opacity:1}32.941%{animation-timing-function:ease-in-out;opacity:1}35.074%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes so4{0%{animation-timing-function:ease-in-out;opacity:0}32.941%{animation-timing-function:ease-in-out;opacity:0}35.074%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so5{0%{animation-timing-function:ease-in-out;opacity:0}5.882%{animation-timing-function:ease-in-out;opacity:0}8.868%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so6{0%{animation-timing-function:ease-in-out;opacity:0}8.824%{animation-timing-function:ease-in-out;opacity:0}11.809%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so7{0%{animation-timing-function:ease-in-out;opacity:0}7.647%{animation-timing-function:ease-in-out;opacity:0}10.632%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so8{0%{animation-timing-function:ease-in-out;opacity:0}8.235%{animation-timing-function:ease-in-out;opacity:0}11.221%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so9{0%{animation-timing-function:ease-in-out;opacity:0}8.824%{animation-timing-function:ease-in-out;opacity:0}11.809%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so10{0%{animation-timing-function:ease-in-out;opacity:0}9.412%{animation-timing-function:ease-in-out;opacity:0}12.397%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so11{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.985%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so12{0%{animation-timing-function:ease-in-out;opacity:0}10.588%{animation-timing-function:ease-in-out;opacity:0}13.574%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so13{0%{animation-timing-function:ease-in-out;opacity:0}7.647%{animation-timing-function:ease-in-out;opacity:0}10.632%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so14{0%{animation-timing-function:ease-in-out;opacity:0}11.765%{animation-timing-function:ease-in-out;opacity:0}14.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so15{0%{animation-timing-function:ease-in-out;opacity:0}35.294%{animation-timing-function:ease-in-out;opacity:0}38.279%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so16{0%{animation-timing-function:ease-in-out;opacity:0}38.235%{animation-timing-function:ease-in-out;opacity:0}41.221%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so17{0%{animation-timing-function:ease-in-out;opacity:0}41.176%{animation-timing-function:ease-in-out;opacity:0}44.162%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so18{0%{animation-timing-function:ease-in-out;opacity:0}47.059%{animation-timing-function:ease-in-out;opacity:0}50.044%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so19{0%{animation-timing-function:ease-in-out;opacity:0}51.765%{animation-timing-function:ease-in-out;opacity:0}54.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so20{0%{animation-timing-function:ease-in-out;opacity:0}56.471%{animation-timing-function:ease-in-out;opacity:0}59.456%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so21{0%{animation-timing-function:ease-in-out;opacity:0}61.176%{animation-timing-function:ease-in-out;opacity:0}64.162%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so22{0%{animation-timing-function:ease-in-out;opacity:0}62.353%{animation-timing-function:ease-in-out;opacity:0}65.338%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so23{0%{animation-timing-function:ease-in-out;opacity:0}67.059%{animation-timing-function:ease-in-out;opacity:0}70.044%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so24{0%{animation-timing-function:ease-in-out;opacity:0}71.765%{animation-timing-function:ease-in-out;opacity:0}74.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so25{0%{animation-timing-function:ease-in-out;opacity:0}76.471%{animation-timing-function:ease-in-out;opacity:0}79.456%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so26{0%{animation-timing-function:ease-in-out;opacity:0}81.176%{animation-timing-function:ease-in-out;opacity:0}84.162%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes so27{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}82.985%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.so1{animation:so1 11.724137931034484s linear 1 forwards}.so2{animation:so2 11.724137931034484s linear 1 forwards}.so3{animation:so3 11.724137931034484s linear 1 forwards}.so4{animation:so4 11.724137931034484s linear 1 forwards}.so5{animation:so5 11.724137931034484s linear 1 forwards}.so6{animation:so6 11.724137931034484s linear 1 forwards}.so7{animation:so7 11.724137931034484s linear 1 forwards}.so8{animation:so8 11.724137931034484s linear 1 forwards}.so9{animation:so9 11.724137931034484s linear 1 forwards}.so10{animation:so10 11.724137931034484s linear 1 forwards}.so11{animation:so11 11.724137931034484s linear 1 forwards}.so12{animation:so12 11.724137931034484s linear 1 forwards}.so13{animation:so13 11.724137931034484s linear 1 forwards}.so14{animation:so14 11.724137931034484s linear 1 forwards}.so15{animation:so15 11.724137931034484s linear 1 forwards}.so16{animation:so16 11.724137931034484s linear 1 forwards}.so17{animation:so17 11.724137931034484s linear 1 forwards}.so18{animation:so18 11.724137931034484s linear 1 forwards}.so19{animation:so19 11.724137931034484s linear 1 forwards}.so20{animation:so20 11.724137931034484s linear 1 forwards}.so21{animation:so21 11.724137931034484s linear 1 forwards}.so22{animation:so22 11.724137931034484s linear 1 forwards}.so23{animation:so23 11.724137931034484s linear 1 forwards}.so24{animation:so24 11.724137931034484s linear 1 forwards}.so25{animation:so25 11.724137931034484s linear 1 forwards}.so26{animation:so26 11.724137931034484s linear 1 forwards}.so27{animation:so27 11.724137931034484s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-d" x="0" y="24" fill="var(--probe)" style="fill:var(--probe)">Khách mới X: tuổi 25 · thu nhập 35tr · chưa biết nhãn</text>
+<text class="sv-d" x="0" y="44" fill="var(--muted)" style="fill:var(--muted)">6 khách đã có nhãn</text>
+<text class="sv-d" x="20.0" y="70" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">id</text><text class="sv-d" x="72.0" y="70" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">tuổi</text><text class="sv-d" x="150.0" y="70" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">thu nhập</text><text class="sv-d" x="232.0" y="70" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">nhãn</text><line x1="0" y1="78" x2="420" y2="78" stroke="var(--rule-hi)" stroke-width="1"/>
+<g class="so1" opacity="0"><rect x="0" y="81" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text><text class="sv-d" x="72.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">24</text><text class="sv-d" x="150.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">12tr</text><text class="sv-d" x="232.0" y="99" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><rect x="0" y="111" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text><text class="sv-d" x="72.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">28</text><text class="sv-d" x="150.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">22tr</text><text class="sv-d" x="232.0" y="129" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><rect x="0" y="141" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text><text class="sv-d" x="72.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">35</text><text class="sv-d" x="150.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">18tr</text><text class="sv-d" x="232.0" y="159" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><rect x="0" y="171" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text><text class="sv-d" x="72.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">41</text><text class="sv-d" x="150.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">26tr</text><text class="sv-d" x="232.0" y="189" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><rect x="0" y="201" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text><text class="sv-d" x="72.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">52</text><text class="sv-d" x="150.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">30tr</text><text class="sv-d" x="232.0" y="219" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><rect x="0" y="231" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text><text class="sv-d" x="72.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">60</text><text class="sv-d" x="150.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">34tr</text><text class="sv-d" x="232.0" y="249" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text></g>
+<g class="so2"><text class="sv-d" x="344.0" y="70" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">khoảng cách tới X</text></g>
+<g class="so3" opacity="0"><rect x="0" y="81" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text><text class="sv-d" x="72.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">24</text><text class="sv-d" x="150.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">12tr</text><text class="sv-d" x="232.0" y="99" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="344.0" y="99" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">23,0</text><rect x="0" y="111" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text><text class="sv-d" x="72.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">28</text><text class="sv-d" x="150.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">22tr</text><text class="sv-d" x="232.0" y="129" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="344.0" y="129" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">13,3</text><rect x="0" y="141" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text><text class="sv-d" x="72.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">35</text><text class="sv-d" x="150.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">18tr</text><text class="sv-d" x="232.0" y="159" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="344.0" y="159" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">19,7</text><rect x="0" y="171" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text><text class="sv-d" x="72.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">41</text><text class="sv-d" x="150.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">26tr</text><text class="sv-d" x="232.0" y="189" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="344.0" y="189" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">18,4</text><rect x="0" y="201" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text><text class="sv-d" x="72.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">52</text><text class="sv-d" x="150.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">30tr</text><text class="sv-d" x="232.0" y="219" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="344.0" y="219" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">27,5</text><rect x="0" y="231" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text><text class="sv-d" x="72.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">60</text><text class="sv-d" x="150.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">34tr</text><text class="sv-d" x="232.0" y="249" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="344.0" y="249" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">35,0</text></g>
+<g class="so4"><rect x="0" y="171" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">A</text><text class="sv-d" x="72.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">24</text><text class="sv-d" x="150.0" y="189" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">12tr</text><text class="sv-d" x="232.0" y="189" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="344.0" y="189" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">23,0</text><rect x="0" y="81" width="420" height="26" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="20.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B</text><text class="sv-d" x="72.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">28</text><text class="sv-d" x="150.0" y="99" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">22tr</text><text class="sv-d" x="232.0" y="99" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="344.0" y="99" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">13,3</text><rect x="0" y="141" width="420" height="26" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="20.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">C</text><text class="sv-d" x="72.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">35</text><text class="sv-d" x="150.0" y="159" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">18tr</text><text class="sv-d" x="232.0" y="159" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="344.0" y="159" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">19,7</text><rect x="0" y="111" width="420" height="26" rx="3" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="20.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">D</text><text class="sv-d" x="72.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">41</text><text class="sv-d" x="150.0" y="129" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">26tr</text><text class="sv-d" x="232.0" y="129" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="344.0" y="129" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">18,4</text><rect x="0" y="201" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">E</text><text class="sv-d" x="72.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">52</text><text class="sv-d" x="150.0" y="219" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">30tr</text><text class="sv-d" x="232.0" y="219" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text><text class="sv-d" x="344.0" y="219" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">27,5</text><rect x="0" y="231" width="420" height="26" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="20.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">F</text><text class="sv-d" x="72.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">60</text><text class="sv-d" x="150.0" y="249" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">34tr</text><text class="sv-d" x="232.0" y="249" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text><text class="sv-d" x="344.0" y="249" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">35,0</text></g>
+<g class="so5"><line x1="470" y1="244" x2="790" y2="244" stroke="var(--rule-hi)" stroke-width="1"/><line x1="470" y1="244" x2="470" y2="48" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="790" y="260" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">tuổi</text><text class="sv-d" x="472" y="42" fill="var(--muted)" style="fill:var(--muted)">thu nhập (triệu)</text></g>
+<g class="so6"><circle cx="600.4" cy="142.5" r="92.9" fill="rgba(var(--amber-a),.07)" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="4 3"/></g>
+<g class="so7"><circle cx="613.4" cy="199.0" r="7" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="2.2"/><text class="sv-d" x="597.4154798826315" y="203.99241809431638" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">B</text></g>
+<g class="so8"><circle cx="669.9" cy="181.6" r="7" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="2.2"/><text class="sv-d" x="653.9467421796255" y="171.59818354139514" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">D</text></g>
+<g class="so9"><circle cx="643.9" cy="216.4" r="7" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="2.2"/><text class="sv-d" x="643.8553903502436" y="238.38665264723758" fill="var(--ok)" style="fill:var(--ok)">C</text></g>
+<g class="so10"><circle cx="596.0" cy="242.5" r="5.5" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="580.0212453297104" y="260.4780044766194" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">A</text></g>
+<g class="so11"><circle cx="717.8" cy="164.2" r="5.5" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="717.7808872001588" y="186.20394898847394" fill="var(--tomb)" style="fill:var(--tomb)">E</text></g>
+<g class="so12"><circle cx="752.6" cy="146.8" r="5.5" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="768.5693563060013" y="136.80971443555273" fill="var(--ok)" style="fill:var(--ok)">F</text></g>
+<g class="so13"><rect x="594.4" y="136.5" width="12" height="12" fill="rgba(var(--amber-a),.55)" stroke="var(--probe)" stroke-width="2"/><text class="sv-d" x="612.3698039679407" y="136.46115579732242" fill="var(--probe)" style="fill:var(--probe)">X</text></g>
+<g class="so14"><line x1="640.4" y1="108.5" x2="608.4" y2="138.5" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="608.4" cy="138.5" r="2.6" fill="var(--probe)"/><text class="sv-d" x="646.3698039679407" y="112.46115579732242" fill="var(--probe)" style="fill:var(--probe)">khách mới X</text></g>
+<g class="so15"><line x1="573.4" y1="165.0" x2="609.4" y2="195.0" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="609.4" cy="195.0" r="2.6" fill="var(--probe)"/><text class="sv-d" x="567.4154798826315" y="168.99241809431638" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">hàng 1: B</text></g>
+<g class="so16"><line x1="721.9" y1="197.6" x2="673.9" y2="185.6" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="673.9" cy="185.6" r="2.6" fill="var(--probe)"/><text class="sv-d" x="727.9467421796255" y="201.59818354139514" fill="var(--probe)" style="fill:var(--probe)">hàng 2: D</text></g>
+<g class="so17"><line x1="669.9" y1="256.4" x2="647.9" y2="220.4" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="647.9" cy="220.4" r="2.6" fill="var(--probe)"/><text class="sv-d" x="675.8553903502436" y="260.3866526472376" fill="var(--probe)" style="fill:var(--probe)">hàng 3: C</text></g>
+<g class="so18"><text class="sv-d" x="470" y="312" fill="var(--text)" style="fill:var(--text)">k = 1</text><text class="sv-d" x="520" y="312" fill="var(--muted)" style="fill:var(--muted)">B</text><text class="sv-d" x="640" y="312" fill="var(--muted)" style="fill:var(--muted)">0/1 mua</text><rect x="710" y="297" width="76" height="22" rx="11" fill="rgba(var(--red-a),.20)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="748" y="312" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text></g>
+<g class="so19"><text class="sv-d" x="470" y="338" fill="var(--text)" style="fill:var(--text)">k = 3</text><text class="sv-d" x="520" y="338" fill="var(--muted)" style="fill:var(--muted)">B D C</text><text class="sv-d" x="640" y="338" fill="var(--muted)" style="fill:var(--muted)">2/3 mua</text><rect x="710" y="323" width="76" height="22" rx="11" fill="rgba(var(--green-a),.20)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="748" y="338" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text></g>
+<g class="so20"><text class="sv-d" x="470" y="364" fill="var(--text)" style="fill:var(--text)">k = 5</text><text class="sv-d" x="520" y="364" fill="var(--muted)" style="fill:var(--muted)">B D C A E</text><text class="sv-d" x="640" y="364" fill="var(--muted)" style="fill:var(--muted)">2/5 mua</text><rect x="710" y="349" width="76" height="22" rx="11" fill="rgba(var(--red-a),.20)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="748" y="364" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text></g>
+<g class="so21"><text class="sv-d" x="0" y="414" fill="var(--muted)" style="fill:var(--muted)">Thứ tự tính · khách mới X, k = 3</text></g>
+<g class="so22"><rect x="0.0" y="424" width="146.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="73.0" y="442" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">dữ liệu</text><text class="sv-d" x="73.0" y="460" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">6 dòng đã có nhãn</text></g>
+<g class="so23"><rect x="164.0" y="424" width="146.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="237.0" y="442" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">distance tới X</text><text class="sv-d" x="237.0" y="460" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">13,3 … 35,0</text><line x1="148.0" y1="447" x2="154.0" y2="447" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="162.0,447 154.0,442.8 154.0,451.2" fill="var(--rule-hi)"/></g>
+<g class="so24"><rect x="328.0" y="424" width="146.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="401.0" y="442" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">xếp tăng dần</text><text class="sv-d" x="401.0" y="460" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B D C A E F</text><line x1="312.0" y1="447" x2="318.0" y2="447" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="326.0,447 318.0,442.8 318.0,451.2" fill="var(--rule-hi)"/></g>
+<g class="so25"><rect x="492.0" y="424" width="146.0" height="46" rx="5" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="565.0" y="442" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">lấy k = 3</text><text class="sv-d" x="565.0" y="460" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">B D C</text><line x1="476.0" y1="447" x2="482.0" y2="447" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="490.0,447 482.0,442.8 482.0,451.2" fill="var(--rule-hi)"/></g>
+<g class="so26"><rect x="656.0" y="424" width="146.0" height="46" rx="5" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="729.0" y="442" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">vote</text><text class="sv-d" x="729.0" y="460" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">2/3 mua → mua</text><line x1="640.0" y1="447" x2="646.0" y2="447" stroke="var(--rule-hi)" stroke-width="1.4"/><polygon points="654.0,447 646.0,442.8 646.0,451.2" fill="var(--rule-hi)"/></g>
+<g class="so27"><rect x="0" y="496" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="511" fill="var(--probe)" style="fill:var(--probe)">k là toàn bộ phần điều chỉnh được · và ba mức k cho ba kết quả khác nhau</text></g>
+</svg>
+  </figure>
   <ul class="why">
-    <li>Bài toán hai lớp thì chọn <b>k lẻ</b> để tránh hoà phiếu.</li>
-    <li>Có thể cho phiếu <b>trọng số theo khoảng cách</b> — neighbor gần tính nặng hơn. Cách này làm k lớn bớt hại.</li>
-    <li>k thường quét trong khoảng 1–30 bằng cross-validation. Không có công thức — <code>k = √n</code> chỉ là điểm khởi đầu.</li>
+    <li>Khách mới X: tuổi 25, thu nhập 35 triệu.</li>
+    <li>Ba mức k cho ba kết quả khác nhau, nên k là toàn bộ phần điều chỉnh được của model.</li>
+    <li>Ranh giới quyết định không có hình dạng cố định, nó bám theo dữ liệu.</li>
+    <li>Mạnh khi quan hệ thật ngoằn ngoèo, yếu khi dữ liệu nhiễu.</li>
   </ul>
 </section>
 
 <section id="knn-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Đo khoảng cách</h2></div>
-
-  <p class="key">"Gần nhau" không có sẵn. <em>Chọn thước đo chính là chọn model.</em></p>
-
-  <figure class="scrollx">
-    <svg viewBox="0 0 860 250" role="img" aria-label="Bốn thước đo khoảng cách vẽ tách nhau: Euclidean đi thẳng từ a tới b, Manhattan đi theo hai cạnh vuông góc, Cosine chỉ đo góc giữa hai vector, Hamming đếm số vị trí khác nhau giữa hai chuỗi bit">
-    <text class="sv-hv" x="0" y="18">CÙNG HAI ĐIỂM a VÀ b &#8212; BỐN CÁCH ĐO</text>
-
-    <text class="sv-t" x="0" y="40" fill="var(--filled)">Euclidean (L2)</text>
-    <rect x="0" y="50" width="200" height="172" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2"/>
-    <line x1="46" y1="186" x2="152" y2="92" stroke="var(--filled)" stroke-width="2.4"/>
-    <circle cx="46" cy="186" r="4" fill="var(--text)"/>
-    <circle cx="152" cy="92" r="4" fill="var(--text)"/>
-    <text class="sv-l" x="30" y="192" fill="var(--text)">a</text>
-    <text class="sv-l" x="160" y="88" fill="var(--text)">b</text>
-    <text class="sv-s" x="14" y="212" fill="var(--dim)">đi thẳng</text>
-
-    <text class="sv-t" x="220" y="40" fill="var(--probe)">Manhattan (L1)</text>
-    <rect x="220" y="50" width="200" height="172" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2"/>
-    <polyline points="266,186 372,186 372,92" fill="none" stroke="var(--probe)" stroke-width="2.4"/>
-    <circle cx="266" cy="186" r="4" fill="var(--text)"/>
-    <circle cx="372" cy="92" r="4" fill="var(--text)"/>
-    <text class="sv-l" x="250" y="192" fill="var(--text)">a</text>
-    <text class="sv-l" x="380" y="88" fill="var(--text)">b</text>
-    <text class="sv-s" x="234" y="212" fill="var(--dim)">cộng từng chiều</text>
-
-    <text class="sv-t" x="440" y="40" fill="var(--ok)">Cosine</text>
-    <rect x="440" y="50" width="200" height="172" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2"/>
-    <line x1="474" y1="192" x2="602" y2="150" stroke="var(--ok)" stroke-width="2.2"/>
-    <line x1="474" y1="192" x2="576" y2="82" stroke="var(--ok)" stroke-width="2.2"/>
-    <path d="M508 181 A 36 36 0 0 0 498 158" fill="none" stroke="var(--probe)" stroke-width="1.6"/>
-    <text class="sv-l" x="518" y="162" fill="var(--probe)">&#952;</text>
-    <text class="sv-l" x="608" y="150" fill="var(--text)">a</text>
-    <text class="sv-l" x="582" y="76" fill="var(--text)">b</text>
-    <text class="sv-s" x="454" y="212" fill="var(--dim)">chỉ đo góc, bỏ độ dài</text>
-
-    <text class="sv-t" x="660" y="40" fill="var(--tomb)">Hamming</text>
-    <rect x="660" y="50" width="200" height="172" rx="6" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2"/>
-    <text class="sv-l" x="676" y="110" fill="var(--dim)">a</text>
-    <text class="sv-l" x="676" y="150" fill="var(--dim)">b</text>
-    <text class="sv-t" x="706" y="110" fill="var(--text)">1</text>
-    <text class="sv-t" x="706" y="150" fill="var(--text)">1</text>
-    <text class="sv-t" x="740" y="110" fill="var(--tomb)">0</text>
-    <text class="sv-t" x="740" y="150" fill="var(--tomb)">1</text>
-    <text class="sv-t" x="774" y="110" fill="var(--text)">1</text>
-    <text class="sv-t" x="774" y="150" fill="var(--text)">1</text>
-    <text class="sv-t" x="808" y="110" fill="var(--tomb)">1</text>
-    <text class="sv-t" x="808" y="150" fill="var(--tomb)">0</text>
-    <line x1="736" y1="166" x2="750" y2="166" stroke="var(--tomb)" stroke-width="2"/>
-    <line x1="804" y1="166" x2="818" y2="166" stroke="var(--tomb)" stroke-width="2"/>
-    <text class="sv-s" x="674" y="212" fill="var(--dim)">đếm vị trí khác nhau: 2</text>
-    </svg>
-    <figcaption>Cùng hai điểm, bốn con số khác nhau. Điểm nào là nearest neighbor phụ thuộc ô nào đang được chọn.</figcaption>
-  </figure>
-
+  <div class="sh"><b>03</b><h2>Classification hay regression</h2></div>
+  <p class="key">Cùng k neighbor, cùng distance. Chỉ đổi <em>cách gộp</em>: classification lấy <em>vote</em>, regression lấy <em>mean</em>.</p>
   <div class="eq">
     <div class="line">
-      <span class="t"><span><var>d</var><sub>L2</sub>(<var>a</var>, <var>b</var>)</span></span>
-      <span class="op">=</span>
-      <span class="t b"><span>&#8730;<span class="ov">&#931; (<var>a</var><sub><var>i</var></sub> &#8722; <var>b</var><sub><var>i</var></sub>)<sup>2</sup></span></span><em>số liên tục, cùng bản chất</em></span>
+      <span class="t"><span>classification</span></span>
+      <span class="op">:</span>
+      <span class="t g"><span><var>ŷ</var> = mode(<var>y</var><sub>j</sub>)</span><em>vote: lớp nhiều phiếu nhất trong k neighbor</em></span>
     </div>
     <div class="line">
-      <span class="t"><span><var>d</var><sub>L1</sub>(<var>a</var>, <var>b</var>)</span></span>
-      <span class="op">=</span>
-      <span class="t r"><span>&#931; |<var>a</var><sub><var>i</var></sub> &#8722; <var>b</var><sub><var>i</var></sub>|</span><em>nhiều chiều hoặc có ngoại lai</em></span>
-    </div>
-    <div class="line">
-      <span class="t"><span><var>d</var><sub>cos</sub>(<var>a</var>, <var>b</var>)</span></span>
-      <span class="op">=</span>
-      <span class="t g"><span>1 &#8722; <span class="frac"><i><var>a</var> &#183; <var>b</var></i><i>&#8214;<var>a</var>&#8214; &#8214;<var>b</var>&#8214;</i></span></span><em>văn bản, embedding</em></span>
-    </div>
-    <div class="line">
-      <span class="t"><span><var>d</var><sub>H</sub>(<var>a</var>, <var>b</var>)</span></span>
-      <span class="op">=</span>
-      <span class="t p"><span>&#931; [ <var>a</var><sub><var>i</var></sub> &#8800; <var>b</var><sub><var>i</var></sub> ]</span><em>đặc trưng nhị phân</em></span>
+      <span class="t"><span>regression</span></span>
+      <span class="op">:</span>
+      <span class="t b"><span><var>ŷ</var> = <span class="frac"><i>1</i><i><var>k</var></i></span> Σ<sub><var>j</var> ∈ <var>N</var><sub>k</sub></sub> <var>y</var><sub>j</sub></span><em>mean: trung bình k neighbor</em></span>
     </div>
   </div>
-
+  <dl class="defs">
+    <dt><var>N</var><sub>k</sub></dt><dd>tập k neighbor gần nhất của dòng cần đoán</dd>
+    <dt><var>y</var><sub>j</sub></dt><dd>nhãn hoặc giá trị của neighbor thứ <var>j</var></dd>
+    <dt>mode</dt><dd>giá trị xuất hiện nhiều nhất</dd>
+  </dl>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 502" role="img" aria-label="Cùng ba neighbor D, B và E: classification gộp bằng vote ra không mua, regression gộp bằng mean ra 2,33 còn median ra 1,00; bảng dưới so ba mức k cho cả hai bài toán" data-anim><style>@keyframes ag1{0%{animation-timing-function:ease-in-out;opacity:0}3.636%{animation-timing-function:ease-in-out;opacity:0}8.091%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag2{0%{animation-timing-function:ease-in-out;opacity:0}8.182%{animation-timing-function:ease-in-out;opacity:0}12.636%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag3{0%{animation-timing-function:ease-in-out;opacity:0}6.364%{animation-timing-function:ease-in-out;opacity:0}10.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag4{0%{animation-timing-function:ease-in-out;opacity:0}7.273%{animation-timing-function:ease-in-out;opacity:0}11.727%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag5{0%{animation-timing-function:ease-in-out;opacity:0}8.182%{animation-timing-function:ease-in-out;opacity:0}12.636%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag6{0%{animation-timing-function:ease-in-out;opacity:0}9.091%{animation-timing-function:ease-in-out;opacity:0}13.545%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag7{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}14.455%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag8{0%{animation-timing-function:ease-in-out;opacity:0}10.909%{animation-timing-function:ease-in-out;opacity:0}15.364%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag9{0%{animation-timing-function:ease-in-out;opacity:0}6.364%{animation-timing-function:ease-in-out;opacity:0}10.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag10{0%{animation-timing-function:ease-in-out;opacity:0}14.545%{animation-timing-function:ease-in-out;opacity:0}19.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag11{0%{animation-timing-function:ease-in-out;opacity:0}9.091%{animation-timing-function:ease-in-out;opacity:0}13.545%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag12{0%{animation-timing-function:ease-in-out;opacity:0}12.727%{animation-timing-function:ease-in-out;opacity:0}17.182%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag13{0%{animation-timing-function:ease-in-out;opacity:0}15.455%{animation-timing-function:ease-in-out;opacity:0}19.909%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag14{0%{animation-timing-function:ease-in-out;opacity:0}18.182%{animation-timing-function:ease-in-out;opacity:0}22.636%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag15{0%{animation-timing-function:ease-in-out;opacity:0}23.636%{animation-timing-function:ease-in-out;opacity:0}28.091%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag16{0%{animation-timing-function:ease-in-out;opacity:0}27.273%{animation-timing-function:ease-in-out;opacity:0}31.727%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag17{0%{animation-timing-function:ease-in-out;opacity:0}36.364%{animation-timing-function:ease-in-out;opacity:0}40.818%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag18{0%{animation-timing-function:ease-in-out;opacity:0}45.455%{animation-timing-function:ease-in-out;opacity:0}49.909%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag19{0%{animation-timing-function:ease-in-out;opacity:0}54.545%{animation-timing-function:ease-in-out;opacity:0}59.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag20{0%{animation-timing-function:ease-in-out;opacity:0}61.818%{animation-timing-function:ease-in-out;opacity:0}66.273%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag21{0%{animation-timing-function:ease-in-out;opacity:0}67.273%{animation-timing-function:ease-in-out;opacity:0}71.727%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag22{0%{animation-timing-function:ease-in-out;opacity:0}69.091%{animation-timing-function:ease-in-out;opacity:0}73.545%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag23{0%{animation-timing-function:ease-in-out;opacity:0}71.818%{animation-timing-function:ease-in-out;opacity:0}76.273%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ag24{0%{animation-timing-function:ease-in-out;opacity:0}74.545%{animation-timing-function:ease-in-out;opacity:0}79.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ag1{animation:ag1 7.857142857142858s linear 1 forwards}.ag2{animation:ag2 7.857142857142858s linear 1 forwards}.ag3{animation:ag3 7.857142857142858s linear 1 forwards}.ag4{animation:ag4 7.857142857142858s linear 1 forwards}.ag5{animation:ag5 7.857142857142858s linear 1 forwards}.ag6{animation:ag6 7.857142857142858s linear 1 forwards}.ag7{animation:ag7 7.857142857142858s linear 1 forwards}.ag8{animation:ag8 7.857142857142858s linear 1 forwards}.ag9{animation:ag9 7.857142857142858s linear 1 forwards}.ag10{animation:ag10 7.857142857142858s linear 1 forwards}.ag11{animation:ag11 7.857142857142858s linear 1 forwards}.ag12{animation:ag12 7.857142857142858s linear 1 forwards}.ag13{animation:ag13 7.857142857142858s linear 1 forwards}.ag14{animation:ag14 7.857142857142858s linear 1 forwards}.ag15{animation:ag15 7.857142857142858s linear 1 forwards}.ag16{animation:ag16 7.857142857142858s linear 1 forwards}.ag17{animation:ag17 7.857142857142858s linear 1 forwards}.ag18{animation:ag18 7.857142857142858s linear 1 forwards}.ag19{animation:ag19 7.857142857142858s linear 1 forwards}.ag20{animation:ag20 7.857142857142858s linear 1 forwards}.ag21{animation:ag21 7.857142857142858s linear 1 forwards}.ag22{animation:ag22 7.857142857142858s linear 1 forwards}.ag23{animation:ag23 7.857142857142858s linear 1 forwards}.ag24{animation:ag24 7.857142857142858s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="20" fill="var(--muted)" style="fill:var(--muted)">CÙNG k NEIGHBOR · HAI BÀI TOÁN GỘP HAI CÁCH KHÁC NHAU</text>
+<g class="ag1"><line x1="14" y1="270" x2="344" y2="270" stroke="var(--rule-hi)" stroke-width="1"/><line x1="14" y1="270" x2="14" y2="56" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="344" y="286" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">tuổi (chuẩn hoá)</text><text class="sv-d" x="16" y="50" fill="var(--muted)" style="fill:var(--muted)">thu nhập (chuẩn hoá)</text></g>
+<g class="ag2"><circle cx="170.7" cy="148.1" r="79.8" fill="rgba(var(--amber-a),.07)" stroke="var(--probe)" stroke-width="1.6" stroke-dasharray="4 3"/></g>
+<g class="ag3"><circle cx="214.8" cy="191.0" r="7" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="2.2"/><text class="sv-d" x="198.77850399230636" y="180.98664268194304" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">D</text></g>
+<g class="ag4"><circle cx="179.0" cy="210.1" r="7" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="2.2"/><text class="sv-d" x="162.98710793217498" y="200.06126312808706" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">B</text></g>
+<g class="ag5"><circle cx="245.1" cy="171.9" r="7" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="2.2"/><text class="sv-d" x="245.0635314278021" y="193.912022235799" fill="var(--tomb)" style="fill:var(--tomb)">E</text></g>
+<g class="ag6"><circle cx="198.3" cy="229.1" r="5.5" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="214.25939811839953" y="247.13588357423106" fill="var(--ok)" style="fill:var(--ok)">C</text></g>
+<g class="ag7"><circle cx="267.1" cy="152.8" r="5.5" fill="rgba(var(--green-a),.55)" stroke="var(--ok)" stroke-width="1.4"/><text class="sv-d" x="283.0890059263445" y="142.83740178965496" fill="var(--ok)" style="fill:var(--ok)">F</text></g>
+<g class="ag8"><circle cx="168.0" cy="257.7" r="5.5" fill="rgba(var(--red-a),.55)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="151.97437068290375" y="275.7478142434471" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">A</text></g>
+<g class="ag9"><rect x="164.7" y="142.1" width="12" height="12" fill="rgba(var(--amber-a),.55)" stroke="var(--probe)" stroke-width="2"/><text class="sv-d" x="182.72755499522157" y="142.06874667811897" fill="var(--probe)" style="fill:var(--probe)">X</text></g>
+<g class="ag10"><text class="sv-d" x="14" y="290" fill="var(--probe)" style="fill:var(--probe)">k = 3 → neighbor: D B E</text></g>
+<g class="ag11"><text class="sv-d" x="380" y="52" fill="var(--muted)" style="fill:var(--muted)">neighbor</text><text class="sv-d" x="476" y="52" fill="var(--ok)" style="fill:var(--ok)">nhãn lớp</text><text class="sv-d" x="586" y="52" fill="var(--filled)" style="fill:var(--filled)">giá trị số</text></g>
+<g class="ag12"><text class="sv-d" x="380" y="72" fill="var(--text)" style="fill:var(--text)">D</text><text class="sv-d" x="476" y="72" fill="var(--ok)" style="fill:var(--ok)">mua</text><text class="sv-d" x="586" y="72" fill="var(--text)" style="fill:var(--text)">+1</text></g>
+<g class="ag13"><text class="sv-d" x="380" y="98" fill="var(--text)" style="fill:var(--text)">B</text><text class="sv-d" x="476" y="98" fill="var(--tomb)" style="fill:var(--tomb)">không</text><text class="sv-d" x="586" y="98" fill="var(--text)" style="fill:var(--text)">−1</text></g>
+<g class="ag14"><text class="sv-d" x="380" y="124" fill="var(--text)" style="fill:var(--text)">E</text><text class="sv-d" x="476" y="124" fill="var(--tomb)" style="fill:var(--tomb)">không</text><text class="sv-d" x="586" y="124" fill="var(--text)" style="fill:var(--text)">+7</text></g>
+<g class="ag15"><line x1="380" y1="148" x2="680" y2="148" stroke="var(--rule-hi)" stroke-width="1"/></g>
+<g class="ag16"><text class="sv-d" x="380" y="168" fill="var(--ok)" style="fill:var(--ok)">classification</text><text class="sv-d" x="476" y="168" fill="var(--muted)" style="fill:var(--muted)">vote 1/3</text><rect x="586" y="152" width="80" height="22" rx="11" fill="rgba(var(--red-a),.20)" stroke="var(--tomb)" stroke-width="1.4"/><text class="sv-d" x="626" y="168" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text></g>
+<g class="ag17"><text class="sv-d" x="380" y="200" fill="var(--filled)" style="fill:var(--filled)">regression</text><text class="sv-d" x="476" y="200" fill="var(--muted)" style="fill:var(--muted)">mean</text><rect x="586" y="184" width="80" height="22" rx="11" fill="rgba(var(--blue-a),.20)" stroke="var(--filled)" stroke-width="1.4"/><text class="sv-d" x="626" y="200" fill="var(--filled)" style="fill:var(--filled)" text-anchor="middle">2,33</text></g>
+<g class="ag18"><text class="sv-d" x="380" y="232" fill="var(--muted)" style="fill:var(--muted)">regression có ngoại lai</text><text class="sv-d" x="530" y="232" fill="var(--muted)" style="fill:var(--muted)">median</text><rect x="586" y="216" width="80" height="22" rx="11" fill="none" stroke="var(--rule-hi)" stroke-width="1.2"/><text class="sv-d" x="626" y="232" fill="var(--text)" style="fill:var(--text)" text-anchor="middle">1,00</text></g>
+<g class="ag19"><rect x="0" y="298" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="313" fill="var(--probe)" style="fill:var(--probe)">Khách E có giá trị +7 nên mean 2,33 lệch xa median 1,00</text></g>
+<g class="ag20"><text class="sv-d" x="14" y="336" fill="var(--muted)" style="fill:var(--muted)">Cùng 3 neighbor, cùng khoảng cách. Chỉ đổi cách gộp là ra đáp án khác.</text><text class="sv-d" x="14" y="354" fill="var(--faint)" style="fill:var(--faint)">Đối chiếu sklearn: KNeighborsClassifier cho vote, KNeighborsRegressor cho mean.</text></g>
+<g class="ag21"><text class="sv-d" x="0" y="394" fill="var(--muted)" style="fill:var(--muted)">k</text><text class="sv-d" x="90" y="394" fill="var(--ok)" style="fill:var(--ok)">vote → nhãn</text><text class="sv-d" x="300" y="394" fill="var(--filled)" style="fill:var(--filled)">mean → giá trị</text></g>
+<g class="ag22"><text class="sv-d" x="0" y="418" fill="var(--text)" style="fill:var(--text)">k = 1</text><text class="sv-d" x="90" y="418" fill="var(--ok)" style="fill:var(--ok)">1/1 → mua</text><text class="sv-d" x="300" y="418" fill="var(--filled)" style="fill:var(--filled)">1,00</text></g>
+<g class="ag23"><text class="sv-d" x="0" y="440" fill="var(--text)" style="fill:var(--text)">k = 3</text><text class="sv-d" x="90" y="440" fill="var(--tomb)" style="fill:var(--tomb)">1/3 → không</text><text class="sv-d" x="300" y="440" fill="var(--filled)" style="fill:var(--filled)">2,33</text></g>
+<g class="ag24"><text class="sv-d" x="0" y="462" fill="var(--text)" style="fill:var(--text)">k = 5</text><text class="sv-d" x="90" y="462" fill="var(--ok)" style="fill:var(--ok)">3/5 → mua</text><text class="sv-d" x="300" y="462" fill="var(--filled)" style="fill:var(--filled)">1,80</text></g>
+</svg>
+  </figure>
   <ul class="why">
-    <li>Phải chuẩn hoá thang đo trước. Cột lương tính bằng triệu át hẳn cột tuổi tính bằng năm, nên model chỉ còn nhìn một cột. Cách làm ở <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>.</li>
-    <li><a href="../../06-tree-models/decision-tree/index.html">Cây</a> so từng cột riêng nên không dính. Mọi model dựa trên khoảng cách thì dính hết.</li>
+    <li>Với k = 3: vote cho không mua, còn mean cho 2,33.</li>
+    <li>Khách E có giá trị +7 nên mean lệch xa median 1,00.</li>
+    <li>Dữ liệu đuôi dài thì dùng median thay mean, giống chuyện MAE và MSE ở <a href="../linear-regression/index.html">Linear regression</a>.</li>
+    <li>Đối chiếu sklearn: <code>KNeighborsClassifier</code> cho vote, <code>KNeighborsRegressor</code> cho mean.</li>
   </ul>
 </section>
 
 <section id="knn-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Curse of dimensionality</h2></div>
-
-  <p class="key">Số chiều tăng thì <em>mọi điểm đều cách nhau xa như nhau</em> — và khái niệm nearest neighbor mất hết ý nghĩa.</p>
-
+  <div class="sh"><b>04</b><h2>Chọn k và thước đo</h2></div>
+  <p class="key">"Gần nhau" không có sẵn. <em>Chọn thước đo chính là chọn model</em>, và bắt buộc chuẩn hoá trước.</p>
   <figure class="scrollx">
-    <svg viewBox="0 0 860 268" role="img" aria-label="Ba trường hợp tách riêng: một chiều chia mười khoảng cần mười điểm, hai chiều cần một trăm, ba chiều cần một nghìn; bên dưới là tỉ số khoảng cách gần nhất trên xa nhất ở 2, 20 và 200 chiều">
-    <text class="sv-hv" x="0" y="18">PHỦ KÍN LƯỚI CHIA 10 KHOẢNG &#8212; MỖI CHIỀU MỘT Ô</text>
-    <rect x="0" y="30" width="276" height="104" rx="6" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.3"/>
-    <text class="sv-t" x="14" y="54" fill="var(--ok)">1 chiều</text>
-    <g stroke="var(--ok)" stroke-width="1.2">
-      <line x1="14" y1="82" x2="262" y2="82"/>
-    </g>
-    <g fill="var(--ok)">
-      <circle cx="26" cy="82" r="3"/><circle cx="53" cy="82" r="3"/><circle cx="80" cy="82" r="3"/><circle cx="107" cy="82" r="3"/><circle cx="134" cy="82" r="3"/><circle cx="161" cy="82" r="3"/><circle cx="188" cy="82" r="3"/><circle cx="215" cy="82" r="3"/><circle cx="242" cy="82" r="3"/>
-    </g>
-    <text class="sv-d" x="14" y="112" fill="var(--muted)">cần <tspan fill="var(--ok)">10</tspan> điểm là dữ liệu còn dày</text>
-    <rect x="292" y="30" width="276" height="104" rx="6" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.3"/>
-    <text class="sv-t" x="306" y="54" fill="var(--probe)">2 chiều</text>
-    <g fill="var(--probe)" opacity=".85">
-      <circle cx="316" cy="70" r="2"/><circle cx="333" cy="70" r="2"/><circle cx="350" cy="70" r="2"/><circle cx="367" cy="70" r="2"/><circle cx="384" cy="70" r="2"/><circle cx="401" cy="70" r="2"/><circle cx="418" cy="70" r="2"/><circle cx="435" cy="70" r="2"/>
-      <circle cx="316" cy="84" r="2"/><circle cx="333" cy="84" r="2"/><circle cx="350" cy="84" r="2"/><circle cx="367" cy="84" r="2"/><circle cx="384" cy="84" r="2"/><circle cx="401" cy="84" r="2"/><circle cx="418" cy="84" r="2"/><circle cx="435" cy="84" r="2"/>
-      <circle cx="316" cy="98" r="2"/><circle cx="333" cy="98" r="2"/><circle cx="350" cy="98" r="2"/><circle cx="367" cy="98" r="2"/><circle cx="384" cy="98" r="2"/><circle cx="401" cy="98" r="2"/><circle cx="418" cy="98" r="2"/><circle cx="435" cy="98" r="2"/>
-    </g>
-    <text class="sv-d" x="306" y="124" fill="var(--muted)">cần <tspan fill="var(--probe)">100</tspan> điểm</text>
-    <rect x="584" y="30" width="276" height="104" rx="6" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.3"/>
-    <text class="sv-t" x="598" y="54" fill="var(--tomb)">3 chiều</text>
-    <text class="sv-d" x="598" y="82" fill="var(--muted)">cần <tspan fill="var(--tomb)">1 000</tspan> điểm</text>
-    <text class="sv-d" x="598" y="104" fill="var(--muted)">20 chiều cần 10<tspan dy="-5" font-size="9">20</tspan></text>
-    <text class="sv-s" x="598" y="124" fill="var(--dim)">nhiều hơn mọi bộ dữ liệu thật</text>
-    <line x1="0" y1="152" x2="860" y2="152" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-    <text class="sv-hv" x="0" y="176">TỈ SỐ KHOẢNG CÁCH GẦN NHẤT / XA NHẤT</text>
-    <rect x="0" y="190" width="620" height="14" rx="3" fill="var(--sunk)"/>
-    <rect x="0" y="190" width="74" height="14" rx="3" fill="var(--ok)"/>
-    <text class="sv-l" x="636" y="201" fill="var(--ok)">0,12 &#183; 2 chiều</text>
-    <rect x="0" y="212" width="620" height="14" rx="3" fill="var(--sunk)"/>
-    <rect x="0" y="212" width="384" height="14" rx="3" fill="var(--probe)"/>
-    <text class="sv-l" x="636" y="223" fill="var(--probe)">0,62 &#183; 20 chiều</text>
-    <rect x="0" y="234" width="620" height="14" rx="3" fill="var(--sunk)"/>
-    <rect x="0" y="234" width="583" height="14" rx="3" fill="var(--tomb)"/>
-    <text class="sv-l" x="636" y="245" fill="var(--tomb)">0,94 &#183; 200 chiều</text>
-    <text class="sv-s" x="0" y="264" fill="var(--dim)">tỉ số tiến về 1 &#8212; điểm gần nhất chẳng gần hơn điểm xa nhất là bao</text>
-    </svg>
-    <figcaption>Ô trên: thêm một chiều thì số điểm cần để phủ kín nhân lên mười lần. Ô dưới: hệ quả đo được — ở 200 chiều mọi điểm cách nhau xa như nhau.</figcaption>
+    <svg viewBox="0 0 860 526" role="img" aria-label="Hai bảng cùng khách X: chưa chuẩn hoá thì khách gần nhất là B với nhãn không mua, đã chuẩn hoá thì khách gần nhất là D với nhãn mua; hai đáp án ngược nhau" data-anim><style>@keyframes sc1{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}8.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc2{0%{animation-timing-function:ease-in-out;opacity:0}34.000%{animation-timing-function:ease-in-out;opacity:0}38.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc3{0%{animation-timing-function:ease-in-out;opacity:0}64.000%{animation-timing-function:ease-in-out;opacity:0}68.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc4{0%{animation-timing-function:ease-in-out;opacity:0}72.000%{animation-timing-function:ease-in-out;opacity:0}76.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc5{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}84.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc6{0%{animation-timing-function:ease-in-out;opacity:0}82.000%{animation-timing-function:ease-in-out;opacity:0}86.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc7{0%{animation-timing-function:ease-in-out;opacity:0}85.000%{animation-timing-function:ease-in-out;opacity:0}89.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes sc8{0%{animation-timing-function:ease-in-out;opacity:0}88.000%{animation-timing-function:ease-in-out;opacity:0}92.900%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.sc1{animation:sc1 7.142857142857143s linear 1 forwards}.sc2{animation:sc2 7.142857142857143s linear 1 forwards}.sc3{animation:sc3 7.142857142857143s linear 1 forwards}.sc4{animation:sc4 7.142857142857143s linear 1 forwards}.sc5{animation:sc5 7.142857142857143s linear 1 forwards}.sc6{animation:sc6 7.142857142857143s linear 1 forwards}.sc7{animation:sc7 7.142857142857143s linear 1 forwards}.sc8{animation:sc8 7.142857142857143s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<g class="sc1"><text class="sv-d" x="0" y="32" fill="var(--text)" style="fill:var(--text)">Chưa chuẩn hoá</text><text class="sv-d" x="30" y="62" fill="var(--muted)" style="fill:var(--muted)">khách</text><text class="sv-d" x="140" y="62" fill="var(--muted)" style="fill:var(--muted)">khoảng cách</text><text class="sv-d" x="260" y="62" fill="var(--muted)" style="fill:var(--muted)">nhãn</text><rect x="0" y="73" width="390" height="24" rx="3" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.8"/><text class="sv-d" x="30" y="91" fill="var(--probe)" style="fill:var(--probe)">B</text><rect x="80" y="80" width="32.76900218313495" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="204" y="91" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">13,3</text><text class="sv-d" x="260" y="91" fill="var(--tomb)" style="fill:var(--tomb)">không</text><text class="sv-d" x="330" y="91" fill="var(--probe)" style="fill:var(--probe)">gần nhất</text><rect x="0" y="101" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="30" y="119" fill="var(--text)" style="fill:var(--text)">D</text><rect x="80" y="108" width="45.088747000065204" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="204" y="119" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">18,4</text><text class="sv-d" x="260" y="119" fill="var(--ok)" style="fill:var(--ok)">mua</text><rect x="0" y="129" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="30" y="147" fill="var(--text)" style="fill:var(--text)">C</text><rect x="80" y="136" width="48.44266384356884" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="204" y="147" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">19,7</text><text class="sv-d" x="260" y="147" fill="var(--ok)" style="fill:var(--ok)">mua</text><rect x="0" y="157" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="30" y="175" fill="var(--text)" style="fill:var(--text)">A</text><rect x="80" y="164" width="56.54460192206932" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="204" y="175" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">23,0</text><text class="sv-d" x="260" y="175" fill="var(--tomb)" style="fill:var(--tomb)">không</text><rect x="0" y="185" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="30" y="203" fill="var(--text)" style="fill:var(--text)">E</text><rect x="80" y="192" width="67.44331194613943" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="204" y="203" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">27,5</text><text class="sv-d" x="260" y="203" fill="var(--tomb)" style="fill:var(--tomb)">không</text><rect x="0" y="213" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="30" y="231" fill="var(--text)" style="fill:var(--text)">F</text><rect x="80" y="220" width="86.0" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="204" y="231" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">35,0</text><text class="sv-d" x="260" y="231" fill="var(--ok)" style="fill:var(--ok)">mua</text><text class="sv-d" x="0" y="266" fill="var(--muted)" style="fill:var(--muted)">cột thu nhập (12–34) át cột tuổi (24–60)</text><text class="sv-d" x="0" y="292" fill="var(--text)" style="fill:var(--text)">k = 1 →</text><rect x="60" y="277" width="80" height="22" rx="11" fill="rgba(var(--red-a),.20)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="100" y="292" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">không</text></g>
+<g class="sc2"><text class="sv-d" x="440" y="32" fill="var(--text)" style="fill:var(--text)">Đã chuẩn hoá</text><text class="sv-d" x="470" y="62" fill="var(--muted)" style="fill:var(--muted)">khách</text><text class="sv-d" x="580" y="62" fill="var(--muted)" style="fill:var(--muted)">khoảng cách</text><text class="sv-d" x="700" y="62" fill="var(--muted)" style="fill:var(--muted)">nhãn</text><rect x="440" y="73" width="390" height="24" rx="3" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.8"/><text class="sv-d" x="470" y="91" fill="var(--probe)" style="fill:var(--probe)">D</text><rect x="520" y="80" width="48.20848405113788" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="644" y="91" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">1,76</text><text class="sv-d" x="700" y="91" fill="var(--ok)" style="fill:var(--ok)">mua</text><text class="sv-d" x="770" y="91" fill="var(--probe)" style="fill:var(--probe)">gần nhất</text><rect x="440" y="101" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="470" y="119" fill="var(--text)" style="fill:var(--text)">B</text><rect x="520" y="108" width="49.022793238726734" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="644" y="119" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">1,79</text><text class="sv-d" x="700" y="119" fill="var(--tomb)" style="fill:var(--tomb)">không</text><rect x="440" y="129" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="470" y="147" fill="var(--text)" style="fill:var(--text)">E</text><rect x="520" y="136" width="61.192926938534214" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="644" y="147" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">2,23</text><text class="sv-d" x="700" y="147" fill="var(--tomb)" style="fill:var(--tomb)">không</text><rect x="440" y="157" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="470" y="175" fill="var(--text)" style="fill:var(--text)">C</text><rect x="520" y="164" width="67.1098764443267" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="644" y="175" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">2,45</text><text class="sv-d" x="700" y="175" fill="var(--ok)" style="fill:var(--ok)">mua</text><rect x="440" y="185" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="470" y="203" fill="var(--text)" style="fill:var(--text)">F</text><rect x="520" y="192" width="75.62621858210092" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="644" y="203" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">2,76</text><text class="sv-d" x="700" y="203" fill="var(--ok)" style="fill:var(--ok)">mua</text><rect x="440" y="213" width="390" height="24" rx="3" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1"/><text class="sv-d" x="470" y="231" fill="var(--text)" style="fill:var(--text)">A</text><rect x="520" y="220" width="86.0" height="10" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1"/><text class="sv-d" x="644" y="231" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">3,13</text><text class="sv-d" x="700" y="231" fill="var(--tomb)" style="fill:var(--tomb)">không</text><text class="sv-d" x="440" y="266" fill="var(--muted)" style="fill:var(--muted)">hai cột đóng góp ngang nhau</text><text class="sv-d" x="440" y="292" fill="var(--text)" style="fill:var(--text)">k = 1 →</text><rect x="500" y="277" width="80" height="22" rx="11" fill="rgba(var(--green-a),.20)" stroke="var(--ok)" stroke-width="1.5"/><text class="sv-d" x="540" y="292" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">mua</text></g>
+<g class="sc3"><rect x="0" y="320" width="3" height="20" rx="1.5" fill="rgba(var(--red-a),1)" stroke="var(--tomb)" stroke-width="0"/><text class="sv-d" x="14" y="335" fill="var(--tomb)" style="fill:var(--tomb)">Cùng dữ liệu, cùng khách X, hai đáp án ngược nhau</text></g>
+<g class="sc4"><text class="sv-d" x="14" y="358" fill="var(--muted)" style="fill:var(--muted)">Chưa chuẩn hoá: gần nhất là B (không mua). Chuẩn hoá rồi: gần nhất là D (mua).</text><text class="sv-d" x="14" y="376" fill="var(--muted)" style="fill:var(--muted)">Cây so từng cột riêng nên không dính. Mọi model dựa trên khoảng cách thì dính hết.</text></g>
+<g class="sc5"><text class="sv-d" x="0" y="414" fill="var(--muted)" style="fill:var(--muted)">Thước đo</text><text class="sv-d" x="200" y="414" fill="var(--muted)" style="fill:var(--muted)">Công thức</text><text class="sv-d" x="430" y="414" fill="var(--muted)" style="fill:var(--muted)">Dùng khi</text></g>
+<g class="sc6"><text class="sv-d" x="0" y="438" fill="var(--text)" style="fill:var(--text)">L2 (Euclid)</text><text class="sv-d" x="200" y="438" fill="var(--muted)" style="fill:var(--muted)">√Σ(aᵢ − bᵢ)²</text><text class="sv-d" x="430" y="438" fill="var(--muted)" style="fill:var(--muted)">số liên tục, cùng bản chất</text></g>
+<g class="sc7"><text class="sv-d" x="0" y="462" fill="var(--text)" style="fill:var(--text)">L1 (Manhattan)</text><text class="sv-d" x="200" y="462" fill="var(--muted)" style="fill:var(--muted)">Σ|aᵢ − bᵢ|</text><text class="sv-d" x="430" y="462" fill="var(--muted)" style="fill:var(--muted)">nhiều chiều hoặc có ngoại lai</text></g>
+<g class="sc8"><text class="sv-d" x="0" y="486" fill="var(--text)" style="fill:var(--text)">Cosine</text><text class="sv-d" x="200" y="486" fill="var(--muted)" style="fill:var(--muted)">1 − (a·b)/(‖a‖‖b‖)</text><text class="sv-d" x="430" y="486" fill="var(--muted)" style="fill:var(--muted)">văn bản, embedding</text></g>
+</svg>
   </figure>
-
+  <p>k nằm đúng trên trục bias–variance:</p>
+  <table>
+    <tr><th>k</th><th>Ranh giới</th><th>Đánh đổi</th></tr>
+    <tr><td>k = 1</td><td>bám từng điểm, học thuộc cả nhiễu</td><td>variance cao, bias thấp</td></tr>
+    <tr><td>k vừa</td><td>chọn bằng cross-validation</td><td>đổi độ chi tiết lấy độ ổn định</td></tr>
+    <tr><td>k = n</td><td>luôn đoán lớp đa số</td><td>bias cao, variance thấp</td></tr>
+  </table>
   <ul class="why">
-    <li>Phiếu bầu của k nearest neighbors gần như là <b>phiếu ngẫu nhiên</b>.</li>
-    <li>Cách chữa: <b>giảm số chiều trước</b> bằng <a href="../../08-dimensionality/pca-dimensionality/index.html">PCA</a> hoặc chọn lọc đặc trưng, hoặc đổi sang model không dựa trên khoảng cách toàn cục như <a href="../../06-tree-models/decision-tree/index.html">cây</a>.</li>
-    <li>Hiện tượng này chạm mọi model dựa trên khoảng cách. <a href="../../07-clustering/kmeans-clustering/index.html">K-means</a> và <a href="../svm/index.html">SVM</a> kernel RBF đều chịu chung.</li>
-    <li>Ngoại lệ: embedding học từ mạng nơ-ron vẫn tìm neighbor tốt ở hàng trăm chiều, vì dữ liệu nằm trên mặt cong ít chiều.</li>
+    <li>Với k = 1, sai số trên tập train bằng 0 vì mỗi điểm là neighbor của chính nó. Con số đó vô nghĩa.</li>
+    <li>Bài toán hai lớp thì chọn k lẻ để tránh hoà phiếu. k thường quét trong khoảng 1 tới 30.</li>
+    <li>Có thể cho phiếu trọng số theo khoảng cách, làm k lớn bớt hại.</li>
+    <li>Cây so từng cột riêng nên không dính chuyện thang đo. Mọi model dựa trên khoảng cách thì dính hết.</li>
   </ul>
 </section>
 
 <section id="knn-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Loss function</h2></div>
-
-  <p class="key">KNN không học gì lúc huấn luyện. <em>Cái gọi là loss ở đây chỉ là cách viết lại quy tắc gộp k neighbor lúc dự đoán.</em></p>
-
+  <div class="sh"><b>05</b><h2>Curse of dimensionality</h2></div>
+  <p class="key">Số chiều tăng thì <em>mọi điểm đều cách nhau xa như nhau</em>, và khái niệm nearest neighbor mất hết ý nghĩa.</p>
   <figure class="scrollx">
-    <svg viewBox="0 0 860 372" role="img" aria-label="Cùng một điểm cần dự đoán và cùng năm neighbor gần nhất: bên trái nhãn gộp bằng đếm phiếu ra lớp A, bên phải giá trị gộp bằng trung bình ra 10,1 hoặc trung vị ra 7">
-    <defs><pattern id="knnhat" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="var(--sunk)"/><line x1="0" y1="0" x2="0" y2="4" stroke="var(--muted)" stroke-width="1.4"/></pattern></defs>
-    <text class="sv-hv" x="0" y="16">PHÂN LOẠI &#8212; NEIGHBOR MANG NHÃN</text>
-    <text class="sv-hv" x="440" y="16">HỒI QUY &#8212; NEIGHBOR MANG SỐ</text>
-    <circle cx="120" cy="160" r="75" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1" stroke-dasharray="4 4"/>
-    <circle cx="48" cy="107" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="77" cy="208" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="77" y="197" text-anchor="middle" fill="var(--filled)">A</text>
-    <circle cx="173" cy="222" r="4" fill="var(--tomb)" opacity=".28"/>
-    <circle cx="202" cy="131" r="4" fill="var(--tomb)" opacity=".28"/>
-    <circle cx="149" cy="83" r="4" fill="var(--tomb)" opacity=".28"/>
-    <circle cx="34" cy="198" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="211" cy="237" r="4" fill="var(--tomb)" opacity=".28"/>
-    <circle cx="110" cy="251" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="24" cy="148" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="216" cy="74" r="4" fill="var(--tomb)" opacity=".28"/>
-    <circle cx="132" cy="148" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="132" y="137" text-anchor="middle" fill="var(--filled)">A</text>
-    <circle cx="96" cy="122" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="96" y="111" text-anchor="middle" fill="var(--filled)">A</text>
-    <circle cx="158" cy="170" r="6" fill="var(--tomb)" opacity="1"/>
-    <text class="sv-s" x="158" y="159" text-anchor="middle" fill="var(--tomb)">B</text>
-    <circle cx="67" cy="64" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="178" cy="112" r="6" fill="var(--tomb)" opacity="1"/>
-    <text class="sv-s" x="178" y="101" text-anchor="middle" fill="var(--tomb)">B</text>
-    <circle cx="120" cy="160" r="7" fill="url(#knnhat)" stroke="var(--muted)" stroke-width="1.6"/>
-    <text class="sv-s" x="108" y="145" text-anchor="end" fill="var(--text)">điểm cần dự đoán</text>
-    <circle cx="560" cy="160" r="75" fill="rgba(var(--amber-a),.06)" stroke="var(--probe)" stroke-width="1" stroke-dasharray="4 4"/>
-    <circle cx="488" cy="107" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="517" cy="208" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="517" y="197" text-anchor="middle" fill="var(--filled)">6</text>
-    <circle cx="613" cy="222" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="642" cy="131" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="589" cy="83" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="474" cy="198" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="651" cy="237" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="550" cy="251" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="464" cy="148" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="656" cy="74" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="572" cy="148" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="572" y="137" text-anchor="middle" fill="var(--filled)">7</text>
-    <circle cx="536" cy="122" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="536" y="111" text-anchor="middle" fill="var(--filled)">7</text>
-    <circle cx="598" cy="170" r="6" fill="var(--filled)" opacity="1"/>
-    <text class="sv-s" x="598" y="159" text-anchor="middle" fill="var(--filled)">6,5</text>
-    <circle cx="507" cy="64" r="4" fill="var(--filled)" opacity=".28"/>
-    <circle cx="618" cy="112" r="6" fill="var(--tomb)" opacity="1"/>
-    <text class="sv-s" x="618" y="101" text-anchor="middle" fill="var(--tomb)">24</text>
-    <circle cx="560" cy="160" r="7" fill="url(#knnhat)" stroke="var(--muted)" stroke-width="1.6"/>
-    <text class="sv-s" x="548" y="145" text-anchor="end" fill="var(--text)">điểm cần dự đoán</text>
-    <rect x="0" y="304" width="320" height="30" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.3"/>
-    <text class="sv-d" x="14" y="324" fill="var(--filled)">đếm phiếu &#8594; A (3 so với 2)</text>
-    <text class="sv-s" x="0" y="358" fill="var(--dim)">chỉ một cách gộp</text>
-    <rect x="440" y="292" width="320" height="30" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.3"/>
-    <text class="sv-d" x="454" y="312" fill="var(--probe)">trung bình &#8594; 10,1</text>
-    <text class="sv-s" x="770" y="312" fill="var(--probe)">bị số 24 kéo</text>
-    <rect x="440" y="330" width="320" height="30" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.3"/>
-    <text class="sv-d" x="454" y="350" fill="var(--ok)">trung vị &#8594; 7</text>
-    <text class="sv-s" x="770" y="350" fill="var(--ok)">đứng yên</text>
-    </svg>
-    <figcaption>Cùng một điểm cần dự đoán, cùng vòng tròn gom 5 neighbor gần nhất. Nhãn thì gộp bằng đếm phiếu; số thì có hai cách gộp, và chúng cho hai đáp án khác nhau.</figcaption>
+    <svg viewBox="0 0 860 410" role="img" aria-label="Bốn cột cho 2, 10, 100 và 500 chiều: tỉ lệ khoảng cách gần nhất chia xa nhất tăng từ 0,011 lên 0,392 rồi 0,744 và 0,859, tiến dần về 1 nghĩa là mọi điểm xa như nhau" data-anim><style>@keyframes cu1{0%{animation-timing-function:ease-in-out;opacity:0}5.556%{animation-timing-function:ease-in-out;opacity:0}11.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu2{0%{animation-timing-function:ease-in-out;opacity:0}16.667%{animation-timing-function:ease-in-out;opacity:0}22.111%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu3{0%{animation-timing-function:ease-in-out;opacity:0}27.778%{animation-timing-function:ease-in-out;opacity:0}33.222%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu4{0%{animation-timing-function:ease-in-out;opacity:0}38.889%{animation-timing-function:ease-in-out;opacity:0}44.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu5{0%{animation-timing-function:ease-in-out;opacity:0}53.333%{animation-timing-function:ease-in-out;opacity:0}58.778%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu6{0%{animation-timing-function:ease-in-out;opacity:0}62.222%{animation-timing-function:ease-in-out;opacity:0}67.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu7{0%{animation-timing-function:ease-in-out;opacity:0}71.111%{animation-timing-function:ease-in-out;opacity:0}76.556%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cu8{0%{animation-timing-function:ease-in-out;opacity:0}82.222%{animation-timing-function:ease-in-out;opacity:0}87.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.cu1{animation:cu1 6.428571428571429s linear 1 forwards}.cu2{animation:cu2 6.428571428571429s linear 1 forwards}.cu3{animation:cu3 6.428571428571429s linear 1 forwards}.cu4{animation:cu4 6.428571428571429s linear 1 forwards}.cu5{animation:cu5 6.428571428571429s linear 1 forwards}.cu6{animation:cu6 6.428571428571429s linear 1 forwards}.cu7{animation:cu7 6.428571428571429s linear 1 forwards}.cu8{animation:cu8 6.428571428571429s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-d" x="0" y="28" fill="var(--muted)" style="fill:var(--muted)">500 điểm ngẫu nhiên · tỉ lệ khoảng cách gần nhất chia xa nhất</text>
+<line x1="0" y1="204" x2="640" y2="204" stroke="var(--rule-hi)" stroke-width="1"/>
+<g class="cu1"><rect x="0" y="202.38572444611555" width="120" height="1.614275553884457" rx="2" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="60.0" y="194.38572444611555" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">0,011</text><text class="sv-d" x="60.0" y="224" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">2 chiều</text></g>
+<g class="cu2"><rect x="160" y="145.26498012826943" width="120" height="58.73501987173057" rx="2" fill="rgba(var(--amber-a),.30)" stroke="var(--probe)" stroke-width="1.3"/><text class="sv-d" x="220.0" y="137.26498012826943" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">0,392</text><text class="sv-d" x="220.0" y="224" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">10 chiều</text></g>
+<g class="cu3"><rect x="320" y="92.37438686129742" width="120" height="111.62561313870258" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="380.0" y="84.37438686129742" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">0,744</text><text class="sv-d" x="380.0" y="224" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">100 chiều</text></g>
+<g class="cu4"><rect x="480" y="75.11679839662315" width="120" height="128.88320160337685" rx="2" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="540.0" y="67.11679839662315" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">0,859</text><text class="sv-d" x="540.0" y="224" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">500 chiều</text></g>
+<g class="cu5"><line x1="0" y1="54" x2="640" y2="54" stroke="var(--rule-hi)" stroke-width="1.2" stroke-dasharray="4 3"/><text class="sv-d" x="648" y="58" fill="var(--tomb)" style="fill:var(--tomb)">= 1: mọi điểm xa như nhau</text></g>
+<g class="cu6"><rect x="0" y="254" width="3" height="20" rx="1.5" fill="rgba(var(--red-a),1)" stroke="var(--tomb)" stroke-width="0"/><text class="sv-d" x="14" y="269" fill="var(--tomb)" style="fill:var(--tomb)">Ở 500 chiều, điểm gần nhất chỉ gần hơn điểm xa nhất khoảng 14%</text></g>
+<g class="cu7"><text class="sv-d" x="14" y="292" fill="var(--muted)" style="fill:var(--muted)">Phiếu bầu của k nearest neighbor gần như là phiếu ngẫu nhiên.</text><text class="sv-d" x="14" y="310" fill="var(--muted)" style="fill:var(--muted)">Cách xử lý: giảm số chiều trước bằng PCA hoặc chọn lọc đặc trưng,</text><text class="sv-d" x="14" y="328" fill="var(--muted)" style="fill:var(--muted)">hoặc đổi sang model không dựa trên khoảng cách toàn cục như cây.</text></g>
+<g class="cu8"><text class="sv-d" x="14" y="362" fill="var(--faint)" style="fill:var(--faint)">Ngoại lệ: embedding học từ mạng nơ-ron vẫn tìm neighbor tốt ở hàng trăm chiều,</text><text class="sv-d" x="14" y="380" fill="var(--faint)" style="fill:var(--faint)">vì dữ liệu nằm trên một mặt cong ít chiều.</text></g>
+</svg>
   </figure>
-
-  <p>Phân loại và hồi quy dùng chung <span class="hl">một công thức</span>, khác nhau ở chỗ trống <var>L</var>:</p>
-
-  <div class="eq">
-    <div class="line">
-      <span class="t"><span><var>&#375;</var></span></span>
-      <span class="op">=</span>
-      <span class="t b"><span><b class="fn">argmin</b><sub><var>c</var></sub> &#8721;<sub><var>j</var> &#8712; <var>N</var><sub><var>k</var></sub></sub> <var>L</var>(<var>c</var>, <var>y</var><sub><var>j</var></sub>)</span><em>chọn <var>c</var> lệch k neighbor ít nhất</em></span>
-    </div>
-    <div class="line">
-      <span class="t b"><span><var>L</var> = [ <var>c</var> &#8800; <var>y</var><sub><var>j</var></sub> ]</span><em>phân loại</em></span>
-      <span class="op">&#8594;</span>
-      <span class="t b"><span><var>&#375;</var> = <b class="fn">mode</b>(<var>y</var><sub><var>j</var></sub>)</span><em>lớp nhiều phiếu nhất</em></span>
-    </div>
-    <div class="line">
-      <span class="t p"><span><var>L</var> = ( <var>c</var> &#8722; <var>y</var><sub><var>j</var></sub> )<sup>2</sup></span><em>hồi quy</em></span>
-      <span class="op">&#8594;</span>
-      <span class="t p"><span><var>&#375;</var> = <b class="fn">mean</b>(<var>y</var><sub><var>j</var></sub>)</span><em>trung bình k neighbor</em></span>
-    </div>
-    <div class="line">
-      <span class="t g"><span><var>L</var> = | <var>c</var> &#8722; <var>y</var><sub><var>j</var></sub> |</span><em>hồi quy có ngoại lai</em></span>
-      <span class="op">&#8594;</span>
-      <span class="t g"><span><var>&#375;</var> = <b class="fn">median</b>(<var>y</var><sub><var>j</var></sub>)</span><em>trung vị k neighbor</em></span>
-    </div>
-  </div>
-
   <ul class="why">
-    <li><var>y</var><sub><var>j</var></sub> &#8212; giá trị của neighbor thứ <var>j</var>.</li>
-    <li><var>c</var> &#8212; đáp án đem ra thử.</li>
-  </ul>
-
-  <ul class="why">
-    <li>Loss chỉ chạy trên k neighbor của <span class="hl">một</span> điểm cần dự đoán, không phải cả tập dữ liệu.</li>
-    <li>Nên KNN <span class="hl">không có hàm mục tiêu toàn cục</span>: không gradient, không early stopping.</li>
+    <li>Hiện tượng này chạm mọi model dựa trên khoảng cách. K-means và SVM kernel RBF đều chịu chung.</li>
+    <li>Thêm một chiều thì số điểm cần để phủ kín không gian nhân lên nhiều lần.</li>
   </ul>
 </section>
 
 <section id="knn-s6" class="lesson">
   <div class="sh"><b>06</b><h2>Ưu và nhược</h2></div>
-
-  <p class="key">Mọi ưu điểm của KNN đến từ <em>không có bước huấn luyện</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
-
+  <p class="key">Mọi ưu điểm đến từ <em>không có bước huấn luyện</em>. Mọi nhược điểm cũng từ đúng chỗ đó.</p>
   <table>
-    <tr><th>Mặt</th><th>Ưu</th><th>Nhược</th></tr>
-    <tr><td>Huấn luyện</td><td>Không có &#8212; chỉ lưu dữ liệu lại</td><td>&#8212;</td></tr>
-    <tr><td>Dự đoán</td><td>&#8212;</td><td>Quét cả tập train mỗi lần, trừ khi dựng chỉ mục</td></tr>
-    <tr><td>Bộ nhớ</td><td>&#8212;</td><td>Giữ nguyên toàn bộ tập train</td></tr>
-    <tr><td>Ranh giới</td><td>Cong tuỳ ý, không giả định dạng nào</td><td>Gồ ghề khi <var>k</var> nhỏ</td></tr>
-    <tr><td>Số chiều</td><td>&#8212;</td><td>Nhiều chiều thì khoảng cách bão hoà</td></tr>
-    <tr><td>Model</td><td>Giải thích được: chỉ ra đúng những neighbor đã bỏ phiếu</td><td>Không có hệ số để đọc ảnh hưởng từng đặc trưng</td></tr>
-    <tr><td>Chuẩn bị</td><td>Chỉ một siêu tham số chính là <var>k</var></td><td>Bắt buộc co giãn đặc trưng</td></tr>
+    <tr><th>Mặt</th><th>Được gì</th><th>Mất gì</th></tr>
+    <tr><td>Huấn luyện</td><td>Không có, chỉ lưu dữ liệu lại</td><td>Không có model để mang đi triển khai</td></tr>
+    <tr><td>Dự đoán</td><td>Cập nhật dữ liệu là dùng được ngay</td><td>Quét cả tập train mỗi lần, trừ khi dựng chỉ mục</td></tr>
+    <tr><td>Bộ nhớ</td><td>Không cần lưu tham số</td><td>Giữ nguyên toàn bộ tập train</td></tr>
+    <tr><td>Ranh giới</td><td>Cong tuỳ ý, không giả định dạng nào</td><td>Gồ ghề khi k nhỏ, nhiễu ảnh hưởng mạnh</td></tr>
+    <tr><td>Số chiều</td><td>—</td><td>Nhiều chiều thì khoảng cách mất ý nghĩa</td></tr>
+    <tr><td>Thang đo</td><td>—</td><td>Bắt buộc chuẩn hoá, sai là ra kết quả khác</td></tr>
   </table>
-
   <ul class="why">
-    <li>Chọn KNN khi tập <b>nhỏ, ít chiều</b> và cần một baseline dựng trong vài phút &#8212; hoặc khi cần chỉ ra <b>vì sao</b> một mẫu được xếp vào lớp đó.</li>
-    <li>Dữ liệu bảng cỡ lớn thì <a href="../../06-tree-models/gradient-boosting/index.html">Gradient boosting</a> gần như luôn tốt hơn, lại không cần co giãn.</li>
-    <li>Ý tưởng "gần thì giống nhau" vẫn sống ở chỗ khác: tìm kiếm vector trong RAG chính là KNN trên embedding, chỉ thêm chỉ mục xấp xỉ cho nhanh.</li>
+    <li><b>Chọn KNN</b> khi cần baseline nhanh, dữ liệu ít chiều, hoặc làm hệ thống gợi ý theo độ tương tự.</li>
+    <li><b>Chọn cây hoặc boosting</b> khi nhiều chiều, nhiều dữ liệu, hoặc cột khác thang đo.</li>
+    <li>Đáng học không phải vì hay dùng, mà vì ba khái niệm hiện ra rõ nhất ở đây.</li>
+    <li>Ba khái niệm đó: variance cao, tầm quan trọng của thang đo, curse of dimensionality.</li>
+    <li>Lỗi hay gặp: quên chuẩn hoá, và tin sai số train của k = 1.</li>
   </ul>
 </section>
 
 <section id="knn-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Lỗi hay gặp</h2></div>
-
-  <div class="grid2">
-    <div class="card bad"><h4>Không co giãn đặc trưng</h4><p>Cột đơn vị lớn nhất quyết định toàn bộ khoảng cách. Lỗi phổ biến nhất và im lặng nhất của KNN.</p></div>
-    <div class="card bad"><h4>Chuẩn hoá trước khi chia dữ liệu</h4><p>Thống kê của tập test rò vào tập train. Đặt scaler vào <code>Pipeline</code> rồi mới cross-validate.</p></div>
-    <div class="card bad"><h4>Khoe sai số train bằng 0</h4><p>Với <code>k = 1</code> điều đó luôn đúng và không nói gì về khả năng tổng quát hoá.</p></div>
-    <div class="card bad"><h4>Dùng trên dữ liệu rất nhiều chiều</h4><p>Khoảng cách bão hoà, neighbor thành ngẫu nhiên. Giảm chiều trước hoặc đổi model.</p></div>
-    <div class="card bad"><h4>Quên chi phí suy luận</h4><p>Mỗi lần dự đoán quét cả tập train. Không hợp với hệ thống cần độ trễ thấp nếu chưa dựng chỉ mục.</p></div>
-    <div class="card bad"><h4>Bỏ qua lệch lớp</h4><p>Lớp đa số thắng phiếu ở mọi vùng. Dùng phiếu có trọng số hoặc cân bằng lại dữ liệu.</p></div>
-  </div>
-</section>
-
-<section id="knn-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>Hỏi đáp</h2></div>
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
   <details class="qa"><summary>KNN học cái gì trong lúc huấn luyện?</summary>
-  <p>Không học gì cả — nó chỉ lưu lại toàn bộ dữ liệu. Không có tham số nào được ước lượng, nên nó là model phi tham số và người ta gọi là lazy learner: mọi tính toán bị hoãn tới lúc có điểm cần dự đoán. Hệ quả là chi phí bị đảo ngược so với mọi model khác — huấn luyện gần như miễn phí, còn mỗi lần suy luận phải đo khoảng cách tới mọi điểm đã lưu, tốn O(n·d).</p></details>
+  <p>Không học gì, chỉ lưu toàn bộ dữ liệu lại.</p>
+  <p>Mọi tính toán bị hoãn tới lúc phải trả lời.</p>
+  <p>Nên nó không có hàm mục tiêu toàn cục: không gradient, không early stopping.</p>
+  <p>Ba lựa chọn của người dùng chính là model: k, thước đo, và cách gộp.</p></details>
 
   <details class="qa"><summary>k nhỏ và k lớn khác nhau thế nào?</summary>
-  <p>k là toàn bộ núm điều chỉnh, và nó nằm đúng trên trục bias–variance. k = 1 bám theo từng điểm nên học thuộc cả nhiễu: variance cao, bias thấp, sai số train bằng 0 một cách vô nghĩa. Tăng k thì ranh giới mượt dần, variance giảm, bias tăng, và ở cực k = n thì model luôn đoán lớp đa số. Không có công thức chọn k — quét khoảng 1–30 bằng cross-validation, và với bài toán hai lớp thì chọn số lẻ để tránh hoà phiếu.</p></details>
+  <p>k = 1 bám từng điểm nên học thuộc cả nhiễu, variance cao.</p>
+  <p>k lớn thì ranh giới mượt dần, bias cao hơn.</p>
+  <p>k = n thì luôn đoán lớp đa số.</p>
+  <p>Chọn k bằng cross-validation, thường quét 1 tới 30.</p></details>
 
-  <details class="qa"><summary>Vì sao KNN bắt buộc phải co giãn đặc trưng?</summary>
-  <p>Vì nó ra quyết định hoàn toàn dựa trên khoảng cách, mà khoảng cách Euclidean cộng chênh lệch của mọi cột lại với nhau. Cột lương tính bằng triệu và cột tuổi tính bằng năm thì chênh lệch một triệu đồng át hẳn chênh lệch ba mươi tuổi — model thực chất chỉ nhìn đúng cột có đơn vị lớn nhất. Đây cũng là chỗ khác decision tree rõ nhất: cây so sánh từng cột riêng lẻ nên miễn nhiễm với thang đo, còn KNN, SVM và k-means thì phụ thuộc hoàn toàn.</p></details>
+  <details class="qa"><summary>Vì sao KNN bắt buộc phải chuẩn hoá?</summary>
+  <p>Vì khoảng cách cộng chênh lệch của mọi cột lại với nhau.</p>
+  <p>Cột có thang lớn át hẳn cột thang nhỏ, nên model chỉ còn nhìn một cột.</p>
+  <p>Ví dụ trong bài: chưa chuẩn hoá thì neighbor gần nhất là B, chuẩn hoá rồi thành D.</p>
+  <p>Hai đáp án ngược nhau trên cùng dữ liệu.</p></details>
 
-  <details class="qa"><summary>Curse of dimensionality ảnh hưởng tới KNN ra sao?</summary>
-  <p>Số chiều tăng thì thể tích không gian tăng theo hàm mũ, dữ liệu trở nên thưa, và tỉ số giữa khoảng cách tới điểm gần nhất và tới điểm xa nhất tiến dần về 1. Khi đó khái niệm "nearest neighbor" mất hết ý nghĩa: điểm gần nhất chẳng gần hơn điểm xa nhất bao nhiêu, phiếu bầu gần như ngẫu nhiên. Cách chữa là giảm số chiều trước bằng PCA hoặc chọn lọc đặc trưng, hoặc đổi sang model không dựa trên khoảng cách toàn cục. Ngoại lệ là embedding học từ mạng nơ-ron — dữ liệu thật ở đó nằm trên mặt cong ít chiều hơn số chiều danh nghĩa nên tìm neighbor vẫn tốt.</p></details>
+  <details class="qa"><summary>Curse of dimensionality ảnh hưởng thế nào?</summary>
+  <p>Số chiều tăng thì tỉ lệ khoảng cách gần nhất chia xa nhất tiến về 1.</p>
+  <p>Mọi điểm cách nhau xa như nhau, nên phiếu bầu gần như là phiếu ngẫu nhiên.</p>
+  <p>Cách xử lý: giảm chiều bằng PCA, chọn lọc đặc trưng, hoặc đổi sang model dựa trên cây.</p>
+  <p>Ngoại lệ: embedding từ mạng nơ-ron vẫn tìm neighbor tốt ở hàng trăm chiều.</p></details>
 </section>
 
-<footer>Machine learning · Classical models · cùng phụ thuộc khoảng cách với <a href="../svm/index.html">SVM</a>; model miễn nhiễm thang đo là <a href="../../06-tree-models/decision-tree/index.html">Decision tree</a>.</footer>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
+<footer>Machine learning · Classical models · model không dựa trên khoảng cách nằm ở <a href="../../06-tree-models/decision-tree/index.html">Decision tree</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>

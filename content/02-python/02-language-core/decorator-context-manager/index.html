@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Decorator & context manager — MazeAI</title>
-<meta name="description" content="Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.">
+<meta name="description" content="@deco chỉ là cách viết gọn của f = deco(f) — closure là nền, và thiếu functools.wraps là hàm mất tên lẫn chữ ký.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/decorator-context-manager/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Decorator &amp; context manager">
-<meta property="og:description" content="Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.">
+<meta property="og:description" content="@deco chỉ là cách viết gọn của f = deco(f) — closure là nền, và thiếu functools.wraps là hàm mất tên lẫn chữ ký.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,347 +39,262 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-deco" data-title="Decorator & context manager" data-tag="Python" data-blurb="Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.">
+<article class="doc" id="art-deco" data-title="Decorator &amp; context manager" data-reviewed="1" data-tag="Python" data-blurb="@deco chỉ là cách viết gọn của f = deco(f) — closure là nền, và thiếu functools.wraps là hàm mất tên lẫn chữ ký.">
         <header class="hero">
   <p class="eyebrow">Deep dive · Python internals</p>
-  <h1>Decorator <em>&amp; context manager</em></h1>
-  <p class="lede"><code>@deco</code> chỉ là cách viết gọn của <code>f = deco(f)</code> — hiểu đúng một câu đó là hiểu hết. Bài này dựng lại từ closure, giải thích vì sao decorator có tham số cần <b>ba tầng lồng nhau</b>, và vì sao thiếu <code>functools.wraps</code> làm hỏng FastAPI và pytest.</p>
+  <h1>Decorator &amp; <em>context manager</em></h1>
+  <p class="lede">Hàm là giá trị: gán lại được, bọc được, nhớ được. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li><code>@deco</code> chỉ là cách viết gọn của <code>f = deco(f)</code></li>
+    <li>closure là nền: hàm trong nhớ biến của hàm ngoài</li>
+    <li>thiếu <code>functools.wraps</code> là hàm mất tên lẫn chữ ký</li>
+  </ul>
 </header>
 
-<section id="deco-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Cả bài chỉ có một ý: <em>hàm là giá trị</em> — gán lại được, bọc được, và nhớ được biến của phạm vi sinh ra nó.</p>
-
+<section id="dc-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Closure</h2></div>
+  <p class="key">Hàm trong giữ <em>một tham chiếu</em> tới biến của hàm ngoài, và biến đó sống sót dù hàm ngoài đã trả về.</p>
   <figure class="gist">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: closure, decorator, ba tầng khi có tham số, context manager">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Closure</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">hàm nhớ biến của phạm vi ngoài</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Decorator</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">hàm bọc hàm — chỉ là gán lại tên</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Ba tầng</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">có tham số thì hàm trả hàm trả hàm</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Context manager</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cùng họ tư duy — đảm bảo dọn dẹp</text>
-<text class="sv-hv" x="372" y="18">HÀM LÀ GIÁ TRỊ — GÁN LẠI ĐƯỢC, BỌC ĐƯỢC, NHỚ ĐƯỢC</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">&#9312; nhớ được</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">biến của hàm ngoài sống sót sau khi hàm ngoài trả về</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">&#9313; bọc được</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">@timed chỉ là slow = timed(slow)</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">&#9314; trả về được</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">ba nhóm thông tin đến ở ba thời điểm khác nhau</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">&#9315; và dọn dẹp</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">with đảm bảo phần đóng luôn chạy, kể cả khi lỗi</text>
+    <svg viewBox="0 0 860 422" role="img" aria-label="Thân hàm make_counter bên trái; ô count nằm trong closure của hàm inc, mỗi lần gọi c thì ô tăng lên một và giá trị bay sang cột kết quả" data-anim><style>@keyframes cl1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl2{0%{animation-timing-function:ease-in-out;opacity:0}2.667%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl3{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl4{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl5{0%{animation-timing-function:ease-in-out;opacity:0}4.667%{animation-timing-function:ease-in-out;opacity:0}7.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl6{0%{animation-timing-function:ease-in-out;opacity:0}5.333%{animation-timing-function:ease-in-out;opacity:0}7.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl7{0%{animation-timing-function:ease-in-out;opacity:0}6.000%{animation-timing-function:ease-in-out;opacity:0}8.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl8{0%{animation-timing-function:ease-in-out;opacity:0}8.000%{animation-timing-function:ease-in-out;opacity:0}10.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl9{0%{animation-timing-function:ease-in-out;opacity:0}9.333%{animation-timing-function:ease-in-out;opacity:0}11.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl10{0%{animation-timing-function:ease-in-out;opacity:0}12.000%{animation-timing-function:ease-in-out;opacity:0}14.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl11{0%{animation-timing-function:ease-in-out;opacity:0}13.333%{animation-timing-function:ease-in-out;opacity:0}15.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl12{0%{animation-timing-function:ease-in-out;opacity:0}14.667%{animation-timing-function:ease-in-out;opacity:0}16.333%{animation-timing-function:ease-in-out;opacity:1}26.667%{animation-timing-function:ease-in-out;opacity:1}28.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cl13{0%{animation-timing-function:ease-in-out;opacity:0}17.333%{animation-timing-function:ease-in-out;opacity:0}19.000%{animation-timing-function:ease-in-out;opacity:1}29.333%{animation-timing-function:ease-in-out;opacity:1}31.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cl14{0%{animation-timing-function:ease-in-out;opacity:0}29.333%{animation-timing-function:ease-in-out;opacity:0}31.000%{animation-timing-function:ease-in-out;opacity:1}41.333%{animation-timing-function:ease-in-out;opacity:1}43.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cl15{0%{animation-timing-function:ease-in-out;opacity:0}32.000%{animation-timing-function:ease-in-out;opacity:0}33.667%{animation-timing-function:ease-in-out;opacity:1}44.000%{animation-timing-function:ease-in-out;opacity:1}45.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cl16{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}33.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}33.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}38.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(150px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(150px,0px)}}@keyframes cl17{0%{animation-timing-function:ease-in-out;opacity:0}41.333%{animation-timing-function:ease-in-out;opacity:0}43.000%{animation-timing-function:ease-in-out;opacity:1}53.333%{animation-timing-function:ease-in-out;opacity:1}55.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cl18{0%{animation-timing-function:ease-in-out;opacity:0}44.000%{animation-timing-function:ease-in-out;opacity:0}45.667%{animation-timing-function:ease-in-out;opacity:1}56.000%{animation-timing-function:ease-in-out;opacity:1}57.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cl19{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}45.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}45.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}50.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(220px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(220px,0px)}}@keyframes cl20{0%{animation-timing-function:ease-in-out;opacity:0}53.333%{animation-timing-function:ease-in-out;opacity:0}55.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl21{0%{animation-timing-function:ease-in-out;opacity:0}56.000%{animation-timing-function:ease-in-out;opacity:0}58.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl22{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}57.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}57.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}62.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(290px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(290px,0px)}}@keyframes cl23{0%{animation-timing-function:ease-in-out;opacity:0}70.667%{animation-timing-function:ease-in-out;opacity:0}73.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl24{0%{animation-timing-function:ease-in-out;opacity:0}76.000%{animation-timing-function:ease-in-out;opacity:0}78.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cl25{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}82.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.cl1{animation:cl1 15.0s linear 1 forwards}.cl2{animation:cl2 15.0s linear 1 forwards}.cl3{animation:cl3 15.0s linear 1 forwards}.cl4{animation:cl4 15.0s linear 1 forwards}.cl5{animation:cl5 15.0s linear 1 forwards}.cl6{animation:cl6 15.0s linear 1 forwards}.cl7{animation:cl7 15.0s linear 1 forwards}.cl8{animation:cl8 15.0s linear 1 forwards}.cl9{animation:cl9 15.0s linear 1 forwards}.cl10{animation:cl10 15.0s linear 1 forwards}.cl11{animation:cl11 15.0s linear 1 forwards}.cl12{animation:cl12 15.0s linear 1 forwards}.cl13{animation:cl13 15.0s linear 1 forwards}.cl14{animation:cl14 15.0s linear 1 forwards}.cl15{animation:cl15 15.0s linear 1 forwards}.cl16{animation:cl16 15.0s linear 1 forwards}.cl17{animation:cl17 15.0s linear 1 forwards}.cl18{animation:cl18 15.0s linear 1 forwards}.cl19{animation:cl19 15.0s linear 1 forwards}.cl20{animation:cl20 15.0s linear 1 forwards}.cl21{animation:cl21 15.0s linear 1 forwards}.cl22{animation:cl22 15.0s linear 1 forwards}.cl23{animation:cl23 15.0s linear 1 forwards}.cl24{animation:cl24 15.0s linear 1 forwards}.cl25{animation:cl25 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">HÀM TRONG GIỮ BIẾN CỦA HÀM NGOÀI · KỂ CẢ KHI HÀM NGOÀI ĐÃ TRẢ VỀ</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="cl1"><text x="0.0" y="98.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def make_counter():</text></g>
+<g class="cl2"><text x="26.0" y="130.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">count = 0</text></g>
+<g class="cl3"><text x="26.0" y="162.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def inc():</text></g>
+<g class="cl4"><text x="52.0" y="194.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">nonlocal count</text></g>
+<g class="cl5"><text x="52.0" y="226.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">count += 1</text></g>
+<g class="cl6"><text x="52.0" y="258.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">return count</text></g>
+<g class="cl7"><text x="26.0" y="290.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">return inc</text></g>
+<g class="cl8"><text class="sv-d" x="400" y="82" fill="var(--probe)" style="fill:var(--probe)">closure của c  ·  ô count</text></g>
+<g class="cl9"><rect x="400" y="98" width="110" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="cl10"><text class="sv-d" x="400" y="194" fill="var(--faint)" style="fill:var(--faint)">hàm ngoài đã trả về, ô này vẫn sống</text></g>
+<g class="cl11"><text class="sv-d" x="570" y="82" fill="var(--ok)" style="fill:var(--ok)">c() trả ra</text></g>
+<g class="cl12" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">c = make_counter()</text></g>
+<g class="cl13" opacity="0"><rect x="400" y="98" width="110" height="40" rx="6" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="455.0" y="123.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">0</text></g>
+<g class="cl14" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">c()</text></g>
+<g class="cl15" opacity="0"><rect x="400" y="98" width="110" height="40" rx="6" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="455.0" y="123.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cl16" transform="translate(150 0)"><rect x="420" y="98" width="60" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="450.0" y="123.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="cl17" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">c()</text></g>
+<g class="cl18" opacity="0"><rect x="400" y="98" width="110" height="40" rx="6" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="455.0" y="123.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="cl19" transform="translate(220 0)"><rect x="420" y="98" width="60" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="450.0" y="123.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="cl20"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">c()</text></g>
+<g class="cl21"><rect x="400" y="98" width="110" height="40" rx="6" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="455.0" y="123.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="cl22" transform="translate(290 0)"><rect x="420" y="98" width="60" height="40" rx="6" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="450.0" y="123.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="cl23"><line x1="400.0" y1="170.0" x2="455.0" y2="138.0" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="455.0" cy="138.0" r="2.6" fill="var(--probe)"/><text class="sv-d" x="406" y="174" fill="var(--probe)" style="fill:var(--probe)">nonlocal: ghi vào ô này</text></g>
+<g class="cl24"><rect x="0" y="358" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="373" fill="var(--probe)" style="fill:var(--probe)">Mỗi lần gọi make_counter() tạo một ô riêng — hai counter không dính nhau</text></g>
+<g class="cl25"><text class="sv-d" x="14" y="390" fill="var(--muted)" style="fill:var(--muted)">Đo thật: c() ba lần cho [1, 2, 3] · closure giữ count = 3.</text></g>
 </svg>
-  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
   </figure>
-
   <ul class="why">
-    <li><code>@deco</code> đặt trên <code>def f</code> chỉ là cách viết gọn của <code>f = deco(f)</code>. Không có gì hơn thế.</li>
-    <li>Hàm bọc bên trong <b>nhớ biến của hàm ngoài</b> kể cả sau khi hàm ngoài trả về — đó là closure.</li>
+    <li>Mỗi lần gọi <code>make_counter()</code> tạo một ô riêng — hai counter không dính nhau.</li>
+    <li><code>nonlocal</code> là bắt buộc để <b>ghi</b> vào ô đó. Thiếu nó là <code>UnboundLocalError</code>.</li>
+    <li>Chỉ <b>đọc</b> thì không cần <code>nonlocal</code> — đây là chỗ hay gây bối rối.</li>
+    <li>Xem thêm <a href="../scope-legb/index.html">Scope &amp; LEGB</a>: đây chính là tầng E.</li>
   </ul>
-
-  <div class="note">
-    <h4>Bài này nối tiếp</h4>
-    Phần iterator protocol, generator, <code>yield from</code> và <code>itertools</code> nằm ở bài
-    <a href="../iterator-generator/index.html">Iterator &amp; generator</a>.
-  </div>
 </section>
 
-<section id="deco-s2">
-  <div class="sh"><b>02</b><h2>Closure — nền của decorator</h2></div>
-
+<section id="dc-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Decorator</h2></div>
+  <p class="key">Không có cú pháp đặc biệt nào. <code>@deco</code> trên <code>def f</code> chỉ là <em>f = deco(f)</em>.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bài: closure, decorator, ba tầng khi có tham số, context manager">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="46" fill="var(--filled)">&#9312; Closure</text>
-<text class="sv-d" x="13" y="64" fill="var(--muted)">hàm nhớ biến của phạm vi ngoài</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Decorator</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">hàm bọc hàm — chỉ là gán lại tên</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Ba tầng</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">có tham số thì hàm trả hàm trả hàm</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Context manager</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cùng họ tư duy — đảm bảo dọn dẹp</text>
-<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9312; CLOSURE — BIẾN SỐNG SÓT SAU KHI HÀM NGOÀI TRẢ VỀ</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--probe)">count = 0 ở hàm ngoài</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">inc còn giữ tham chiếu nên count không bị dọn</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--filled)">def inc(): nonlocal count</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">đọc thì không cần khai, ghi thì bắt buộc</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--tomb)">thiếu nonlocal → UnboundLocalError</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">gán tạo ra biến cục bộ mới, che mất biến ngoài</text>
+    <svg viewBox="0 0 860 340" role="img" aria-label="Tên f ban đầu trỏ vào hàm gốc; sau khi gán f bằng deco của f thì hàm gốc chui vào bên trong một lớp vỏ wrapper và tên f trỏ vào lớp vỏ đó" data-anim><style>@keyframes dc1{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc2{0%{animation-timing-function:ease-in-out;opacity:0}3.077%{animation-timing-function:ease-in-out;opacity:0}5.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc3{0%{animation-timing-function:ease-in-out;opacity:0}6.923%{animation-timing-function:ease-in-out;opacity:0}8.846%{animation-timing-function:ease-in-out;opacity:1}34.615%{animation-timing-function:ease-in-out;opacity:1}36.538%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes dc4{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}21.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc5{0%{animation-timing-function:ease-in-out;opacity:0}30.769%{animation-timing-function:ease-in-out;opacity:0}33.462%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc6{0%{animation-timing-function:ease-in-out;opacity:0}32.308%{animation-timing-function:ease-in-out;opacity:0}35.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}33.846%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}34.231%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}42.308%{animation-timing-function:ease-in-out;opacity:1;transform:translate(330px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(330px,0px)}}@keyframes dc8{0%{animation-timing-function:ease-in-out;opacity:0}46.154%{animation-timing-function:ease-in-out;opacity:0}48.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc9{0%{animation-timing-function:ease-in-out;opacity:0}52.308%{animation-timing-function:ease-in-out;opacity:0}55.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc10{0%{animation-timing-function:ease-in-out;opacity:0}58.462%{animation-timing-function:ease-in-out;opacity:0}61.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc11{0%{animation-timing-function:ease-in-out;opacity:0}61.538%{animation-timing-function:ease-in-out;opacity:0}64.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc12{0%{animation-timing-function:ease-in-out;opacity:0}64.615%{animation-timing-function:ease-in-out;opacity:0}67.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes dc13{0%{animation-timing-function:ease-in-out;opacity:0}70.769%{animation-timing-function:ease-in-out;opacity:0}73.462%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.dc1{animation:dc1 13.0s linear 1 forwards}.dc2{animation:dc2 13.0s linear 1 forwards}.dc3{animation:dc3 13.0s linear 1 forwards}.dc4{animation:dc4 13.0s linear 1 forwards}.dc5{animation:dc5 13.0s linear 1 forwards}.dc6{animation:dc6 13.0s linear 1 forwards}.dc7{animation:dc7 13.0s linear 1 forwards}.dc8{animation:dc8 13.0s linear 1 forwards}.dc9{animation:dc9 13.0s linear 1 forwards}.dc10{animation:dc10 13.0s linear 1 forwards}.dc11{animation:dc11 13.0s linear 1 forwards}.dc12{animation:dc12 13.0s linear 1 forwards}.dc13{animation:dc13 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">@deco CHỈ LÀ CÁCH VIẾT GỌN CỦA  f = deco(f)</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="dc1"><text class="sv-d" x="24" y="115" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">f</text></g>
+<g class="dc2"><rect x="40" y="90" width="170" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="dc3" opacity="0"><rect x="40" y="90" width="170" height="40" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="125.0" y="115.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">hàm gốc</text></g>
+<g class="dc4"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">f = deco(f)</text></g>
+<g class="dc5"><text class="sv-d" x="324" y="115" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">f</text></g>
+<g class="dc6"><rect x="340" y="72" width="230" height="76" rx="8" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.8"/><text class="sv-d" x="352" y="88" fill="var(--ok)" style="fill:var(--ok)">wrapper</text></g>
+<g class="dc7" transform="translate(330 0)"><rect x="40" y="90" width="170" height="40" rx="6" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.6"/><text x="125.0" y="115.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">hàm gốc</text></g>
+<g class="dc8"><text class="sv-d" x="340" y="162" fill="var(--ok)" style="fill:var(--ok)">tên f giờ trỏ vào wrapper</text><text class="sv-d" x="340" y="180" fill="var(--faint)" style="fill:var(--faint)">hàm gốc nằm BÊN TRONG nó</text></g>
+<g class="dc9"><line x1="40.0" y1="162.0" x2="125.0" y2="130.0" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="125.0" cy="130.0" r="2.6" fill="var(--probe)"/><text class="sv-d" x="46" y="166" fill="var(--probe)" style="fill:var(--probe)">ô cũ bỏ trống — không ai trỏ vào hàm gốc nữa</text></g>
+<g class="dc10"><text class="sv-d" x="0" y="220" fill="var(--text)" style="fill:var(--text)">Hai cách cho kết quả y hệt:</text></g>
+<g class="dc11"><text x="0.0" y="246.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">@deco  rồi  f1(3)</text><text class="sv-d" x="300" y="246" fill="var(--ok)" style="fill:var(--ok)">→ 8</text></g>
+<g class="dc12"><text x="0.0" y="270.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">f2 = deco(f2)  rồi  f2(3)</text><text class="sv-d" x="300" y="270" fill="var(--ok)" style="fill:var(--ok)">→ 8</text></g>
+<g class="dc13"><rect x="0" y="304" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="319" fill="var(--probe)" style="fill:var(--probe)">Không có cú pháp đặc biệt nào · chỉ là một phép gán</text></g>
 </svg>
-  <figcaption>Ô &#9312; sáng lên. Biến của hàm ngoài sống sót vì hàm trong còn giữ tham chiếu.</figcaption>
   </figure>
-<pre><code><span class="kw">def</span> make_counter():
-    count = <span class="st">0</span>                  <span class="cm"># biến của phạm vi ngoài</span>
-    <span class="kw">def</span> inc():
-        <span class="kw">nonlocal</span> count         <span class="cm">← bắt buộc, nếu không sẽ tạo biến cục bộ mới</span>
-        count += <span class="st">1</span>
-        <span class="kw">return</span> count
-    <span class="kw">return</span> inc                 <span class="cm"># hàm trong "nhớ" được count</span>
-
-c = make_counter()
-c(); c(); c()                  <span class="cm"># 1, 2, 3</span></code></pre>
-  <p>Hàm trong giữ một tham chiếu tới biến của phạm vi bao ngoài, và biến đó <strong>sống sót</strong> dù hàm ngoài đã trả về. Đó là closure.</p>
-  <div class="note warn">
-    <h4>Vì sao cần <code>nonlocal</code></h4>
-    Trong Python, <em>gán</em> vào một tên bên trong hàm sẽ tự động khai báo nó là biến cục bộ. Không có <code>nonlocal</code> thì <code>count += 1</code> báo <code>UnboundLocalError</code> vì nó đọc một biến cục bộ chưa được khởi tạo. Chỉ <em>đọc</em> thì không cần <code>nonlocal</code> — đây là chỗ hay gây bối rối.
-  </div>
+  <ul class="why">
+    <li>Sau khi bọc, tên <code>f</code> trỏ vào <code>wrapper</code>, còn hàm gốc nằm bên trong nó.</li>
+    <li><code>wrapper(*args, **kwargs)</code> để nhận mọi kiểu đối số mà không cần biết hàm gốc nhận gì.</li>
+    <li>Dùng <code>try / finally</code> trong wrapper nếu cần chạy phần kết thúc cả khi hàm gốc ném lỗi.</li>
+  </ul>
 </section>
 
-<section id="deco-s3">
-  <div class="sh"><b>03</b><h2>Decorator</h2></div>
-
+<section id="dc-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>functools.wraps</h2></div>
+  <p class="key">Bọc hàm là <em>thay nó bằng wrapper</em> — nên hàm mất tên, mất docstring, mất chữ ký. <code>wraps</code> khôi phục lại.</p>
+  <p class="defs"><b>Chữ ký</b> (signature) là mô tả hàm nhận tham số gì: tên, thứ tự, kiểu, giá trị mặc định. Đọc bằng <code>inspect.signature(fn)</code>.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 260" role="img" aria-label="Bản đồ bài: closure, decorator, ba tầng khi có tham số, context manager">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Closure</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">hàm nhớ biến của phạm vi ngoài</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="109" fill="var(--probe)">&#9313; Decorator</text>
-<text class="sv-d" x="13" y="127" fill="var(--muted)">hàm bọc hàm — chỉ là gán lại tên</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Ba tầng</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">có tham số thì hàm trả hàm trả hàm</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Context manager</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cùng họ tư duy — đảm bảo dọn dẹp</text>
-<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9313; DECORATOR — CHỈ LÀ MỘT PHÉP GÁN LẠI TÊN</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--probe)">def slow → timed(slow) → slow = wrapper</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">@timed đặt trên def không hơn gì dòng gán đó</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--ok)">lru_cache, property, staticmethod</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">cùng cơ chế, chỉ là wrapper viết sẵn trong stdlib</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--tomb)">thiếu @functools.wraps</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">mất tên, docstring, chữ ký — hỏng ở FastAPI, pytest, log</text>
+    <svg viewBox="0 0 860 424" role="img" aria-label="Bảng ba hàng hai cột: hàm gốc có tên target và chữ ký đầy đủ; bản bọc không dùng wraps có tên wrapper và chữ ký sao a sao k; bản bọc có wraps khôi phục đúng tên và chữ ký gốc" data-anim><style>@keyframes wr1{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr2{0%{animation-timing-function:ease-in-out;opacity:0}1.538%{animation-timing-function:ease-in-out;opacity:0}4.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr3{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr4{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr5{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}3.077%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}3.462%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}10.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-420px,48px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-420px,48px)}}@keyframes wr6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}3.077%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}3.462%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}10.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-210px,48px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-210px,48px)}}@keyframes wr7{0%{animation-timing-function:ease-in-out;opacity:0}21.538%{animation-timing-function:ease-in-out;opacity:0}24.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr8{0%{animation-timing-function:ease-in-out;opacity:0}22.308%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr9{0%{animation-timing-function:ease-in-out;opacity:0}22.308%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr10{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.077%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.462%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}30.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-420px,124px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-420px,124px)}}@keyframes wr11{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.077%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.462%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}30.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-210px,124px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-210px,124px)}}@keyframes wr12{0%{animation-timing-function:ease-in-out;opacity:0}47.692%{animation-timing-function:ease-in-out;opacity:0}50.385%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr13{0%{animation-timing-function:ease-in-out;opacity:0}48.462%{animation-timing-function:ease-in-out;opacity:0}51.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr14{0%{animation-timing-function:ease-in-out;opacity:0}48.462%{animation-timing-function:ease-in-out;opacity:0}51.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr15{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.231%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.615%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.154%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-420px,200px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-420px,200px)}}@keyframes wr16{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.231%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.615%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.154%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-210px,200px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-210px,200px)}}@keyframes wr17{0%{animation-timing-function:ease-in-out;opacity:0}41.538%{animation-timing-function:ease-in-out;opacity:0}44.231%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr18{0%{animation-timing-function:ease-in-out;opacity:0}66.154%{animation-timing-function:ease-in-out;opacity:0}68.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr19{0%{animation-timing-function:ease-in-out;opacity:0}72.308%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes wr20{0%{animation-timing-function:ease-in-out;opacity:0}76.923%{animation-timing-function:ease-in-out;opacity:0}79.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.wr1{animation:wr1 13.0s linear 1 forwards}.wr2{animation:wr2 13.0s linear 1 forwards}.wr3{animation:wr3 13.0s linear 1 forwards}.wr4{animation:wr4 13.0s linear 1 forwards}.wr5{animation:wr5 13.0s linear 1 forwards}.wr6{animation:wr6 13.0s linear 1 forwards}.wr7{animation:wr7 13.0s linear 1 forwards}.wr8{animation:wr8 13.0s linear 1 forwards}.wr9{animation:wr9 13.0s linear 1 forwards}.wr10{animation:wr10 13.0s linear 1 forwards}.wr11{animation:wr11 13.0s linear 1 forwards}.wr12{animation:wr12 13.0s linear 1 forwards}.wr13{animation:wr13 13.0s linear 1 forwards}.wr14{animation:wr14 13.0s linear 1 forwards}.wr15{animation:wr15 13.0s linear 1 forwards}.wr16{animation:wr16 13.0s linear 1 forwards}.wr17{animation:wr17 13.0s linear 1 forwards}.wr18{animation:wr18 13.0s linear 1 forwards}.wr19{animation:wr19 13.0s linear 1 forwards}.wr20{animation:wr20 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">THIẾU functools.wraps · HÀM MẤT TÊN VÀ MẤT CHỮ KÝ</text>
+<g class="wr1"><text class="sv-d" x="295.0" y="62" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">__name__  ·  tên hàm</text><text class="sv-d" x="560.0" y="62" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">signature  ·  chữ ký</text></g>
+<g class="wr2"><text class="sv-d" x="134" y="100" fill="var(--clay)" style="fill:var(--clay)" text-anchor="end">hàm gốc</text></g>
+<g class="wr3"><rect x="200" y="74" width="190" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr4"><rect x="410" y="74" width="300" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr5" transform="translate(-420 48)"><rect x="620" y="26" width="190" height="42" rx="6" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.6"/><text x="715.0" y="52.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">target</text></g>
+<g class="wr6" transform="translate(-210 48)"><rect x="620" y="26" width="300" height="42" rx="6" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.6"/><text x="770.0" y="52.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">(x: int, y: int = 2) -> int</text></g>
+<g class="wr7"><text class="sv-d" x="134" y="176" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">bọc, KHÔNG wraps</text></g>
+<g class="wr8"><rect x="200" y="150" width="190" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr9"><rect x="410" y="150" width="300" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr10" transform="translate(-420 124)"><rect x="620" y="26" width="190" height="42" rx="6" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="715.0" y="52.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">wrapper</text></g>
+<g class="wr11" transform="translate(-210 124)"><rect x="620" y="26" width="300" height="42" rx="6" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="770.0" y="52.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">(*a, **k)</text></g>
+<g class="wr12"><text class="sv-d" x="134" y="252" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">bọc, CÓ wraps</text></g>
+<g class="wr13"><rect x="200" y="226" width="190" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr14"><rect x="410" y="226" width="300" height="42" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="wr15" transform="translate(-420 200)"><rect x="620" y="26" width="190" height="42" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="715.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">target</text></g>
+<g class="wr16" transform="translate(-210 200)"><rect x="620" y="26" width="300" height="42" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="770.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">(x: int, y: int = 2) -> int</text></g>
+<g class="wr17"><line x1="200.0" y1="212.0" x2="290.0" y2="192.0" stroke="var(--tomb)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="290.0" cy="192.0" r="2.6" fill="var(--tomb)"/><text class="sv-d" x="206" y="216" fill="var(--tomb)" style="fill:var(--tomb)">tên thành wrapper · chữ ký thành (*a, **k)</text></g>
+<g class="wr18"><line x1="200.0" y1="288.0" x2="290.0" y2="268.0" stroke="var(--ok)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="290.0" cy="268.0" r="2.6" fill="var(--ok)"/><text class="sv-d" x="206" y="292" fill="var(--ok)" style="fill:var(--ok)">khôi phục đúng như hàm gốc</text></g>
+<g class="wr19"><rect x="0" y="342" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="357" fill="var(--probe)" style="fill:var(--probe)">FastAPI đọc chữ ký để dựng route · pytest đọc tên để gom test</text></g>
+<g class="wr20"><text class="sv-d" x="14" y="374" fill="var(--muted)" style="fill:var(--muted)">Mất hai thứ đó là FastAPI không biết tham số nào cần, pytest thấy mọi test trùng tên.</text><text class="sv-d" x="14" y="392" fill="var(--muted)" style="fill:var(--muted)">Nên @functools.wraps(fn) là dòng bắt buộc, không phải tuỳ chọn.</text></g>
 </svg>
-  <figcaption>Ô &#9313; sáng lên. Không có cú pháp đặc biệt nào — chỉ là một phép gán.</figcaption>
   </figure>
-<pre><code><span class="kw">import</span> functools, time
-
-<span class="kw">def</span> timed(fn):
-    @functools.wraps(fn)                    <span class="cm">← giữ __name__, __doc__, chữ ký</span>
-    <span class="kw">def</span> wrapper(*args, **kwargs):        <span class="cm"># nhận mọi kiểu đối số</span>
-        t0 = time.perf_counter()
-        <span class="kw">try</span>:
-            <span class="kw">return</span> fn(*args, **kwargs)
-        <span class="kw">finally</span>:                            <span class="cm"># đo cả khi hàm ném lỗi</span>
-            <span class="kw">print</span>(<span class="st">f"{fn.__name__}: {time.perf_counter()-t0:.3f}s"</span>)
-    <span class="kw">return</span> wrapper
-
-@timed
-<span class="kw">def</span> slow(): time.sleep(<span class="st">1</span>)
-
-<span class="cm"># @timed chỉ là cách viết ngắn của:</span>
-<span class="cm"># slow = timed(slow)</span></code></pre>
-  <div class="flow">
-    <div class="n"><h5>def slow</h5><p>hàm gốc</p></div>
-    <div class="a act"><i>@timed</i>&#8594;</div>
-    <div class="n"><h5>timed(slow)</h5><p>hàm nhận hàm, trả về hàm</p></div>
-    <div class="a act"><i>gán lại tên cũ</i>&#8594;</div>
-    <div class="n ok"><h5>slow = wrapper</h5><p>tên cũ, thân mới</p></div>
-  </div>
-  <p class="stripnote"><span>Decorator không có gì huyền bí.</span><span>Nó chỉ là phép <em>gán lại tên hàm</em> bằng kết quả của một hàm nhận hàm.</span></p>
-  <div class="note key">
-    <h4>Vì sao bắt buộc dùng functools.wraps</h4>
-    Không có nó, hàm sau khi bọc mang tên <code>wrapper</code>: <code>help()</code> vô dụng, docstring biến mất, log ghi sai tên, và các thư viện dựa vào chữ ký hàm sẽ hỏng — FastAPI đọc annotation để sinh schema, pytest đọc tên để đặt tên test. Thiếu một dòng này gây ra những bug rất khó truy.
-  </div>
-  <p>Ba dùng thực tế đáng biết: <code>functools.lru_cache</code> để ghi nhớ kết quả, <code>property</code> để biến phương thức thành thuộc tính, và <code>staticmethod</code>/<code>classmethod</code> — tất cả đều là decorator có sẵn.</p>
+  <ul class="why">
+    <li>Wrapper viết là <code>def wrapper(*a, **k)</code> vì nó không biết hàm gốc nhận gì — nên chữ ký của nó đúng là <code>(*a, **k)</code>.</li>
+    <li>Không có <code>wraps</code>: <code>__name__</code> thành <code>wrapper</code>, chữ ký thành <code>(*a, **k)</code> — thông tin về <code>x</code> và <code>y</code> mất hẳn.</li>
+    <li>Có <code>wraps</code>: cả hai khôi phục đúng như hàm gốc.</li>
+    <li>FastAPI đọc chữ ký để dựng route, pytest đọc tên để gom test — mất hai thứ đó là cả hai hỏng.</li>
+    <li>Nên <code>@functools.wraps(fn)</code> là dòng bắt buộc, không phải tuỳ chọn.</li>
+  </ul>
 </section>
 
-<section id="deco-s4">
-  <div class="sh"><b>04</b><h2>Decorator có tham số — ba tầng</h2></div>
-
+<section id="dc-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Decorator có tham số</h2></div>
+  <p class="key">Cần <em>ba tầng</em> vì có ba thứ phải nhận ở ba thời điểm khác nhau: tham số, hàm, rồi đối số lúc gọi.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: closure, decorator, ba tầng khi có tham số, context manager">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Closure</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">hàm nhớ biến của phạm vi ngoài</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Decorator</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">hàm bọc hàm — chỉ là gán lại tên</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="172" fill="var(--ok)">&#9314; Ba tầng</text>
-<text class="sv-d" x="13" y="190" fill="var(--muted)">có tham số thì hàm trả hàm trả hàm</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Context manager</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">cùng họ tư duy — đảm bảo dọn dẹp</text>
-<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9314; BA TẦNG — VÌ BA NHÓM THÔNG TIN ĐẾN Ở BA THỜI ĐIỂM</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">1 · retry(times, delay)</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">nhận cấu hình, lúc trang trí</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--filled)">2 · decorator(fn)</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">nhận hàm, lúc hàm được định nghĩa</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">3 · wrapper(*a, **kw)</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">nhận đối số, lúc hàm được gọi</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--probe)">@a trên @b</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">bọc thì b trước, gọi thì a trước</text>
+    <svg viewBox="0 0 860 428" role="img" aria-label="Thân decorator ba tầng lồng nhau bên trái; ba ngăn bên phải lần lượt nhận tham số n bằng ba, nhận hàm hi, rồi tới lúc gọi mới chạy tầng thứ ba và trả ra danh sách ba phần tử" data-anim><style>@keyframes th1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th2{0%{animation-timing-function:ease-in-out;opacity:0}2.667%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th3{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th4{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th5{0%{animation-timing-function:ease-in-out;opacity:0}4.667%{animation-timing-function:ease-in-out;opacity:0}7.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th6{0%{animation-timing-function:ease-in-out;opacity:0}5.333%{animation-timing-function:ease-in-out;opacity:0}7.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th7{0%{animation-timing-function:ease-in-out;opacity:0}6.000%{animation-timing-function:ease-in-out;opacity:0}8.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th8{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th9{0%{animation-timing-function:ease-in-out;opacity:0}4.667%{animation-timing-function:ease-in-out;opacity:0}7.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th10{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}16.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}16.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}22.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-150px,58px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-150px,58px)}}@keyframes th11{0%{animation-timing-function:ease-in-out;opacity:0}22.667%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th12{0%{animation-timing-function:ease-in-out;opacity:0}5.333%{animation-timing-function:ease-in-out;opacity:0}7.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th13{0%{animation-timing-function:ease-in-out;opacity:0}6.000%{animation-timing-function:ease-in-out;opacity:0}8.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th14{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}32.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}32.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}38.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-150px,142px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-150px,142px)}}@keyframes th15{0%{animation-timing-function:ease-in-out;opacity:0}38.667%{animation-timing-function:ease-in-out;opacity:0}41.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th16{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}9.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th17{0%{animation-timing-function:ease-in-out;opacity:0}7.333%{animation-timing-function:ease-in-out;opacity:0}9.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th18{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}50.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}51.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-150px,226px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-150px,226px)}}@keyframes th19{0%{animation-timing-function:ease-in-out;opacity:0}57.333%{animation-timing-function:ease-in-out;opacity:0}59.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th20{0%{animation-timing-function:ease-in-out;opacity:0}13.333%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}49.333%{animation-timing-function:ease-in-out;opacity:1}51.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes th21{0%{animation-timing-function:ease-in-out;opacity:0}49.333%{animation-timing-function:ease-in-out;opacity:0}51.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th22{0%{animation-timing-function:ease-in-out;opacity:0}62.667%{animation-timing-function:ease-in-out;opacity:0}65.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th23{0%{animation-timing-function:ease-in-out;opacity:0}68.000%{animation-timing-function:ease-in-out;opacity:0}70.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes th24{0%{animation-timing-function:ease-in-out;opacity:0}72.000%{animation-timing-function:ease-in-out;opacity:0}74.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.th1{animation:th1 15.0s linear 1 forwards}.th2{animation:th2 15.0s linear 1 forwards}.th3{animation:th3 15.0s linear 1 forwards}.th4{animation:th4 15.0s linear 1 forwards}.th5{animation:th5 15.0s linear 1 forwards}.th6{animation:th6 15.0s linear 1 forwards}.th7{animation:th7 15.0s linear 1 forwards}.th8{animation:th8 15.0s linear 1 forwards}.th9{animation:th9 15.0s linear 1 forwards}.th10{animation:th10 15.0s linear 1 forwards}.th11{animation:th11 15.0s linear 1 forwards}.th12{animation:th12 15.0s linear 1 forwards}.th13{animation:th13 15.0s linear 1 forwards}.th14{animation:th14 15.0s linear 1 forwards}.th15{animation:th15 15.0s linear 1 forwards}.th16{animation:th16 15.0s linear 1 forwards}.th17{animation:th17 15.0s linear 1 forwards}.th18{animation:th18 15.0s linear 1 forwards}.th19{animation:th19 15.0s linear 1 forwards}.th20{animation:th20 15.0s linear 1 forwards}.th21{animation:th21 15.0s linear 1 forwards}.th22{animation:th22 15.0s linear 1 forwards}.th23{animation:th23 15.0s linear 1 forwards}.th24{animation:th24 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">DECORATOR CÓ THAM SỐ CẦN BA TẦNG · MỖI TẦNG NHẬN MỘT THỨ</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="th1"><text x="0.0" y="100.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def repeat(n):</text></g>
+<g class="th2"><text x="26.0" y="130.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def deco(fn):</text></g>
+<g class="th3"><text x="52.0" y="160.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">@functools.wraps(fn)</text></g>
+<g class="th4"><text x="52.0" y="190.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def wrapper(*a, **k):</text></g>
+<g class="th5"><text x="78.0" y="220.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">return [fn(*a,**k) for _ in range(n)]</text></g>
+<g class="th6"><text x="52.0" y="250.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">return wrapper</text></g>
+<g class="th7"><text x="26.0" y="280.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">return deco</text></g>
+<g class="th8"><text class="sv-d" x="470" y="74" fill="var(--muted)" style="fill:var(--muted)">tầng 1  repeat(n)</text></g>
+<g class="th9"><rect x="470" y="84" width="240" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="th10" transform="translate(-150 58)"><rect x="620" y="26" width="240" height="40" rx="6" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.6"/><text x="740.0" y="51.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">n = 3</text></g>
+<g class="th11"><text class="sv-d" x="726" y="109" fill="var(--faint)" style="fill:var(--faint)">lúc đọc @repeat(3)</text></g>
+<g class="th12"><text class="sv-d" x="470" y="158" fill="var(--muted)" style="fill:var(--muted)">tầng 2  deco(fn)</text></g>
+<g class="th13"><rect x="470" y="168" width="240" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="th14" transform="translate(-150 142)"><rect x="620" y="26" width="240" height="40" rx="6" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.6"/><text x="740.0" y="51.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">hàm hi</text></g>
+<g class="th15"><text class="sv-d" x="726" y="193" fill="var(--faint)" style="fill:var(--faint)">lúc gắn vào def hi</text></g>
+<g class="th16"><text class="sv-d" x="470" y="242" fill="var(--muted)" style="fill:var(--muted)">tầng 3  wrapper()</text></g>
+<g class="th17"><rect x="470" y="252" width="240" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="th18" transform="translate(-150 226)"><rect x="620" y="26" width="240" height="40" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="740.0" y="51.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">mỗi lần gọi hi()</text></g>
+<g class="th19"><text class="sv-d" x="726" y="277" fill="var(--faint)" style="fill:var(--faint)">lúc chạy thật</text></g>
+<g class="th20" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">@repeat(3)  rồi  def hi()</text></g>
+<g class="th21"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">hi()</text></g>
+<g class="th22"><text class="sv-d" x="470" y="310" fill="var(--ok)" style="fill:var(--ok)">→ [&#x27;hi&#x27;, &#x27;hi&#x27;, &#x27;hi&#x27;]</text></g>
+<g class="th23"><rect x="0" y="364" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="379" fill="var(--probe)" style="fill:var(--probe)">Tầng 1 và 2 chạy MỘT lần lúc định nghĩa · tầng 3 chạy mỗi lần gọi</text></g>
+<g class="th24"><text class="sv-d" x="14" y="396" fill="var(--muted)" style="fill:var(--muted)">Đo thật: trước khi gọi hi() đã chạy 2 tầng · gọi rồi mới tới tầng 3.</text></g>
 </svg>
-  <figcaption>Ô &#9314; sáng lên. Ba tầng vì ba nhóm thông tin đến ở ba thời điểm.</figcaption>
   </figure>
-<pre><code><span class="kw">def</span> retry(times=<span class="st">3</span>, delay=<span class="st">1.0</span>):          <span class="cm"># TẦNG 1: nhận tham số</span>
-    <span class="kw">def</span> decorator(fn):                   <span class="cm"># TẦNG 2: nhận hàm</span>
-        @functools.wraps(fn)
-        <span class="kw">def</span> wrapper(*a, **kw):           <span class="cm"># TẦNG 3: nhận đối số lúc gọi</span>
-            <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(times):
-                <span class="kw">try</span>:
-                    <span class="kw">return</span> fn(*a, **kw)
-                <span class="kw">except</span> Exception:
-                    <span class="kw">if</span> i == times - <span class="st">1</span>: <span class="kw">raise</span>   <span class="cm"># lần cuối thì ném ra</span>
-                    time.sleep(delay * <span class="st">2</span>**i)   <span class="cm"># chờ tăng dần</span>
-        <span class="kw">return</span> wrapper
-    <span class="kw">return</span> decorator
-
-@retry(times=<span class="st">5</span>, delay=<span class="st">0.5</span>)
-<span class="kw">def</span> call_api(): ...
-
-<span class="cm"># tương đương: call_api = retry(times=5, delay=0.5)(call_api)</span>
-<span class="cm">#                          └─ tầng 1 ─┘└──── tầng 2 ────┘</span></code></pre>
-  <div class="stack">
-    <div class="s"><b>Tầng 1 — retry(times, delay)</b><span>nhận tham số cấu hình, ngay lúc trang trí</span></div>
-    <div class="s"><b>Tầng 2 — decorator(fn)</b><span>nhận hàm, lúc hàm được định nghĩa</span></div>
-    <div class="s ok"><b>Tầng 3 — wrapper(*a, **kw)</b><span>nhận đối số, lúc hàm thật sự được gọi</span></div>
-  </div>
-  <p class="stripnote"><span>Ba tầng vì có ba nhóm thông tin đến ở ba thời điểm khác nhau.</span><span><code>call_api = retry(times=5)(call_api)</code> — hai lần gọi liên tiếp, nên phải hai tầng trả về hàm.</span></p>
-  <p><strong>Thứ tự khi xếp nhiều decorator</strong> — hay bị hỏi:</p>
-<div class="cmp two">
-    <div><h5>Lúc bọc</h5><p><code>@a</code> trên <code>@b</code> trên <code>def f</code> nghĩa là <code>f = a(b(f))</code> — <b>b bọc trước</b> vì nó gần hàm nhất, a bọc ngoài cùng.</p></div>
-    <div><h5>Lúc gọi</h5><p>Đi từ ngoài vào: <b>a chạy trước</b>, rồi tới b, cuối cùng mới tới <code>f</code>.</p></div>
-  </div>
+  <ul class="why">
+    <li>Tầng 1 và tầng 2 chạy <b>một lần</b> lúc định nghĩa. Tầng 3 chạy <b>mỗi lần gọi</b>.</li>
+    <li>Đo thật: trước khi gọi <code>hi()</code> đã chạy 2 tầng.</li>
+    <li>Thiếu một tầng là lỗi kinh điển: <code>@repeat</code> không ngoặc thì <code>fn</code> nhận mất số 3.</li>
+  </ul>
 </section>
 
-<section id="deco-s5">
+<section id="dc-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Context manager</h2></div>
-
+  <p class="key"><code>with</code> gọi <code>__enter__</code> khi vào, và <em>luôn</em> gọi <code>__exit__</code> khi ra — kể cả khi thân <code>with</code> ném lỗi.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: closure, decorator, ba tầng khi có tham số, context manager">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Closure</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">hàm nhớ biến của phạm vi ngoài</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Decorator</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">hàm bọc hàm — chỉ là gán lại tên</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Ba tầng</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">có tham số thì hàm trả hàm trả hàm</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="235" fill="var(--tomb)">&#9315; Context manager</text>
-<text class="sv-d" x="13" y="253" fill="var(--muted)">cùng họ tư duy — đảm bảo dọn dẹp</text>
-<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9315; CONTEXT MANAGER — ĐẢM BẢO DỌN DẸP LUÔN CHẠY</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">__enter__ · phần trước yield</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">mở tài nguyên, trả về thứ gán cho as</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">thân khối with</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">chạy tại chỗ yield</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">__exit__ · finally</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">chạy dù có lỗi — thiếu try/finally là file không đóng</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">__exit__ trả True là nuốt exception</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">trả False để lỗi bay tiếp — mặc định nên là False</text>
+    <svg viewBox="0 0 860 440" role="img" aria-label="Bốn ngăn thứ tự chạy: __enter__ vào khối, thân with ném lỗi, __exit__ vẫn luôn chạy, rồi except bên ngoài bắt lỗi; nếu __exit__ trả True thì lỗi bị nuốt" data-anim><style>@keyframes cm1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm2{0%{animation-timing-function:ease-in-out;opacity:0}2.667%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm3{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm4{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm5{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm6{0%{animation-timing-function:ease-in-out;opacity:0}3.333%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm7{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}10.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}11.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}16.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,58px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,58px)}}@keyframes cm8{0%{animation-timing-function:ease-in-out;opacity:0}17.333%{animation-timing-function:ease-in-out;opacity:0}19.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}28.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,110px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,110px)}}@keyframes cm10{0%{animation-timing-function:ease-in-out;opacity:0}29.333%{animation-timing-function:ease-in-out;opacity:0}31.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm11{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}34.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}35.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}40.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,162px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,162px)}}@keyframes cm12{0%{animation-timing-function:ease-in-out;opacity:0}41.333%{animation-timing-function:ease-in-out;opacity:0}43.000%{animation-timing-function:ease-in-out;opacity:1}61.333%{animation-timing-function:ease-in-out;opacity:1}63.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cm13{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}46.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}47.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}52.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,214px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-200px,214px)}}@keyframes cm14{0%{animation-timing-function:ease-in-out;opacity:0}53.333%{animation-timing-function:ease-in-out;opacity:0}55.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm15{0%{animation-timing-function:ease-in-out;opacity:0}62.667%{animation-timing-function:ease-in-out;opacity:0}64.333%{animation-timing-function:ease-in-out;opacity:1}86.667%{animation-timing-function:ease-in-out;opacity:1}88.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes cm16{0%{animation-timing-function:ease-in-out;opacity:0}76.000%{animation-timing-function:ease-in-out;opacity:0}78.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm17{0%{animation-timing-function:ease-in-out;opacity:0}81.333%{animation-timing-function:ease-in-out;opacity:0}83.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes cm18{0%{animation-timing-function:ease-in-out;opacity:0}85.333%{animation-timing-function:ease-in-out;opacity:0}87.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.cm1{animation:cm1 15.0s linear 1 forwards}.cm2{animation:cm2 15.0s linear 1 forwards}.cm3{animation:cm3 15.0s linear 1 forwards}.cm4{animation:cm4 15.0s linear 1 forwards}.cm5{animation:cm5 15.0s linear 1 forwards}.cm6{animation:cm6 15.0s linear 1 forwards}.cm7{animation:cm7 15.0s linear 1 forwards}.cm8{animation:cm8 15.0s linear 1 forwards}.cm9{animation:cm9 15.0s linear 1 forwards}.cm10{animation:cm10 15.0s linear 1 forwards}.cm11{animation:cm11 15.0s linear 1 forwards}.cm12{animation:cm12 15.0s linear 1 forwards}.cm13{animation:cm13 15.0s linear 1 forwards}.cm14{animation:cm14 15.0s linear 1 forwards}.cm15{animation:cm15 15.0s linear 1 forwards}.cm16{animation:cm16 15.0s linear 1 forwards}.cm17{animation:cm17 15.0s linear 1 forwards}.cm18{animation:cm18 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">with GỌI __enter__ RỒI LUÔN GỌI __exit__ · KỂ CẢ KHI CÓ LỖI</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="cm1"><text x="0.0" y="104.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">with CM():</text><text x="26.0" y="134.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">raise ValueError()</text></g>
+<g class="cm2"><text class="sv-d" x="420" y="70" fill="var(--muted)" style="fill:var(--muted)">thứ tự chạy</text></g>
+<g class="cm3"><rect x="420" y="84" width="260" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="cm4"><rect x="420" y="136" width="260" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="cm5"><rect x="420" y="188" width="260" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="cm6"><rect x="420" y="240" width="260" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="cm7" transform="translate(-200 58)"><rect x="620" y="26" width="260" height="40" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="632.0" y="51.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">__enter__</text></g>
+<g class="cm8"><text class="sv-d" x="696" y="109" fill="var(--faint)" style="fill:var(--faint)">vào khối</text></g>
+<g class="cm9" transform="translate(-200 110)"><rect x="620" y="26" width="260" height="40" rx="6" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="632.0" y="51.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">thân with</text></g>
+<g class="cm10"><text class="sv-d" x="696" y="161" fill="var(--faint)" style="fill:var(--faint)">có raise ValueError</text></g>
+<g class="cm11" transform="translate(-200 162)"><rect x="620" y="26" width="260" height="40" rx="6" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="632.0" y="51.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">__exit__</text></g>
+<g class="cm12" opacity="0"><text class="sv-d" x="696" y="213" fill="var(--faint)" style="fill:var(--faint)">LUÔN chạy, dù có lỗi</text></g>
+<g class="cm13" transform="translate(-200 214)"><rect x="620" y="26" width="260" height="40" rx="6" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="632.0" y="51.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except bên ngoài</text></g>
+<g class="cm14"><text class="sv-d" x="696" y="265" fill="var(--faint)" style="fill:var(--faint)">lỗi bay tiếp lên</text></g>
+<g class="cm15" opacity="0"><rect x="720" y="186" width="199.60000000000002" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="731.0" y="204.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">trả False → lỗi bay tiếp</text><line x1="819.8" y1="212.0" x2="688.0" y2="208.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="688.0" cy="208.0" r="2.8" fill="var(--tomb)"/><rect x="416.0" y="184.0" width="268.0" height="48.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="cm16"><text class="sv-d" x="0" y="234" fill="var(--tomb)" style="fill:var(--tomb)">trả True thì NUỐT lỗi:</text><text class="sv-d" x="0" y="256" fill="var(--faint)" style="fill:var(--faint)">chương trình chạy tiếp như chưa có gì</text></g>
+<g class="cm17"><rect x="0" y="358" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="373" fill="var(--probe)" style="fill:var(--probe)">__exit__ là finally có tên · nó chạy cả khi thân with ném lỗi</text></g>
+<g class="cm18"><text class="sv-d" x="14" y="390" fill="var(--muted)" style="fill:var(--muted)">Đo thật: thứ tự là __enter__ → thân with → __exit__ → except bên ngoài.</text><text class="sv-d" x="14" y="408" fill="var(--muted)" style="fill:var(--muted)">@contextlib.contextmanager viết gọn hơn: phần trước yield là __enter__, phần trong finally là __exit__.</text></g>
 </svg>
-  <figcaption>Ô &#9315; sáng lên. Phần sau yield chạy dù thân khối có lỗi hay không.</figcaption>
   </figure>
-  <p>Cùng họ tư duy: đảm bảo phần dọn dẹp <strong>luôn chạy</strong>, kể cả khi có lỗi.</p>
-<pre><code><span class="cm"># cách 1: cài hai phương thức</span>
-<span class="kw">class</span> Timer:
-    <span class="kw">def</span> __enter__(self):
-        self.t0 = time.perf_counter(); <span class="kw">return</span> self
-    <span class="kw">def</span> __exit__(self, exc_type, exc, tb):
-        <span class="kw">print</span>(time.perf_counter() - self.t0)
-        <span class="kw">return</span> <span class="kw">False</span>          <span class="cm">← False: không nuốt exception. True là NUỐT nó</span>
-
-<span class="cm"># cách 2: generator + contextmanager — ngắn hơn nhiều</span>
-<span class="kw">from</span> contextlib <span class="kw">import</span> contextmanager
-
-@contextmanager
-<span class="kw">def</span> timer():
-    t0 = time.perf_counter()
-    <span class="kw">try</span>:
-        <span class="kw">yield</span>                     <span class="cm"># phần thân khối with chạy ở đây</span>
-    <span class="kw">finally</span>:
-        <span class="kw">print</span>(time.perf_counter() - t0)   <span class="cm"># finally: chạy dù có lỗi</span>
-
-<span class="kw">with</span> timer():
-    heavy()</code></pre>
-  <div class="flow">
-    <div class="n"><h5>__enter__</h5><p>trước <code>yield</code> &#8212; chuẩn bị</p></div>
-    <div class="a act"><i>vào khối</i>&#8594;</div>
-    <div class="n"><h5>thân khối with</h5><p>chạy tại chỗ <code>yield</code></p></div>
-    <div class="a act"><i>rời khối, kể cả khi lỗi</i>&#8594;</div>
-    <div class="n ok"><h5>__exit__</h5><p><code>finally</code> &#8212; chạy dù có lỗi</p></div>
-  </div>
-  <p class="stripnote"><span>Thiếu <code>try/finally</code> quanh <code>yield</code> thì một exception trong khối <code>with</code> làm phần dọn dẹp không bao giờ chạy.</span><span>Đây là chỗ sai nhiều nhất khi tự viết context manager bằng generator.</span></p>
-  <p>Cách này ghép trực tiếp hai chủ đề của bài: <code>@contextmanager</code> là một <em>decorator</em> biến một <em>generator</em> thành context manager.</p>
+  <ul class="why">
+    <li><code>__exit__</code> là <code>finally</code> có tên: đóng tài nguyên gọn hơn <code>try / finally</code> viết tay.</li>
+    <li>Trả <code>False</code> thì lỗi bay tiếp lên. Trả <code>True</code> là <b>nuốt lỗi</b> — hiếm khi nên làm.</li>
+    <li><code>@contextlib.contextmanager</code> viết gọn hơn: phần trước <code>yield</code> là <code>__enter__</code>, phần trong <code>finally</code> là <code>__exit__</code>.</li>
+    <li>Xem <a href="../exception-handling/index.html">Exception handling</a> cho phần lỗi bay lên.</li>
+  </ul>
 </section>
 
-<section id="deco-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+<section id="dc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <p class="key">Hai lỗi này không báo gì lúc viết, chỉ nổ ở nơi khác trong hệ thống.</p>
+  <details class="qa"><summary>Closure là gì?</summary>
+  <p>Hàm trong giữ tham chiếu tới biến của hàm ngoài.</p>
+  <p>Biến đó sống sót dù hàm ngoài đã trả về.</p>
+  <p>Mỗi lần gọi hàm ngoài tạo một ô riêng.</p>
+  <p>Muốn ghi vào ô đó thì cần nonlocal.</p></details>
 
-  <div class="grid2">
-    <div class="card bad"><h4>Quên functools.wraps</h4><p>Mất tên, docstring và chữ ký hàm. Gây hỏng ở FastAPI, pytest, log.</p></div>
-    <div class="card bad"><h4>Thiếu try/finally trong @contextmanager</h4><p>Exception làm phần dọn dẹp không chạy — file không đóng, khoá không nhả.</p></div>
-  </div>
+  <details class="qa"><summary>@deco thực chất làm gì?</summary>
+  <p>Nó chỉ là cách viết gọn của f = deco(f).</p>
+  <p>Không có cú pháp đặc biệt nào.</p>
+  <p>Sau đó tên f trỏ vào wrapper.</p>
+  <p>Hàm gốc nằm bên trong wrapper.</p></details>
+
+  <details class="qa"><summary>Vì sao cần functools.wraps?</summary>
+  <p>Bọc hàm là thay nó bằng wrapper.</p>
+  <p>Nên hàm mất tên, docstring và chữ ký.</p>
+  <p>FastAPI đọc chữ ký, pytest đọc tên — cả hai hỏng.</p>
+  <p>wraps sao lại các thuộc tính đó cho wrapper.</p></details>
+
+  <details class="qa"><summary>Vì sao decorator có tham số cần ba tầng?</summary>
+  <p>Có ba thứ phải nhận ở ba thời điểm.</p>
+  <p>Tầng một nhận tham số của decorator.</p>
+  <p>Tầng hai nhận hàm được bọc.</p>
+  <p>Tầng ba nhận đối số mỗi lần gọi.</p></details>
+
+  <details class="qa"><summary>__exit__ trả True thì sao?</summary>
+  <p>Lỗi bị nuốt, không bay tiếp lên.</p>
+  <p>Chương trình chạy tiếp như chưa có gì.</p>
+  <p>Hiếm khi nên làm vì che mất lỗi thật.</p>
+  <p>Trả False hoặc không trả gì thì lỗi bay tiếp.</p></details>
 </section>
 
-<section id="deco-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
-
-  <details class="qa"><summary>Vì sao decorator cần functools.wraps?</summary>
-  <p>Vì hàm bọc thay thế hàm gốc, nên nếu không copy metadata thì hàm mang tên <code>wrapper</code>: <code>__name__</code>, docstring, annotation và chữ ký đều mất. Hậu quả thật là log ghi sai tên, <code>help()</code> vô dụng, và những thư viện đọc chữ ký hàm bị hỏng — FastAPI dùng annotation để sinh schema, pytest dùng tên để nhận diện test. Một dòng <code>@functools.wraps(fn)</code> giải quyết hết.</p></details>
-
-  <details class="qa"><summary>Viết một decorator nhận tham số.</summary>
-  <p>Cần ba tầng lồng nhau vì có ba nhóm thông tin đến ở ba thời điểm: tầng ngoài nhận tham số cấu hình, tầng giữa nhận hàm, tầng trong nhận đối số lúc gọi. Cách nhớ là viết lại dạng tương đương: <code>@retry(times=5)</code> nghĩa là <code>f = retry(times=5)(f)</code> — hai lần gọi liên tiếp, nên phải có hai tầng trả về hàm, cộng tầng wrapper thật sự. Nhớ <code>functools.wraps</code> ở tầng trong cùng.</p></details>
-
-  <details class="qa"><summary>Vì sao <code>[lambda: i for i in range(3)]</code> cho ra [2,2,2]?</summary>
-  <p>Vì closure giữ tham chiếu tới <em>biến</em> chứ không phải giá trị lúc tạo. Khi các lambda được gọi, vòng lặp đã kết thúc và <code>i</code> đang là 2, nên cả ba đều trả về 2. Cách chữa phổ biến là chốt giá trị bằng đối số mặc định: <code>lambda i=i: i</code>, vì đối số mặc định được lượng giá ngay lúc định nghĩa. Đây cũng chính là cơ chế gây ra bẫy đối số mặc định khả biến.</p></details>
-</section>
-
-<footer>Deep dive · decorator &amp; context manager · phần iterator protocol và generator nằm ở bài <a href="../iterator-generator/index.html">Iterator &amp; generator</a>.</footer>
-
+<footer>Deep dive · Python internals · nền tảng ở <a href="../scope-legb/index.html">Scope &amp; LEGB</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>

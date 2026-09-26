@@ -18,7 +18,7 @@ window.CATALOG = [
       "n": 3,
       "path": "content/01-dsa/01-overview/dsa-overview/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -36,7 +36,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/01-dsa/02-foundations/big-o-complexity/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -54,7 +54,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/01-dsa/03-data-structures/data-structures-overview/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -66,7 +66,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/03-data-structures/array-string/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 6
      },
      {
@@ -78,7 +78,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/03-data-structures/linked-list/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 8
      },
      {
@@ -90,7 +90,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/03-data-structures/hash-map/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 8
      },
      {
@@ -102,7 +102,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/stack-monotonic-queue/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 17
      },
      {
@@ -114,7 +114,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/heap-priority-queue/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 14
      },
      {
@@ -126,7 +126,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/tree-bst-traversal/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 19
      },
      {
@@ -138,7 +138,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/03-data-structures/trie/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 5
      },
      {
@@ -150,7 +150,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/03-data-structures/union-find/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 12
      }
     ]
@@ -168,7 +168,7 @@ window.CATALOG = [
       "n": 2,
       "path": "content/01-dsa/04-algorithms/algorithms-overview/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -180,7 +180,7 @@ window.CATALOG = [
       "n": 9,
       "path": "content/01-dsa/04-algorithms/sorting/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 6
      },
      {
@@ -192,7 +192,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/04-algorithms/two-pointers/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 9
      },
      {
@@ -204,7 +204,7 @@ window.CATALOG = [
       "n": 8,
       "path": "content/01-dsa/04-algorithms/sliding-window/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 12
      },
      {
@@ -216,7 +216,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/04-algorithms/prefix-sum/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 8
      },
      {
@@ -228,7 +228,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/04-algorithms/binary-search/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 19
      },
      {
@@ -240,7 +240,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/04-algorithms/greedy/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 8
      },
      {
@@ -252,7 +252,7 @@ window.CATALOG = [
       "n": 6,
       "path": "content/01-dsa/04-algorithms/intervals/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 7
      },
      {
@@ -264,7 +264,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/04-algorithms/backtracking/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 16
      },
      {
@@ -276,7 +276,7 @@ window.CATALOG = [
       "n": 10,
       "path": "content/01-dsa/04-algorithms/graph-bfs-dfs-topo/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 20
      },
      {
@@ -288,7 +288,7 @@ window.CATALOG = [
       "n": 7,
       "path": "content/01-dsa/04-algorithms/shortest-path/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 6
      },
      {
@@ -300,8 +300,26 @@ window.CATALOG = [
       "n": 11,
       "path": "content/01-dsa/04-algorithms/dynamic-programming/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 21
+     }
+    ]
+   },
+   {
+    "dir": "05-toolkit",
+    "name": "Toolkit",
+    "books": [
+     {
+      "dir": "leetcode-toolkit",
+      "slug": "kit",
+      "title": "LeetCode toolkit",
+      "tag": "Toolkit",
+      "blurb": "Sáu công cụ rút ngắn lời giải nhiều nhất: bisect, Counter, defaultdict, deque, heapq và comprehension.",
+      "n": 7,
+      "path": "content/01-dsa/05-toolkit/leetcode-toolkit/index.html",
+      "skeleton": false,
+      "reviewed": true,
+      "lc": 0
      }
     ]
    }
@@ -351,11 +369,11 @@ window.CATALOG = [
       "slug": "memory",
       "title": "Memory model & mutability",
       "tag": "Python internals",
-      "blurb": "Biến là cái tên, không phải ô nhớ. Gán, shallow copy, deep copy, truyền tham số, và bốn cái bẫy mọc ra từ đó.",
-      "n": 10,
+      "blurb": "Tên là nhãn, object là dữ liệu: mỗi dòng code hoặc dán nhãn sang chỗ khác, hoặc sửa ruột object — mutability quyết định nhánh thứ hai có mở hay không.",
+      "n": 8,
       "path": "content/02-python/02-language-core/memory-model-mutability/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -363,11 +381,11 @@ window.CATALOG = [
       "slug": "memgc",
       "title": "Memory management & GC",
       "tag": "Python internals",
-      "blurb": "Một bản đồ hai nhánh: reference counting là cơ chế chính, cyclic GC vá lỗ hổng reference cycle — kèm del, resource management và bốn nguồn memory leak.",
-      "n": 9,
+      "blurb": "Reference counting dọn ngay khi bộ đếm về 0; cyclic GC chỉ vá một lỗ hổng là reference cycle — kèm del, with và bốn nguồn rò rỉ.",
+      "n": 7,
       "path": "content/02-python/02-language-core/memory-management-gc/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -375,11 +393,11 @@ window.CATALOG = [
       "slug": "scope",
       "title": "Scope & LEGB",
       "tag": "Language core",
-      "blurb": "Python tra một cái tên ở đâu: bốn tầng LEGB, global và nonlocal, và cách hàm nhận đối số qua *args, **kwargs.",
-      "n": 7,
+      "blurb": "Gõ một cái tên ra thì Python tra bốn tầng LEGB từ trong ra ngoài; còn gán thì luôn tạo biến ở tầng hiện tại.",
+      "n": 6,
       "path": "content/02-python/02-language-core/scope-legb/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -387,11 +405,11 @@ window.CATALOG = [
       "slug": "dunder",
       "title": "Data model & dunder",
       "tag": "Language core",
-      "blurb": "Vì sao len(x) chứ không phải x.len(), giao thức phía sau toán tử, và cách một object tự nhập vai list hay dict.",
-      "n": 6,
+      "blurb": "Mọi cú pháp của Python là đường tắt gọi một phương thức có tên cố định — biết bảng tên đó là đọc được mọi thư viện.",
+      "n": 5,
       "path": "content/02-python/02-language-core/data-model-dunder/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -399,11 +417,11 @@ window.CATALOG = [
       "slug": "iter",
       "title": "Iterator & generator",
       "tag": "Python",
-      "blurb": "Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.",
-      "n": 10,
+      "blurb": "Iterator không giữ dữ liệu, nó giữ vị trí — nên duyệt được đúng một lượt; yield là cách viết iterator ngắn nhất.",
+      "n": 7,
       "path": "content/02-python/02-language-core/iterator-generator/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -411,11 +429,11 @@ window.CATALOG = [
       "slug": "deco",
       "title": "Decorator & context manager",
       "tag": "Python",
-      "blurb": "Closure là nền của decorator, ba tầng lồng nhau khi có tham số, vì sao cần functools.wraps, và try/finally trong context manager.",
-      "n": 7,
+      "blurb": "@deco chỉ là cách viết gọn của f = deco(f) — closure là nền, và thiếu functools.wraps là hàm mất tên lẫn chữ ký.",
+      "n": 6,
       "path": "content/02-python/02-language-core/decorator-context-manager/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -423,11 +441,11 @@ window.CATALOG = [
       "slug": "exc",
       "title": "Exception handling",
       "tag": "Language core",
-      "blurb": "try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.",
-      "n": 7,
+      "blurb": "Lỗi bay ngược lên chuỗi lời gọi tới khối except khớp đầu tiên — nên mọi quyết định là bắt ở đâu và bắt rộng bao nhiêu.",
+      "n": 5,
       "path": "content/02-python/02-language-core/exception-handling/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -441,11 +459,11 @@ window.CATALOG = [
       "slug": "listset",
       "title": "List, tuple & set",
       "tag": "Built-in types",
-      "blurb": "Chi phí thật của từng thao tác, vì sao tuple làm khoá được mà list thì không, và set là hash table không giá trị.",
-      "n": 6,
+      "blurb": "list duyệt từng ô, set tính thẳng ra chỗ — và khoá phải bất biến thì hash mới ổn định.",
+      "n": 5,
       "path": "content/02-python/03-builtin-structures/list-tuple-set/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -453,11 +471,11 @@ window.CATALOG = [
       "slug": "dict",
       "title": "Python dict & hash table",
       "tag": "Python internals",
-      "blurb": "Hash function, hashable, collision, probe sequence, tombstone, load factor, resize, insertion order — đủ để trả lời mọi câu dict trong phỏng vấn.",
-      "n": 11,
+      "blurb": "Hash tính thẳng ra số ô nên tra là O(1) — collision thì probe tiếp, xoá thì đặt tombstone, load factor quá 2/3 thì resize.",
+      "n": 6,
       "path": "content/02-python/03-builtin-structures/dict-hash-table/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -469,13 +487,13 @@ window.CATALOG = [
      {
       "dir": "thread-process-gil",
       "slug": "gil",
-      "title": "Thread, process & GIL",
+      "title": "Process, thread & GIL",
       "tag": "Concurrency",
-      "blurb": "Process và thread khác nhau ở bộ nhớ và chi phí context switching — hiểu hai thứ đó rồi thì GIL chỉ còn là một câu.",
-      "n": 11,
+      "blurb": "Core chạy, scheduler chia lát, process bao thread — hiểu bốn tầng đó rồi thì GIL chỉ còn là một câu.",
+      "n": 8,
       "path": "content/02-python/04-concurrency/thread-process-gil/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      },
      {
@@ -483,29 +501,11 @@ window.CATALOG = [
       "slug": "async",
       "title": "Async / asyncio",
       "tag": "Python",
-      "blurb": "Vì sao 1000 kết nối thì async chứ không thread, ba lỗi async kinh điển, chi phí thật của từng mô hình, và bảng chọn.",
-      "n": 9,
+      "blurb": "Một thread duy nhất nhảy giữa các task tại mỗi await — nên async cho phép đợi nhiều thứ cùng lúc, không làm code chạy nhanh hơn.",
+      "n": 7,
       "path": "content/02-python/04-concurrency/asyncio/index.html",
       "skeleton": false,
-      "reviewed": false,
-      "lc": 0
-     }
-    ]
-   },
-   {
-    "dir": "05-toolkit",
-    "name": "Toolkit",
-    "books": [
-     {
-      "dir": "leetcode-toolkit",
-      "slug": "kit",
-      "title": "LeetCode toolkit",
-      "tag": "Toolkit",
-      "blurb": "bisect, Counter, defaultdict, deque, heapq và comprehension — sáu thứ rút ngắn lời giải nhiều nhất.",
-      "n": 8,
-      "path": "content/02-python/05-toolkit/leetcode-toolkit/index.html",
-      "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -519,11 +519,11 @@ window.CATALOG = [
       "slug": "oop",
       "title": "OOP trong Python",
       "tag": "OOP",
-      "blurb": "Bốn trụ OOP mà Python hỗ trợ trực tiếp qua cú pháp: encapsulation, abstraction, inheritance, polymorphism — và MRO khi đa kế thừa.",
-      "n": 9,
+      "blurb": "Bốn trụ OOP trong Python: encapsulation chỉ là quy ước, polymorphism không cần chung lớp cha, và super() đi theo MRO.",
+      "n": 6,
       "path": "content/02-python/06-oop/oop-python/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -537,11 +537,11 @@ window.CATALOG = [
       "slug": "typing",
       "title": "Type hints & dataclass",
       "tag": "Typing",
-      "blurb": "Type hints không đổi runtime nhưng đổi cách team đọc code — Generic, Protocol và dataclass dùng thế nào cho đúng.",
-      "n": 8,
+      "blurb": "Type hint không đổi runtime — nó viết cho type checker, IDE và người đọc code.",
+      "n": 5,
       "path": "content/02-python/07-typing/typing-dataclass/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -555,11 +555,11 @@ window.CATALOG = [
       "slug": "perf",
       "title": "Profiling & performance",
       "tag": "Performance",
-      "blurb": "Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.",
-      "n": 7,
+      "blurb": "Đo trước khi tối ưu — cProfile chỉ ra chỗ thật sự chậm, và vectorize nhanh hơn vòng lặp Python hàng chục lần.",
+      "n": 5,
       "path": "content/02-python/08-performance/performance-profiling/index.html",
       "skeleton": false,
-      "reviewed": false,
+      "reviewed": true,
       "lc": 0
      }
     ]
@@ -601,18 +601,6 @@ window.CATALOG = [
       "blurb": "Hệ điều hành chia một máy cho nhiều việc thế nào: tiến trình, bộ nhớ, và đồng bộ.",
       "n": 3,
       "path": "content/03-cs-fundamentals/02-os/os-overview/index.html",
-      "skeleton": false,
-      "reviewed": false,
-      "lc": 0
-     },
-     {
-      "dir": "process-thread-scheduling",
-      "slug": "osproc",
-      "title": "Process, thread & scheduling",
-      "tag": "CS",
-      "blurb": "Ranh giới cô lập, chi phí context switch, và bộ lập lịch quyết định ai chạy tiếp.",
-      "n": 7,
-      "path": "content/03-cs-fundamentals/02-os/process-thread-scheduling/index.html",
       "skeleton": false,
       "reviewed": false,
       "lc": 0
@@ -1341,11 +1329,11 @@ window.CATALOG = [
      },
      {
       "dir": "linear-regression",
-      "slug": "linreg",
+      "slug": "lr",
       "title": "Linear regression",
       "tag": "ML",
-      "blurb": "MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, đa cộng tuyến và Ridge/Lasso.",
-      "n": 11,
+      "blurb": "Tìm w và b làm sai lệch nhỏ nhất: MSE hay MAE, nghiệm đóng hay gradient descent, bốn giả định, và đa cộng tuyến làm hệ số loạn.",
+      "n": 9,
       "path": "content/05-machine-learning/05-classical-ml/linear-regression/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1356,8 +1344,8 @@ window.CATALOG = [
       "slug": "logreg",
       "title": "Logistic regression",
       "tag": "ML",
-      "blurb": "Vì sao log loss chứ không phải MSE, cách đọc odds ratio, ngưỡng quyết định, và vì sao vẫn là baseline.",
-      "n": 11,
+      "blurb": "Xác suất thay vì nhãn: sigmoid ép điểm số về (0,1), log loss thay MSE, cách đọc odds ratio và ngưỡng là quyết định nghiệp vụ.",
+      "n": 8,
       "path": "content/05-machine-learning/05-classical-ml/logistic-regression/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1365,7 +1353,7 @@ window.CATALOG = [
      },
      {
       "dir": "ridge-lasso-elasticnet",
-      "slug": "ridge",
+      "slug": "rlen",
       "title": "Ridge, Lasso & Elastic Net",
       "tag": "ML",
       "blurb": "Ba cách regularize model tuyến tính: L2 co hệ số về gần 0, L1 đưa về đúng 0, Elastic Net gộp cả hai — khác nhau ở hình dạng vùng phạt.",
@@ -1380,8 +1368,8 @@ window.CATALOG = [
       "slug": "svm",
       "title": "SVM",
       "tag": "ML",
-      "blurb": "Margin lớn nhất, support vector, tham số C và gamma, kernel trick — và vì sao nó từng thắng trước khi deep learning tới.",
-      "n": 8,
+      "blurb": "Tách bằng dải trống rộng nhất: support vector, hinge loss, C và gamma, và kernel trick cho ranh giới cong.",
+      "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/svm/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1393,7 +1381,7 @@ window.CATALOG = [
       "title": "KNN",
       "tag": "ML",
       "blurb": "Không huấn luyện gì cả, chỉ nhớ dữ liệu: chọn k, đo khoảng cách, và vì sao mọi thứ sụp đổ khi số chiều tăng.",
-      "n": 8,
+      "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/knn/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1404,8 +1392,8 @@ window.CATALOG = [
       "slug": "nb",
       "title": "Naive Bayes",
       "tag": "ML",
-      "blurb": "Bốn bước từ thư tới nhãn: đếm tần suất, cộng alpha, cộng log, argmax — và cái giá của giả định độc lập.",
-      "n": 9,
+      "blurb": "Bốn bước từ thư tới nhãn: đếm tần suất, cộng α, cộng log, lấy lớp điểm cao nhất — và cái giá của giả định các chữ độc lập.",
+      "n": 7,
       "path": "content/05-machine-learning/05-classical-ml/naive-bayes/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1458,8 +1446,8 @@ window.CATALOG = [
       "slug": "ada",
       "title": "AdaBoost",
       "tag": "Ensemble",
-      "blurb": "Một stump chỉ vẽ được một lát cắt thẳng. AdaBoost đội trọng số vào chỗ đang sai rồi trồng stump tiếp: alpha, exponential loss, bẫy nhiễu nhãn, và đường nối sang gradient boosting.",
-      "n": 9,
+      "blurb": "Nhiều stump nối tiếp: dồn trọng số vào dòng bị đoán sai, chấm α cho từng stump, rồi bỏ phiếu có trọng số; công thức từ exponential loss ra err, α và trọng số mới.",
+      "n": 7,
       "path": "content/05-machine-learning/06-tree-models/adaboost/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1470,8 +1458,8 @@ window.CATALOG = [
       "slug": "gb",
       "title": "Gradient boosting",
       "tag": "Ensemble",
-      "blurb": "Cây sau học phần dư của cây trước. Cây nông, learning_rate nhỏ, loss function thay được, và chỗ cắt vòng lặp chỉ đo được trên tập validation riêng.",
-      "n": 9,
+      "blurb": "Nhiều cây nông nối tiếp, mỗi cây học phần dư của các cây trước rồi cộng vào với η: công thức tổng quát, regression và classification, từ bảng tới dự đoán, η và điểm dừng.",
+      "n": 8,
       "path": "content/05-machine-learning/06-tree-models/gradient-boosting/index.html",
       "skeleton": false,
       "reviewed": true,
@@ -1482,8 +1470,8 @@ window.CATALOG = [
       "slug": "xgb",
       "title": "XGBoost",
       "tag": "Ensemble",
-      "blurb": "Đưa cả cây về một công thức: mỗi mẫu cho hai số g và h, lá nào cũng tính thẳng ra giá trị, phép tách nào cũng chấm được điểm — nên λ, γ và ô trống đều nằm trong cùng một chỗ.",
-      "n": 9,
+      "blurb": "Từ bảng dữ liệu tới dự đoán: residual, Similarity Score, Gain, Output value, cộng dồn nhiều cây; hai dạng regression và classification; hàm loss với γ và λ.",
+      "n": 8,
       "path": "content/05-machine-learning/06-tree-models/xgboost/index.html",
       "skeleton": false,
       "reviewed": true,

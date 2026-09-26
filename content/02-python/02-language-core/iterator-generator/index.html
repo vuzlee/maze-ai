@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Iterator & generator — MazeAI</title>
-<meta name="description" content="Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.">
+<meta name="description" content="Iterator không giữ dữ liệu, nó giữ vị trí — nên duyệt được đúng một lượt; yield là cách viết iterator ngắn nhất.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/iterator-generator/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Iterator &amp; generator">
-<meta property="og:description" content="Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.">
+<meta property="og:description" content="Iterator không giữ dữ liệu, nó giữ vị trí — nên duyệt được đúng một lượt; yield là cách viết iterator ngắn nhất.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,450 +39,296 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-iter" data-title="Iterator & generator" data-tag="Python" data-blurb="Iterable khác iterator ở đâu, vòng for thực chất làm gì, generator tiết kiệm bao nhiêu bộ nhớ, yield from và itertools.">
+<article class="doc" id="art-iter" data-title="Iterator &amp; generator" data-reviewed="1" data-tag="Python" data-blurb="Iterator không giữ dữ liệu, nó giữ vị trí — nên duyệt được đúng một lượt; yield là cách viết iterator ngắn nhất.">
         <header class="hero">
-  <p class="eyebrow">Deep dive &#183; Python internals</p>
-  <h1>Iterator <em>&amp; generator</em></h1>
-  <p class="lede">Vòng <code>for</code> của Python không đọc thẳng từ list. Nó xin một <b>iterator</b> — thứ chỉ nhớ hai điều:</p>
+  <p class="eyebrow">Deep dive · Python internals</p>
+  <h1>Iterator &amp; <em>generator</em></h1>
+  <p class="lede">Vòng <code>for</code> không đọc thẳng từ list. Ba thứ cần nhớ:</p>
   <ul class="ledelist">
-    <li><b>Đang đứng ở đâu</b> — <em>không giữ dữ liệu, chỉ giữ vị trí</em></li>
-    <li><b>Cách lấy phần tử kế tiếp</b> — <em>tính ra khi được hỏi, không tính sẵn</em></li>
+    <li>iterator chỉ giữ vị trí, không giữ dữ liệu</li>
+    <li>vì thế nó đi được đúng một lượt</li>
+    <li><code>yield</code> là cách viết iterator ngắn nhất</li>
   </ul>
-  <p class="lede"><code>yield</code> là cách viết iterator ngắn nhất, và cái giá của nó là bạn chỉ được đi qua một lần.</p>
 </header>
 
 <section id="iter-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Iterator không giữ dữ liệu, nó giữ <em>cách tính ra phần tử tiếp theo</em> — mọi ưu điểm và mọi bẫy của cả bài đều rơi ra từ câu đó.</p>
-
-<figure class="gist">
-<svg viewBox="0 0 860 274" role="img" aria-label="Bản đồ bốn ô: dòng for bạn viết, iterable, iterator, yield và cái giá của lười; bên phải là bốn ý cốt lõi">
-<rect x="0" y="26" width="300" height="30" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="150" y="47" fill="var(--tomb)" text-anchor="middle">for x in obj:  &#8212; BẠN VIẾT</text>
-<line x1="62" y1="56" x2="62" y2="64" stroke="var(--tomb)" stroke-width="1.2"/><polygon points="62,72 57.8,64 66.2,64" fill="var(--tomb)"/>
-<rect x="0" y="74" width="124" height="66" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="95" fill="var(--filled)">ITERABLE</text>
-<text class="sv-d" x="14" y="112" fill="var(--dim)">giữ dữ liệu</text>
-<text class="sv-d" x="14" y="129" fill="var(--dim)">duyệt lại được</text>
-<text class="sv-d" x="150" y="100" fill="var(--probe)" text-anchor="middle">sinh ra</text>
-<line x1="126" y1="112" x2="166" y2="112" stroke="var(--probe)" stroke-width="1.2"/><polygon points="174,112 166,107.8 166,116.2" fill="var(--probe)"/>
-<rect x="176" y="74" width="124" height="66" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="190" y="95" fill="var(--probe)">ITERATOR</text>
-<text class="sv-d" x="190" y="112" fill="var(--dim)">giữ vị trí</text>
-<text class="sv-d" x="190" y="129" fill="var(--dim)">cạn là hết</text>
-<path d="M238 140 V 152" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<line x1="0" y1="156" x2="300" y2="156" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
-<rect x="0" y="164" width="300" height="40" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="185" fill="var(--ok)">YIELD &#8212; cách viết gọn</text>
-<text class="sv-s" x="14" y="201" fill="var(--dim)">đóng băng hàm &#8212; khỏi tự cài phương thức nào</text>
-<rect x="0" y="212" width="300" height="40" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="14" y="233" fill="var(--tomb)">CÁI GIÁ CỦA LƯỜI</text>
-<text class="sv-s" x="14" y="249" fill="var(--dim)">đổi bộ nhớ lấy khả năng quay lại</text>
-<text class="sv-hv" x="360" y="22" fill="var(--muted)">BỐN Ý &#8212; HẾT</text>
-<rect x="360" y="32" width="500" height="52" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="376" y="53" fill="var(--filled)">Iterable giữ dữ liệu, duyệt lại được</text>
-<text class="sv-t" x="376" y="71" fill="var(--dim)">list &#183; dict &#183; str &#8212; mỗi vòng for tạo một iterator mới</text>
-<rect x="360" y="92" width="500" height="52" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="376" y="113" fill="var(--probe)">Iterator giữ vị trí, cạn là hết</text>
-<text class="sv-t" x="376" y="131" fill="var(--dim)">duyệt lần hai ra rỗng, và không có exception nào báo cho bạn</text>
-<rect x="360" y="152" width="500" height="52" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="376" y="173" fill="var(--ok)">yield đóng băng hàm giữa chừng</text>
-<text class="sv-t" x="376" y="191" fill="var(--dim)">biến cục bộ còn nguyên, lần next sau chạy tiếp từ đúng chỗ đó</text>
-<rect x="360" y="212" width="500" height="52" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="376" y="233" fill="var(--tomb)">Lười đổi bộ nhớ lấy khả năng quay lại</text>
-<text class="sv-t" x="376" y="251" fill="var(--dim)">không có len(), không chỉ số, không duyệt được lần thứ hai</text>
+  <p class="key">Iterator <em>không giữ dữ liệu</em> — nó giữ cách tính ra phần tử tiếp theo. Mọi ưu điểm và mọi bẫy đều rơi ra từ câu đó.</p>
+  <figure class="gist">
+    <svg viewBox="0 0 860 338" role="img" aria-label="Hàng trên là iterable ba ô chứa dữ liệu thật; hàng dưới là iterator chỉ có một khung rỗng với con trỏ chạy qua từng vị trí; mỗi bước next trả ra một phần tử sang cột bên phải" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}2.143%{animation-timing-function:ease-in-out;opacity:0}4.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}3.571%{animation-timing-function:ease-in-out;opacity:0}6.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}6.429%{animation-timing-function:ease-in-out;opacity:0}8.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}11.429%{animation-timing-function:ease-in-out;opacity:0}13.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0}13.571%{animation-timing-function:ease-in-out;opacity:0}16.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0}17.143%{animation-timing-function:ease-in-out;opacity:0}19.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}21.429%{animation-timing-function:ease-in-out;opacity:0}23.214%{animation-timing-function:ease-in-out;opacity:1}32.143%{animation-timing-function:ease-in-out;opacity:1}33.929%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.857%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.214%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}29.286%{animation-timing-function:ease-in-out;opacity:1;transform:translate(460px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(460px,0px)}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}32.857%{animation-timing-function:ease-in-out;opacity:0}34.643%{animation-timing-function:ease-in-out;opacity:1}43.571%{animation-timing-function:ease-in-out;opacity:1}45.357%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}34.286%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}34.643%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}40.714%{animation-timing-function:ease-in-out;opacity:1;transform:translate(460px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(460px,0px)}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}44.286%{animation-timing-function:ease-in-out;opacity:0}46.071%{animation-timing-function:ease-in-out;opacity:1}55.000%{animation-timing-function:ease-in-out;opacity:1}56.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}45.714%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}46.071%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}52.143%{animation-timing-function:ease-in-out;opacity:1;transform:translate(460px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(460px,0px)}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}55.714%{animation-timing-function:ease-in-out;opacity:0}58.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}61.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm16{0%{animation-timing-function:ease-in-out;opacity:0}64.286%{animation-timing-function:ease-in-out;opacity:0}66.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm17{0%{animation-timing-function:ease-in-out;opacity:0}68.571%{animation-timing-function:ease-in-out;opacity:0}71.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 14.0s linear 1 forwards}.mm2{animation:mm2 14.0s linear 1 forwards}.mm3{animation:mm3 14.0s linear 1 forwards}.mm4{animation:mm4 14.0s linear 1 forwards}.mm5{animation:mm5 14.0s linear 1 forwards}.mm6{animation:mm6 14.0s linear 1 forwards}.mm7{animation:mm7 14.0s linear 1 forwards}.mm8{animation:mm8 14.0s linear 1 forwards}.mm9{animation:mm9 14.0s linear 1 forwards}.mm10{animation:mm10 14.0s linear 1 forwards}.mm11{animation:mm11 14.0s linear 1 forwards}.mm12{animation:mm12 14.0s linear 1 forwards}.mm13{animation:mm13 14.0s linear 1 forwards}.mm14{animation:mm14 14.0s linear 1 forwards}.mm15{animation:mm15 14.0s linear 1 forwards}.mm16{animation:mm16 14.0s linear 1 forwards}.mm17{animation:mm17 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">ITERABLE GIỮ DỮ LIỆU · ITERATOR CHỈ GIỮ VỊ TRÍ</text>
+<g class="mm1"><text class="sv-d" x="60" y="64" fill="var(--clay)" style="fill:var(--clay)">iterable  ·  [10, 20, 30]</text></g>
+<g class="mm2"><rect x="60" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="84.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">10</text></g>
+<g class="mm3"><rect x="108" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="132.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">20</text></g>
+<g class="mm4"><rect x="156" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="180.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">30</text></g>
+<g class="mm5"><text class="sv-d" x="60" y="156" fill="var(--probe)" style="fill:var(--probe)">iterator  ·  chỉ nhớ đang đứng ở đâu</text></g>
+<g class="mm6"><rect x="60" y="178" width="144" height="36" rx="5" fill="none" stroke="var(--probe)" stroke-width="1.4" stroke-dasharray="4 3"/><text class="sv-d" x="220" y="202" fill="var(--faint)" style="fill:var(--faint)">không có ô nào — không giữ dữ liệu</text></g>
+<g class="mm7"><text class="sv-d" x="520" y="64" fill="var(--ok)" style="fill:var(--ok)">next() trả ra</text></g>
+<g class="mm8" opacity="0"><rect x="66" y="182" width="36" height="28" rx="4" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="84.0" y="202" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">▲</text></g>
+<g class="mm9" transform="translate(460 0)"><rect x="60" y="86" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="84.0" y="110.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">10</text></g>
+<g class="mm10" opacity="0"><rect x="114" y="182" width="36" height="28" rx="4" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="132.0" y="202" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">▲</text></g>
+<g class="mm11" transform="translate(460 0)"><rect x="108" y="86" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="132.0" y="110.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">20</text></g>
+<g class="mm12" opacity="0"><rect x="162" y="182" width="36" height="28" rx="4" fill="rgba(var(--amber-a),.35)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="180.0" y="202" fill="var(--probe)" style="fill:var(--probe)" text-anchor="middle">▲</text></g>
+<g class="mm13" transform="translate(460 0)"><rect x="156" y="86" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="180.0" y="110.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">30</text></g>
+<g class="mm14"><text class="sv-d" x="520" y="142" fill="var(--ok)" style="fill:var(--ok)">mỗi lần hỏi mới tính · không tính sẵn</text></g>
+<g class="mm15"><text class="sv-d" x="60" y="234" fill="var(--tomb)" style="fill:var(--tomb)">đi hết → cạn, không lùi lại được</text></g>
+<g class="mm16"><rect x="0" y="274" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="289" fill="var(--probe)" style="fill:var(--probe)">Iterator không giữ dữ liệu · nó giữ cách tính ra phần tử tiếp theo</text></g>
+<g class="mm17"><text class="sv-d" x="14" y="306" fill="var(--muted)" style="fill:var(--muted)">Nhờ tách hai vai mà một dòng file, một luồng vô hạn hay kết quả truy vấn đều dùng chung cú pháp for.</text></g>
 </svg>
-<figcaption>Bản đồ bên trái lặp lại ở <b>mọi mục</b> của bài — mỗi lần chỉ sáng đúng ô đang học, phần còn lại xám đi. Học cách đọc nó một lần là đọc được cả bài.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><strong>Ô ITERABLE</strong> giữ dữ liệu thật, nên duyệt lại bao nhiêu lần cũng được — mục 02.</li>
-    <li><strong>Ô ITERATOR</strong> chỉ giữ vị trí, nên cạn là hết — mục 02 và mục 03.</li>
-    <li><strong>Ô YIELD</strong> là cách viết một iterator mà không phải tự cài phương thức nào — mục 04 và 06.</li>
-    <li><strong>Ô CÁI GIÁ</strong> nói vì sao lười không phải lúc nào cũng thắng — mục 05.</li>
+    <li>Có <code>__iter__</code> là <b>iterable</b>; có thêm <code>__next__</code> là <b>iterator</b>.</li>
+    <li><code>list</code>, <code>dict</code>, <code>str</code>, <code>range</code> là iterable. Generator và file object là iterator.</li>
+    <li>Iterator cũng có <code>__iter__</code> — nó trả về chính nó, nên bỏ thẳng vào <code>for</code> vẫn chạy.</li>
   </ul>
-
-  <details class="deep"><summary>Vì sao Python không cho <code>for</code> đọc thẳng dữ liệu cho xong?</summary>
-    <div class="body">
-      <p>Vì như vậy thì <code>for</code> chỉ chạy được trên thứ đã nằm sẵn trong bộ nhớ. Tách ra làm hai vai — một bên giữ dữ liệu, một bên giữ vị trí — thì <code>for</code> chỉ cần biết cách hỏi &quot;phần tử tiếp là gì&quot;, còn phần tử đó ở đâu ra là việc của phía kia.</p>
-      <p>Đổi lại, một dòng đọc từ file, một luồng số vô hạn, hay kết quả của một truy vấn đều dùng chung được cú pháp <code>for</code>. Đó là toàn bộ lý do bản đồ này có hai ô riêng thay vì một.</p>
-    </div></details>
 </section>
 
 <section id="iter-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Iterable vs iterator</h2></div>
-
-  <p class="key">Hai ô giữa của bản đồ. <em>Iterable</em> giữ dữ liệu và tạo ra iterator mới mỗi lần được duyệt; <em>iterator</em> chỉ giữ vị trí, và vị trí thì chỉ đi tới được một lượt.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 300" role="img" aria-label="so sánh duyệt lại được với cạn là hết, và cái bug im lặng sinh ra từ đó">
-<path d="M0.0 112 H 37.12 V 100 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,100.0 69.51,95.8 69.51,104.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">CÙNG MỘT DỮ LIỆU &#183; HAI CÁCH CẦM</text>
-<rect x="86.62" y="30" width="371.22" height="128" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="52" fill="var(--filled)">ITERABLE &#8212; có __iter__</text>
-<rect x="108.27" y="62" width="327.91" height="24" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="126.83" y="79" fill="var(--dim)">a = [1, 2, 3]</text>
-<text class="sv-d" x="108.27" y="106" fill="var(--muted)">for x in a:  &#8594; 1 2 3</text>
-<text class="sv-d" x="108.27" y="124" fill="var(--muted)">for x in a:  &#8594; 1 2 3  chạy lại được</text>
-<text class="sv-d" x="108.27" y="146" fill="var(--ok)">mỗi vòng for tạo một iterator MỚI</text>
-<rect x="488.78" y="30" width="371.22" height="128" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="510.43" y="52" fill="var(--probe)">ITERATOR &#8212; có thêm __next__</text>
-<rect x="510.43" y="62" width="327.91" height="24" rx="4" fill="var(--sunk)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="528.99" y="79" fill="var(--dim)">it = iter(a)</text>
-<text class="sv-d" x="510.43" y="106" fill="var(--muted)">list(it)  &#8594; [1, 2, 3]</text>
-<text class="sv-d" x="510.43" y="124" fill="var(--tomb)">list(it)  &#8594; []   đã cạn, im lặng</text>
-<text class="sv-d" x="510.43" y="146" fill="var(--tomb)">nó giữ VỊ TRÍ, không giữ dữ liệu</text>
-<text class="sv-hv" x="86.62" y="190" fill="var(--muted)">VÌ SAO PHÂN BIỆT NÀY ĐÁNG TIỀN</text>
-<rect x="86.62" y="198" width="773.38" height="62" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="220" fill="var(--tomb)">Hàm nhận tham số rồi duyệt HAI LẦN</text>
-<text class="sv-s" x="108.27" y="238" fill="var(--muted)">người gọi truyền list &#8594; đúng &#183; truyền generator &#8594; lượt hai rỗng</text>
-<text class="sv-d" x="108.27" y="254" fill="var(--ok)">cần duyệt nhiều lần thì items = list(items) ngay đầu hàm</text>
+  <div class="sh"><b>02</b><h2>Duyệt lại lần hai</h2></div>
+  <p class="key">Iterable tạo iterator <em>mới</em> mỗi lần được duyệt. Iterator chỉ có <em>một lượt</em> — lượt hai trả về rỗng mà không báo gì.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 476" role="img" aria-label="Hàng trên là list, hàng dưới là iterator; lượt một cả hai đều trả ra đủ ba phần tử vào các ngăn; lượt hai list vẫn trả đủ còn iterator để trống hoàn toàn mà không báo lỗi" data-anim><style>@keyframes ru1{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}4.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru2{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru3{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru4{0%{animation-timing-function:ease-in-out;opacity:0}4.688%{animation-timing-function:ease-in-out;opacity:0}6.875%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru5{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru6{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru7{0%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:0}8.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru8{0%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:0}9.687%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru9{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru10{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru11{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru12{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru13{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru14{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru15{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru16{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru17{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru18{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru19{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru20{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru21{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru22{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru23{0%{animation-timing-function:ease-in-out;opacity:0}12.500%{animation-timing-function:ease-in-out;opacity:0}14.062%{animation-timing-function:ease-in-out;opacity:1}43.750%{animation-timing-function:ease-in-out;opacity:1}45.312%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ru24{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.312%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}20.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}}@keyframes ru25{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.125%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.438%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}23.125%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}}@keyframes ru26{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}21.250%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}21.562%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.250%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}}@keyframes ru27{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}16.250%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}16.562%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}21.250%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}}@keyframes ru28{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}19.375%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}19.688%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.375%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}}@keyframes ru29{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.500%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.812%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}27.500%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,0px)}}@keyframes ru30{0%{animation-timing-function:ease-in-out;opacity:0}45.000%{animation-timing-function:ease-in-out;opacity:0}46.562%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru31{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}47.500%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}47.812%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}52.500%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,44px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,44px)}}@keyframes ru32{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}50.625%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}50.938%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}55.625%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,44px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,44px)}}@keyframes ru33{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.750%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}54.062%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}58.750%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,44px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(360px,44px)}}@keyframes ru34{0%{animation-timing-function:ease-in-out;opacity:0}60.000%{animation-timing-function:ease-in-out;opacity:0}62.187%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru35{0%{animation-timing-function:ease-in-out;opacity:0}56.250%{animation-timing-function:ease-in-out;opacity:0}57.812%{animation-timing-function:ease-in-out;opacity:1}81.250%{animation-timing-function:ease-in-out;opacity:1}82.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ru36{0%{animation-timing-function:ease-in-out;opacity:0}65.000%{animation-timing-function:ease-in-out;opacity:0}67.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru37{0%{animation-timing-function:ease-in-out;opacity:0}71.250%{animation-timing-function:ease-in-out;opacity:0}73.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ru38{0%{animation-timing-function:ease-in-out;opacity:0}75.000%{animation-timing-function:ease-in-out;opacity:0}77.188%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ru1{animation:ru1 16.0s linear 1 forwards}.ru2{animation:ru2 16.0s linear 1 forwards}.ru3{animation:ru3 16.0s linear 1 forwards}.ru4{animation:ru4 16.0s linear 1 forwards}.ru5{animation:ru5 16.0s linear 1 forwards}.ru6{animation:ru6 16.0s linear 1 forwards}.ru7{animation:ru7 16.0s linear 1 forwards}.ru8{animation:ru8 16.0s linear 1 forwards}.ru9{animation:ru9 16.0s linear 1 forwards}.ru10{animation:ru10 16.0s linear 1 forwards}.ru11{animation:ru11 16.0s linear 1 forwards}.ru12{animation:ru12 16.0s linear 1 forwards}.ru13{animation:ru13 16.0s linear 1 forwards}.ru14{animation:ru14 16.0s linear 1 forwards}.ru15{animation:ru15 16.0s linear 1 forwards}.ru16{animation:ru16 16.0s linear 1 forwards}.ru17{animation:ru17 16.0s linear 1 forwards}.ru18{animation:ru18 16.0s linear 1 forwards}.ru19{animation:ru19 16.0s linear 1 forwards}.ru20{animation:ru20 16.0s linear 1 forwards}.ru21{animation:ru21 16.0s linear 1 forwards}.ru22{animation:ru22 16.0s linear 1 forwards}.ru23{animation:ru23 16.0s linear 1 forwards}.ru24{animation:ru24 16.0s linear 1 forwards}.ru25{animation:ru25 16.0s linear 1 forwards}.ru26{animation:ru26 16.0s linear 1 forwards}.ru27{animation:ru27 16.0s linear 1 forwards}.ru28{animation:ru28 16.0s linear 1 forwards}.ru29{animation:ru29 16.0s linear 1 forwards}.ru30{animation:ru30 16.0s linear 1 forwards}.ru31{animation:ru31 16.0s linear 1 forwards}.ru32{animation:ru32 16.0s linear 1 forwards}.ru33{animation:ru33 16.0s linear 1 forwards}.ru34{animation:ru34 16.0s linear 1 forwards}.ru35{animation:ru35 16.0s linear 1 forwards}.ru36{animation:ru36 16.0s linear 1 forwards}.ru37{animation:ru37 16.0s linear 1 forwards}.ru38{animation:ru38 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">DUYỆT LẠI LẦN HAI · LIST CÒN NGUYÊN, ITERATOR ĐÃ CẠN</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="ru1"><text x="0.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">list(xs)</text></g>
+<g class="ru2"><text x="0.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">it = iter(xs)</text></g>
+<g class="ru3"><rect x="200" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="224.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="ru4"><rect x="248" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="272.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="ru5"><rect x="296" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="320.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="ru6"><rect x="200" y="232" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="224.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="ru7"><rect x="248" y="232" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="272.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="ru8"><rect x="296" y="232" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="320.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="ru9"><rect x="560" y="84" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru10"><rect x="608" y="84" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru11"><rect x="656" y="84" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru12"><rect x="560" y="128" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru13"><rect x="608" y="128" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru14"><rect x="656" y="128" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru15"><text class="sv-d" x="504" y="108" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">lượt 1</text><text class="sv-d" x="504" y="152" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">lượt 2</text></g>
+<g class="ru16"><rect x="560" y="232" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru17"><rect x="608" y="232" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru18"><rect x="656" y="232" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru19"><rect x="560" y="276" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru20"><rect x="608" y="276" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru21"><rect x="656" y="276" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="ru22"><text class="sv-d" x="504" y="256" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">lượt 1</text><text class="sv-d" x="504" y="300" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">lượt 2</text></g>
+<g class="ru23" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">lượt 1</text></g>
+<g class="ru24" transform="translate(360 0)"><rect x="200" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="224.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="ru25" transform="translate(360 0)"><rect x="248" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="272.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="ru26" transform="translate(360 0)"><rect x="296" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="320.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="ru27" transform="translate(360 0)"><rect x="200" y="232" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="224.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="ru28" transform="translate(360 0)"><rect x="248" y="232" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="272.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="ru29" transform="translate(360 0)"><rect x="296" y="232" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="320.0" y="256.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="ru30"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">lượt 2</text></g>
+<g class="ru31" transform="translate(360 44)"><rect x="200" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="224.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="ru32" transform="translate(360 44)"><rect x="248" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="272.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="ru33" transform="translate(360 44)"><rect x="296" y="84" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="320.0" y="108.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="ru34"><text class="sv-d" x="718" y="152" fill="var(--ok)" style="fill:var(--ok)">→ [1, 2, 3]</text></g>
+<g class="ru35" opacity="0"><rect x="560" y="372" width="162.6" height="26" rx="5" fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-width="1.6"/><text x="571.0" y="390.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">lượt 2 của iterator</text><line x1="641.3" y1="398.0" x2="608.0" y2="312.0" stroke="var(--tomb)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="608.0" cy="312.0" r="2.8" fill="var(--tomb)"/><rect x="556.0" y="272.0" width="152.0" height="44.0" fill="none" stroke="var(--tomb)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="ru36"><text class="sv-d" x="560" y="344" fill="var(--tomb)" style="fill:var(--tomb)">→ []  RỖNG · không báo lỗi gì</text></g>
+<g class="ru37"><rect x="0" y="412" width="3" height="20" rx="1.5" fill="rgba(var(--red-a),1)" stroke="var(--tomb)" stroke-width="0"/><text class="sv-d" x="14" y="427" fill="var(--tomb)" style="fill:var(--tomb)">Bug im lặng: không exception, không log — chỉ là kết quả rỗng</text></g>
+<g class="ru38"><text class="sv-d" x="14" y="444" fill="var(--muted)" style="fill:var(--muted)">Hàm nào cần duyệt nhiều lượt thì items = list(items) ngay dòng đầu, và ghi rõ trong docstring.</text></g>
 </svg>
-<figcaption>Cùng một dãy số, hai cách cầm. <code>list</code> duyệt lại được vì mỗi vòng <code>for</code> tạo iterator mới; iterator thì chỉ có một lượt, và lượt hai trả về rỗng mà không báo gì.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><strong>Phân biệt bằng phương thức</strong>: có <code>__iter__</code> là iterable, có thêm <code>__next__</code> là iterator.</li>
-    <li><strong>Generator và file object là iterator</strong>, còn <code>list</code>, <code>dict</code>, <code>str</code>, <code>range</code> là iterable.</li>
-    <li><strong>Iterator cũng có <code>__iter__</code></strong> — nó trả về chính nó, nên bỏ thẳng vào <code>for</code> vẫn chạy.</li>
+    <li>Đây là <b>bug im lặng</b>: không exception, không log, chỉ là kết quả rỗng.</li>
+    <li>Hàm duyệt hai lượt: test truyền list vào thì xanh hết, production truyền generator vào thì rỗng.</li>
+    <li>Cách chữa đáng tin: <code>items = list(items)</code> ngay dòng đầu, và ghi rõ trong docstring.</li>
   </ul>
-
-  <details class="deep"><summary>Bug im lặng đó trông như thế nào trong code thật?</summary>
-    <div class="body">
-      <p>Một hàm nhận <code>items</code> rồi vừa tính <code>total</code> vừa lọc ra danh sách con. Nó duyệt hai lượt. Người viết test truyền list vào — xanh hết. Sáu tháng sau ai đó truyền <code>(x for x in rows)</code> vào cho tiết kiệm bộ nhớ, và danh sách con trả về rỗng.</p>
-      <p>Không exception nào được ném, không dòng log nào bất thường. Cách chữa duy nhất đáng tin: hàm nào cần duyệt nhiều lần thì <code>items = list(items)</code> ngay dòng đầu và ghi rõ trong docstring.</p>
-    </div></details>
 </section>
 
 <section id="iter-s3" class="lesson">
   <div class="sh"><b>03</b><h2>Vòng for thực chất làm gì</h2></div>
-
-  <p class="key">Ô trên cùng của bản đồ. Dòng <code>for</code> bạn viết chỉ là <em>đường tắt cú pháp</em> cho bốn dòng gọi <code>iter</code> rồi <code>next</code> lặp lại.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 306" role="img" aria-label="bốn dòng Python thực thi và ba hệ quả rút ra">
-<path d="M0.0 41 H 37.12 V 46 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,46.0 69.51,41.8 69.51,50.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">PYTHON DỊCH DÒNG ĐÓ RA BỐN DÒNG NÀY</text>
-<rect x="86.62" y="30" width="773.38" height="108" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-l" x="111.37" y="54" fill="var(--probe)">it = iter(obj)</text>
-<text class="sv-d" x="405.25" y="54" fill="var(--muted)">gọi obj.__iter__()</text>
-<text class="sv-l" x="111.37" y="76" fill="var(--probe)">while True:</text>
-<text class="sv-l" x="111.37" y="96" fill="var(--probe)">    x = next(it)</text>
-<text class="sv-d" x="405.25" y="96" fill="var(--muted)">gọi it.__next__()</text>
-<text class="sv-l" x="111.37" y="118" fill="var(--tomb)">    except StopIteration: break</text>
-<text class="sv-d" x="405.25" y="130" fill="var(--muted)">không phải lỗi &#8212; là cách báo hết</text>
-<text class="sv-hv" x="86.62" y="168" fill="var(--muted)">BA HỆ QUẢ RƠI THẲNG RA TỪ BỐN DÒNG TRÊN</text>
-<rect x="86.62" y="176" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-t" x="111.37" y="191" fill="var(--probe)">StopIteration là điều khiển luồng</text>
-<text class="sv-s" x="111.37" y="208" fill="var(--muted)">để nó lọt ra ngoài &#8594; vòng for hiểu nhầm là hết dữ liệu</text>
-<rect x="86.62" y="218" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-t" x="111.37" y="233" fill="var(--ok)">Object nào cài đủ hai phương thức đều chạy</text>
-<text class="sv-s" x="111.37" y="250" fill="var(--muted)">duck typing &#8212; không cần kế thừa lớp nào</text>
-<rect x="86.62" y="260" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-t" x="111.37" y="275" fill="var(--filled)">Vòng for không hề biết độ dài</text>
-<text class="sv-s" x="111.37" y="292" fill="var(--muted)">chỉ hỏi phần tử tiếp cho tới khi bị từ chối &#8594; duyệt được chuỗi vô hạn</text>
+  <p class="key">Dòng <code>for</code> chỉ là đường tắt cú pháp cho <em>iter() rồi next() lặp lại</em>, tới khi gặp <code>StopIteration</code>.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 396" role="img" aria-label="Bốn bước của vòng for xếp dọc: gọi iter lấy iterator, hai lần next trả ra mười và hai mươi bay sang cột bên phải, lần next thứ ba ném StopIteration và vòng for tự thoát" data-anim><style>@keyframes fr1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr2{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr3{0%{animation-timing-function:ease-in-out;opacity:0}9.333%{animation-timing-function:ease-in-out;opacity:0}11.000%{animation-timing-function:ease-in-out;opacity:1}19.333%{animation-timing-function:ease-in-out;opacity:1}21.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes fr4{0%{animation-timing-function:ease-in-out;opacity:0}19.667%{animation-timing-function:ease-in-out;opacity:0}22.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr5{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr6{0%{animation-timing-function:ease-in-out;opacity:0}19.333%{animation-timing-function:ease-in-out;opacity:0}21.000%{animation-timing-function:ease-in-out;opacity:1}29.333%{animation-timing-function:ease-in-out;opacity:1}31.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes fr7{0%{animation-timing-function:ease-in-out;opacity:0}29.667%{animation-timing-function:ease-in-out;opacity:0}32.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr8{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr9{0%{animation-timing-function:ease-in-out;opacity:0}29.333%{animation-timing-function:ease-in-out;opacity:0}31.000%{animation-timing-function:ease-in-out;opacity:1}39.333%{animation-timing-function:ease-in-out;opacity:1}41.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes fr10{0%{animation-timing-function:ease-in-out;opacity:0}39.667%{animation-timing-function:ease-in-out;opacity:0}42.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr11{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}6.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr12{0%{animation-timing-function:ease-in-out;opacity:0}39.333%{animation-timing-function:ease-in-out;opacity:0}41.000%{animation-timing-function:ease-in-out;opacity:1}49.333%{animation-timing-function:ease-in-out;opacity:1}51.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes fr13{0%{animation-timing-function:ease-in-out;opacity:0}49.333%{animation-timing-function:ease-in-out;opacity:0}51.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr14{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}9.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr15{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}19.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}19.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(410px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(410px,0px)}}@keyframes fr16{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}29.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}29.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}34.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(410px,0px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(410px,0px)}}@keyframes fr17{0%{animation-timing-function:ease-in-out;opacity:0}43.333%{animation-timing-function:ease-in-out;opacity:0}45.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr18{0%{animation-timing-function:ease-in-out;opacity:0}53.333%{animation-timing-function:ease-in-out;opacity:0}55.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes fr19{0%{animation-timing-function:ease-in-out;opacity:0}57.333%{animation-timing-function:ease-in-out;opacity:0}59.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.fr1{animation:fr1 15.0s linear 1 forwards}.fr2{animation:fr2 15.0s linear 1 forwards}.fr3{animation:fr3 15.0s linear 1 forwards}.fr4{animation:fr4 15.0s linear 1 forwards}.fr5{animation:fr5 15.0s linear 1 forwards}.fr6{animation:fr6 15.0s linear 1 forwards}.fr7{animation:fr7 15.0s linear 1 forwards}.fr8{animation:fr8 15.0s linear 1 forwards}.fr9{animation:fr9 15.0s linear 1 forwards}.fr10{animation:fr10 15.0s linear 1 forwards}.fr11{animation:fr11 15.0s linear 1 forwards}.fr12{animation:fr12 15.0s linear 1 forwards}.fr13{animation:fr13 15.0s linear 1 forwards}.fr14{animation:fr14 15.0s linear 1 forwards}.fr15{animation:fr15 15.0s linear 1 forwards}.fr16{animation:fr16 15.0s linear 1 forwards}.fr17{animation:fr17 15.0s linear 1 forwards}.fr18{animation:fr18 15.0s linear 1 forwards}.fr19{animation:fr19 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">VÒNG for CHỈ LÀ iter() RỒI next() LẶP LẠI</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="fr1"><text x="0.0" y="72.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">for v in [10, 20]:</text><text class="sv-d" x="0" y="94" fill="var(--faint)" style="fill:var(--faint)">tương đương bốn bước dưới đây</text></g>
+<g class="fr2"><rect x="0" y="124" width="300" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="fr3" opacity="0"><rect x="0" y="124" width="300" height="36" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="12.0" y="148.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">it = iter(obj)</text><text class="sv-d" x="320" y="148" fill="var(--faint)" style="fill:var(--faint)">xin một iterator</text></g>
+<g class="fr4"><g opacity=".4"><rect x="0" y="124" width="300" height="36" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text x="12.0" y="148.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">it = iter(obj)</text><text class="sv-d" x="320" y="148" fill="var(--faint)" style="fill:var(--faint)">xin một iterator</text></g></g>
+<g class="fr5"><rect x="0" y="166" width="300" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="fr6" opacity="0"><rect x="0" y="166" width="300" height="36" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="12.0" y="190.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(it)  →  10</text><text class="sv-d" x="320" y="190" fill="var(--faint)" style="fill:var(--faint)">lấy phần tử</text></g>
+<g class="fr7"><g opacity=".4"><rect x="0" y="166" width="300" height="36" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="12.0" y="190.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(it)  →  10</text><text class="sv-d" x="320" y="190" fill="var(--faint)" style="fill:var(--faint)">lấy phần tử</text></g></g>
+<g class="fr8"><rect x="0" y="208" width="300" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="fr9" opacity="0"><rect x="0" y="208" width="300" height="36" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="12.0" y="232.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(it)  →  20</text><text class="sv-d" x="320" y="232" fill="var(--faint)" style="fill:var(--faint)">lấy phần tử</text></g>
+<g class="fr10"><g opacity=".4"><rect x="0" y="208" width="300" height="36" rx="4" fill="rgba(var(--green-a),.16)" stroke="var(--ok)" stroke-width="1.6"/><text x="12.0" y="232.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(it)  →  20</text><text class="sv-d" x="320" y="232" fill="var(--faint)" style="fill:var(--faint)">lấy phần tử</text></g></g>
+<g class="fr11"><rect x="0" y="250" width="300" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="fr12" opacity="0"><rect x="0" y="250" width="300" height="36" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="12.0" y="274.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(it)  →  StopIteration</text><text class="sv-d" x="320" y="274" fill="var(--faint)" style="fill:var(--faint)">hết → for tự thoát</text></g>
+<g class="fr13"><rect x="0" y="250" width="300" height="36" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text x="12.0" y="274.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(it)  →  StopIteration</text><text class="sv-d" x="320" y="274" fill="var(--faint)" style="fill:var(--faint)">hết → for tự thoát</text></g>
+<g class="fr14"><text class="sv-d" x="560" y="128" fill="var(--ok)" style="fill:var(--ok)">v nhận được</text></g>
+<g class="fr15" transform="translate(410 0)"><rect x="150" y="166" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="174.0" y="190.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">10</text></g>
+<g class="fr16" transform="translate(410 0)"><rect x="150" y="208" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="174.0" y="232.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">20</text></g>
+<g class="fr17"><text class="sv-d" x="560" y="274" fill="var(--tomb)" style="fill:var(--tomb)">StopIteration → for dừng, không ném ra ngoài</text></g>
+<g class="fr18"><rect x="0" y="332" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="347" fill="var(--probe)" style="fill:var(--probe)">for tự bắt StopIteration · đó là lý do bạn không bao giờ thấy nó</text></g>
+<g class="fr19"><text class="sv-d" x="14" y="364" fill="var(--muted)" style="fill:var(--muted)">Cũng vì thế mọi thứ có __iter__ đều bỏ vào for được, không cần biết nó là gì.</text></g>
 </svg>
-<figcaption>Vòng <code>for</code> chỉ là <code>iter</code> rồi <code>next</code> lặp lại tới khi bị từ chối. Ba hệ quả bên dưới đều là cách đọc lại đúng bốn dòng đó.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><strong><code>StopIteration</code> là tín hiệu, không phải lỗi</strong> — cách duy nhất để iterator nói &quot;hết rồi&quot;.</li>
-    <li><strong>Duck typing</strong>: cài đủ hai phương thức là chạy được trong <code>for</code>, không cần kế thừa gì.</li>
-    <li><strong>Không có bước hỏi độ dài</strong> nào trong bốn dòng đó — nên chuỗi vô hạn vẫn duyệt được.</li>
+    <li><code>for</code> tự bắt <code>StopIteration</code> — đó là lý do bạn không bao giờ thấy nó.</li>
+    <li>Nhờ vậy mọi thứ có <code>__iter__</code> đều bỏ vào <code>for</code> được, không cần biết nó là gì.</li>
   </ul>
-
-  <details class="deep"><summary>Tự viết một iterator thì cần đúng những gì?</summary>
-    <div class="body">
-      <p>Một lớp <code>Countdown(n)</code> cần hai phương thức: <code>__iter__</code> trả về <code>self</code> vì chính nó giữ vị trí, và <code>__next__</code> giảm bộ đếm rồi trả về giá trị, hoặc <code>raise StopIteration</code> khi <code>n</code> về 0.</p>
-      <p>Đúng hai phương thức đó, không kế thừa lớp nào, là <code>for x in Countdown(3)</code> chạy. Nhưng viết bằng <code>yield</code> thì chỉ tốn ba dòng và không phải tự giữ biến trạng thái — đó là toàn bộ lý do ô YIELD tồn tại trong bản đồ.</p>
-    </div></details>
 </section>
 
 <section id="iter-s4" class="lesson">
   <div class="sh"><b>04</b><h2>Generator</h2></div>
-
-  <p class="key">Ô YIELD. Hàm có <code>yield</code> khi gọi <em>không chạy dòng nào</em> — mỗi <code>next()</code> mới cho nó chạy tới <code>yield</code> kế tiếp rồi đóng băng lại.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 348" role="img" aria-label="dòng thời gian bốn bước của một generator và hai chỗ dùng đặc trưng">
-<path d="M0.0 184 H 37.12 V 60 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,60.0 69.51,55.8 69.51,64.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">GỌI HÀM CÓ YIELD &#8212; KHÔNG CHẠY DÒNG NÀO</text>
-<rect x="86.62" y="30" width="773.38" height="26" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="48" fill="var(--muted)">g = gen()</text>
-<text class="sv-t" x="303.17" y="48" fill="var(--muted)">không in gì cả</text>
-<text class="sv-d" x="519.71" y="48" fill="var(--muted)">mới chỉ tạo ra generator object</text>
-<rect x="86.62" y="60" width="773.38" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="78" fill="var(--probe)">next(g)</text>
-<text class="sv-t" x="303.17" y="78" fill="var(--probe)">in &quot;bắt đầu&quot; &#8594; 1</text>
-<text class="sv-d" x="519.71" y="78" fill="var(--muted)">ĐÓNG BĂNG ngay tại yield đó</text>
-<rect x="86.62" y="90" width="773.38" height="26" rx="4" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="108" fill="var(--probe)">next(g)</text>
-<text class="sv-t" x="303.17" y="108" fill="var(--probe)">in &quot;giữa&quot; &#8594; 2</text>
-<text class="sv-d" x="519.71" y="108" fill="var(--muted)">chạy tiếp đúng từ chỗ vừa dừng</text>
-<rect x="86.62" y="120" width="773.38" height="26" rx="4" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="138" fill="var(--tomb)">next(g)</text>
-<text class="sv-t" x="303.17" y="138" fill="var(--tomb)">StopIteration</text>
-<text class="sv-d" x="519.71" y="138" fill="var(--muted)">hết &#8212; không lùi lại được nữa</text>
-<text class="sv-hv" x="86.62" y="172" fill="var(--muted)">CÁI ĐƯỢC GIỮ LẠI KHI ĐÓNG BĂNG</text>
-<rect x="86.62" y="180" width="773.38" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-t" x="111.37" y="202" fill="var(--ok)">biến cục bộ &#183; vị trí trong vòng lặp &#183; cả ngăn xếp</text>
-<text class="sv-s" x="111.37" y="222" fill="var(--muted)">tức là một máy trạng thái mà bạn không phải tự viết dòng nào</text>
-<text class="sv-hv" x="86.62" y="264" fill="var(--muted)">HAI CHỖ DÙNG MÀ LIST LÀM KHÔNG NỔI</text>
-<rect x="86.62" y="272" width="377.41" height="62" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="292" fill="var(--filled)">File 10 GB</text>
-<text class="sv-s" x="108.27" y="309" fill="var(--muted)">yield từng dòng &#8212; bộ nhớ không</text>
-<text class="sv-d" x="108.27" y="325" fill="var(--muted)">đổi theo kích thước file</text>
-<rect x="482.59" y="272" width="377.41" height="62" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="504.24" y="292" fill="var(--filled)">Chuỗi vô hạn</text>
-<text class="sv-s" x="504.24" y="309" fill="var(--muted)">while True: yield n &#8212; chỉ khả thi</text>
-<text class="sv-d" x="504.24" y="325" fill="var(--muted)">khi không phải dựng sẵn cả dãy</text>
+  <p class="key">Gọi hàm generator <em>không chạy thân hàm</em>. Chỉ <code>next()</code> mới đẩy nó chạy tới <code>yield</code> kế tiếp rồi dừng lại.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 386" role="img" aria-label="Thân hàm generator sáu dòng; gọi hàm thì chưa chạy dòng nào; lần next thứ nhất chạy tới yield một rồi dừng và trả ra số một; lần next thứ hai chạy tiếp từ đúng chỗ đó tới yield hai" data-anim><style>@keyframes gn1{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}4.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn2{0%{animation-timing-function:ease-in-out;opacity:0}2.500%{animation-timing-function:ease-in-out;opacity:0}4.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn3{0%{animation-timing-function:ease-in-out;opacity:0}3.125%{animation-timing-function:ease-in-out;opacity:0}5.312%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn4{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn5{0%{animation-timing-function:ease-in-out;opacity:0}4.375%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn6{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}7.187%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn7{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn8{0%{animation-timing-function:ease-in-out;opacity:0}4.375%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn9{0%{animation-timing-function:ease-in-out;opacity:0}4.375%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn10{0%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:0}9.062%{animation-timing-function:ease-in-out;opacity:1}25.000%{animation-timing-function:ease-in-out;opacity:1}26.562%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gn11{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}11.562%{animation-timing-function:ease-in-out;opacity:1}26.250%{animation-timing-function:ease-in-out;opacity:1}27.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gn12{0%{animation-timing-function:ease-in-out;opacity:0}26.250%{animation-timing-function:ease-in-out;opacity:0}27.812%{animation-timing-function:ease-in-out;opacity:1}56.250%{animation-timing-function:ease-in-out;opacity:1}57.812%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gn13{0%{animation-timing-function:ease-in-out;opacity:0}27.500%{animation-timing-function:ease-in-out;opacity:0}29.063%{animation-timing-function:ease-in-out;opacity:1}57.500%{animation-timing-function:ease-in-out;opacity:1}59.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gn14{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}33.750%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}34.062%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}39.375%{animation-timing-function:ease-in-out;opacity:1;transform:translate(400px,-34px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(400px,-34px)}}@keyframes gn15{0%{animation-timing-function:ease-in-out;opacity:0}40.000%{animation-timing-function:ease-in-out;opacity:0}41.562%{animation-timing-function:ease-in-out;opacity:1}57.500%{animation-timing-function:ease-in-out;opacity:1}59.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gn16{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}59.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn17{0%{animation-timing-function:ease-in-out;opacity:0}58.750%{animation-timing-function:ease-in-out;opacity:0}60.312%{animation-timing-function:ease-in-out;opacity:1}87.500%{animation-timing-function:ease-in-out;opacity:1}89.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes gn18{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}65.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}65.312%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}70.625%{animation-timing-function:ease-in-out;opacity:1;transform:translate(400px,-32px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(400px,-32px)}}@keyframes gn19{0%{animation-timing-function:ease-in-out;opacity:0}71.250%{animation-timing-function:ease-in-out;opacity:0}73.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn20{0%{animation-timing-function:ease-in-out;opacity:0}77.500%{animation-timing-function:ease-in-out;opacity:0}79.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gn21{0%{animation-timing-function:ease-in-out;opacity:0}81.250%{animation-timing-function:ease-in-out;opacity:0}83.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.gn1{animation:gn1 16.0s linear 1 forwards}.gn2{animation:gn2 16.0s linear 1 forwards}.gn3{animation:gn3 16.0s linear 1 forwards}.gn4{animation:gn4 16.0s linear 1 forwards}.gn5{animation:gn5 16.0s linear 1 forwards}.gn6{animation:gn6 16.0s linear 1 forwards}.gn7{animation:gn7 16.0s linear 1 forwards}.gn8{animation:gn8 16.0s linear 1 forwards}.gn9{animation:gn9 16.0s linear 1 forwards}.gn10{animation:gn10 16.0s linear 1 forwards}.gn11{animation:gn11 16.0s linear 1 forwards}.gn12{animation:gn12 16.0s linear 1 forwards}.gn13{animation:gn13 16.0s linear 1 forwards}.gn14{animation:gn14 16.0s linear 1 forwards}.gn15{animation:gn15 16.0s linear 1 forwards}.gn16{animation:gn16 16.0s linear 1 forwards}.gn17{animation:gn17 16.0s linear 1 forwards}.gn18{animation:gn18 16.0s linear 1 forwards}.gn19{animation:gn19 16.0s linear 1 forwards}.gn20{animation:gn20 16.0s linear 1 forwards}.gn21{animation:gn21 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">GENERATOR CHẠY TỚI yield RỒI DỪNG · GIỮ NGUYÊN CHỖ ĐANG ĐỨNG</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="gn1"><text x="0.0" y="100.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def gen():</text></g>
+<g class="gn2"><text x="26.0" y="134.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">log('bắt đầu')</text></g>
+<g class="gn3"><text x="26.0" y="168.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">yield 1</text></g>
+<g class="gn4"><text x="26.0" y="202.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">log('chạy tiếp')</text></g>
+<g class="gn5"><text x="26.0" y="236.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">yield 2</text></g>
+<g class="gn6"><text x="26.0" y="270.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">log('kết thúc')</text></g>
+<g class="gn7"><text class="sv-d" x="520" y="86" fill="var(--ok)" style="fill:var(--ok)">next() trả ra</text></g>
+<g class="gn8"><rect x="520" y="112" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="gn9"><rect x="520" y="182" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="gn10" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">g = gen()</text></g>
+<g class="gn11" opacity="0"><text class="sv-d" x="300" y="100" fill="var(--probe)" style="fill:var(--probe)">chưa chạy dòng nào · thân hàm đứng im</text></g>
+<g class="gn12" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(g)</text></g>
+<g class="gn13" opacity="0"><rect x="-8" y="112" width="320" height="68" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.5"/></g>
+<g class="gn14" transform="translate(400 -34)"><rect x="120" y="146" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="144.0" y="170.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="gn15" opacity="0"><text class="sv-d" x="300" y="168" fill="var(--ok)" style="fill:var(--ok)">DỪNG ở đây, giữ nguyên trạng thái</text></g>
+<g class="gn16"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">next(g)</text></g>
+<g class="gn17" opacity="0"><rect x="-8" y="180" width="320" height="68" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.5"/></g>
+<g class="gn18" transform="translate(400 -32)"><rect x="120" y="214" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="144.0" y="238.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="gn19"><text class="sv-d" x="300" y="236" fill="var(--ok)" style="fill:var(--ok)">lại DỪNG · chạy tiếp từ đúng chỗ cũ</text></g>
+<g class="gn20"><rect x="0" y="322" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="337" fill="var(--probe)" style="fill:var(--probe)">Gọi hàm không chạy thân hàm · chỉ next() mới đẩy nó đi tiếp</text></g>
+<g class="gn21"><text class="sv-d" x="14" y="354" fill="var(--muted)" style="fill:var(--muted)">Đo thật: trước next log rỗng [] · sau next 1 là [&#x27;bắt đầu&#x27;] · sau next 2 là [&#x27;bắt đầu&#x27;, &#x27;chạy tiếp&#x27;].</text></g>
 </svg>
-<figcaption><code>yield</code> không trả về rồi kết thúc như <code>return</code> — nó <b>tạm dừng</b> và giữ nguyên mọi thứ, nên lần <code>next</code> sau hàm chạy tiếp đúng từ chỗ đã dừng.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><strong>Trạng thái được giữ hộ</strong>: biến cục bộ, vị trí trong vòng lặp, cả ngăn xếp — không phải tự lưu.</li>
-    <li><strong>Generator expression</strong> <code>(x*x for x in it)</code> là cách viết một dòng, lười y hệt.</li>
-    <li><strong>File object cũng là iterator</strong>, nên <code>for line in f</code> đọc từng dòng chứ không nạp cả file.</li>
+    <li>Nó giữ nguyên chỗ đang đứng, cả biến cục bộ, nên lần sau chạy tiếp từ đúng đó.</li>
+    <li><code>yield</code> là cách viết iterator ngắn nhất: không phải tự cài <code>__iter__</code> và <code>__next__</code>.</li>
+    <li>Generator expression <code>(x for x in xs)</code> là cùng một thứ, viết gọn hơn.</li>
   </ul>
-
-  <details class="deep"><summary><code>yield</code> khác <code>return</code> ở chỗ nào là quan trọng nhất?</summary>
-    <div class="body">
-      <p><code>return</code> kết thúc hàm: khung stack bị xoá, biến cục bộ biến mất, lần gọi sau bắt đầu lại từ dòng đầu. <code>yield</code> chỉ <b>tạm dừng</b>: khung stack được giữ nguyên trên heap, nên lần <code>next</code> sau hàm chạy tiếp đúng từ dòng dưới <code>yield</code>.</p>
-      <p>Vì cái khung đó sống trên heap chứ không nằm trên stack, nó chịu đúng luật của bài <a href="../memory-management-gc/index.html">Memory management &amp; GC</a>: generator chưa chạy hết mà mất tham chiếu cuối thì cả khung được giải phóng, và <code>finally</code> trong thân hàm được chạy lúc đóng.</p>
-    </div></details>
 </section>
 
 <section id="iter-s5" class="lesson">
   <div class="sh"><b>05</b><h2>Cái giá của lười</h2></div>
-
-  <p class="key">Ô dưới cùng của bản đồ. Lười <em>đổi bộ nhớ lấy khả năng quay lại</em> — được cái này thì mất cái kia, không có bữa trưa miễn phí.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 294" role="img" aria-label="so sánh bộ nhớ giữa list comprehension và generator expression, rồi liệt kê được và mất">
-<path d="M0.0 232 H 37.12 V 46 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,46.0 69.51,41.8 69.51,50.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">KHÁC NHAU ĐÚNG HAI DẤU NGOẶC VUÔNG</text>
-<rect x="86.62" y="30" width="773.38" height="40" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="48" fill="var(--dim)">sum([x*x for x in range(10**7)])</text>
-<text class="sv-t" x="612.52" y="49" fill="var(--tomb)">&#8776; 400 MB</text>
-<text class="sv-d" x="108.27" y="63" fill="var(--muted)">dựng đủ 10 triệu phần tử rồi mới cộng</text>
-<rect x="86.62" y="76" width="773.38" height="40" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="94" fill="var(--dim)">sum(x*x for x in range(10**7))</text>
-<text class="sv-t" x="612.52" y="95" fill="var(--ok)">vài trăm byte</text>
-<text class="sv-d" x="108.27" y="109" fill="var(--muted)">cộng xong phần tử nào thì bỏ phần tử đó</text>
-<text class="sv-d" x="86.62" y="136" fill="var(--probe)">Với sum, max, any, all, join &#8212; luôn bỏ hai dấu ngoặc vuông đi.</text>
-<text class="sv-hv" x="86.62" y="172" fill="var(--muted)">ĐỔI ĐƯỢC GÌ, MẤT GÌ</text>
-<rect x="86.62" y="180" width="377.41" height="96" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="200" fill="var(--ok)">ĐƯỢC</text>
-<text class="sv-d" x="108.27" y="219" fill="var(--muted)">bộ nhớ là hằng số, không</text>
-<text class="sv-d" x="108.27" y="235" fill="var(--muted)">đổi theo lượng dữ liệu</text>
-<text class="sv-d" x="108.27" y="255" fill="var(--muted)">dựng được đường ống nhiều</text>
-<text class="sv-d" x="108.27" y="271" fill="var(--muted)">tầng, dừng ngay khi đủ hàng</text>
-<rect x="482.59" y="180" width="377.41" height="96" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.55"/>
-<text class="sv-t" x="504.24" y="200" fill="var(--tomb)">MẤT</text>
-<text class="sv-s" x="504.24" y="219" fill="var(--muted)">không len(), không truy cập</text>
-<text class="sv-d" x="504.24" y="235" fill="var(--muted)">theo chỉ số, không duyệt lại</text>
-<text class="sv-d" x="504.24" y="255" fill="var(--muted)">stack trace chỉ hiện khi phần</text>
-<text class="sv-d" x="504.24" y="271" fill="var(--muted)">tử được lấy &#8594; khó gỡ lỗi hơn</text>
+  <p class="key">Lười đổi <em>bộ nhớ</em> lấy <em>tốc độ khi duyệt nhiều lượt</em>. Không phải lúc nào cũng thắng.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 424" role="img" aria-label="Hai cặp thanh: về bộ nhớ generator nhẹ hơn list hơn một trăm nghìn lần; về thời gian khi duyệt ba lượt thì generator chậm hơn list năm phẩy ba lần" data-anim><style>@keyframes ct1{0%{animation-timing-function:ease-in-out;opacity:0}2.500%{animation-timing-function:ease-in-out;opacity:0}5.708%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct2{0%{animation-timing-function:ease-in-out;opacity:0}6.667%{animation-timing-function:ease-in-out;opacity:0}9.875%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct3{0%{animation-timing-function:ease-in-out;opacity:0}12.500%{animation-timing-function:ease-in-out;opacity:0}15.708%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct4{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}23.208%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct5{0%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:0}28.208%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct6{0%{animation-timing-function:ease-in-out;opacity:0}28.333%{animation-timing-function:ease-in-out;opacity:0}31.542%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct7{0%{animation-timing-function:ease-in-out;opacity:0}34.167%{animation-timing-function:ease-in-out;opacity:0}37.375%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct8{0%{animation-timing-function:ease-in-out;opacity:0}41.667%{animation-timing-function:ease-in-out;opacity:0}44.875%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct9{0%{animation-timing-function:ease-in-out;opacity:0}48.333%{animation-timing-function:ease-in-out;opacity:0}51.542%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ct10{0%{animation-timing-function:ease-in-out;opacity:0}53.333%{animation-timing-function:ease-in-out;opacity:0}56.542%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ct1{animation:ct1 10.909090909090908s linear 1 forwards}.ct2{animation:ct2 10.909090909090908s linear 1 forwards}.ct3{animation:ct3 10.909090909090908s linear 1 forwards}.ct4{animation:ct4 10.909090909090908s linear 1 forwards}.ct5{animation:ct5 10.909090909090908s linear 1 forwards}.ct6{animation:ct6 10.909090909090908s linear 1 forwards}.ct7{animation:ct7 10.909090909090908s linear 1 forwards}.ct8{animation:ct8 10.909090909090908s linear 1 forwards}.ct9{animation:ct9 10.909090909090908s linear 1 forwards}.ct10{animation:ct10 10.909090909090908s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">LƯỜI ĐỔI BỘ NHỚ LẤY TỐC ĐỘ KHI DUYỆT NHIỀU LƯỢT</text>
+<g class="ct1"><text class="sv-d" x="0" y="60" fill="var(--text)" style="fill:var(--text)">Bộ nhớ · 1 triệu phần tử</text></g>
+<g class="ct2"><text class="sv-d" x="0" y="106" fill="var(--tomb)" style="fill:var(--tomb)">list</text><rect x="96" y="86" width="360.0" height="24" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="466.0" y="106" fill="var(--tomb)" style="fill:var(--tomb)">40.4 MB</text></g>
+<g class="ct3"><text class="sv-d" x="0" y="146" fill="var(--ok)" style="fill:var(--ok)">generator</text><rect x="96" y="126" width="4" height="24" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="110" y="146" fill="var(--ok)" style="fill:var(--ok)">400 byte</text></g>
+<g class="ct4"><text class="sv-d" x="0" y="172" fill="var(--ok)" style="fill:var(--ok)">generator nhẹ hơn 101120 lần</text></g>
+<g class="ct5"><text class="sv-d" x="0" y="210" fill="var(--text)" style="fill:var(--text)">Thời gian · duyệt 3 lượt trên 100.000 phần tử</text></g>
+<g class="ct6"><text class="sv-d" x="0" y="256" fill="var(--ok)" style="fill:var(--ok)">list</text><rect x="96" y="236" width="67.86686793509872" height="24" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="173.86686793509872" y="256" fill="var(--ok)" style="fill:var(--ok)">1.10 ms</text></g>
+<g class="ct7"><text class="sv-d" x="0" y="296" fill="var(--tomb)" style="fill:var(--tomb)">generator</text><rect x="96" y="276" width="360.0" height="24" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="466.0" y="296" fill="var(--tomb)" style="fill:var(--tomb)">5.84 ms</text></g>
+<g class="ct8"><text class="sv-d" x="0" y="322" fill="var(--tomb)" style="fill:var(--tomb)">generator chậm hơn 5,3 lần — vì mỗi lượt phải tính lại từ đầu</text></g>
+<g class="ct9"><rect x="0" y="360" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="375" fill="var(--probe)" style="fill:var(--probe)">Duyệt một lượt và dữ liệu lớn → generator · duyệt nhiều lượt → list</text></g>
+<g class="ct10"><text class="sv-d" x="14" y="392" fill="var(--muted)" style="fill:var(--muted)">Generator không có len(), không cắt lát được, và truy vết lỗi khó đọc hơn.</text></g>
 </svg>
-<figcaption>Dữ liệu vừa RAM mà còn dùng nhiều lần thì <code>list</code> vẫn đơn giản hơn và nhanh hơn — lười chỉ thắng khi nguồn lớn, vô hạn, hoặc chỉ cần duyệt một lượt.</figcaption>
-</figure>
-
+  </figure>
   <ul class="why">
-    <li><strong>Bỏ hai dấu ngoặc vuông</strong> khi truyền vào <code>sum</code>, <code>max</code>, <code>any</code>, <code>all</code>, <code>join</code>.</li>
-    <li><strong>Dữ liệu vừa RAM và dùng nhiều lần</strong> thì <code>list</code> đơn giản hơn, nhanh hơn, dễ gỡ lỗi hơn.</li>
-    <li><strong>Đường ống nhiều tầng</strong> chỉ chạm tới phần tử thật sự cần — dừng ngay khi đủ hàng.</li>
+    <li>Một triệu phần tử: list tốn 40.4 MB, generator tốn 400 byte — nhẹ hơn 101.120 lần.</li>
+    <li>Nhưng duyệt 3 lượt thì generator chậm hơn 5.3 lần, vì mỗi lượt phải tính lại từ đầu.</li>
+    <li>Generator không có <code>len()</code>, không cắt lát được, truy vết lỗi cũng khó đọc hơn.</li>
+    <li>Duyệt một lượt và dữ liệu lớn thì dùng generator. Duyệt nhiều lượt thì dùng list.</li>
   </ul>
-
-  <details class="deep"><summary>Vì sao generator lại khó gỡ lỗi hơn?</summary>
-    <div class="body">
-      <p>Vì thân hàm không chạy lúc bạn gọi nó. Dòng <code>g = gen(bad_input)</code> luôn thành công; lỗi chỉ nổ ra ở nơi nào đó phía sau, lúc có người gọi <code>next</code> — thường là bên trong <code>sum()</code> hay một vòng <code>for</code> cách đó vài chục dòng.</p>
-      <p>Stack trace vì thế trỏ vào chỗ <b>tiêu thụ</b> chứ không phải chỗ <b>tạo ra</b>. Với đường ống nhiều tầng lồng nhau, tìm đúng tầng gây lỗi là việc mất thời gian thật.</p>
-    </div></details>
 </section>
 
 <section id="iter-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lab: đường ống lười</h2></div>
-
-  <p class="key">Đường ống bốn tầng, lấy 3 phần tử. Bấm từng bước để thấy dữ liệu bị <em>kéo từ cuối lên</em> chứ không phải đẩy từ đầu xuống.</p>
-
-  <div class="lab">
-    <div class="bar">
-      <div><label>chế độ</label>
-        <select id="pmode">
-          <option value="gen" selected>generator — lười</option>
-          <option value="list">list — làm hết từng tầng</option>
-        </select>
-      </div>
-      <div><label>lấy bao nhiêu phần tử</label><input type="number" id="ptake" value="3" min="1" max="8"></div>
-      <button id="pstep">Bước tiếp</button>
-      <button class="ghost" id="pauto">Tự chạy</button>
-      <button class="ghost" id="prst">Đặt lại</button>
-    </div>
-    <div id="pview"></div>
-    <div class="stat">
-      <u>tổng số phép tính <b id="pops">0</b></u>
-      <u>đã lấy được <b id="pgot">0</b></u>
-      <u>trạng thái <b id="pstate">chưa chạy</b></u>
-    </div>
-    <div class="steps" id="plog"></div>
-    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Chạy hết cả hai chế độ rồi so <strong>tổng số phép tính</strong>. Bản list xử lý cả 12 phần tử ở mọi tầng rồi mới cắt lấy 3.</p>
-  <p>Bản generator chỉ chạm tới đúng những phần tử cần thiết.
-    </p>
-  </div>
+  <div class="sh"><b>06</b><h2>yield from</h2></div>
+  <p class="key">Nối thẳng ống của generator con vào generator cha, thay vì tự lặp rồi <code>yield</code> lại từng cái.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 468" role="img" aria-label="Generator inner sinh hai phần tử; cách dài phải tự lặp rồi yield lại từng cái, còn yield from nối thẳng ống; hai cách cho cùng kết quả một và hai" data-anim><style>@keyframes yf1{0%{animation-timing-function:ease-in-out;opacity:0}2.308%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf2{0%{animation-timing-function:ease-in-out;opacity:0}4.615%{animation-timing-function:ease-in-out;opacity:0}7.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf3{0%{animation-timing-function:ease-in-out;opacity:0}6.154%{animation-timing-function:ease-in-out;opacity:0}8.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf4{0%{animation-timing-function:ease-in-out;opacity:0}3.846%{animation-timing-function:ease-in-out;opacity:0}6.538%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf5{0%{animation-timing-function:ease-in-out;opacity:0}12.308%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf6{0%{animation-timing-function:ease-in-out;opacity:0}13.077%{animation-timing-function:ease-in-out;opacity:0}15.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf7{0%{animation-timing-function:ease-in-out;opacity:0}13.077%{animation-timing-function:ease-in-out;opacity:0}15.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf8{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.385%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}15.769%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}22.308%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,90px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,90px)}}@keyframes yf9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.385%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}26.923%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,90px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,90px)}}@keyframes yf10{0%{animation-timing-function:ease-in-out;opacity:0}30.769%{animation-timing-function:ease-in-out;opacity:0}33.462%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf11{0%{animation-timing-function:ease-in-out;opacity:0}46.154%{animation-timing-function:ease-in-out;opacity:0}48.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf12{0%{animation-timing-function:ease-in-out;opacity:0}46.923%{animation-timing-function:ease-in-out;opacity:0}49.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf13{0%{animation-timing-function:ease-in-out;opacity:0}46.923%{animation-timing-function:ease-in-out;opacity:0}49.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf14{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.231%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}49.615%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.154%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,194px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,194px)}}@keyframes yf15{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.846%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}54.231%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}60.769%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,194px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(500px,194px)}}@keyframes yf16{0%{animation-timing-function:ease-in-out;opacity:0}64.615%{animation-timing-function:ease-in-out;opacity:0}67.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf17{0%{animation-timing-function:ease-in-out;opacity:0}35.385%{animation-timing-function:ease-in-out;opacity:0}38.077%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf18{0%{animation-timing-function:ease-in-out;opacity:0}69.231%{animation-timing-function:ease-in-out;opacity:0}71.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf19{0%{animation-timing-function:ease-in-out;opacity:0}75.385%{animation-timing-function:ease-in-out;opacity:0}78.077%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes yf20{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}82.692%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.yf1{animation:yf1 13.0s linear 1 forwards}.yf2{animation:yf2 13.0s linear 1 forwards}.yf3{animation:yf3 13.0s linear 1 forwards}.yf4{animation:yf4 13.0s linear 1 forwards}.yf5{animation:yf5 13.0s linear 1 forwards}.yf6{animation:yf6 13.0s linear 1 forwards}.yf7{animation:yf7 13.0s linear 1 forwards}.yf8{animation:yf8 13.0s linear 1 forwards}.yf9{animation:yf9 13.0s linear 1 forwards}.yf10{animation:yf10 13.0s linear 1 forwards}.yf11{animation:yf11 13.0s linear 1 forwards}.yf12{animation:yf12 13.0s linear 1 forwards}.yf13{animation:yf13 13.0s linear 1 forwards}.yf14{animation:yf14 13.0s linear 1 forwards}.yf15{animation:yf15 13.0s linear 1 forwards}.yf16{animation:yf16 13.0s linear 1 forwards}.yf17{animation:yf17 13.0s linear 1 forwards}.yf18{animation:yf18 13.0s linear 1 forwards}.yf19{animation:yf19 13.0s linear 1 forwards}.yf20{animation:yf20 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">yield from NỐI THẲNG ỐNG · KHÔNG PHẢI LỒNG THÊM VÒNG LẶP</text>
+<g class="yf1"><text x="0.0" y="72.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def inner(): yield 1; yield 2</text></g>
+<g class="yf2"><rect x="60" y="96" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="84.0" y="120.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="yf3"><rect x="108" y="96" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.18)" stroke="var(--clay)" stroke-width="1.5"/><text x="132.0" y="120.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="yf4"><text class="sv-d" x="172" y="120" fill="var(--clay)" style="fill:var(--clay)">inner()</text></g>
+<g class="yf5"><text class="sv-d" x="0" y="170" fill="var(--probe)" style="fill:var(--probe)">cách dài</text><text x="0.0" y="210.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">for v in inner(): yield v</text></g>
+<g class="yf6"><rect x="560" y="186" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="yf7"><rect x="608" y="186" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="yf8" transform="translate(500 90)"><rect x="60" y="96" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="84.0" y="120.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="yf9" transform="translate(500 90)"><rect x="108" y="96" width="48" height="36" rx="4" fill="rgba(var(--amber-a),.18)" stroke="var(--probe)" stroke-width="1.5"/><text x="132.0" y="120.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="yf10"><text class="sv-d" x="672" y="210" fill="var(--probe)" style="fill:var(--probe)">→ [1, 2]</text></g>
+<g class="yf11"><text class="sv-d" x="0" y="274" fill="var(--ok)" style="fill:var(--ok)">yield from</text><text x="0.0" y="314.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">yield from inner()</text></g>
+<g class="yf12"><rect x="560" y="290" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="yf13"><rect x="608" y="290" width="48" height="36" rx="4" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="yf14" transform="translate(500 194)"><rect x="60" y="96" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="84.0" y="120.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="yf15" transform="translate(500 194)"><rect x="108" y="96" width="48" height="36" rx="4" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.5"/><text x="132.0" y="120.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="yf16"><text class="sv-d" x="672" y="314" fill="var(--ok)" style="fill:var(--ok)">→ [1, 2]</text></g>
+<g class="yf17"><line x1="300.0" y1="246.0" x2="300.0" y2="214.0" stroke="var(--probe)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="300.0" cy="214.0" r="2.6" fill="var(--probe)"/><text class="sv-d" x="306" y="250" fill="var(--probe)" style="fill:var(--probe)">phải tự lặp rồi yield lại từng cái</text></g>
+<g class="yf18"><line x1="300.0" y1="350.0" x2="300.0" y2="318.0" stroke="var(--ok)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="300.0" cy="318.0" r="2.6" fill="var(--ok)"/><text class="sv-d" x="306" y="354" fill="var(--ok)" style="fill:var(--ok)">ống nối thẳng, ít code và nhanh hơn</text></g>
+<g class="yf19"><rect x="0" y="386" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="401" fill="var(--probe)" style="fill:var(--probe)">Cùng kết quả · yield from còn chuyển cả send và exception xuống dưới</text></g>
+<g class="yf20"><text class="sv-d" x="14" y="418" fill="var(--muted)" style="fill:var(--muted)">itertools là bộ ống dựng sẵn: islice cắt lát, chain nối, groupby gom cụm — tất cả đều lười.</text><text class="sv-d" x="14" y="436" fill="var(--faint)" style="fill:var(--faint)">islice(count(), 5) → [0, 1, 2, 3, 4] · chain([1,2],[3]) → [1, 2, 3]</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Cùng kết quả, nhưng <code>yield from</code> còn chuyển cả <code>send</code> và exception xuống generator con.</li>
+    <li><b>itertools</b> là bộ ống dựng sẵn và đều lười: <code>islice</code> cắt lát, <code>chain</code> nối, <code>groupby</code> gom cụm.</li>
+    <li><code>groupby</code> chỉ gom phần tử <b>liền kề</b> — phải sắp xếp trước, khác hẳn <code>GROUP BY</code> của SQL.</li>
+  </ul>
 </section>
 
 <section id="iter-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>yield from và send</h2></div>
+  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <p class="key">Vẫn ô YIELD, nhìn kỹ hơn: <code>yield</code> không chỉ <em>trả ra</em> — nó còn <em>nhận vào</em>, và đó là nền của coroutine.</p>
+  <details class="qa"><summary>Iterable khác iterator ở đâu?</summary>
+  <p>Iterable giữ dữ liệu, có <code>__iter__</code>.</p>
+  <p>Iterator giữ vị trí, có thêm <code>__next__</code>.</p>
+  <p>Mỗi vòng for tạo một iterator mới từ iterable.</p>
+  <p>Nên list duyệt lại được, iterator thì không.</p></details>
 
-<figure class="scrollx">
-<svg viewBox="0 0 860 288" role="img" aria-label="yield from giao quyền và ba bước send đẩy dữ liệu ngược vào generator">
-<path d="M0.0 184 H 37.12 V 46 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,46.0 69.51,41.8 69.51,50.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">YIELD FROM &#8212; GIAO QUYỀN CHO ITERABLE KHÁC</text>
-<rect x="86.62" y="30" width="773.38" height="74" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="52" fill="var(--dim)">yield from flatten(item)</text>
-<text class="sv-d" x="108.27" y="70" fill="var(--muted)">viết gọn của: for i in x: yield i</text>
-<text class="sv-d" x="108.27" y="90" fill="var(--probe)">nhưng còn chuyển tiếp send, throw, close xuống generator con</text>
-<text class="sv-hv" x="86.62" y="134" fill="var(--muted)">YIELD VỪA TRẢ RA VỪA NHẬN VÀO</text>
-<rect x="86.62" y="142" width="241.29" height="66" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="105.18" y="162" fill="var(--dim)">next(acc)</text>
-<text class="sv-t" x="105.18" y="182" fill="var(--probe)">&#8594; 0</text>
-<text class="sv-d" x="105.18" y="198" fill="var(--muted)">chạy tới yield đầu tiên</text>
-<rect x="346.47" y="142" width="241.29" height="66" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="365.04" y="162" fill="var(--dim)">acc.send(10)</text>
-<text class="sv-t" x="365.04" y="182" fill="var(--probe)">&#8594; 10</text>
-<text class="sv-d" x="365.04" y="198" fill="var(--muted)">giá trị đi NGƯỢC vào hàm</text>
-<rect x="606.33" y="142" width="241.29" height="66" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-l" x="624.89" y="162" fill="var(--dim)">acc.send(5)</text>
-<text class="sv-t" x="624.89" y="182" fill="var(--probe)">&#8594; 15</text>
-<text class="sv-d" x="624.89" y="198" fill="var(--muted)">total còn nguyên</text>
-<line x1="321.73" y1="175" x2="321.73" y2="175" stroke="var(--faint)" stroke-width="1"/>
-<polygon points="331.18,175.0 323.18,170.8 323.18,179.2" fill="var(--faint)"/>
-<line x1="581.58" y1="175" x2="581.58" y2="175" stroke="var(--faint)" stroke-width="1"/>
-<polygon points="591.04,175.0 583.04,170.8 583.04,179.2" fill="var(--faint)"/>
-<rect x="86.62" y="224" width="773.38" height="46" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="244" fill="var(--filled)">Đây chính là nền của asyncio trước khi có async/await</text>
-<text class="sv-s" x="108.27" y="262" fill="var(--muted)">await về bản chất là &quot;yield rồi chờ được send lại&quot;</text>
-</svg>
-<figcaption>Generator không chỉ đẩy dữ liệu ra — <code>send()</code> đẩy được dữ liệu <b>ngược vào</b>, và đó là cơ chế mà coroutine được xây trên.</figcaption>
-</figure>
+  <details class="qa"><summary>Vòng for thực chất làm gì?</summary>
+  <p>Gọi <code>iter()</code> để xin một iterator.</p>
+  <p>Gọi <code>next()</code> lặp lại để lấy từng phần tử.</p>
+  <p>Gặp <code>StopIteration</code> thì thoát, và tự bắt nó.</p>
+  <p>Nên mọi thứ có <code>__iter__</code> đều bỏ vào for được.</p></details>
 
-  <ul class="why">
-    <li><strong><code>yield from x</code></strong> gọn hơn <code>for i in x: yield i</code>, và chuyển tiếp cả <code>send</code>, <code>throw</code>, <code>close</code>.</li>
-    <li><strong>Đệ quy sạch</strong>: <code>flatten</code> một cấu trúc lồng nhau chỉ cần một dòng <code>yield from</code>.</li>
-    <li><strong><code>send()</code> đẩy giá trị ngược vào</strong> đúng chỗ <code>yield</code> đang dừng, trạng thái vẫn còn nguyên.</li>
-  </ul>
+  <details class="qa"><summary>Gọi một hàm có yield thì chuyện gì xảy ra?</summary>
+  <p>Thân hàm chưa chạy dòng nào.</p>
+  <p>Nó trả về một generator object.</p>
+  <p>Mỗi <code>next()</code> đẩy nó chạy tới yield kế tiếp rồi dừng.</p>
+  <p>Trạng thái và biến cục bộ giữ nguyên giữa hai lần gọi.</p></details>
 
-  <details class="deep"><summary>Biết <code>send</code> thì hiểu <code>async</code>/<code>await</code> dễ hơn ở chỗ nào?</summary>
-    <div class="body">
-      <p>Trước Python 3.5, coroutine <b>chính là</b> generator: hàm chạy tới <code>yield</code>, nhường quyền cho event loop, và được đánh thức bằng <code>send(kết_quả)</code>. Cú pháp <code>async</code>/<code>await</code> ra đời sau chỉ đặt tên mới cho đúng cơ chế đó.</p>
-      <p>Nên câu &quot;<code>await</code> là yield rồi chờ được send lại&quot; không phải phép so sánh cho vui — nó là mô tả đúng cách chạy. Chi tiết ở bài <a href="../../04-concurrency/asyncio/index.html">Asyncio</a>.</p>
-    </div></details>
+  <details class="qa"><summary>Khi nào không nên dùng generator?</summary>
+  <p>Khi cần duyệt nhiều lượt — mỗi lượt phải tính lại từ đầu.</p>
+  <p>Khi cần <code>len()</code> hoặc cắt lát.</p>
+  <p>Khi dữ liệu nhỏ, vì lợi ích bộ nhớ không đáng.</p>
+  <p>Truy vết lỗi của generator cũng khó đọc hơn.</p></details>
+
+  <details class="qa"><summary>yield from để làm gì?</summary>
+  <p>Nối thẳng ống của generator con vào generator cha.</p>
+  <p>Ngắn hơn việc tự lặp rồi yield lại từng phần tử.</p>
+  <p>Nó chuyển cả send và exception xuống generator con.</p>
+  <p>Hay dùng khi đệ quy trên cây hoặc gộp nhiều nguồn.</p></details>
 </section>
 
-<section id="iter-s8" class="lesson">
-  <div class="sh"><b>08</b><h2>itertools</h2></div>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
-  <p class="key">Thư viện chuẩn đã dựng sẵn hàng chục iterator trên đúng giao thức ở mục 03 — ghép vào đường ống mà <em>không phá tính lười</em>.</p>
-
-<figure class="scrollx">
-<svg viewBox="0 0 860 348" role="img" aria-label="bảng tra itertools, đánh dấu hai hàm có bẫy">
-<path d="M0.0 112 H 37.12 V 46 H 68.06" stroke="var(--probe)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
-<polygon points="77.51,46.0 69.51,41.8 69.51,50.2" fill="var(--probe)"/>
-<text class="sv-hv" x="86.62" y="22" fill="var(--muted)">DỰNG SẴN TRÊN ĐÚNG GIAO THỨC ITERATOR &#8212; VẪN LƯỜI</text>
-<rect x="86.62" y="30" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="52" fill="var(--ok)">islice(it, n)</text>
-<text class="sv-d" x="426.91" y="52" fill="var(--muted)">lấy n phần tử đầu, không tải hết phần sau</text>
-<rect x="86.62" y="72" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="94" fill="var(--ok)">chain(a, b)</text>
-<text class="sv-d" x="426.91" y="94" fill="var(--muted)">duyệt nhiều nguồn như một dòng liền</text>
-<rect x="86.62" y="114" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="136" fill="var(--ok)">count() &#183; cycle() &#183; repeat()</text>
-<text class="sv-d" x="426.91" y="136" fill="var(--muted)">chuỗi vô hạn &#8212; sinh id, luân phiên, ghép với zip</text>
-<rect x="86.62" y="156" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="178" fill="var(--ok)">batched(it, n)  (3.12+)</text>
-<text class="sv-d" x="426.91" y="178" fill="var(--muted)">chia thành khối n phần tử &#8212; gửi request theo lô</text>
-<rect x="86.62" y="198" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="220" fill="var(--probe)">groupby(it, key)</text>
-<text class="sv-d" x="426.91" y="220" fill="var(--muted)">CHỈ gom phần tử kề nhau &#8212; phải sắp xếp trước</text>
-<rect x="86.62" y="240" width="773.38" height="36" rx="4" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.55"/>
-<text class="sv-l" x="108.27" y="262" fill="var(--tomb)">tee(it, 2)</text>
-<text class="sv-d" x="426.91" y="262" fill="var(--muted)">cho duyệt hai lần, nhưng đệm ngầm nên tốn bộ nhớ</text>
-<rect x="86.62" y="288" width="773.38" height="44" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.55"/>
-<text class="sv-t" x="108.27" y="308" fill="var(--probe)">product &#183; permutations &#183; combinations</text>
-<text class="sv-s" x="108.27" y="325" fill="var(--muted)">thay vòng lặp lồng nhau, hoặc thay backtracking đơn giản</text>
-</svg>
-<figcaption>Ghép được vào đường ống mà không phá tính lười — trừ <code>tee</code>, thứ đệm ngầm và trả lại đúng phần bộ nhớ vừa tiết kiệm.</figcaption>
-</figure>
-
-  <ul class="why">
-    <li><strong><code>islice</code> và <code>chain</code></strong> dùng nhiều nhất: xem thử dữ liệu lớn, nối nhiều nguồn thành một dòng.</li>
-    <li><strong><code>groupby</code> có bẫy</strong> — nó gom phần tử kề nhau, nên phải sắp xếp theo đúng khoá trước.</li>
-    <li><strong><code>tee</code> là ngoại lệ duy nhất</strong>: nó đệm ngầm, trả lại phần bộ nhớ vừa tiết kiệm được.</li>
-  </ul>
-
-  <details class="deep"><summary>Khi nào nên bỏ <code>groupby</code> mà dùng <code>defaultdict</code>?</summary>
-    <div class="body">
-      <p><code>groupby</code> chỉ đáng dùng khi dữ liệu <b>đã</b> sắp xếp sẵn theo khoá — đọc từ file đã sort, hay kết quả một truy vấn có <code>ORDER BY</code>. Khi đó nó gom theo kiểu lười, bộ nhớ không đổi.</p>
-      <p>Còn phải tự sort trước thì đằng nào cũng đã nạp hết vào bộ nhớ, và <code>defaultdict(list)</code> gọn hơn, không có bẫy kề-nhau, lại chạy đúng dù dữ liệu xáo trộn. Chi tiết cách dict gom nhóm ở bài <a href="../../03-builtin-structures/dict-hash-table/index.html">Python dict &amp; hash table</a>.</p>
-    </div></details>
-</section>
-
-<section id="iter-s9" class="lesson">
-  <div class="sh"><b>09</b><h2>Lỗi hay gặp</h2></div>
-
-  <p class="key">Bốn lỗi này đều <em>im lặng</em> — không exception nào, chỉ ra kết quả thiếu. Mỗi lỗi là hệ quả của việc đọc sai một ô trong bản đồ ở mục 01.</p>
-
-  <div class="grid2">
-    <div class="card bad"><h4>Duyệt generator lần thứ hai</h4><p><code>sum(g)</code> ra 3, gọi lại <code>sum(g)</code> ra 0. Iterator cạn là hết, không có cảnh báo nào.</p></div>
-    <div class="card bad"><h4><code>groupby</code> khi chưa sắp xếp</h4><p>Nó chỉ gom các phần tử <b>kề nhau</b>, nên một khoá xuất hiện lại ở chỗ khác sẽ thành nhóm mới.</p></div>
-    <div class="card bad"><h4>Để <code>StopIteration</code> lọt ra ngoài</h4><p>Vòng <code>for</code> bao ngoài hiểu nhầm là hết dữ liệu rồi dừng — dùng <code>next(it, default)</code>.</p></div>
-    <div class="card bad"><h4><code>tee</code> để duyệt hai lần dữ liệu lớn</h4><p>Nó đệm ngầm mọi phần tử nhánh kia chưa lấy, tốn bằng cả một <code>list</code>.</p></div>
-  </div>
-
-  <ul class="why">
-    <li><strong>Nguy hiểm nhất là lỗi đầu</strong>: hàm chạy đúng với <code>list</code> nên test không bắt được.</li>
-    <li><strong>Chữa bằng <code>list(items)</code></strong> ngay đầu hàm, mỗi khi hàm cần duyệt nhiều hơn một lượt.</li>
-    <li><strong>Trong generator</strong>, đừng để <code>StopIteration</code> lọt ra — dùng <code>next(it, default)</code>.</li>
-  </ul>
-
-  <p class="stripnote"><span>ba bẫy hay bị gộp nhầm vào đây</span><span>biến vòng lặp trong closure ở <a href="../decorator-context-manager/index.html"><em>decorator</em></a> &#183; đối số mặc định khả biến và <code>lru_cache</code> giữ <code>self</code> ở <a href="../memory-model-mutability/index.html"><em>memory model</em></a></span></p>
-</section>
-
-<section id="iter-s10" class="lesson">
-  <div class="sh"><b>10</b><h2>Hỏi đáp</h2></div>
-
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
-
-  <details class="qa"><summary>Iterable và iterator khác nhau thế nào?</summary>
-  <p>Iterable có <code>__iter__</code> và tạo ra iterator mới mỗi lần được duyệt, nên duyệt lại được nhiều lần — list, dict, str. Iterator có thêm <code>__next__</code>, giữ vị trí hiện tại, và <b>chỉ duyệt được một lần</b>. Điều này quan trọng thực tế: một hàm nhận tham số rồi duyệt hai lần sẽ chạy đúng với list nhưng trả kết quả sai với generator, mà không có exception nào — bug im lặng.</p></details>
-
-  <details class="qa"><summary>Vòng <code>for</code> thực chất chạy những gì?</summary>
-  <p>Bốn dòng: gọi <code>iter(obj)</code> lấy iterator, rồi lặp <code>next(it)</code> cho tới khi bắt được <code>StopIteration</code> thì <code>break</code>. Ba hệ quả rơi ra từ đó: <code>StopIteration</code> là cơ chế điều khiển luồng chứ không phải lỗi; object nào cài đủ hai phương thức đều dùng được trong <code>for</code> mà không cần kế thừa gì; và vòng <code>for</code> không bao giờ hỏi độ dài, nên duyệt được cả chuỗi vô hạn.</p></details>
-
-  <details class="qa"><summary>Generator hoạt động thế nào, khi nào bạn dùng?</summary>
-  <p>Hàm có <code>yield</code> khi gọi không chạy dòng nào, chỉ trả về generator object. Mỗi lần <code>next()</code> thì thân hàm chạy tới <code>yield</code> tiếp theo rồi đóng băng, giữ nguyên biến cục bộ và vị trí — thực chất là một máy trạng thái viết sẵn. Tôi dùng khi dữ liệu lớn hoặc vô hạn, khi chỉ cần duyệt một lần, và khi dựng đường ống xử lý theo tầng. Đổi lại thì mất <code>len()</code>, mất truy cập theo chỉ số và không duyệt lại được.</p></details>
-
-  <details class="qa"><summary>Khi nào dùng list comprehension và khi nào generator expression?</summary>
-  <p>Generator khi chỉ duyệt một lần, khi đưa thẳng vào hàm gộp như <code>sum</code>, <code>max</code>, <code>any</code>, hoặc khi dữ liệu lớn tới mức không nên giữ trong RAM — bộ nhớ là hằng số thay vì O(n). List khi cần <code>len()</code>, cần truy cập theo chỉ số, hoặc cần duyệt nhiều lần. Chi tiết đáng nhớ: <code>sum([...])</code> và <code>sum(...)</code> chỉ khác hai dấu ngoặc vuông nhưng có thể lệch nhau hàng trăm MB.</p></details>
-
-  <details class="qa"><summary><code>yield from</code> làm gì mà <code>for ... yield</code> không làm được?</summary>
-  <p>Về mặt sinh ra giá trị thì hai cách như nhau. Khác biệt là <code>yield from</code> <b>chuyển tiếp cả kênh ngược</b>: <code>send()</code>, <code>throw()</code>, <code>close()</code> và giá trị <code>return</code> của generator con đều đi xuyên qua. Viết tay bằng vòng <code>for</code> thì mất hết những thứ đó, nên với generator lồng nhau — nhất là coroutine — <code>yield from</code> là cách đúng.</p></details>
-
-  <details class="qa"><summary>Vì sao duyệt một generator lần thứ hai lại ra rỗng mà không báo lỗi?</summary>
-  <p>Vì generator là iterator, mà iterator chỉ giữ <b>vị trí</b> chứ không giữ dữ liệu. Duyệt hết lượt đầu thì vị trí đã ở cuối; lượt hai gọi <code>next</code> là nhận ngay <code>StopIteration</code>, và <code>for</code> hiểu đúng tín hiệu đó là &quot;không còn gì&quot; nên kết thúc bình thường. Đứng từ chỗ đó thì không có gì sai để mà báo — cái sai nằm ở kỳ vọng của người viết, và đó là lý do nó im lặng.</p></details>
-</section>
-
-<footer>Deep dive &#183; iterator &amp; generator &#183; phần closure, decorator và context manager nằm ở bài <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</footer>
-
+<footer>Deep dive · Python internals · nền tảng ở <a href="../memory-model-mutability/index.html">Memory model &amp; mutability</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>
@@ -494,6 +340,5 @@
 <script src="../../../../assets/catalog.js"></script>
 <script src="../../../../assets/search-index.js"></script>
 <script src="../../../../assets/app.js"></script>
-<script src="lab.js"></script>
 </body>
 </html>

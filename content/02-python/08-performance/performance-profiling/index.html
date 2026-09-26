@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profiling & performance — MazeAI</title>
-<meta name="description" content="Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.">
+<meta name="description" content="Đo trước khi tối ưu — cProfile chỉ ra chỗ thật sự chậm, và vectorize nhanh hơn vòng lặp Python hàng chục lần.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/08-performance/performance-profiling/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Profiling &amp; performance">
-<meta property="og:description" content="Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.">
+<meta property="og:description" content="Đo trước khi tối ưu — cProfile chỉ ra chỗ thật sự chậm, và vectorize nhanh hơn vòng lặp Python hàng chục lần.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,317 +39,199 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-perf" data-title="Profiling &amp; performance" data-tag="Performance" data-blurb="Đo trước khi tối ưu — cProfile, memory profiler và vì sao vectorize bằng NumPy nhanh hơn vòng lặp Python.">
+<article class="doc" id="art-perf" data-title="Profiling &amp; performance" data-reviewed="1" data-tag="Performance" data-blurb="Đo trước khi tối ưu — cProfile chỉ ra chỗ thật sự chậm, và vectorize nhanh hơn vòng lặp Python hàng chục lần.">
         <header class="hero">
   <p class="eyebrow">Python · performance</p>
   <h1>Profiling &amp; <em>performance</em></h1>
-  <p class="lede">Quy tắc duy nhất: <b>đo trước, sửa sau</b>. Chỗ bạn đoán là chậm gần như luôn không phải chỗ chậm thật.</p>
+  <p class="lede">Tối ưu mà không đo là đoán. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>đo trước, chỗ chậm thường không nằm ở chỗ bạn nghĩ</li>
+    <li>tối ưu chỗ chiếm 1% thời gian thì gần như vô ích</li>
+    <li>dữ liệu lớn và phép tính đồng đều thì <b>vectorize</b></li>
+  </ul>
 </header>
 
-<section id="performance-profiling-s1" class="lesson">
-  <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Đo trước, rồi sửa theo thứ tự đáng giá — và chỗ đáng giá nhất thường là <em>một thao tác O(n) bị giấu</em>, không phải tối ưu vi mô.</p>
-
+<section id="prof-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Đo trước khi tối ưu</h2></div>
+  <p class="key">Hàm gọi <em>nhiều lần</em> chưa chắc tốn thời gian. Chỉ số đo mới trả lời được.</p>
   <figure class="gist">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: đo trước, thao tác O(n) bị giấu, bộ nhớ, vectorization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Đo trước</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ba mức, chi tiết dần</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Thao tác O(n) bị giấu</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">chỗ sửa đáng giá nhất</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bộ nhớ</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">phần thừa cố định mỗi object</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Vectorization</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">đẩy vòng lặp xuống C</text>
-<text class="sv-hv" x="372" y="18">ĐO TRƯỚC, RỒI SỬA THEO THỨ TỰ ĐÁNG GIÁ</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">&#9312; đo ở đâu</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">perf_counter → cProfile → line_profiler</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">&#9313; sửa gì trước</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">một O(n) bị giấu ăn đứt mọi tối ưu vi mô</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">&#9314; rồi tới bộ nhớ</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">triệu object nhỏ chênh nhau cả trăm MB</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">&#9315; cuối cùng mới vectorize</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">chỉ có lãi khi mảng đủ lớn</text>
+    <svg viewBox="0 0 860 320" role="img" aria-label="Hàm main gọi slow_part ba lần và fast_part mười lần; cProfile đo ra hai thanh, thanh slow_part dài chiếm chín mươi chín phần trăm còn fast_part gần như không đáng kể" data-anim><style>@keyframes gs1{0%{animation-timing-function:ease-in-out;opacity:0}3.077%{animation-timing-function:ease-in-out;opacity:0}5.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs2{0%{animation-timing-function:ease-in-out;opacity:0}9.231%{animation-timing-function:ease-in-out;opacity:0}11.923%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs3{0%{animation-timing-function:ease-in-out;opacity:0}15.385%{animation-timing-function:ease-in-out;opacity:0}17.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs4{0%{animation-timing-function:ease-in-out;opacity:0}16.923%{animation-timing-function:ease-in-out;opacity:0}19.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs5{0%{animation-timing-function:ease-in-out;opacity:0}18.462%{animation-timing-function:ease-in-out;opacity:0}21.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.077%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.462%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}30.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,68px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,68px)}}@keyframes gs7{0%{animation-timing-function:ease-in-out;opacity:0}30.769%{animation-timing-function:ease-in-out;opacity:0}33.462%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs8{0%{animation-timing-function:ease-in-out;opacity:0}18.462%{animation-timing-function:ease-in-out;opacity:0}21.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}30.769%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}31.154%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}37.692%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,118px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,118px)}}@keyframes gs10{0%{animation-timing-function:ease-in-out;opacity:0}38.462%{animation-timing-function:ease-in-out;opacity:0}41.154%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs11{0%{animation-timing-function:ease-in-out;opacity:0}46.154%{animation-timing-function:ease-in-out;opacity:0}48.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs12{0%{animation-timing-function:ease-in-out;opacity:0}52.308%{animation-timing-function:ease-in-out;opacity:0}55.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes gs13{0%{animation-timing-function:ease-in-out;opacity:0}56.923%{animation-timing-function:ease-in-out;opacity:0}59.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.gs1{animation:gs1 13.0s linear 1 forwards}.gs2{animation:gs2 13.0s linear 1 forwards}.gs3{animation:gs3 13.0s linear 1 forwards}.gs4{animation:gs4 13.0s linear 1 forwards}.gs5{animation:gs5 13.0s linear 1 forwards}.gs6{animation:gs6 13.0s linear 1 forwards}.gs7{animation:gs7 13.0s linear 1 forwards}.gs8{animation:gs8 13.0s linear 1 forwards}.gs9{animation:gs9 13.0s linear 1 forwards}.gs10{animation:gs10 13.0s linear 1 forwards}.gs11{animation:gs11 13.0s linear 1 forwards}.gs12{animation:gs12 13.0s linear 1 forwards}.gs13{animation:gs13 13.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">ĐOÁN CHỖ CHẬM THƯỜNG SAI · ĐO THÌ RA NGAY</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="gs1"><text x="0.0" y="84.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">def main():</text><text x="26.0" y="108.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">slow_part()   # 3 lần</text><text x="26.0" y="132.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">fast_part()   # 10 lần</text></g>
+<g class="gs2"><text class="sv-d" x="0" y="170" fill="var(--tomb)" style="fill:var(--tomb)">Đoán: cái gọi 10 lần chắc tốn hơn?</text></g>
+<g class="gs3"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">cProfile.run(main)</text></g>
+<g class="gs4"><text class="sv-d" x="380" y="70" fill="var(--muted)" style="fill:var(--muted)">cProfile · cumtime</text></g>
+<g class="gs5"><rect x="380" y="94" width="300" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="gs6" transform="translate(-320 68)"><rect x="700" y="26" width="297.6608549931069" height="40" rx="6" fill="rgba(var(--red-a),.26)" stroke="var(--tomb)" stroke-width="1.6"/><text x="712.0" y="52.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">slow_part</text></g>
+<g class="gs7"><text class="sv-d" x="694" y="120" fill="var(--tomb)" style="fill:var(--tomb)">99.2%</text></g>
+<g class="gs8"><rect x="380" y="144" width="300" height="40" rx="6" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="gs9" transform="translate(-320 118)"><rect x="700" y="26" width="60" height="40" rx="6" fill="rgba(var(--green-a),.26)" stroke="var(--ok)" stroke-width="1.6"/><text x="712.0" y="52.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">fast_part</text></g>
+<g class="gs10"><text class="sv-d" x="694" y="170" fill="var(--ok)" style="fill:var(--ok)">0.8%</text></g>
+<g class="gs11"><line x1="500.0" y1="204.0" x2="440.0" y2="174.0" stroke="var(--tomb)" stroke-width="1.1" stroke-dasharray="3 2" opacity=".8"/><circle cx="440.0" cy="174.0" r="2.6" fill="var(--tomb)"/><text class="sv-d" x="506" y="208" fill="var(--tomb)" style="fill:var(--tomb)">gọi ÍT hơn nhưng chiếm gần hết thời gian</text></g>
+<g class="gs12"><rect x="0" y="220" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="235" fill="var(--probe)" style="fill:var(--probe)">Tối ưu chỗ chiếm 0,8% thì dù nhanh gấp đôi cũng gần như vô ích</text></g>
+<g class="gs13"><text class="sv-d" x="14" y="252" fill="var(--muted)" style="fill:var(--muted)">cProfile cho tổng thời gian mỗi hàm; line_profiler cho từng DÒNG trong hàm.</text><text class="sv-d" x="14" y="270" fill="var(--muted)" style="fill:var(--muted)">Bản thân cProfile làm chương trình chậm đi — dùng để so tỉ lệ, không đo tốc độ tuyệt đối.</text><text class="sv-d" x="14" y="288" fill="var(--muted)" style="fill:var(--muted)">Đo tốc độ tuyệt đối thì dùng timeit trên đoạn nhỏ.</text></g>
 </svg>
-  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
   </figure>
-</section>
-
-<section id="performance-profiling-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Đo trước, đoán sau</h2></div>
-
-  <p class="key">Tối ưu mà không đo là <em>sửa mò</em>. Ba công cụ, ba mức chi tiết.</p>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: đo trước, thao tác O(n) bị giấu, bộ nhớ, vectorization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="46" fill="var(--filled)">&#9312; Đo trước</text>
-<text class="sv-d" x="13" y="64" fill="var(--muted)">ba mức, chi tiết dần</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Thao tác O(n) bị giấu</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">chỗ sửa đáng giá nhất</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bộ nhớ</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">phần thừa cố định mỗi object</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Vectorization</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">đẩy vòng lặp xuống C</text>
-<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9312; ĐO TRƯỚC — BA MỨC, CHI TIẾT DẦN</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">1 · perf_counter</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">đo một ĐOẠN, không cần cài gì</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">2 · cProfile — BẮT ĐẦU Ở ĐÂY</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">HÀM nào tốn bao nhiêu · cumtime gồm cả hàm con</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--filled)">3 · line_profiler</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">từng DÒNG, khi đã khoanh được hàm nghi ngờ</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">luôn đo trên DỮ LIỆU THẬT</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">dữ liệu nhỏ hay cho kết luận ngược</text>
-</svg>
-  <figcaption>Ô &#9312; sáng lên. Bắt đầu ở cProfile, chỉ xuống line_profiler khi đã khoanh được hàm.</figcaption>
-  </figure>
-
-<pre class="core"><code><span class="cm"># 1 — nhanh nhất: đo một đoạn</span>
-<span class="kw">import</span> time; t = time.perf_counter(); ...; <span class="kw">print</span>(time.perf_counter() - t)
-
-<span class="cm"># 2 — cProfile: hàm nào tốn bao nhiêu</span>
-python -m cProfile -s cumtime script.py | head -<span class="st">20</span>
-
-<span class="cm"># 3 — line_profiler: từng DÒNG trong một hàm</span>
-<span class="kw">@profile</span>
-<span class="kw">def</span> hàm_chậm(): ...     <span class="cm"># rồi chạy: kernprof -l -v script.py</span></code></pre>
-
   <ul class="why">
-    <li>Đọc cột <b><code>cumtime</code></b> trước — tổng thời gian gồm cả hàm con. Nó chỉ thẳng ra nhánh đắt.</li>
-    <li><code>tottime</code> là thời gian <b>trong thân hàm</b>, không tính hàm con — dùng để tìm hàm tự nó chậm.</li>
-    <li>Đo trên <b>dữ liệu thật</b>. Dữ liệu nhỏ thường cho kết luận ngược.</li>
+    <li>Đo thật: <code>slow_part</code> gọi 3 lần chiếm <b>99.2%</b>, <code>fast_part</code> gọi 10 lần chỉ 0.8%.</li>
+    <li>Tối ưu chỗ 0.8% dù nhanh gấp đôi cũng gần như không đổi gì.</li>
+    <li><b>cProfile</b> cho tổng thời gian mỗi hàm; <b>line_profiler</b> cho từng dòng trong hàm.</li>
+    <li>Bản thân cProfile làm chương trình chậm đi — dùng để so <b>tỉ lệ</b>, không đo tốc độ tuyệt đối.</li>
+    <li>Đo tốc độ tuyệt đối thì dùng <code>timeit</code> trên đoạn nhỏ.</li>
   </ul>
 </section>
 
-<section id="performance-profiling-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Thao tác O(n) bị giấu</h2></div>
-
-  <p class="key">Ba dòng dưới đây trông như thao tác một bước, nhưng <em>mỗi lần gọi là duyệt cả cấu trúc</em> — đặt trong vòng lặp là bài toán thành O(n²).</p>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: đo trước, thao tác O(n) bị giấu, bộ nhớ, vectorization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Đo trước</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ba mức, chi tiết dần</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="109" fill="var(--probe)">&#9313; Thao tác O(n) bị giấu</text>
-<text class="sv-d" x="13" y="127" fill="var(--muted)">chỗ sửa đáng giá nhất</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bộ nhớ</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">phần thừa cố định mỗi object</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Vectorization</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">đẩy vòng lặp xuống C</text>
-<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9313; THAO TÁC O(n) BỊ GIẤU — SỬA CHỖ NÀY TRƯỚC</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--tomb)">x in list</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">duyệt cả list · đổi sang set là O(1)</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--tomb)">list.pop(0)</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">dịch cả mảng · đổi sang deque.popleft()</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--tomb)">s += "a" trong vòng lặp</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">chép lại cả chuỗi mỗi vòng · gom rồi "".join</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--ok)">vì sao đáng nhất</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">hàm chiếm 2% có nhanh gấp đôi cũng chỉ được 1%</text>
-</svg>
-  <figcaption>Ô &#9313; sáng lên. Sửa ba dòng này thường ăn đứt mọi tối ưu vi mô.</figcaption>
-  </figure>
-
-<pre class="core"><code><span class="cm"># x in list — duyệt cả list mỗi lần</span>
-<span class="kw">if</span> x <span class="kw">in</span> danh_sách: ...        <span class="cm"># O(n)</span>
-<span class="kw">if</span> x <span class="kw">in</span> tập_hợp: ...          <span class="cm"># O(1) — chuyển sang set</span>
-
-<span class="cm"># list.pop(0) — dịch toàn bộ mảng sang trái</span>
-hàng_đợi.pop(<span class="st">0</span>)             <span class="cm"># O(n)</span>
-deque(...).popleft()          <span class="cm"># O(1)</span>
-
-<span class="cm"># s += "a" — chuỗi bất biến, mỗi lần là chép lại cả chuỗi</span>
-<span class="kw">for</span> t <span class="kw">in</span> phần: s += t        <span class="cm"># O(n²) trên tổng độ dài</span>
-s = <span class="st">""</span>.join(phần)           <span class="cm"># O(n)</span></code></pre>
-
+<section id="prof-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Đọc kết quả cProfile</h2></div>
+  <p class="key">Bốn cột cần nhìn, và <em>cumtime</em> là cột trả lời câu "tối ưu chỗ nào".</p>
+  <table>
+    <tr><th>Cột</th><th>Nghĩa</th></tr>
+    <tr><td><code>ncalls</code></td><td>gọi bao nhiêu lần</td></tr>
+    <tr><td><code>tottime</code></td><td>thời gian trong <b>thân hàm</b>, không tính hàm nó gọi</td></tr>
+    <tr><td><code>cumtime</code></td><td>tính cả hàm con — <b>chọn theo cột này</b></td></tr>
+    <tr><td><code>percall</code></td><td>trung bình mỗi lần gọi</td></tr>
+  </table>
   <ul class="why">
-    <li>Đây là chỗ sửa <b>đáng giá nhất</b> vì nó đổi độ phức tạp, không phải đổi hằng số: hàm chiếm 2% thời gian có nhanh gấp đôi cũng chỉ tiết kiệm 1%.</li>
-    <li>Dấu hiệu nhận ra trong profile: một hàm có <code>ncalls</code> rất lớn mà mỗi lần gọi đều rẻ — chi phí nằm ở <b>số lần</b>, không ở từng lần.</li>
+    <li><code>tottime</code> cao mà <code>cumtime</code> bằng nó: chính hàm đó chậm.</li>
+    <li><code>cumtime</code> cao mà <code>tottime</code> thấp: nó chỉ gọi hàm khác — đi tiếp xuống dưới.</li>
+    <li>Bộ nhớ thì dùng <code>tracemalloc</code> hoặc <b>memory_profiler</b>, cProfile không đo bộ nhớ.</li>
+    <li>Trên production thì dùng sampling profiler như <b>py-spy</b>: không cần sửa code, chi phí thấp.</li>
   </ul>
 </section>
 
-<section id="performance-profiling-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Bộ nhớ</h2></div>
-
+<section id="prof-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Vectorize</h2></div>
+  <p class="key">Vòng lặp Python chạy từng phần tử qua interpreter. NumPy đẩy cả vòng lặp <em>xuống C</em>.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: đo trước, thao tác O(n) bị giấu, bộ nhớ, vectorization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Đo trước</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ba mức, chi tiết dần</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Thao tác O(n) bị giấu</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">chỗ sửa đáng giá nhất</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="172" fill="var(--ok)">&#9314; Bộ nhớ</text>
-<text class="sv-d" x="13" y="190" fill="var(--muted)">phần thừa cố định mỗi object</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Vectorization</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">đẩy vòng lặp xuống C</text>
-<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9314; BỘ NHỚ — PHẦN THỪA CỐ ĐỊNH MỖI OBJECT</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">một int ~28 byte · list rỗng ~56 byte</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">con số không nhỏ như tưởng</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">object thường ~152 byte</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">vì mỗi instance mang một __dict__ riêng</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">có __slots__ còn ~56 byte</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">đổi lại: không thêm được thuộc tính lúc chạy</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">triệu object nhỏ</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">chênh nhau cả TRĂM MB</text>
+    <svg viewBox="0 0 860 544" role="img" aria-label="Hàng trên là vòng lặp Python xử lý từng ô một, khung đỏ chạy qua từng phần tử; hàng dưới NumPy khoanh cả mảng trong một lệnh và kết quả hiện cùng lúc" data-anim><style>@keyframes vc1{0%{animation-timing-function:ease-in-out;opacity:0}2.143%{animation-timing-function:ease-in-out;opacity:0}4.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc2{0%{animation-timing-function:ease-in-out;opacity:0}3.571%{animation-timing-function:ease-in-out;opacity:0}6.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc3{0%{animation-timing-function:ease-in-out;opacity:0}4.286%{animation-timing-function:ease-in-out;opacity:0}6.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc4{0%{animation-timing-function:ease-in-out;opacity:0}5.000%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc5{0%{animation-timing-function:ease-in-out;opacity:0}5.714%{animation-timing-function:ease-in-out;opacity:0}8.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc6{0%{animation-timing-function:ease-in-out;opacity:0}6.429%{animation-timing-function:ease-in-out;opacity:0}8.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc7{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}11.786%{animation-timing-function:ease-in-out;opacity:1}15.000%{animation-timing-function:ease-in-out;opacity:1}16.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes vc8{0%{animation-timing-function:ease-in-out;opacity:0}12.143%{animation-timing-function:ease-in-out;opacity:0}14.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc9{0%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:0}16.786%{animation-timing-function:ease-in-out;opacity:1}20.000%{animation-timing-function:ease-in-out;opacity:1}21.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes vc10{0%{animation-timing-function:ease-in-out;opacity:0}17.143%{animation-timing-function:ease-in-out;opacity:0}19.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc11{0%{animation-timing-function:ease-in-out;opacity:0}20.000%{animation-timing-function:ease-in-out;opacity:0}21.786%{animation-timing-function:ease-in-out;opacity:1}25.000%{animation-timing-function:ease-in-out;opacity:1}26.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes vc12{0%{animation-timing-function:ease-in-out;opacity:0}22.143%{animation-timing-function:ease-in-out;opacity:0}24.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc13{0%{animation-timing-function:ease-in-out;opacity:0}25.000%{animation-timing-function:ease-in-out;opacity:0}26.786%{animation-timing-function:ease-in-out;opacity:1}30.000%{animation-timing-function:ease-in-out;opacity:1}31.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes vc14{0%{animation-timing-function:ease-in-out;opacity:0}27.143%{animation-timing-function:ease-in-out;opacity:0}29.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc15{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}31.786%{animation-timing-function:ease-in-out;opacity:1}35.000%{animation-timing-function:ease-in-out;opacity:1}36.786%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes vc16{0%{animation-timing-function:ease-in-out;opacity:0}32.143%{animation-timing-function:ease-in-out;opacity:0}34.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc17{0%{animation-timing-function:ease-in-out;opacity:0}37.143%{animation-timing-function:ease-in-out;opacity:0}39.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc18{0%{animation-timing-function:ease-in-out;opacity:0}41.429%{animation-timing-function:ease-in-out;opacity:0}43.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc19{0%{animation-timing-function:ease-in-out;opacity:0}42.857%{animation-timing-function:ease-in-out;opacity:0}45.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc20{0%{animation-timing-function:ease-in-out;opacity:0}43.286%{animation-timing-function:ease-in-out;opacity:0}45.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc21{0%{animation-timing-function:ease-in-out;opacity:0}43.714%{animation-timing-function:ease-in-out;opacity:0}46.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc22{0%{animation-timing-function:ease-in-out;opacity:0}44.143%{animation-timing-function:ease-in-out;opacity:0}46.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc23{0%{animation-timing-function:ease-in-out;opacity:0}44.571%{animation-timing-function:ease-in-out;opacity:0}47.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc24{0%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:0}48.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc25{0%{animation-timing-function:ease-in-out;opacity:0}48.571%{animation-timing-function:ease-in-out;opacity:0}50.357%{animation-timing-function:ease-in-out;opacity:1}57.143%{animation-timing-function:ease-in-out;opacity:1}58.929%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes vc26{0%{animation-timing-function:ease-in-out;opacity:0}57.143%{animation-timing-function:ease-in-out;opacity:0}59.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc27{0%{animation-timing-function:ease-in-out;opacity:0}57.571%{animation-timing-function:ease-in-out;opacity:0}60.071%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc28{0%{animation-timing-function:ease-in-out;opacity:0}58.000%{animation-timing-function:ease-in-out;opacity:0}60.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc29{0%{animation-timing-function:ease-in-out;opacity:0}58.429%{animation-timing-function:ease-in-out;opacity:0}60.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc30{0%{animation-timing-function:ease-in-out;opacity:0}58.857%{animation-timing-function:ease-in-out;opacity:0}61.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc31{0%{animation-timing-function:ease-in-out;opacity:0}61.429%{animation-timing-function:ease-in-out;opacity:0}63.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc32{0%{animation-timing-function:ease-in-out;opacity:0}67.143%{animation-timing-function:ease-in-out;opacity:0}69.643%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc33{0%{animation-timing-function:ease-in-out;opacity:0}70.000%{animation-timing-function:ease-in-out;opacity:0}72.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc34{0%{animation-timing-function:ease-in-out;opacity:0}74.286%{animation-timing-function:ease-in-out;opacity:0}76.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc35{0%{animation-timing-function:ease-in-out;opacity:0}80.000%{animation-timing-function:ease-in-out;opacity:0}82.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes vc36{0%{animation-timing-function:ease-in-out;opacity:0}84.286%{animation-timing-function:ease-in-out;opacity:0}86.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.vc1{animation:vc1 14.0s linear 1 forwards}.vc2{animation:vc2 14.0s linear 1 forwards}.vc3{animation:vc3 14.0s linear 1 forwards}.vc4{animation:vc4 14.0s linear 1 forwards}.vc5{animation:vc5 14.0s linear 1 forwards}.vc6{animation:vc6 14.0s linear 1 forwards}.vc7{animation:vc7 14.0s linear 1 forwards}.vc8{animation:vc8 14.0s linear 1 forwards}.vc9{animation:vc9 14.0s linear 1 forwards}.vc10{animation:vc10 14.0s linear 1 forwards}.vc11{animation:vc11 14.0s linear 1 forwards}.vc12{animation:vc12 14.0s linear 1 forwards}.vc13{animation:vc13 14.0s linear 1 forwards}.vc14{animation:vc14 14.0s linear 1 forwards}.vc15{animation:vc15 14.0s linear 1 forwards}.vc16{animation:vc16 14.0s linear 1 forwards}.vc17{animation:vc17 14.0s linear 1 forwards}.vc18{animation:vc18 14.0s linear 1 forwards}.vc19{animation:vc19 14.0s linear 1 forwards}.vc20{animation:vc20 14.0s linear 1 forwards}.vc21{animation:vc21 14.0s linear 1 forwards}.vc22{animation:vc22 14.0s linear 1 forwards}.vc23{animation:vc23 14.0s linear 1 forwards}.vc24{animation:vc24 14.0s linear 1 forwards}.vc25{animation:vc25 14.0s linear 1 forwards}.vc26{animation:vc26 14.0s linear 1 forwards}.vc27{animation:vc27 14.0s linear 1 forwards}.vc28{animation:vc28 14.0s linear 1 forwards}.vc29{animation:vc29 14.0s linear 1 forwards}.vc30{animation:vc30 14.0s linear 1 forwards}.vc31{animation:vc31 14.0s linear 1 forwards}.vc32{animation:vc32 14.0s linear 1 forwards}.vc33{animation:vc33 14.0s linear 1 forwards}.vc34{animation:vc34 14.0s linear 1 forwards}.vc35{animation:vc35 14.0s linear 1 forwards}.vc36{animation:vc36 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">VÒNG LẶP PYTHON vs NUMPY · MỘT LỆNH CHO CẢ MẢNG</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="vc1"><text class="sv-d" x="104" y="110" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">Python</text><text x="0.0" y="72.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">[x*2 for x in a]</text></g>
+<g class="vc2"><rect x="120" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="144.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="vc3"><rect x="172" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="196.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="vc4"><rect x="224" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="248.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="vc5"><rect x="276" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="300.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="vc6"><rect x="328" y="86" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="352.0" y="110.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">5</text></g>
+<g class="vc7" opacity="0"><rect x="117" y="83" width="54" height="42" rx="5" fill="none" stroke="var(--tomb)" stroke-width="2.2" stroke-dasharray="3 2"/></g>
+<g class="vc8"><rect x="120" y="138" width="48" height="36" rx="4" fill="rgba(var(--red-a),.2)" stroke="var(--tomb)" stroke-width="1.4"/><text x="144.0" y="162.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="vc9" opacity="0"><rect x="169" y="83" width="54" height="42" rx="5" fill="none" stroke="var(--tomb)" stroke-width="2.2" stroke-dasharray="3 2"/></g>
+<g class="vc10"><rect x="172" y="138" width="48" height="36" rx="4" fill="rgba(var(--red-a),.2)" stroke="var(--tomb)" stroke-width="1.4"/><text x="196.0" y="162.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="vc11" opacity="0"><rect x="221" y="83" width="54" height="42" rx="5" fill="none" stroke="var(--tomb)" stroke-width="2.2" stroke-dasharray="3 2"/></g>
+<g class="vc12"><rect x="224" y="138" width="48" height="36" rx="4" fill="rgba(var(--red-a),.2)" stroke="var(--tomb)" stroke-width="1.4"/><text x="248.0" y="162.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">6</text></g>
+<g class="vc13" opacity="0"><rect x="273" y="83" width="54" height="42" rx="5" fill="none" stroke="var(--tomb)" stroke-width="2.2" stroke-dasharray="3 2"/></g>
+<g class="vc14"><rect x="276" y="138" width="48" height="36" rx="4" fill="rgba(var(--red-a),.2)" stroke="var(--tomb)" stroke-width="1.4"/><text x="300.0" y="162.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">8</text></g>
+<g class="vc15" opacity="0"><rect x="325" y="83" width="54" height="42" rx="5" fill="none" stroke="var(--tomb)" stroke-width="2.2" stroke-dasharray="3 2"/></g>
+<g class="vc16"><rect x="328" y="138" width="48" height="36" rx="4" fill="rgba(var(--red-a),.2)" stroke="var(--tomb)" stroke-width="1.4"/><text x="352.0" y="162.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">10</text></g>
+<g class="vc17"><text class="sv-d" x="400" y="162" fill="var(--tomb)" style="fill:var(--tomb)">lặp 1 triệu lần trong Python</text></g>
+<g class="vc18"><text class="sv-d" x="104" y="260" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">NumPy</text><text x="0.0" y="222.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b * 2</text></g>
+<g class="vc19"><rect x="120" y="236" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="144.0" y="260.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">1</text></g>
+<g class="vc20"><rect x="172" y="236" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="196.0" y="260.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="vc21"><rect x="224" y="236" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="248.0" y="260.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">3</text></g>
+<g class="vc22"><rect x="276" y="236" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="300.0" y="260.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="vc23"><rect x="328" y="236" width="48" height="36" rx="4" fill="rgba(var(--clay-a),.16)" stroke="var(--clay)" stroke-width="1.4"/><text x="352.0" y="260.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">5</text></g>
+<g class="vc24"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">b * 2</text></g>
+<g class="vc25" opacity="0"><rect x="116" y="232" width="264" height="44" rx="6" fill="none" stroke="var(--ok)" stroke-width="2.4" stroke-dasharray="4 3"/><text class="sv-d" x="400" y="260" fill="var(--ok)" style="fill:var(--ok)">MỘT lệnh cho cả mảng</text></g>
+<g class="vc26"><rect x="120" y="288" width="48" height="36" rx="4" fill="rgba(var(--green-a),.2)" stroke="var(--ok)" stroke-width="1.4"/><text x="144.0" y="312.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">2</text></g>
+<g class="vc27"><rect x="172" y="288" width="48" height="36" rx="4" fill="rgba(var(--green-a),.2)" stroke="var(--ok)" stroke-width="1.4"/><text x="196.0" y="312.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">4</text></g>
+<g class="vc28"><rect x="224" y="288" width="48" height="36" rx="4" fill="rgba(var(--green-a),.2)" stroke="var(--ok)" stroke-width="1.4"/><text x="248.0" y="312.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">6</text></g>
+<g class="vc29"><rect x="276" y="288" width="48" height="36" rx="4" fill="rgba(var(--green-a),.2)" stroke="var(--ok)" stroke-width="1.4"/><text x="300.0" y="312.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">8</text></g>
+<g class="vc30"><rect x="328" y="288" width="48" height="36" rx="4" fill="rgba(var(--green-a),.2)" stroke="var(--ok)" stroke-width="1.4"/><text x="352.0" y="312.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">10</text></g>
+<g class="vc31"><text class="sv-d" x="400" y="312" fill="var(--ok)" style="fill:var(--ok)">vòng lặp chạy trong C, không qua interpreter</text></g>
+<g class="vc32"><text class="sv-d" x="0" y="366" fill="var(--text)" style="fill:var(--text)">Nhân đôi 1 triệu số:</text></g>
+<g class="vc33"><text class="sv-d" x="0" y="406" fill="var(--tomb)" style="fill:var(--tomb)">list comprehension</text><rect x="200" y="388" width="340.0" height="22" rx="3" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.3"/><text class="sv-d" x="550.0" y="406" fill="var(--tomb)" style="fill:var(--tomb)">30.33 ms</text></g>
+<g class="vc34"><text class="sv-d" x="0" y="440" fill="var(--ok)" style="fill:var(--ok)">NumPy</text><rect x="200" y="422" width="7.362609974201606" height="22" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="217.3626099742016" y="440" fill="var(--ok)" style="fill:var(--ok)">0.66 ms</text></g>
+<g class="vc35"><rect x="0" y="462" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="477" fill="var(--probe)" style="fill:var(--probe)">Nhanh hơn 46 lần · và nhẹ hơn: 8 MB so với ~36 MB</text></g>
+<g class="vc36"><text class="sv-d" x="14" y="494" fill="var(--muted)" style="fill:var(--muted)">Vì mỗi phần tử list là một object riêng, còn ndarray là một khối byte liền nhau.</text><text class="sv-d" x="14" y="512" fill="var(--muted)" style="fill:var(--muted)">Chỉ đáng khi dữ liệu lớn và phép tính đồng đều — mảng nhỏ thì chi phí dựng array ăn hết.</text></g>
 </svg>
-  <figcaption>Ô &#9314; sáng lên. Phần thừa cố định mới là thứ nhân lên theo số object.</figcaption>
   </figure>
-
-  <p class="key">Mỗi object Python có <em>phần thừa cố định</em>. Nhiều object nhỏ tốn hơn bạn tưởng rất nhiều.</p>
-
-  <div class="bars">
-    <div class="b"><i>một số nguyên</i><u style="width:10%"></u><b>~28 byte</b></div>
-    <div class="b"><i>list rỗng</i><u style="width:20%"></u><b>~56 byte</b></div>
-    <div class="b bad"><i>object thường</i><u style="width:56%"></u><b>~152 byte (có <code>__dict__</code>)</b></div>
-    <div class="b hi"><i>object có <code>__slots__</code></i><u style="width:20%"></u><b>~56 byte</b></div>
-  </div>
-  <p class="stripnote"><span>số ước lượng trên CPython 64-bit</span><span><em>triệu object nhỏ → chênh nhau cả trăm MB</em></span></p>
-
   <ul class="why">
-    <li><code>__slots__</code> bỏ <code>__dict__</code> của instance → <b>gọn hơn và truy cập nhanh hơn</b>, đổi lại không thêm thuộc tính mới lúc chạy được.</li>
-    <li>Đo bằng <code>tracemalloc</code> (thư viện chuẩn) hoặc <code>memory_profiler</code>.</li>
-    <li>Đọc file lớn thì <b>duyệt theo dòng</b> hoặc dùng generator — đừng <code>read().split()</code> cả file.</li>
+    <li>Nhân đôi 1 triệu số: Python 30 ms, NumPy 0.66 ms — nhanh hơn 46 lần.</li>
+    <li>Cũng nhẹ hơn: 8 MB so với khoảng 36 MB.</li>
+    <li>Vì mỗi phần tử <code>list</code> là một object riêng, còn <code>ndarray</code> là một khối byte liền nhau.</li>
+    <li>Chỉ đáng khi dữ liệu lớn và phép tính đồng đều — mảng nhỏ thì chi phí dựng array ăn hết.</li>
+    <li>Nền tảng ở <a href="../../02-language-core/memory-model-mutability/index.html">Memory model &amp; mutability</a>.</li>
   </ul>
 </section>
 
-<section id="performance-profiling-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>NumPy vectorization</h2></div>
-
-  <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: đo trước, thao tác O(n) bị giấu, bộ nhớ, vectorization">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Đo trước</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ba mức, chi tiết dần</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Thao tác O(n) bị giấu</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">chỗ sửa đáng giá nhất</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bộ nhớ</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">phần thừa cố định mỗi object</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="235" fill="var(--tomb)">&#9315; Vectorization</text>
-<text class="sv-d" x="13" y="253" fill="var(--muted)">đẩy vòng lặp xuống C</text>
-<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9315; VECTORIZATION — MỘT LỆNH XUỐNG C THAY VÌ N LẦN THÔNG DỊCH</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--tomb)">vòng lặp Python</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">mỗi bước kiểm kiểu, cấp phát object, tăng refcount</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--tomb)">dữ liệu rải rác trong bộ nhớ</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">nên cache miss liên tục</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">NumPy: out = data * 2 + 1</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">vòng lặp nằm trong C, dữ liệu liền khối, tận dụng SIMD</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--probe)">chỉ đáng khi mảng ĐỦ LỚN</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">và đừng lặp Python trên ndarray — chậm hơn cả list</text>
-</svg>
-  <figcaption>Ô &#9315; sáng lên. Lãi đến từ chỗ vòng lặp chạy, không phải từ phép tính.</figcaption>
-  </figure>
-
-  <p class="key">Vòng lặp Python chậm vì <em>mỗi phép tính đi qua tầng thông dịch</em>. NumPy đẩy cả vòng lặp xuống C.</p>
-
-  <div class="cmp two">
-    <div>
-      <h5>Vòng lặp Python</h5>
-      <p>Mỗi bước: kiểm kiểu, cấp phát object, tăng bộ đếm tham chiếu.</p>
-      <p>Dữ liệu <b>rải rác</b> trong bộ nhớ.</p>
-    </div>
-    <div>
-      <h5>NumPy</h5>
-      <p>Một lệnh gọi xuống C, lặp bên trong không qua thông dịch.</p>
-      <p>Dữ liệu <b>liền khối</b> → tận dụng cache và lệnh SIMD.</p>
-    </div>
-  </div>
-
-<pre class="core"><code><span class="cm"># chậm</span>
-out = [x * <span class="st">2</span> + <span class="st">1</span> <span class="kw">for</span> x <span class="kw">in</span> data]
-
-<span class="cm"># nhanh hơn hàng chục lần trên mảng lớn</span>
-out = data * <span class="st">2</span> + <span class="st">1</span>          <span class="cm"># data là np.ndarray</span></code></pre>
-
+<section id="prof-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Thứ tự nên thử</h2></div>
+  <p class="key">Đi từ rẻ tới đắt, và <em>dừng khi đủ nhanh</em>.</p>
+  <table>
+    <tr><th>Bước</th><th>Việc</th></tr>
+    <tr><td>1</td><td>đo bằng cProfile, tìm hàm chiếm nhiều <code>cumtime</code> nhất</td></tr>
+    <tr><td>2</td><td>đổi thuật toán hoặc cấu trúc dữ liệu — thường ăn nhất</td></tr>
+    <tr><td>3</td><td>bỏ việc thừa: cache kết quả, tránh tính lại trong vòng lặp</td></tr>
+    <tr><td>4</td><td>vectorize bằng NumPy nếu dữ liệu lớn và đồng đều</td></tr>
+    <tr><td>5</td><td>cuối cùng mới tới C extension, Cython hay chuyển sang process</td></tr>
+  </table>
   <ul class="why">
-    <li>Chỉ đáng khi mảng <b>đủ lớn</b>: mảng vài chục phần tử thì chi phí gọi NumPy còn lớn hơn phần tiết kiệm.</li>
-    <li>Đừng <b>lặp Python trên ndarray</b> — vừa mất lợi thế vừa chậm hơn cả list thường.</li>
+    <li>Bước 2 thường thắng mọi bước sau: đổi <code>in list</code> thành <code>in set</code> ăn hàng nghìn lần.</li>
+    <li>Đo lại sau mỗi bước — không thì không biết bước nào có tác dụng.</li>
+    <li>Code nhanh mà sai thì vô nghĩa: giữ test chạy được sau mỗi lần sửa.</li>
   </ul>
 </section>
 
-<section id="performance-profiling-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+<section id="prof-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <p class="key">Lỗi đầu tiên tốn nhiều thời gian nhất mà <em>không đổi được gì</em>.</p>
+  <details class="qa"><summary>Vì sao phải đo trước khi tối ưu?</summary>
+  <p>Chỗ chậm thường không nằm ở chỗ mình nghĩ.</p>
+  <p>Hàm gọi nhiều lần chưa chắc tốn thời gian.</p>
+  <p>Tối ưu chỗ chiếm 1% thì gần như vô ích.</p>
+  <p>cProfile chỉ ra ngay hàm nào chiếm nhiều nhất.</p></details>
 
-  <div class="grid2">
-    <div class="card bad"><h4>Tối ưu chỗ không phải bottleneck</h4><p>Hàm chiếm 2% tổng thời gian, tối ưu nhanh gấp đôi cũng chỉ tiết kiệm 1%. <b>Đo trước.</b></p></div>
-    <div class="card bad"><h4>Bỏ qua thao tác O(n) bị giấu</h4><p><code>x in list</code>, <code>list.pop(0)</code>, <code>s += "a"</code> trong vòng lặp. Sửa mấy dòng này thường ăn đứt mọi tối ưu vi mô.</p></div>
-    <div class="card bad"><h4>Đo trên dữ liệu đồ chơi</h4><p>Với n nhỏ thì cache và hằng số quyết định, kết luận có thể ngược hẳn khi n lớn.</p></div>
-  </div>
+  <details class="qa"><summary>tottime khác cumtime thế nào?</summary>
+  <p>tottime là thời gian trong thân hàm.</p>
+  <p>cumtime tính cả các hàm nó gọi.</p>
+  <p>Chọn chỗ tối ưu thì nhìn cumtime.</p>
+  <p>cumtime cao mà tottime thấp thì đi tiếp xuống hàm con.</p></details>
+
+  <details class="qa"><summary>Vì sao NumPy nhanh hơn vòng lặp Python?</summary>
+  <p>Vòng lặp Python chạy từng phần tử qua interpreter.</p>
+  <p>NumPy đẩy cả vòng lặp xuống C.</p>
+  <p>ndarray là một khối byte liền nhau, không phải nhiều object.</p>
+  <p>Đo được nhanh hơn hàng chục lần trên một triệu số.</p></details>
+
+  <details class="qa"><summary>Khi nào KHÔNG nên dùng NumPy?</summary>
+  <p>Khi mảng nhỏ, chi phí dựng array ăn hết phần lợi.</p>
+  <p>Khi phép tính không đồng đều giữa các phần tử.</p>
+  <p>Khi dữ liệu không phải số thuần.</p>
+  <p>Lúc đó vòng lặp thường hoặc thuật toán khác tốt hơn.</p></details>
+
+  <details class="qa"><summary>Đo bộ nhớ bằng gì?</summary>
+  <p>tracemalloc trong thư viện chuẩn.</p>
+  <p>Hoặc memory_profiler cho từng dòng.</p>
+  <p>cProfile không đo bộ nhớ.</p>
+  <p>Trên production thì dùng py-spy, không cần sửa code.</p></details>
 </section>
 
-<section id="performance-profiling-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
-
-  <details class="qa"><summary>Code Python chậm, bạn làm gì đầu tiên?</summary>
-  <p><b>Đo bằng cProfile</b> trên dữ liệu thật, đọc <code>cumtime</code> để tìm nhánh đắt nhất. Chưa đo thì chưa sửa.</p></details>
-
-  <details class="qa"><summary>Vì sao vòng lặp Python chậm hơn NumPy?</summary>
-  <p>Mỗi phép tính phải qua <b>tầng thông dịch</b> và tạo object mới. NumPy chạy vòng lặp trong C trên vùng nhớ liền khối.</p></details>
-
-  <details class="qa"><summary><code>__slots__</code> để làm gì?</summary>
-  <p>Bỏ <code>__dict__</code> của instance → <b>tốn ít bộ nhớ hơn và truy cập nhanh hơn</b>, đổi lại không thêm thuộc tính mới lúc chạy được.</p></details>
-</section>
-
-<footer>Python · profiling &amp; performance · số liệu bộ nhớ ước lượng trên CPython 64-bit.</footer>
-
+<footer>Python · performance · nền tảng ở <a href="../../03-builtin-structures/list-tuple-set/index.html">List, tuple &amp; set</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>

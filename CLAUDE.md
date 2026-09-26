@@ -19,24 +19,24 @@ assets/style.css · app.js · catalog.js* · search-index.js*     (* sinh tự �
 assets/favicon.svg               ← nguồn hình của logo; .ico + .png bên dưới sinh từ nó
 assets/favicon.ico · icon-192.png · icon-512.png · apple-touch-icon.png   (sinh tự động)
 content/                         ← thứ tự dưới đây = đúng thứ tự hiện trên giao diện
-  01-dsa/                        23 bài · 0 khung
+  01-dsa/                        24 bài · 0 khung
     category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
     01-overview/{dsa-overview}
     02-foundations/{big-o-complexity}
     03-data-structures/{data-structures-overview, array-string, linked-list, hash-map, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie, union-find}
     04-algorithms/{algorithms-overview, sorting, two-pointers, sliding-window, prefix-sum, binary-search, greedy, intervals, backtracking, graph-bfs-dfs-topo, shortest-path, dynamic-programming}
-  02-python/                        17 bài · 0 khung
+    05-toolkit/{leetcode-toolkit}
+  02-python/                        16 bài · 0 khung
     01-overview/{python-overview}
     02-language-core/{language-core-overview, memory-model-mutability, memory-management-gc, scope-legb, data-model-dunder, iterator-generator, decorator-context-manager, exception-handling}
     03-builtin-structures/{list-tuple-set, dict-hash-table}
     04-concurrency/{thread-process-gil, asyncio}
-    05-toolkit/{leetcode-toolkit}
     06-oop/{oop-python}
     07-typing/{typing-dataclass}
     08-performance/{performance-profiling}
-  03-cs-fundamentals/                        14 bài · 0 khung
+  03-cs-fundamentals/                        13 bài · 0 khung
     01-overview/{cs-overview}
-    02-os/{os-overview, process-thread-scheduling, memory-virtual-paging, lock-deadlock-race}
+    02-os/{os-overview, memory-virtual-paging, lock-deadlock-race}
     03-networking/{networking-overview, dns-tls, tcp-http, caching, rest-api-design, load-balancing}
     04-distributed/{cap-theorem-consistency, consensus-leader-election}
     05-messaging/{messaging-queue-pubsub}
@@ -419,9 +419,9 @@ nhất khi một khái niệm chạm nhiều kệ.
 
 | Kệ | Khung bài chờ viết |
 |---|---|
-| DSA — data structures & algorithms | ✅ **xong** — 23 bài, không còn khung |
-| Python | ✅ **xong** — 17 bài, không còn khung |
-| CS fundamentals | ✅ **xong** — 14 bài, không còn khung |
+| DSA — data structures & algorithms | ✅ **xong** — 24 bài, không còn khung |
+| Python | ✅ **xong** — 16 bài, không còn khung |
+| CS fundamentals | ✅ **xong** — 13 bài, không còn khung |
 | Database & SQL | ✅ **xong** — 23 bài, không còn khung |
 | Machine learning | ✅ **xong** — 39 bài, không còn khung |
 | Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe · Debugging training · **Autoencoder · VAE · GAN** |

@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Exception handling — MazeAI</title>
-<meta name="description" content="try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.">
+<meta name="description" content="Lỗi bay ngược lên chuỗi lời gọi tới khối except khớp đầu tiên — nên mọi quyết định là bắt ở đâu và bắt rộng bao nhiêu.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#14110E">
 <meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/02-python/02-language-core/exception-handling/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="MazeAI">
 <meta property="og:title" content="Exception handling">
-<meta property="og:description" content="try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.">
+<meta property="og:description" content="Lỗi bay ngược lên chuỗi lời gọi tới khối except khớp đầu tiên — nên mọi quyết định là bắt ở đâu và bắt rộng bao nhiêu.">
 <meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
@@ -39,352 +39,217 @@
   <div class="cols">
     <nav class="toc"><p>Mục lục</p><div class="list" id="toc"></div></nav>
     <main class="reader" id="stage">
-      <article class="doc" id="art-exc" data-title="Exception handling" data-tag="Language core" data-blurb="try/except/else/finally, cây Exception, exception tự viết, raise from — và vì sao except: trần là lỗi nặng nhất.">
+<article class="doc" id="art-exc" data-title="Exception handling" data-reviewed="1" data-tag="Language core" data-blurb="Lỗi bay ngược lên chuỗi lời gọi tới khối except khớp đầu tiên — nên mọi quyết định là bắt ở đâu và bắt rộng bao nhiêu.">
         <header class="hero">
   <p class="eyebrow">Python · language core</p>
   <h1>Exception <em>handling</em></h1>
-  <p class="lede">Python không trả mã lỗi. Hàm nào không làm được việc thì <b>ném một object lên</b>, và nó bay ngược theo chuỗi lời gọi cho tới khi có ai bắt. Viết đúng phần bắt là ranh giới rõ nhất giữa code chạy được và code chạy được trên production.</p>
+  <p class="lede">Python không trả mã lỗi. Ba thứ cần nhớ:</p>
+  <ul class="ledelist">
+    <li>lỗi bay ngược lên tới khối <code>except</code> khớp đầu tiên</li>
+    <li>không ai bắt thì chương trình dừng, kèm traceback</li>
+    <li>bắt đúng loại, ghi lớp con lên trước lớp cha</li>
+  </ul>
 </header>
 
 <section id="exc-s1" class="lesson">
   <div class="sh"><b>01</b><h2>Mental model</h2></div>
-
-  <p class="key">Lỗi bay ngược lên tới khối <code>except</code> khớp đầu tiên — nên mọi quyết định trong bài đều là <em>chọn bắt ở đâu, bắt rộng bao nhiêu, và bắt xong làm gì</em>.</p>
-
+  <p class="key">Lỗi là một object <em>bay ngược lên</em> chuỗi lời gọi, dừng ở khối <code>except</code> khớp đầu tiên.</p>
   <figure class="gist">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: lỗi bay đi đâu, bốn khối đón nó, bắt rộng bao nhiêu, ném lại thế nào">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Lỗi bay đi đâu</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ngược theo chuỗi lời gọi</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn khối đón nó</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">try · except · else · finally</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bắt rộng bao nhiêu</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cây Exception — bắt lớp là bắt cả nhánh</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Bắt xong ném lại</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">raise · raise e · raise X from e</text>
-<text class="sv-hv" x="372" y="18">MỌI QUYẾT ĐỊNH ĐỀU LÀ: BẮT Ở ĐÂU, RỘNG BAO NHIÊU, XONG LÀM GÌ</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--filled)">&#9312; bắt ở đâu</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">lỗi bay lên tới khối except khớp đầu tiên</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">&#9313; đón bằng khối nào</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">bốn khối, bốn vai trò khác hẳn nhau</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">&#9314; rộng bao nhiêu</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">vị trí trong cây Exception quyết định độ rộng</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--tomb)">&#9315; xong làm gì</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">ném lại, dịch lỗi, hay để nó dừng ở đây</text>
+    <svg viewBox="0 0 860 398" role="img" aria-label="Ba khung lời gọi xếp dọc: parse ở dưới ném ValueError, quả lỗi bay ngược lên load_config không bắt nên đi xuyên qua, tới main có except ValueError thì bị bắt và chương trình chạy tiếp" data-anim><style>@keyframes mm1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}3.667%{animation-timing-function:ease-in-out;opacity:1}49.333%{animation-timing-function:ease-in-out;opacity:1}51.000%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm2{0%{animation-timing-function:ease-in-out;opacity:0}4.000%{animation-timing-function:ease-in-out;opacity:0}5.667%{animation-timing-function:ease-in-out;opacity:1}32.000%{animation-timing-function:ease-in-out;opacity:1}33.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm3{0%{animation-timing-function:ease-in-out;opacity:0}6.000%{animation-timing-function:ease-in-out;opacity:0}7.667%{animation-timing-function:ease-in-out;opacity:1}14.667%{animation-timing-function:ease-in-out;opacity:1}16.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm4{0%{animation-timing-function:ease-in-out;opacity:0}13.333%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}22.667%{animation-timing-function:ease-in-out;opacity:1}24.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm5{0%{animation-timing-function:ease-in-out;opacity:0}13.333%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm6{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}22.667%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}23.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}30.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,-76px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,-76px)}}@keyframes mm7{0%{animation-timing-function:ease-in-out;opacity:0}30.667%{animation-timing-function:ease-in-out;opacity:0}32.333%{animation-timing-function:ease-in-out;opacity:1}40.000%{animation-timing-function:ease-in-out;opacity:1}41.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm8{0%{animation-timing-function:ease-in-out;opacity:0}30.667%{animation-timing-function:ease-in-out;opacity:0}32.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}40.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}40.333%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}48.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,-76px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,-76px)}}@keyframes mm10{0%{animation-timing-function:ease-in-out;opacity:0}48.000%{animation-timing-function:ease-in-out;opacity:0}49.667%{animation-timing-function:ease-in-out;opacity:1}62.667%{animation-timing-function:ease-in-out;opacity:1}64.333%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm11{0%{animation-timing-function:ease-in-out;opacity:0}48.000%{animation-timing-function:ease-in-out;opacity:0}49.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm12{0%{animation-timing-function:ease-in-out;opacity:0}53.333%{animation-timing-function:ease-in-out;opacity:0}55.000%{animation-timing-function:ease-in-out;opacity:1}76.000%{animation-timing-function:ease-in-out;opacity:1}77.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes mm13{0%{animation-timing-function:ease-in-out;opacity:0}64.000%{animation-timing-function:ease-in-out;opacity:0}66.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm14{0%{animation-timing-function:ease-in-out;opacity:0}69.333%{animation-timing-function:ease-in-out;opacity:0}71.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes mm15{0%{animation-timing-function:ease-in-out;opacity:0}73.333%{animation-timing-function:ease-in-out;opacity:0}75.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.mm1{animation:mm1 15.0s linear 1 forwards}.mm2{animation:mm2 15.0s linear 1 forwards}.mm3{animation:mm3 15.0s linear 1 forwards}.mm4{animation:mm4 15.0s linear 1 forwards}.mm5{animation:mm5 15.0s linear 1 forwards}.mm6{animation:mm6 15.0s linear 1 forwards}.mm7{animation:mm7 15.0s linear 1 forwards}.mm8{animation:mm8 15.0s linear 1 forwards}.mm9{animation:mm9 15.0s linear 1 forwards}.mm10{animation:mm10 15.0s linear 1 forwards}.mm11{animation:mm11 15.0s linear 1 forwards}.mm12{animation:mm12 15.0s linear 1 forwards}.mm13{animation:mm13 15.0s linear 1 forwards}.mm14{animation:mm14 15.0s linear 1 forwards}.mm15{animation:mm15 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">LỖI BAY NGƯỢC LÊN CHUỖI LỜI GỌI · DỪNG Ở except KHỚP ĐẦU TIÊN</text>
+<g class="mm1" opacity="0"><rect x="40" y="72" width="300" height="46" rx="6" fill="rgba(var(--clay-a),.12)" stroke="var(--clay)" stroke-width="1.6"/><text x="52.0" y="93.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">main()</text><text class="sv-d" x="52" y="110" fill="var(--faint)" style="fill:var(--faint)">có  except ValueError</text></g>
+<g class="mm2" opacity="0"><rect x="40" y="148" width="300" height="46" rx="6" fill="rgba(var(--clay-a),.12)" stroke="var(--clay)" stroke-width="1.6"/><text x="52.0" y="169.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">load_config()</text><text class="sv-d" x="52" y="186" fill="var(--faint)" style="fill:var(--faint)">không bắt gì</text></g>
+<g class="mm3" opacity="0"><rect x="40" y="224" width="300" height="46" rx="6" fill="rgba(var(--clay-a),.12)" stroke="var(--clay)" stroke-width="1.6"/><text x="52.0" y="245.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">parse()</text><text class="sv-d" x="52" y="262" fill="var(--faint)" style="fill:var(--faint)">raise ValueError</text></g>
+<g class="mm4" opacity="0"><rect x="364" y="234" width="92.0" height="26" rx="13" fill="rgba(var(--red-a),.34)" stroke="var(--tomb)" stroke-width="1.6"/><text x="410.0" y="252.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="mm5"><rect x="40" y="224" width="300" height="46" rx="6" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.6"/><text x="52.0" y="245.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">parse()</text><text class="sv-d" x="52" y="262" fill="var(--faint)" style="fill:var(--faint)">raise ValueError</text></g>
+<g class="mm6" transform="translate(0 -76)"><rect x="364" y="234" width="92.0" height="26" rx="13" fill="rgba(var(--red-a),.34)" stroke="var(--tomb)" stroke-width="1.6"/><text x="410.0" y="252.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="mm7" opacity="0"><rect x="364" y="158" width="92.0" height="26" rx="13" fill="rgba(var(--red-a),.34)" stroke="var(--tomb)" stroke-width="1.6"/><text x="410.0" y="176.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="mm8"><rect x="40" y="148" width="300" height="46" rx="6" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.6" stroke-dasharray="4 3"/><text x="52.0" y="169.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">load_config()</text><text class="sv-d" x="52" y="186" fill="var(--faint)" style="fill:var(--faint)">không bắt → lỗi đi xuyên qua</text></g>
+<g class="mm9" transform="translate(0 -76)"><rect x="364" y="158" width="92.0" height="26" rx="13" fill="rgba(var(--red-a),.34)" stroke="var(--tomb)" stroke-width="1.6"/><text x="410.0" y="176.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="mm10" opacity="0"><rect x="364" y="82" width="92.0" height="26" rx="13" fill="rgba(var(--red-a),.34)" stroke="var(--tomb)" stroke-width="1.6"/><text x="410.0" y="100.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="mm11"><rect x="40" y="72" width="300" height="46" rx="6" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.6"/><text x="52.0" y="93.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">main()</text><text class="sv-d" x="52" y="110" fill="var(--faint)" style="fill:var(--faint)">có except ValueError → BẮT ĐƯỢC</text></g>
+<g class="mm12" opacity="0"><rect x="364" y="32" width="184.8" height="26" rx="5" fill="rgba(var(--green-a),.18)" stroke="var(--ok)" stroke-width="1.6"/><text x="375.0" y="50.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except ValueError khớp</text><line x1="456.4" y1="58.0" x2="340.0" y2="95.0" stroke="var(--ok)" stroke-width="1.3" stroke-dasharray="3 2" opacity=".85"/><circle cx="340.0" cy="95.0" r="2.8" fill="var(--ok)"/><rect x="36.0" y="68.0" width="308.0" height="54.0" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3" rx="6"/></g>
+<g class="mm13"><text class="sv-d" x="364" y="132" fill="var(--ok)" style="fill:var(--ok)">lỗi dừng ở đây · chương trình chạy tiếp</text></g>
+<g class="mm14"><rect x="0" y="316" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="331" fill="var(--probe)" style="fill:var(--probe)">Không ai bắt thì chương trình dừng · kèm traceback đúng đường vừa bay</text></g>
+<g class="mm15"><text class="sv-d" x="14" y="348" fill="var(--muted)" style="fill:var(--muted)">Điểm mạnh: chỗ xử lý không cần nằm cạnh chỗ sinh lỗi.</text><text class="sv-d" x="14" y="366" fill="var(--muted)" style="fill:var(--muted)">Đổi lại: đường đi của lỗi không hiện trong chữ ký hàm, phải đọc code mới biết.</text></g>
 </svg>
-  <figcaption>Cả bài là bốn ý dưới đây. Mỗi mục sau vẽ lại bản đồ này và tô sáng ô đang học.</figcaption>
   </figure>
+  <ul class="why">
+    <li>Trả mã lỗi thì người gọi được quyền quên kiểm tra. Ném exception thì không: không bắt là dừng.</li>
+    <li>Điểm mạnh: chỗ xử lý không cần nằm cạnh chỗ sinh lỗi.</li>
+    <li>Đổi lại: đường đi của lỗi không hiện trong chữ ký hàm, phải đọc code mới biết.</li>
+    <li>Python còn dùng exception cho luồng bình thường: <code>StopIteration</code> kết thúc vòng <code>for</code>, <code>KeyError</code> là cách <code>dict</code> báo thiếu khoá.</li>
+  </ul>
 </section>
 
 <section id="exc-s2" class="lesson">
-  <div class="sh"><b>02</b><h2>Đường đi của một lỗi</h2></div>
-
-  <p class="key">Trả mã lỗi thì người gọi <em>được quyền quên kiểm tra</em>. Ném exception thì không — không bắt là chương trình dừng.</p>
-
+  <div class="sh"><b>02</b><h2>Bốn khối chạy khi nào</h2></div>
+  <p class="key"><code>try</code> luôn chạy · <code>except</code> khi có lỗi khớp · <code>else</code> khi không lỗi · <code>finally</code> trong <em>mọi</em> trường hợp.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: lỗi bay đi đâu, bốn khối đón nó, bắt rộng bao nhiêu, ném lại thế nào">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="46" fill="var(--filled)">&#9312; Lỗi bay đi đâu</text>
-<text class="sv-d" x="13" y="64" fill="var(--muted)">ngược theo chuỗi lời gọi</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn khối đón nó</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">try · except · else · finally</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bắt rộng bao nhiêu</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cây Exception — bắt lớp là bắt cả nhánh</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Bắt xong ném lại</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">raise · raise e · raise X from e</text>
-<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9312; LỖI BAY NGƯỢC THEO CHUỖI LỜI GỌI</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--tomb)">parse() · raise ValueError</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">chỗ sinh lỗi</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--muted)">load_config() · không bắt</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">lỗi đi xuyên qua, bay tiếp lên trên</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">main() · có except ValueError</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">lỗi dừng ở đây, chương trình chạy tiếp</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--probe)">Cái giá</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">đường đi của lỗi không hiện trong chữ ký hàm</text>
+    <svg viewBox="0 0 860 434" role="img" aria-label="Bốn khối try except else finally xếp dọc, hai cột ngăn bên phải; cột không có lỗi thì try else finally chạy còn except bị bỏ qua; cột có lỗi thì try except finally chạy còn else bị bỏ qua" data-anim><style>@keyframes bl1{0%{animation-timing-function:ease-in-out;opacity:0}1.875%{animation-timing-function:ease-in-out;opacity:0}4.062%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl2{0%{animation-timing-function:ease-in-out;opacity:0}3.125%{animation-timing-function:ease-in-out;opacity:0}5.312%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl3{0%{animation-timing-function:ease-in-out;opacity:0}4.375%{animation-timing-function:ease-in-out;opacity:0}6.562%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl4{0%{animation-timing-function:ease-in-out;opacity:0}5.625%{animation-timing-function:ease-in-out;opacity:0}7.812%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl5{0%{animation-timing-function:ease-in-out;opacity:0}3.125%{animation-timing-function:ease-in-out;opacity:0}5.312%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl6{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl7{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl8{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl9{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl10{0%{animation-timing-function:ease-in-out;opacity:0}3.125%{animation-timing-function:ease-in-out;opacity:0}5.312%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl11{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl12{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl13{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl14{0%{animation-timing-function:ease-in-out;opacity:0}3.750%{animation-timing-function:ease-in-out;opacity:0}5.938%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl15{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}11.562%{animation-timing-function:ease-in-out;opacity:1}47.500%{animation-timing-function:ease-in-out;opacity:1}49.062%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes bl16{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}12.500%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}12.812%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}17.500%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,64px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,64px)}}@keyframes bl17{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.000%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}20.312%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}25.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,172px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,172px)}}@keyframes bl18{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}27.500%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}27.812%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}32.500%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,226px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,226px)}}@keyframes bl19{0%{animation-timing-function:ease-in-out;opacity:0}33.750%{animation-timing-function:ease-in-out;opacity:0}35.312%{animation-timing-function:ease-in-out;opacity:1}48.750%{animation-timing-function:ease-in-out;opacity:1}50.313%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes bl20{0%{animation-timing-function:ease-in-out;opacity:0}48.750%{animation-timing-function:ease-in-out;opacity:0}50.313%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl21{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}51.250%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}51.562%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}56.250%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,64px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,64px)}}@keyframes bl22{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}58.750%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}59.063%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}63.750%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,118px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,118px)}}@keyframes bl23{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}66.250%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}66.562%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}71.250%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,226px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,226px)}}@keyframes bl24{0%{animation-timing-function:ease-in-out;opacity:0}72.500%{animation-timing-function:ease-in-out;opacity:0}74.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl25{0%{animation-timing-function:ease-in-out;opacity:0}77.500%{animation-timing-function:ease-in-out;opacity:0}79.688%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes bl26{0%{animation-timing-function:ease-in-out;opacity:0}81.250%{animation-timing-function:ease-in-out;opacity:0}83.438%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.bl1{animation:bl1 16.0s linear 1 forwards}.bl2{animation:bl2 16.0s linear 1 forwards}.bl3{animation:bl3 16.0s linear 1 forwards}.bl4{animation:bl4 16.0s linear 1 forwards}.bl5{animation:bl5 16.0s linear 1 forwards}.bl6{animation:bl6 16.0s linear 1 forwards}.bl7{animation:bl7 16.0s linear 1 forwards}.bl8{animation:bl8 16.0s linear 1 forwards}.bl9{animation:bl9 16.0s linear 1 forwards}.bl10{animation:bl10 16.0s linear 1 forwards}.bl11{animation:bl11 16.0s linear 1 forwards}.bl12{animation:bl12 16.0s linear 1 forwards}.bl13{animation:bl13 16.0s linear 1 forwards}.bl14{animation:bl14 16.0s linear 1 forwards}.bl15{animation:bl15 16.0s linear 1 forwards}.bl16{animation:bl16 16.0s linear 1 forwards}.bl17{animation:bl17 16.0s linear 1 forwards}.bl18{animation:bl18 16.0s linear 1 forwards}.bl19{animation:bl19 16.0s linear 1 forwards}.bl20{animation:bl20 16.0s linear 1 forwards}.bl21{animation:bl21 16.0s linear 1 forwards}.bl22{animation:bl22 16.0s linear 1 forwards}.bl23{animation:bl23 16.0s linear 1 forwards}.bl24{animation:bl24 16.0s linear 1 forwards}.bl25{animation:bl25 16.0s linear 1 forwards}.bl26{animation:bl26 16.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">BỐN KHỐI · MỖI CỘT LÀ MỘT TÌNH HUỐNG</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="bl1"><text x="0.0" y="106.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">try:</text><text class="sv-d" x="96" y="106" fill="var(--faint)" style="fill:var(--faint)">phần CÓ THỂ hỏng</text></g>
+<g class="bl2"><text x="0.0" y="160.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except:</text><text class="sv-d" x="96" y="160" fill="var(--faint)" style="fill:var(--faint)">khi có lỗi khớp loại</text></g>
+<g class="bl3"><text x="0.0" y="214.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">else:</text><text class="sv-d" x="96" y="214" fill="var(--faint)" style="fill:var(--faint)">khi KHÔNG có lỗi nào</text></g>
+<g class="bl4"><text x="0.0" y="268.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">finally:</text><text class="sv-d" x="96" y="268" fill="var(--faint)" style="fill:var(--faint)">mọi trường hợp</text></g>
+<g class="bl5"><text class="sv-d" x="480" y="68" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">không có lỗi</text></g>
+<g class="bl6"><rect x="420" y="84" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl7"><rect x="420" y="138" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl8"><rect x="420" y="192" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl9"><rect x="420" y="246" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl10"><text class="sv-d" x="700" y="68" fill="var(--muted)" style="fill:var(--muted)" text-anchor="middle">có lỗi</text></g>
+<g class="bl11"><rect x="640" y="84" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl12"><rect x="640" y="138" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl13"><rect x="640" y="192" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl14"><rect x="640" y="246" width="120" height="34" rx="5" fill="none" stroke="var(--rule-hi)" stroke-width="1.3" stroke-dasharray="4 3"/></g>
+<g class="bl15" opacity="0"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">không có lỗi</text></g>
+<g class="bl16" transform="translate(0 64)"><rect x="420" y="20" width="120" height="34" rx="5" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="480" y="42" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">chạy</text></g>
+<g class="bl17" transform="translate(0 172)"><rect x="420" y="20" width="120" height="34" rx="5" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="480" y="42" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">chạy</text></g>
+<g class="bl18" transform="translate(0 226)"><rect x="420" y="20" width="120" height="34" rx="5" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="480" y="42" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">chạy</text></g>
+<g class="bl19" opacity="0"><text class="sv-d" x="420" y="316" fill="var(--faint)" style="fill:var(--faint)">except bị bỏ qua</text></g>
+<g class="bl20"><rect x="560" y="10" width="260" height="26" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.6"/><text x="570.0" y="28.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">có lỗi</text></g>
+<g class="bl21" transform="translate(0 64)"><rect x="640" y="20" width="120" height="34" rx="5" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="700" y="42" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">chạy</text></g>
+<g class="bl22" transform="translate(0 118)"><rect x="640" y="20" width="120" height="34" rx="5" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="700" y="42" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="middle">chạy</text></g>
+<g class="bl23" transform="translate(0 226)"><rect x="640" y="20" width="120" height="34" rx="5" fill="rgba(var(--green-a),.22)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="700" y="42" fill="var(--ok)" style="fill:var(--ok)" text-anchor="middle">chạy</text></g>
+<g class="bl24"><text class="sv-d" x="640" y="316" fill="var(--faint)" style="fill:var(--faint)">else bị bỏ qua</text></g>
+<g class="bl25"><rect x="0" y="352" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="367" fill="var(--probe)" style="fill:var(--probe)">finally chạy cả khi có return · và cả khi lỗi đang bay tiếp lên trên</text></g>
+<g class="bl26"><text class="sv-d" x="14" y="384" fill="var(--muted)" style="fill:var(--muted)">Đo thật: không lỗi → [&#x27;try&#x27;, &#x27;else&#x27;, &#x27;finally&#x27;] · có lỗi → [&#x27;try&#x27;, &#x27;except&#x27;, &#x27;finally&#x27;].</text><text class="sv-d" x="14" y="402" fill="var(--muted)" style="fill:var(--muted)">try giữ càng ít dòng càng tốt — bọc cả hàm là bắt nhầm lỗi của dòng khác.</text></g>
 </svg>
-  <figcaption>Ô &#9312; sáng lên. Chỗ xử lý không cần nằm cạnh chỗ sinh lỗi.</figcaption>
   </figure>
-
-<pre class="core"><code><span class="cm"># kiểu mã lỗi: quên một dòng if là bug đi tiếp âm thầm</span>
-val, err = parse(s)
-<span class="kw">if</span> err: ...
-
-<span class="cm"># kiểu exception: không xử lý thì nó tự ồn ào</span>
-val = parse(s)          <span class="cm"># hỏng ở đây là dừng ngay, kèm traceback</span></code></pre>
-
-  <div class="stack">
-    <div class="s ok"><b>main() — có <code>except ValueError</code></b><span>lỗi dừng ở đây, chương trình chạy tiếp</span></div>
-    <div class="s"><b>load_config() — không bắt</b><span>lỗi đi xuyên qua, bay tiếp lên trên</span></div>
-    <div class="s warn"><b>parse() — <code>raise ValueError</code></b><span>chỗ sinh lỗi</span></div>
-  </div>
-  <p class="stripnote"><span>nơi xử lý lỗi</span><span><em>lỗi bay ngược lên tới khối <code>except</code> khớp đầu tiên</em></span><span>nơi sinh lỗi</span></p>
-
   <ul class="why">
-    <li>Chỗ xử lý lỗi <b>không cần nằm cạnh chỗ sinh lỗi</b> — đó là điểm mạnh chính.</li>
-    <li>Đổi lại: đường đi của lỗi không hiện trong chữ ký hàm. Muốn biết hàm ném gì thì phải đọc tài liệu hoặc đọc code.</li>
-    <li>Trong Python, exception còn dùng cho <b>luồng chạy bình thường</b> — <code>StopIteration</code> kết thúc vòng <code>for</code>, <code>KeyError</code> là cách <code>dict</code> báo thiếu khoá.</li>
+    <li><code>try</code> giữ càng ít dòng càng tốt — bọc cả hàm là bắt nhầm lỗi của dòng khác.</li>
+    <li><code>else</code> tách phần "chạy tiếp" ra khỏi phần được canh chừng.</li>
+    <li><code>finally</code> chạy cả khi có <code>return</code>, và cả khi lỗi đang bay tiếp lên trên.</li>
+    <li>Nhưng đóng tài nguyên thì <code>with</code> gọn hơn — xem <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</li>
   </ul>
 </section>
 
 <section id="exc-s3" class="lesson">
-  <div class="sh"><b>03</b><h2>Vai trò của từng khối</h2></div>
-
+  <div class="sh"><b>03</b><h2>Cây Exception</h2></div>
+  <p class="key"><code>except</code> khớp cả <em>lớp con</em>. Nên thứ tự khối quyết định ai bắt được — lớp con phải ghi lên trước.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: lỗi bay đi đâu, bốn khối đón nó, bắt rộng bao nhiêu, ném lại thế nào">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Lỗi bay đi đâu</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ngược theo chuỗi lời gọi</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="109" fill="var(--probe)">&#9313; Bốn khối đón nó</text>
-<text class="sv-d" x="13" y="127" fill="var(--muted)">try · except · else · finally</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bắt rộng bao nhiêu</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cây Exception — bắt lớp là bắt cả nhánh</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Bắt xong ném lại</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">raise · raise e · raise X from e</text>
-<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9313; BỐN KHỐI, BỐN VAI TRÒ</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--probe)">try — chạy luôn</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">giữ càng ít dòng càng tốt, bọc cả hàm là bắt nhầm</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--probe)">except — khi lỗi khớp loại</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">hẹp lên trước, rộng xếp sau</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">else — khi KHÔNG có lỗi</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">tách phần chạy tiếp khỏi phần đang canh chừng</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--ok)">finally — MỌI trường hợp</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">kể cả có return, kể cả lỗi đang bay</text>
+    <svg viewBox="0 0 860 520" role="img" aria-label="Cây kế thừa bốn tầng từ BaseException xuống FileNotFoundError; bên phải hai thứ tự khối except: thứ tự sai để OSError lên trước nên khối FileNotFoundError không bao giờ chạy, thứ tự đúng để lớp con lên trước" data-anim><style>@keyframes tr1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}4.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr2{0%{animation-timing-function:ease-in-out;opacity:0}4.667%{animation-timing-function:ease-in-out;opacity:0}7.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr3{0%{animation-timing-function:ease-in-out;opacity:0}7.333%{animation-timing-function:ease-in-out;opacity:0}9.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr4{0%{animation-timing-function:ease-in-out;opacity:0}10.000%{animation-timing-function:ease-in-out;opacity:0}12.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr5{0%{animation-timing-function:ease-in-out;opacity:0}12.667%{animation-timing-function:ease-in-out;opacity:0}15.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr6{0%{animation-timing-function:ease-in-out;opacity:0}14.667%{animation-timing-function:ease-in-out;opacity:0}17.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr7{0%{animation-timing-function:ease-in-out;opacity:0}16.000%{animation-timing-function:ease-in-out;opacity:0}18.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr8{0%{animation-timing-function:ease-in-out;opacity:0}16.000%{animation-timing-function:ease-in-out;opacity:0}17.667%{animation-timing-function:ease-in-out;opacity:1}24.000%{animation-timing-function:ease-in-out;opacity:1}25.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tr9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}17.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}17.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}24.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,30px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,30px)}}@keyframes tr10{0%{animation-timing-function:ease-in-out;opacity:0}25.333%{animation-timing-function:ease-in-out;opacity:0}27.000%{animation-timing-function:ease-in-out;opacity:1}48.000%{animation-timing-function:ease-in-out;opacity:1}49.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tr11{0%{animation-timing-function:ease-in-out;opacity:0}29.333%{animation-timing-function:ease-in-out;opacity:0}31.000%{animation-timing-function:ease-in-out;opacity:1}48.000%{animation-timing-function:ease-in-out;opacity:1}49.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tr12{0%{animation-timing-function:ease-in-out;opacity:0}50.667%{animation-timing-function:ease-in-out;opacity:0}53.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr13{0%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:0}54.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr14{0%{animation-timing-function:ease-in-out;opacity:0}52.000%{animation-timing-function:ease-in-out;opacity:0}53.667%{animation-timing-function:ease-in-out;opacity:1}60.000%{animation-timing-function:ease-in-out;opacity:1}61.667%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes tr15{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.333%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.667%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}60.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,30px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(-320px,30px)}}@keyframes tr16{0%{animation-timing-function:ease-in-out;opacity:0}61.333%{animation-timing-function:ease-in-out;opacity:0}63.667%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr17{0%{animation-timing-function:ease-in-out;opacity:0}84.000%{animation-timing-function:ease-in-out;opacity:0}86.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes tr18{0%{animation-timing-function:ease-in-out;opacity:0}88.000%{animation-timing-function:ease-in-out;opacity:0}90.333%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.tr1{animation:tr1 15.0s linear 1 forwards}.tr2{animation:tr2 15.0s linear 1 forwards}.tr3{animation:tr3 15.0s linear 1 forwards}.tr4{animation:tr4 15.0s linear 1 forwards}.tr5{animation:tr5 15.0s linear 1 forwards}.tr6{animation:tr6 15.0s linear 1 forwards}.tr7{animation:tr7 15.0s linear 1 forwards}.tr8{animation:tr8 15.0s linear 1 forwards}.tr9{animation:tr9 15.0s linear 1 forwards}.tr10{animation:tr10 15.0s linear 1 forwards}.tr11{animation:tr11 15.0s linear 1 forwards}.tr12{animation:tr12 15.0s linear 1 forwards}.tr13{animation:tr13 15.0s linear 1 forwards}.tr14{animation:tr14 15.0s linear 1 forwards}.tr15{animation:tr15 15.0s linear 1 forwards}.tr16{animation:tr16 15.0s linear 1 forwards}.tr17{animation:tr17 15.0s linear 1 forwards}.tr18{animation:tr18 15.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">except KHỚP CẢ LỚP CON · NÊN THỨ TỰ KHỐI QUYẾT ĐỊNH AI BẮT</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="tr1"><rect x="30" y="74" width="190" height="32" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.5"/><text x="40.0" y="95.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">BaseException</text></g>
+<g class="tr2"><rect x="70" y="128" width="170" height="32" rx="5" fill="rgba(var(--amber-a),.14)" stroke="var(--probe)" stroke-width="1.5"/><text x="80.0" y="149.0" class="sv-d" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">Exception</text><line x1="50" y1="106" x2="50" y2="144" stroke="var(--rule-hi)" stroke-width="1.3"/><line x1="50" y1="144" x2="70" y2="144" stroke="var(--rule-hi)" stroke-width="1.3"/></g>
+<g class="tr3"><rect x="110" y="182" width="170" height="32" rx="5" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.5"/><text x="120.0" y="203.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">OSError</text><line x1="90" y1="160" x2="90" y2="198" stroke="var(--rule-hi)" stroke-width="1.3"/><line x1="90" y1="198" x2="110" y2="198" stroke="var(--rule-hi)" stroke-width="1.3"/></g>
+<g class="tr4"><rect x="150" y="236" width="190" height="32" rx="5" fill="rgba(var(--clay-a),.14)" stroke="var(--clay)" stroke-width="1.5"/><text x="160.0" y="257.0" class="sv-d" style="fill:var(--clay);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">FileNotFoundError</text><line x1="130" y1="214" x2="130" y2="252" stroke="var(--rule-hi)" stroke-width="1.3"/><line x1="130" y1="252" x2="150" y2="252" stroke="var(--rule-hi)" stroke-width="1.3"/></g>
+<g class="tr5"><text class="sv-d" x="360" y="257" fill="var(--tomb)" style="fill:var(--tomb)">lỗi được ném ra</text></g>
+<g class="tr6"><text class="sv-d" x="480" y="64" fill="var(--tomb)" style="fill:var(--tomb)">thứ tự SAI</text></g>
+<g class="tr7"><rect x="480" y="116" width="300" height="32" rx="5" fill="rgba(var(--clay-a),.14)" stroke="var(--rule-hi)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="490.0" y="137.0" class="sv-d" style="fill:var(--rule-hi);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except FileNotFoundError</text></g>
+<g class="tr8" opacity="0"><rect x="480" y="74" width="300" height="32" rx="5" fill="rgba(var(--clay-a),.14)" stroke="var(--rule-hi)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="490.0" y="95.0" class="sv-d" style="fill:var(--rule-hi);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except OSError</text></g>
+<g class="tr9" transform="translate(-320 30)"><rect x="800" y="44" width="300" height="32" rx="5" fill="rgba(var(--red-a),.20)" stroke="var(--tomb)" stroke-width="1.7"/><text x="810.0" y="65.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except OSError</text><text x="1086.0" y="65.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="end">◀</text></g>
+<g class="tr10" opacity="0"><text class="sv-d" x="480" y="162" fill="var(--tomb)" style="fill:var(--tomb)">OSError bắt trước</text></g>
+<g class="tr11" opacity="0"><text class="sv-d" x="480" y="180" fill="var(--tomb)" style="fill:var(--tomb)">khối dưới KHÔNG BAO GIỜ chạy</text></g>
+<g class="tr12"><text class="sv-d" x="480" y="240" fill="var(--ok)" style="fill:var(--ok)">thứ tự ĐÚNG</text></g>
+<g class="tr13"><rect x="480" y="292" width="300" height="32" rx="5" fill="rgba(var(--clay-a),.14)" stroke="var(--rule-hi)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="490.0" y="313.0" class="sv-d" style="fill:var(--rule-hi);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except OSError</text></g>
+<g class="tr14" opacity="0"><rect x="480" y="250" width="300" height="32" rx="5" fill="rgba(var(--clay-a),.14)" stroke="var(--rule-hi)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="490.0" y="271.0" class="sv-d" style="fill:var(--rule-hi);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except FileNotFoundError</text></g>
+<g class="tr15" transform="translate(-320 30)"><rect x="800" y="220" width="300" height="32" rx="5" fill="rgba(var(--green-a),.20)" stroke="var(--ok)" stroke-width="1.7"/><text x="810.0" y="241.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">except FileNotFoundError</text><text x="1086.0" y="241.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="end">◀</text></g>
+<g class="tr16"><text class="sv-d" x="480" y="338" fill="var(--ok)" style="fill:var(--ok)">lớp con khớp trước</text></g>
+<g class="tr17"><rect x="0" y="438" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="453" fill="var(--probe)" style="fill:var(--probe)">Ghi lớp CON lên trước lớp CHA · ngược lại là khối dưới thành code chết</text></g>
+<g class="tr18"><text class="sv-d" x="14" y="470" fill="var(--muted)" style="fill:var(--muted)">except: trần bắt cả KeyboardInterrupt và SystemExit — nên Ctrl-C cũng không thoát được.</text><text class="sv-d" x="14" y="488" fill="var(--muted)" style="fill:var(--muted)">Muốn bắt rộng thì dùng except Exception, đừng dùng except: trần.</text></g>
 </svg>
-  <figcaption>Ô &#9313; sáng lên. try giữ càng ít dòng càng tốt.</figcaption>
   </figure>
-
-  <p class="key">Hai khối ai cũng dùng, hai khối bị bỏ quên nhưng làm code sạch hơn hẳn.</p>
-
-<pre class="core"><code><span class="kw">try</span>:
-    f = <span class="kw">open</span>(path)          <span class="cm"># chỉ đặt ở đây phần CÓ THỂ hỏng</span>
-<span class="kw">except</span> FileNotFoundError <span class="kw">as</span> e:
-    log(e); <span class="kw">raise</span>           <span class="cm"># bắt đúng loại đã lường trước</span>
-<span class="kw">else</span>:
-    process(f)                <span class="cm"># chạy khi KHÔNG có lỗi</span>
-<span class="kw">finally</span>:
-    cleanup()                 <span class="cm"># chạy trong MỌI trường hợp</span></code></pre>
-
-<div class="stack">
-    <div class="s"><b><code>try</code> — chạy luôn</b><span>giữ <b>càng ít dòng càng tốt</b>; bọc cả hàm là bắt nhầm lỗi của dòng khác</span></div>
-    <div class="s"><b><code>except</code> — khi có lỗi khớp loại</b><span>ghi rõ loại lỗi đã lường trước, không bắt bừa</span></div>
-    <div class="s ok"><b><code>else</code> — khi không có lỗi nào</b><span>tách phần "chạy tiếp" ra khỏi phần được canh chừng</span></div>
-    <div class="s ok"><b><code>finally</code> — mọi trường hợp, kể cả <code>return</code></b><span>đóng tài nguyên, chạy cả khi lỗi đang bay lên tiếp</span></div>
-  </div>
-
-  <p class="stripnote"><span><code>finally</code> cho tài nguyên là cách viết tay</span><span>có <code>__enter__</code>/<code>__exit__</code> rồi thì <a href="../decorator-context-manager/index.html"><em>context manager</em></a> gọn hơn</span></p>
+  <ul class="why">
+    <li>Ghi lớp cha lên trước là biến khối dưới thành <b>code chết</b>, và không có cảnh báo nào.</li>
+    <li><code>except:</code> trần bắt cả <code>KeyboardInterrupt</code> và <code>SystemExit</code> — nên <kbd>Ctrl-C</kbd> cũng không thoát được.</li>
+    <li>Muốn bắt rộng thì dùng <code>except Exception</code>, đừng dùng <code>except:</code> trần.</li>
+    <li>Bắt rộng mà không <code>raise</code> lại là <b>nuốt lỗi</b>: chương trình chạy tiếp với trạng thái sai.</li>
+  </ul>
 </section>
 
 <section id="exc-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Cây Exception</h2></div>
-
+  <div class="sh"><b>04</b><h2>raise from</h2></div>
+  <p class="key">Bọc lỗi thành loại của mình thì phải dùng <code>raise ... from e</code>, nếu không là <em>xoá dấu vết</em> nguyên nhân gốc.</p>
   <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: lỗi bay đi đâu, bốn khối đón nó, bắt rộng bao nhiêu, ném lại thế nào">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Lỗi bay đi đâu</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ngược theo chuỗi lời gọi</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn khối đón nó</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">try · except · else · finally</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="172" fill="var(--ok)">&#9314; Bắt rộng bao nhiêu</text>
-<text class="sv-d" x="13" y="190" fill="var(--muted)">cây Exception — bắt lớp là bắt cả nhánh</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="235" fill="var(--dim)">&#9315; Bắt xong ném lại</text>
-<text class="sv-d" x="13" y="253" fill="var(--dim)">raise · raise e · raise X from e</text>
-<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9314; CÂY EXCEPTION — BẮT MỘT LỚP LÀ BẮT CẢ NHÁNH DƯỚI</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--muted)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--muted)">BaseException</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">gốc của tất cả</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--tomb)">SystemExit · KeyboardInterrupt</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">là yêu cầu dừng, không phải lỗi — nằm ngoài Exception</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">Exception</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">mọi lỗi bình thường: LookupError, OSError, ValueError…</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--probe)">nên except: trần ≠ except Exception:</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">viết thư viện thì cho một lớp gốc chung AppError</text>
+    <svg viewBox="0 0 860 502" role="img" aria-label="Một ValueError sinh ra ở trên; nhánh không có from chỉ còn RuntimeError và lỗi gốc mất hẳn; nhánh có from thì RuntimeError kéo theo cả ValueError trong __cause__" data-anim><style>@keyframes ch1{0%{animation-timing-function:ease-in-out;opacity:0}2.857%{animation-timing-function:ease-in-out;opacity:0}5.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch2{0%{animation-timing-function:ease-in-out;opacity:0}7.143%{animation-timing-function:ease-in-out;opacity:0}8.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch3{0%{animation-timing-function:ease-in-out;opacity:0}15.714%{animation-timing-function:ease-in-out;opacity:0}18.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch4{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.571%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}18.929%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}25.714%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,80px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,80px)}}@keyframes ch5{0%{animation-timing-function:ease-in-out;opacity:0}27.143%{animation-timing-function:ease-in-out;opacity:0}28.929%{animation-timing-function:ease-in-out;opacity:1}51.429%{animation-timing-function:ease-in-out;opacity:1}53.214%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ch6{0%{animation-timing-function:ease-in-out;opacity:0}30.000%{animation-timing-function:ease-in-out;opacity:0}31.786%{animation-timing-function:ease-in-out;opacity:1}51.429%{animation-timing-function:ease-in-out;opacity:1}53.214%{animation-timing-function:ease-in-out;opacity:0}100%{animation-timing-function:ease-in-out;opacity:0}}@keyframes ch7{0%{animation-timing-function:ease-in-out;opacity:0}50.000%{animation-timing-function:ease-in-out;opacity:0}52.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch8{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}52.857%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}53.214%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}60.000%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,208px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,208px)}}@keyframes ch9{0%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}61.429%{animation-timing-function:ease-in-out;opacity:0;transform:translate(0px,0px)}61.786%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,0px)}68.571%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,252px)}100%{animation-timing-function:ease-in-out;opacity:1;transform:translate(0px,252px)}}@keyframes ch10{0%{animation-timing-function:ease-in-out;opacity:0}70.000%{animation-timing-function:ease-in-out;opacity:0}72.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch11{0%{animation-timing-function:ease-in-out;opacity:0}72.857%{animation-timing-function:ease-in-out;opacity:0}75.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch12{0%{animation-timing-function:ease-in-out;opacity:0}81.429%{animation-timing-function:ease-in-out;opacity:0}83.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes ch13{0%{animation-timing-function:ease-in-out;opacity:0}85.714%{animation-timing-function:ease-in-out;opacity:0}88.214%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.ch1{animation:ch1 14.0s linear 1 forwards}.ch2{animation:ch2 14.0s linear 1 forwards}.ch3{animation:ch3 14.0s linear 1 forwards}.ch4{animation:ch4 14.0s linear 1 forwards}.ch5{animation:ch5 14.0s linear 1 forwards}.ch6{animation:ch6 14.0s linear 1 forwards}.ch7{animation:ch7 14.0s linear 1 forwards}.ch8{animation:ch8 14.0s linear 1 forwards}.ch9{animation:ch9 14.0s linear 1 forwards}.ch10{animation:ch10 14.0s linear 1 forwards}.ch11{animation:ch11 14.0s linear 1 forwards}.ch12{animation:ch12 14.0s linear 1 forwards}.ch13{animation:ch13 14.0s linear 1 forwards}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">raise from GIỮ LẠI LỖI GỐC · KHÔNG raise from THÌ MẤT</text>
+<text class="sv-d" x="470" y="34" fill="var(--faint)" style="fill:var(--faint)" text-anchor="end">đang chạy:</text>
+<g class="ch1"><rect x="40" y="80" width="200" height="34" rx="5" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)" stroke-width="1.5"/><text x="50.0" y="101.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">int('abc')</text><text class="sv-d" x="256" y="102" fill="var(--tomb)" style="fill:var(--tomb)">ném ValueError</text></g>
+<g class="ch2"><rect x="420" y="80" width="150" height="34" rx="17" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.6"/><text x="495.0" y="102.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="ch3"><text class="sv-d" x="40" y="148" fill="var(--tomb)" style="fill:var(--tomb)">không có from</text><text x="40.0" y="182.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">raise RuntimeError(...)</text></g>
+<g class="ch4" transform="translate(0 80)"><rect x="420" y="80" width="150" height="34" rx="17" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.6"/><text x="495.0" y="102.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">RuntimeError</text></g>
+<g class="ch5" opacity="0"><text class="sv-d" x="586" y="182" fill="var(--tomb)" style="fill:var(--tomb)">lỗi gốc MẤT HẲN</text></g>
+<g class="ch6" opacity="0"><text class="sv-d" x="40" y="210" fill="var(--tomb)" style="fill:var(--tomb)">traceback chỉ còn RuntimeError · không biết vì sao</text></g>
+<g class="ch7"><text class="sv-d" x="40" y="276" fill="var(--ok)" style="fill:var(--ok)">có from</text><text x="40.0" y="310.0" class="sv-d" style="fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">raise RuntimeError(...) from e</text></g>
+<g class="ch8" transform="translate(0 208)"><rect x="420" y="80" width="150" height="34" rx="17" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.6"/><text x="495.0" y="102.0" class="sv-d" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">RuntimeError</text></g>
+<g class="ch9" transform="translate(0 252)"><rect x="420" y="80" width="150" height="30" rx="15" fill="rgba(var(--red-a),.22)" stroke="var(--tomb)" stroke-width="1.4"/><text x="495.0" y="100.0" class="sv-d" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ValueError</text></g>
+<g class="ch10"><text class="sv-d" x="586" y="352" fill="var(--ok)" style="fill:var(--ok)">__cause__ giữ nguyên lỗi gốc</text></g>
+<g class="ch11"><text class="sv-d" x="40" y="352" fill="var(--ok)" style="fill:var(--ok)">traceback in cả hai tầng</text></g>
+<g class="ch12"><rect x="0" y="420" width="3" height="20" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="435" fill="var(--probe)" style="fill:var(--probe)">Bọc lỗi thì luôn dùng raise ... from e · nếu không là xoá dấu vết</text></g>
+<g class="ch13"><text class="sv-d" x="14" y="452" fill="var(--muted)" style="fill:var(--muted)">Đo thật: __cause__ là ValueError với thông điệp gốc còn nguyên.</text><text class="sv-d" x="14" y="470" fill="var(--muted)" style="fill:var(--muted)">Dùng raise trần trong except để ném lại y nguyên lỗi cũ, giữ cả traceback.</text></g>
 </svg>
-  <figcaption>Ô &#9314; sáng lên. Bắt một lớp là bắt cả nhánh dưới nó.</figcaption>
   </figure>
-
-  <p class="key">Bắt một lớp là bắt <em>toàn bộ nhánh dưới nó</em>. Vì vậy vị trí trong cây thừa kế quyết định bạn bắt được bao nhiêu.</p>
-
-<pre><code>BaseException
-├── SystemExit          <span class="cm">← sys.exit()</span>
-├── KeyboardInterrupt   <span class="cm">← Ctrl-C</span>
-├── GeneratorExit
-└── Exception           <span class="cm">← MỌI lỗi bình thường nằm dưới đây</span>
-    ├── ArithmeticError → ZeroDivisionError
-    ├── LookupError     → IndexError, KeyError
-    ├── OSError         → FileNotFoundError, PermissionError, TimeoutError
-    ├── ValueError      <span class="cm">← đúng kiểu, sai giá trị</span>
-    ├── TypeError       <span class="cm">← sai kiểu</span>
-    └── RuntimeError    → RecursionError</code></pre>
-
-  <div class="note warn">
-    <h4>Vì sao ba nhánh kia không nằm dưới <code>Exception</code></h4>
-    <code>SystemExit</code> và <code>KeyboardInterrupt</code> là <b>yêu cầu dừng chương trình</b>, không phải lỗi. Tách chúng ra ngoài <code>Exception</code> để <code>except Exception</code> — cách bắt rộng nhất còn hợp lý — không nuốt mất Ctrl-C. Đây cũng là lý do <code>except:</code> trần khác hẳn <code>except Exception:</code>: nó bắt cả những thứ này.
-  </div>
-
-  <p>Bắt nhiều loại thì viết thành tuple, và <b>xếp loại hẹp lên trước loại rộng</b> — Python thử từng <code>except</code> theo thứ tự, gặp cái khớp đầu tiên là dừng:</p>
-
-<pre><code><span class="kw">except</span> (FileNotFoundError, PermissionError) <span class="kw">as</span> e: ...
-<span class="kw">except</span> OSError <span class="kw">as</span> e: ...      <span class="cm"># rộng hơn → phải xếp sau</span></code></pre>
+  <ul class="why">
+    <li>Có <code>from e</code> thì <code>__cause__</code> giữ nguyên lỗi gốc, và traceback in cả hai tầng.</li>
+    <li>Đo thật: <code>__cause__</code> là <code>ValueError</code>, thông điệp gốc còn nguyên.</li>
+    <li>Dùng <code>raise</code> trần trong <code>except</code> để ném lại y nguyên lỗi cũ, giữ cả traceback.</li>
+    <li>Exception tự viết: một lớp gốc cho cả ứng dụng, rồi các lớp con theo nhóm việc — người gọi chọn bắt rộng hay hẹp.</li>
+  </ul>
 </section>
 
 <section id="exc-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Exception tự viết và raise from</h2></div>
+  <div class="sh"><b>05</b><h2>Hỏi đáp</h2></div>
+  <p class="key">Tự nghĩ ý trả lời trước rồi mới mở.</p>
 
-  <figure class="scrollx">
-<svg viewBox="0 0 860 280" role="img" aria-label="Bản đồ bài: lỗi bay đi đâu, bốn khối đón nó, bắt rộng bao nhiêu, ném lại thế nào">
-<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="46" fill="var(--dim)">&#9312; Lỗi bay đi đâu</text>
-<text class="sv-d" x="13" y="64" fill="var(--dim)">ngược theo chuỗi lời gọi</text>
-<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
-<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="109" fill="var(--dim)">&#9313; Bốn khối đón nó</text>
-<text class="sv-d" x="13" y="127" fill="var(--dim)">try · except · else · finally</text>
-<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
-<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
-<text class="sv-t" x="13" y="172" fill="var(--dim)">&#9314; Bắt rộng bao nhiêu</text>
-<text class="sv-d" x="13" y="190" fill="var(--dim)">cây Exception — bắt lớp là bắt cả nhánh</text>
-<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
-<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
-<text class="sv-t" x="13" y="235" fill="var(--tomb)">&#9315; Bắt xong ném lại</text>
-<text class="sv-d" x="13" y="253" fill="var(--muted)">raise · raise e · raise X from e</text>
-<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
-<text class="sv-hv" x="372" y="18">&#9315; BẮT XONG THÌ NÉM LẠI THẾ NÀO</text>
-<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="50" fill="var(--ok)">raise — trần</text>
-<text class="sv-s" x="388" y="68" fill="var(--dim)">ném lại đúng exception đang xử lý, giữ nguyên traceback</text>
-<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
-<text class="sv-t" x="388" y="112" fill="var(--tomb)">raise e</text>
-<text class="sv-s" x="388" y="130" fill="var(--dim)">cùng object nhưng traceback bị cắt — mất chỗ hỏng thật</text>
-<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
-<text class="sv-t" x="388" y="174" fill="var(--ok)">raise X from e</text>
-<text class="sv-s" x="388" y="192" fill="var(--dim)">lỗi mới, ghi rõ e là nguyên nhân trực tiếp</text>
-<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
-<text class="sv-t" x="388" y="236" fill="var(--probe)">Exception tự viết</text>
-<text class="sv-s" x="388" y="254" fill="var(--dim)">một lớp gốc cho ứng dụng, các lỗi cụ thể kế thừa nó</text>
-</svg>
-  <figcaption>Ô &#9315; sáng lên. Ba cách ném lại, chỉ hai cách giữ được traceback.</figcaption>
-  </figure>
+  <details class="qa"><summary>Exception đi như thế nào?</summary>
+  <p>Nó bay ngược lên chuỗi lời gọi.</p>
+  <p>Hàm nào không bắt thì lỗi đi xuyên qua.</p>
+  <p>Dừng ở khối except khớp đầu tiên.</p>
+  <p>Không ai bắt thì chương trình dừng kèm traceback.</p></details>
 
-  <p class="key">Một lớp cha cho cả thư viện, để người dùng bắt được <em>mọi lỗi của bạn</em> bằng một dòng.</p>
+  <details class="qa"><summary>else và finally khác nhau ở đâu?</summary>
+  <p>else chỉ chạy khi không có lỗi nào.</p>
+  <p>finally chạy trong mọi trường hợp.</p>
+  <p>finally chạy cả khi có return, và cả khi lỗi đang bay tiếp.</p>
+  <p>Đóng tài nguyên thì dùng with gọn hơn finally.</p></details>
 
-<pre class="core"><code><span class="kw">class</span> AppError(Exception): <span class="kw">pass</span>              <span class="cm"># gốc chung</span>
-<span class="kw">class</span> ConfigError(AppError): <span class="kw">pass</span>
-<span class="kw">class</span> RetryableError(AppError): <span class="kw">pass</span>
+  <details class="qa"><summary>Vì sao thứ tự khối except quan trọng?</summary>
+  <p>except khớp cả lớp con của loại ghi trong nó.</p>
+  <p>Ghi lớp cha lên trước thì khối dưới thành code chết.</p>
+  <p>Không có cảnh báo nào cho lỗi này.</p>
+  <p>Nên luôn ghi lớp con lên trước lớp cha.</p></details>
 
-<span class="cm"># người dùng chọn độ rộng họ muốn:</span>
-<span class="kw">except</span> ConfigError: ...      <span class="cm"># đúng một loại</span>
-<span class="kw">except</span> AppError: ...         <span class="cm"># mọi lỗi của thư viện này</span></code></pre>
+  <details class="qa"><summary>Vì sao except: trần là lỗi nặng?</summary>
+  <p>Nó bắt cả KeyboardInterrupt và SystemExit.</p>
+  <p>Nên Ctrl-C và lệnh thoát cũng bị chặn.</p>
+  <p>Nó còn che mọi lỗi lập trình như gõ sai tên biến.</p>
+  <p>Muốn bắt rộng thì dùng except Exception.</p></details>
 
-  <p>Khi đổi một lỗi tầng dưới thành lỗi tầng trên, dùng <code>raise ... from</code> để <b>giữ nguyên nguồn gốc</b>:</p>
-
-  <div class="cmp two">
-    <div>
-      <h5>Mất dấu vết</h5>
-<pre class="core" style="margin:6px 0"><code><span class="kw">except</span> KeyError:
-    <span class="kw">raise</span> ConfigError(<span class="st">"thiếu khoá"</span>)</code></pre>
-      <p>Traceback vẫn hiện lỗi cũ nhưng kèm dòng khó hiểu "During handling of the above exception, another exception occurred".</p>
-    </div>
-    <div>
-      <h5>Nối đúng nguyên nhân</h5>
-<pre class="core" style="margin:6px 0"><code><span class="kw">except</span> KeyError <span class="kw">as</span> e:
-    <span class="kw">raise</span> ConfigError(<span class="st">"thiếu khoá"</span>) <span class="kw">from</span> e</code></pre>
-      <p>Traceback ghi rõ "The above exception was the direct cause" — người đọc log biết ngay lỗi gốc là gì.</p>
-    </div>
-  </div>
-
-  <div class="note">
-    <h4>Ném lại nguyên vẹn</h4>
-    Trong <code>except</code>, một chữ <code>raise</code> trần ném lại đúng exception đang xử lý, <b>giữ nguyên traceback gốc</b>. Đó là cách ghi log rồi vẫn để lỗi bay lên: <code>except OSError as e: log(e); raise</code>. Viết <code>raise e</code> thì traceback bị cắt lại từ dòng này.
-  </div>
+  <details class="qa"><summary>raise from để làm gì?</summary>
+  <p>Giữ lại nguyên nhân gốc khi bọc lỗi thành loại của mình.</p>
+  <p>__cause__ trỏ tới lỗi gốc.</p>
+  <p>Traceback in cả hai tầng nên debug được.</p>
+  <p>Không có from thì lỗi gốc mất hẳn.</p></details>
 </section>
 
-<section id="exc-s6" class="lesson">
-  <div class="sh"><b>06</b><h2>Lỗi hay gặp</h2></div>
+<script>
+/* Hình chỉ bắt đầu chạy khi cuộn tới (lần đầu). Hình chạy một lần thì giữ nguyên trạng thái cuối. Bấm vào hình để chạy lại. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
 
-  <p class="key">Lỗi đầu tiên là thứ <em>xoá dấu vết của mọi bug khác</em> trong service.</p>
-
-  <div class="grid2">
-    <div class="card bad"><h4><code>except:</code> hoặc <code>except Exception: pass</code></h4><p>Nuốt cả lỗi lập trình lẫn Ctrl-C. Service vẫn "chạy" trong khi dữ liệu đã sai. Bắt loại hẹp, và đã bắt thì phải <b>log hoặc ném lại</b>.</p></div>
-    <div class="card bad"><h4>Khối <code>try</code> quá rộng</h4><p>Bọc cả hàm thì <code>except KeyError</code> bắt luôn <code>KeyError</code> của một dòng khác mà bạn không hề lường trước.</p></div>
-    <div class="card bad"><h4><code>return</code> trong <code>finally</code></h4><p>Nó <b>nuốt mất exception đang bay lên</b> — hàm trả về bình thường như chưa có gì xảy ra.</p></div>
-    <div class="card bad"><h4>Dùng exception cho luồng chạy thông thường</h4><p>Bắt <code>KeyError</code> để kiểm tra khoá thì <code>d.get(k)</code> hoặc <code>k in d</code> vừa rõ hơn vừa nhanh hơn.</p></div>
-  </div>
-
-  <div class="cmp two">
-    <div><h5>EAFP — cứ thử rồi bắt lỗi</h5>
-      <p><b>Đúng khi</b> lỗi hiếm: mở file, gọi mạng</p>
-      <p><b>Vì</b> kiểm tra trước vừa thừa, vừa có khe hở giữa lúc kiểm và lúc dùng</p></div>
-    <div><h5>Kiểm tra trước</h5>
-      <p><b>Đúng khi</b> lỗi là chuyện thường xuyên: khoá thiếu trong <code>dict</code></p>
-      <p><b>Vì</b> bắt exception tốn hơn một phép kiểm tra rất nhiều</p></div>
-  </div>
-</section>
-
-<section id="exc-s7" class="lesson">
-  <div class="sh"><b>07</b><h2>Hỏi đáp</h2></div>
-
-  <p class="key">Tự nghĩ ra ý trả lời trước rồi mới mở — cốt là hiểu ý, không phải thuộc chữ.</p>
-
-  <details class="qa"><summary><code>except Exception</code> và <code>except:</code> trần khác nhau thế nào?</summary>
-  <p><code>except:</code> bắt từ <code>BaseException</code>, tức nuốt luôn <code>KeyboardInterrupt</code> và <code>SystemExit</code> — Ctrl-C không dừng được chương trình nữa. <code>except Exception</code> chỉ bắt các lỗi bình thường, nên đó là mức rộng nhất còn chấp nhận được, và chỉ nên dùng ở ranh giới ngoài cùng của service để ghi log rồi ném lại. Cả hai đều không nên đi kèm <code>pass</code>.</p></details>
-
-  <details class="qa"><summary><code>else</code> trong <code>try</code> để làm gì?</summary>
-  <p>Nó chạy khi khối <code>try</code> không ném lỗi nào. Lợi ích là giữ <code>try</code> chỉ chứa đúng dòng có thể hỏng: phần xử lý tiếp theo nằm trong <code>else</code> nên nếu chính nó ném ra cùng loại lỗi thì cũng không bị <code>except</code> ở trên bắt nhầm. Không có <code>else</code> thì phần đó phải nằm trong <code>try</code>, và ranh giới lỗi bị nhoè.</p></details>
-
-  <details class="qa"><summary><code>finally</code> có luôn chạy không?</summary>
-  <p>Có, kể cả khi khối <code>try</code> có <code>return</code>, <code>break</code> hay đang có exception bay lên — đó là lý do nó là chỗ đóng tài nguyên. Hai lưu ý: <code>return</code> đặt trong chính <code>finally</code> sẽ <b>nuốt mất</b> exception đang bay và ghi đè giá trị trả về, nên đừng làm; và nó không chạy nếu tiến trình bị giết cứng hoặc <code>os._exit()</code>.</p></details>
-
-  <details class="qa"><summary>Khi nào bạn viết exception riêng?</summary>
-  <p>Khi viết thư viện hoặc một module có ranh giới rõ: một lớp gốc chung như <code>AppError</code> rồi các lớp con cụ thể. Người dùng chọn được độ rộng họ muốn bắt bằng đúng một dòng, và bạn đổi chi tiết bên trong mà không phá code của họ. Ném thẳng <code>ValueError</code> thì người gọi không phân biệt được lỗi của bạn với lỗi của thư viện khác trong cùng khối <code>try</code>.</p></details>
-
-  <details class="qa"><summary><code>raise</code>, <code>raise e</code> và <code>raise X from e</code> khác nhau ra sao?</summary>
-  <p><code>raise</code> trần ném lại đúng exception đang xử lý và giữ nguyên traceback gốc — dùng khi chỉ muốn ghi log rồi để lỗi đi tiếp. <code>raise e</code> ném lại cùng object nhưng traceback bị cắt từ dòng đó, nên mất chỗ hỏng thật. <code>raise X from e</code> ném một lỗi mới và ghi rõ <code>e</code> là nguyên nhân trực tiếp — cách chuẩn khi dịch lỗi tầng dưới sang lỗi tầng trên.</p></details>
-</section>
-
-<footer>Python · language core · phần <code>with</code> và <code>__exit__</code> ở <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</footer>
-
+<footer>Python · language core · tiếp theo: <a href="../decorator-context-manager/index.html">Decorator &amp; context manager</a>.</footer>
       </article>
       <div class="nextprev" id="np"></div>
     </main>
