@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metric &amp; confusion matrix — MazeAI</title>
+<meta name="description" content="Four cells produce every metric: choose precision vs recall by the cost of errors, why accuracy lies on imbalanced data, and set the threshold by money instead of by F1.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/09-evaluation/metrics-confusion-matrix/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Metric &amp; confusion matrix">
+<meta property="og:description" content="Four cells produce every metric: choose precision vs recall by the cost of errors, why accuracy lies on imbalanced data, and set the threshold by money instead of by F1.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/09-evaluation/metrics-confusion-matrix/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-metrics" data-title="Metric &amp; confusion matrix" data-tag="Evaluation" data-blurb="Four cells produce every metric: choose precision vs recall by the cost of errors, why accuracy lies on imbalanced data, and set the threshold by money instead of by F1.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Model evaluation</p>
+  <h1>Metric &amp;<br><em>confusion matrix</em></h1>
+  <p class="lede">Picking the wrong metric is the fastest way to fool yourself that a model is good. This lesson goes from the <b>four cells</b> of the confusion matrix out to every metric, explains with concrete numbers why <b>99% accuracy can be meaningless</b>, and why the 0.5 threshold is almost always wrong.</p>
+</header>
+
+
+<section id="metrics-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+<figure class="gist">
+<svg viewBox="0 0 860 370" role="img" aria-label="On imbalanced data, a model that always says negative gets higher accuracy than a model that catches 94% of sick cases; and three groups of metrics answer three different questions">
+<text class="sv-hv" x="0" y="18">IMBALANCED DATA — 103 SICK IN 10,000 PEOPLE</text>
+<text class="sv-t" x="0" y="42" fill="var(--tomb)">Model "always NEG"</text>
+<text class="sv-s" x="0" y="60" fill="var(--dim)">no training needed — returns neg for all</text>
+<text class="sv-d" x="122" y="82" fill="var(--faint)" text-anchor="middle">sick</text>
+<text class="sv-d" x="206" y="82" fill="var(--faint)" text-anchor="middle">healthy</text>
+<text class="sv-d" x="0" y="110" fill="var(--faint)">flag</text>
+<rect x="84" y="88" width="76" height="30" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="122" y="108" fill="var(--ok)" text-anchor="middle">0</text>
+<rect x="168" y="88" width="76" height="30" rx="3" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-l" x="206" y="108" fill="var(--tomb)" text-anchor="middle">0</text>
+<text class="sv-d" x="0" y="144" fill="var(--faint)">no flag</text>
+<rect x="84" y="122" width="76" height="30" rx="3" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-l" x="122" y="142" fill="var(--tomb)" text-anchor="middle">103</text>
+<rect x="168" y="122" width="76" height="30" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="206" y="142" fill="var(--ok)" text-anchor="middle">9,897</text>
+<text class="sv-l" x="340" y="100" fill="var(--tomb)" text-anchor="end">accuracy 99.0%</text>
+<text class="sv-l" x="340" y="126" fill="var(--tomb)" text-anchor="end">recall 0%</text>
+<text class="sv-t" x="0" y="174" fill="var(--ok)">Model catches 94% of sick</text>
+<text class="sv-s" x="0" y="192" fill="var(--dim)">threshold lowered to miss none</text>
+<text class="sv-d" x="122" y="214" fill="var(--faint)" text-anchor="middle">sick</text>
+<text class="sv-d" x="206" y="214" fill="var(--faint)" text-anchor="middle">healthy</text>
+<text class="sv-d" x="0" y="242" fill="var(--faint)">flag</text>
+<rect x="84" y="220" width="76" height="30" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="122" y="240" fill="var(--ok)" text-anchor="middle">97</text>
+<rect x="168" y="220" width="76" height="30" rx="3" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-l" x="206" y="240" fill="var(--tomb)" text-anchor="middle">2,680</text>
+<text class="sv-d" x="0" y="276" fill="var(--faint)">no flag</text>
+<rect x="84" y="254" width="76" height="30" rx="3" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-l" x="122" y="274" fill="var(--tomb)" text-anchor="middle">6</text>
+<rect x="168" y="254" width="76" height="30" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-l" x="206" y="274" fill="var(--ok)" text-anchor="middle">7,217</text>
+<text class="sv-l" x="340" y="232" fill="var(--ok)" text-anchor="end">accuracy 73.1%</text>
+<text class="sv-l" x="340" y="258" fill="var(--ok)" text-anchor="end">recall 94%</text>
+<line x1="0" y1="286" x2="340" y2="286" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-s" x="0" y="308" fill="var(--dim)">The useless model scores HIGHER than the lifesaver.</text>
+<text class="sv-s" x="0" y="326" fill="var(--dim)">Accuracy counts the "no flag · healthy" cell — it</text>
+<text class="sv-s" x="0" y="344" fill="var(--dim)">holds 99% of the data, so it swallows everything</text>
+<text class="sv-s" x="0" y="362" fill="var(--dim)">else.</text>
+<text class="sv-hv" x="372" y="18">THREE QUESTIONS — THREE METRIC GROUPS</text>
+<rect x="372" y="30" width="488" height="34" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="386" y="52" fill="var(--filled)">Is the ranking good?</text>
+<text class="sv-l" x="846" y="52" fill="var(--filled)" text-anchor="end">ROC-AUC · PR-AUC</text>
+<text class="sv-s" x="386" y="80" fill="var(--dim)">no threshold yet — only asks: do positives score above negatives</text>
+<rect x="372" y="96" width="488" height="34" rx="4" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-t" x="386" y="118" fill="var(--probe)">Is the decision right?</text>
+<text class="sv-l" x="846" y="118" fill="var(--probe)" text-anchor="end">precision · recall · F1</text>
+<text class="sv-s" x="386" y="146" fill="var(--dim)">MUST pick a threshold first; change it, all 3 change</text>
+<text class="sv-d" x="846" y="146" fill="var(--probe)" text-anchor="end">← here</text>
+<rect x="372" y="162" width="488" height="34" rx="4" fill="rgba(var(--blue-a),.06)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="386" y="184" fill="var(--filled)">Says 70%, right 70%?</text>
+<text class="sv-l" x="846" y="184" fill="var(--filled)" text-anchor="end">calibration</text>
+<text class="sv-s" x="386" y="212" fill="var(--dim)">can the score be read as a true probability</text>
+<line x1="372" y1="220" x2="860" y2="220" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-s" x="372" y="242" fill="var(--dim)">A model can ace the top question and fail the bottom — right ranking order but</text>
+<text class="sv-s" x="372" y="260" fill="var(--dim)">wrong threshold, or right decisions but a score of 0.7 does not mean 70%.</text>
+<text class="sv-s" x="372" y="278" fill="var(--dim)">So there is no universal "right metric": picking one is picking the question.</text>
+</svg>
+    <figcaption>Same data table, two models. The one that does nothing gets 99.0% accuracy; the one that catches 97 of 103 sick cases only gets 73.1% — because accuracy also counts the true-negative cell, and that cell holds 99% of the data.</figcaption>
+  </figure>
+
+  <p class="key">No metric is the universal "right metric" — <em>choosing a metric is choosing which question you are asking</em>.</p>
+
+  <ul class="why">
+    <li>The four cells on the left are the <b>confusion matrix</b>, the root of every metric in this lesson; section 02 takes each cell apart and names it.</li>
+    <li>This lesson stays on the <b>middle branch</b> on the right. The top branch has its own lesson: <a href="../roc-auc-pr/index.html">ROC-AUC &amp; PR curve</a>; the bottom one: <a href="../calibration/index.html">Probability calibration</a>.</li>
+    <li>This lesson stops at <b>offline metrics</b> — the things that measure the model. The table of which metric to use when, and the story of <b>AUC going up while revenue does not budge</b>, live in <a href="../evaluation-overview/index.html">Model evaluation overview</a>.</li>
+    <li>The more imbalanced the data, the more useless accuracy becomes — with 1% positives, blindly guessing "negative" already scores 99%, so <b>that number says nothing</b>.</li>
+  </ul>
+</section>
+
+<section id="metrics-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Confusion matrix — every metric starts here</h2></div>
+<p class="key">These four cells are <em>the root of every classification metric</em> — every formula below is just a way of combining them.</p>
+  <div class="mtx">
+    <div class="hd"></div><div class="hd">Actual positive</div><div class="hd">Actual negative</div>
+    <div class="hd rl">Predicted<br>positive</div>
+    <div class="q ok"><b>TP</b><span>correct catch</span></div>
+    <div class="q bad"><b>FP</b><span>false alarm — bothers real people</span></div>
+    <div class="hd rl">Predicted<br>negative</div>
+    <div class="q bad"><b>FN</b><span>miss — the most expensive in disease screening</span></div>
+    <div class="q ok"><b>TN</b><span>correct pass</span></div>
+  </div>
+  <table>
+    <tr><th>Metric</th><th>Formula</th><th>Question it answers</th></tr>
+    <tr><td>precision</td><td>TP / (TP + FP)</td><td>Of the ones I <em>flagged</em> positive, how many are right?</td></tr>
+    <tr><td>recall<br><span class="cm">= sensitivity = TPR</span></td><td>TP / (TP + FN)</td><td>Of the <em>truly</em> positive ones, how many did I catch?</td></tr>
+    <tr><td>specificity<br><span class="cm">= TNR</span></td><td>TN / (TN + FP)</td><td>Of the truly negative ones, how many did I correctly pass?</td></tr>
+    <tr><td>FPR</td><td>FP / (FP + TN) = 1 − specificity</td><td>What share of negatives got a false alarm?</td></tr>
+    <tr><td>accuracy</td><td>(TP + TN) / total</td><td>What share of predictions are right?</td></tr>
+    <tr><td>F1</td><td>2PR / (P + R)</td><td>Balance between precision and recall</td></tr>
+  </table>
+  <ul class="why">
+    <li><b>precision reads along the ROW</b> — within what I flagged positive. <b>recall reads down the COLUMN</b> — within what is truly positive. Remember the reading direction and you will not mix them up.</li>
+    <li>Neither one <b>uses TN</b> — they skip exactly the cell that balloons on imbalanced data, so they still work there.</li>
+  </ul>
+  <h3>Accuracy and imbalanced data</h3>
+<p>The figure in section 01 already showed how accuracy breaks. This section answers the next question: <em>what to replace it with.</em></p>
+
+  <table>
+    <tr><th>Replace accuracy with</th><th>When</th></tr>
+    <tr><td>PR-AUC, precision, recall</td><td>The positive class is rare and is the one you care about</td></tr>
+    <tr><td>Balanced accuracy<br><span class="cm">= (recall + specificity) / 2</span></td><td>You want a single number that weighs both classes</td></tr>
+    <tr><td>Matthews correlation (MCC)</td><td>You want one number that uses all four cells and holds up on imbalanced data</td></tr>
+    <tr><td>Expected cost</td><td>When you know the real cost of FP and FN — always the best choice</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>When you get a classification task, <b>ask for the class ratio before discussing models</b>: at 99:1 the metric, threshold, split and loss all change.</li>
+    <li>The first three rows are just <b>ways to dodge the true-negative cell</b>; only the last row actually answers what people need — missing one sick case costs many times more than calling back one healthy person.</li>
+  </ul>
+</section>
+
+<section id="metrics-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Precision, recall, F1 — which one</h2></div>
+  <p>The answer always lies in <strong>the cost of the two kinds of error</strong>, not in the model.</p>
+  <table>
+    <tr><th>Task</th><th>Which error costs more</th><th>Prioritize</th></tr>
+    <tr><td>Cancer screening</td><td>Missing a sick case (FN)</td><td><strong>Recall</strong> — better a false alarm and one more test</td></tr>
+    <tr><td>Blocking suspected fraud transactions</td><td>Wrongly blocking a real customer (FP)</td><td><strong>Precision</strong> — wrong blocks lose customers</td></tr>
+    <tr><td>Spam filtering</td><td>Sending an important email to spam (FP)</td><td><strong>Precision</strong></td></tr>
+    <tr><td>Machine fault detection</td><td>Missing a fault that causes an accident (FN)</td><td><strong>Recall</strong></td></tr>
+    <tr><td>Product recommendation</td><td>Balanced, and computed over top-k</td><td>Precision@k, NDCG</td></tr>
+  </table>
+  <h3>F1 and its variants</h3>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span><var>F</var><sub><var>β</var></sub></span></span>
+      <span class="op">=</span>
+      <span class="t p"><span><span class="frac"><i>(1 + <var>β</var><sup>2</sup>) <var>P</var> <var>R</var></i><i><var>β</var><sup>2</sup> <var>P</var> + <var>R</var></i></span></span></span>
+    </div>
+    <dl>
+      <dt>β = 1</dt><dd>is exactly F1 — treats precision and recall as equally important</dd>
+      <dt>β = 2</dt><dd>treats recall as twice as important as precision</dd>
+      <dt>β = 0.5</dt><dd>treats precision as twice as important</dd>
+    </dl>
+    <p class="read">This is a <b>harmonic</b> mean, not an ordinary mean: with P = 1.0 and R = 0.0 the ordinary mean is 0.50 but F1 is <b>0.00</b>. The smaller value always pulls the result down.</p>
+  </div>
+  <ul class="why">
+    <li>F1 implicitly assumes the two kinds of error <b>cost the same</b>. That assumption is almost always wrong.</li>
+    <li>Missing one fraud case loses 10M, wrongly blocking one customer loses 100k — a 100:1 ratio, and F1 reflects none of it.</li>
+    <li>Pick <span class="mth"><var>β</var></span> by the cost ratio, or compute directly in money as in section 05.</li>
+  </ul>
+</section>
+
+<section id="metrics-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Lab: change the threshold and class ratio</h2></div>
+  <p>The simulated model has fixed quality. Drag the positive-class ratio and the threshold to see which metrics hold steady and which collapse.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>% positive class</label>
+        <select id="mprev">
+          <option value="50">50% — balanced</option>
+          <option value="10" selected>10%</option>
+          <option value="1">1% — rare</option>
+          <option value="0.2">0.2% — very rare</option>
+        </select>
+      </div>
+      <div><label>threshold</label><input type="number" id="mthr" value="0.5" step="0.05" min="0.05" max="0.95"></div>
+      <div><label>model quality</label>
+        <select id="msep">
+          <option value="1.2">weak</option>
+          <option value="2.2" selected>fair</option>
+          <option value="3.5">good</option>
+        </select>
+      </div>
+    </div>
+    <div id="mview3"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Keep model quality fixed and drag the positive ratio from 50% down to 0.2%: <strong>ROC-AUC barely changes</strong> while <strong>PR-AUC and precision collapse</strong>.<br>
+      Same model, same ranking ability — but the real-world usefulness is entirely different.<br>
+      That is the whole reason to use PR-AUC when the positive class is rare.
+    </p>
+  </div>
+</section>
+
+<section id="metrics-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Choose the threshold by cost, not by F1</h2></div>
+<p class="key">Ask the business side for the price of the two kinds of error, then <em>sweep every threshold and pick the cheapest point</em>.</p>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>cost</span></span>
+      <span class="op">=</span>
+      <span class="t r"><span>#FP × 200k</span><em>real customer wrongly blocked</em></span>
+      <span class="op">+</span>
+      <span class="t r"><span>#FN × 5M</span><em>fraud case missed</em></span>
+    </div>
+    <p class="read">A 25 : 1 ratio — misses cost far more, so the best threshold will be <b>lower</b> than 0.5 to catch more.</p>
+  </div>
+
+  <div class="bars">
+    <div class="b bad"><i>threshold 0.50</i><u style="width:100%"></u><b>costs 41M</b></div>
+    <div class="b"><i>threshold 0.30</i><u style="width:58%"></u><b>24M</b></div>
+    <div class="b hi"><i>threshold 0.15</i><u style="width:44%"></u><b>18M ← cheapest</b></div>
+    <div class="b"><i>threshold 0.05</i><u style="width:71%"></u><b>29M — too many wrong blocks</b></div>
+  </div>
+  <p class="stripnote"><span>sweep the threshold, measure in money</span><span><em>0.5 is the library default, almost never the cheapest point</em></span></p>
+
+  <ul class="why">
+    <li>It uses exactly what the business side <b>already has</b> and F1 throws away: the real price of each kind of error.</li>
+    <li>The result is <b>a number in money</b>, something you can say to non-technical people.</li>
+    <li>When prices change you only re-pick the threshold — <b>no retraining</b>.</li>
+    <li>The threshold <b>is not a model parameter</b>. The model gives a score; the threshold is a business decision applied on top of that score.</li>
+    <li>Deploy the model so it returns <b>probabilities</b>, and keep the threshold in config — changing the threshold then needs no redeploy.</li>
+  </ul>
+</section>
+
+<section id="metrics-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Multiclass</h2></div>
+<p class="key">Multiple classes means multiple numbers — <em>how you combine them is a choice, not a technical detail</em>.</p>
+  <div class="stack">
+    <div class="s ok"><b>macro</b><span>compute per class then take a plain average → rare classes get as much say as large ones</span></div>
+    <div class="s"><b>weighted</b><span>average weighted by sample count → large classes dominate</span></div>
+    <div class="s warn"><b>micro</b><span>pool TP, FP, FN of every class then compute once → for single-label tasks, micro-F1 <b>equals accuracy</b></span></div>
+  </div>
+  <table>
+    <tr><th>Choose</th><th>When</th></tr>
+    <tr><td><strong>macro</strong></td><td>Every class matters equally, rare ones included — usually the right default for imbalanced data</td></tr>
+    <tr><td>weighted</td><td>You want to reflect performance on the real-world distribution</td></tr>
+    <tr><td>micro</td><td>Multi-label tasks, or when each <em>prediction</em> matters equally rather than each class</td></tr>
+  </table>
+  <ul class="why">
+    <li>Since micro-F1 is accuracy, it <b>inherits the same flaw</b> from section 02 — do not use it on imbalanced data.</li>
+  </ul>
+</section>
+
+<section id="metrics-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Regression metrics</h2></div>
+  <table>
+    <tr><th>Metric</th><th>Formula</th><th>Properties</th></tr>
+    <tr><td>MAE</td><td><span class="mth"><b class="fn">mean</b>(|<var>ŷ</var> − <var>y</var>|)</span></td><td>Same unit as <span class="mth"><var>y</var></span>, easy to explain, robust to outliers. Estimates the <em>median</em></td></tr>
+    <tr><td>RMSE</td><td><span class="mth">√<b class="fn">mean</b>((<var>ŷ</var> − <var>y</var>)²)</span></td><td>Same unit, punishes large errors heavily. Estimates the <em>mean</em></td></tr>
+    <tr><td>R²</td><td><span class="mth">1 − <span class="frac"><i>SSE</i><i>SST</i></span></span></td><td>Unitless, but depends on the variance of the test set</td></tr>
+    <tr><td>MAPE</td><td><span class="mth"><b class="fn">mean</b>(<span class="frac"><i>|<var>ŷ</var> − <var>y</var>|</i><i>|<var>y</var>|</i></span>)</span></td><td>In %, but has three serious problems</td></tr>
+  </table>
+  <div class="stack">
+    <div class="s bad"><b>Breaks when <span class="mth"><var>y</var></span> is near 0</b><span>It divides by the true value, so one sample with <span class="mth"><var>y</var> = 0.01</span> blows MAPE up to thousands of percent.</span></div>
+    <div class="s bad"><b>Asymmetric</b><span>Under-predictions are capped at 100%, over-predictions are unbounded. So a model optimizing MAPE tends to <b>under-predict</b> systematically.</span></div>
+    <div class="s bad"><b>Not comparable across series</b><span>Two series at different value levels give MAPE numbers that do not mean the same thing.</span></div>
+    <div class="s ok"><b>Replace with</b><span>WAPE, sMAPE, or MASE for time-series forecasting.</span></div>
+  </div>
+  <p class="key">The biggest difference between MAE and RMSE shows up <em>when one sample is off by a lot</em>:</p>
+  <div class="bars">
+    <div class="b"><i>MAE — 100 samples each off by 2</i><u style="width:20%"></u><b>2.0</b></div>
+    <div class="b"><i>RMSE — same data</i><u style="width:20%"></u><b>2.0</b></div>
+    <div class="b"><i>MAE — add 1 sample off by 100</i><u style="width:29%"></u><b>2.98</b></div>
+    <div class="b hi"><i>RMSE — add 1 sample off by 100</i><u style="width:110%"></u><b>11.0 ← jumps 5×</b></div>
+  </div>
+  <p class="stripnote"><span>one outlier barely moves MAE</span><span><em>but makes RMSE explode — because it squares before averaging</em></span></p>
+
+  <p><strong>About R²</strong>, two things are easy to misread.</p>
+
+  <ul class="why">
+    <li>It <b>can be negative</b> — meaning the model is worse than predicting the constant mean.</li>
+    <li>The denominator is the variance of the test set, so the same model gives different R² on two different test sets — <b>do not use R² to compare two datasets</b>.</li>
+  </ul>
+</section>
+
+<section id="metrics-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Common mistakes</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Reporting accuracy on imbalanced data</h4><p>99% with recall 0. Always ask the class ratio first.</p></div>
+    <div class="card bad"><h4>Using ROC-AUC when positives are very rare</h4><p>The number looks falsely good because FPR divides by a huge negative count. Use <a href="../roc-auc-pr/index.html">PR-AUC</a>.</p></div>
+    <div class="card bad"><h4>Keeping the 0.5 threshold</h4><p>The threshold is a business decision. Choose it by expected cost.</p></div>
+    <div class="card bad"><h4>Optimizing F1 by default</h4><p>F1 assumes both errors cost the same — almost always wrong.</p></div>
+    <div class="card bad"><h4>Using MAPE when <span class="mth"><var>y</var></span> is near 0</h4><p>The metric explodes and favors under-prediction.</p></div>
+    <div class="card bad"><h4>Comparing R² across two different datasets</h4><p>The denominator is the test-set variance, so they cannot be compared.</p></div>
+  </div>
+</section>
+
+
+<footer>Machine learning · Model evaluation · numbers in the examples are illustrative, chosen for easy mental math. Read on: <a href="../roc-auc-pr/index.html">ROC-AUC &amp; PR curve</a>, then <a href="../calibration/index.html">Probability calibration</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -20,13 +20,13 @@ assets/favicon.svg               ← nguồn hình của logo; .ico + .png bên 
 assets/favicon.ico · icon-192.png · icon-512.png · apple-touch-icon.png   (sinh tự động)
 content/                         ← thứ tự dưới đây = đúng thứ tự hiện trên giao diện
   01-dsa/                        24 bài · 0 khung
-    category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài
+    category.json                ← tên kệ, ghi chú, danh sách nhóm + thứ tự bài (mỗi kệ một file)
     01-overview/{dsa-overview}
     02-foundations/{big-o-complexity}
     03-data-structures/{data-structures-overview, array-string, linked-list, hash-map, stack-monotonic-queue, heap-priority-queue, tree-bst-traversal, trie, union-find}
     04-algorithms/{algorithms-overview, sorting, two-pointers, sliding-window, prefix-sum, binary-search, greedy, intervals, backtracking, graph-bfs-dfs-topo, shortest-path, dynamic-programming}
     05-toolkit/{leetcode-toolkit}
-  02-python/                        16 bài · 0 khung
+  02-python/                     16 bài · 0 khung
     01-overview/{python-overview}
     02-language-core/{language-core-overview, memory-model-mutability, memory-management-gc, scope-legb, data-model-dunder, iterator-generator, decorator-context-manager, exception-handling}
     03-builtin-structures/{list-tuple-set, dict-hash-table}
@@ -34,43 +34,47 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     06-oop/{oop-python}
     07-typing/{typing-dataclass}
     08-performance/{performance-profiling}
-  03-cs-fundamentals/                        13 bài · 0 khung
+  03-cs-fundamentals/            9 bài · 0 khung
     01-overview/{cs-overview}
     02-os/{os-overview, memory-virtual-paging, lock-deadlock-race}
-    03-networking/{networking-overview, dns-tls, tcp-http, caching, rest-api-design, load-balancing}
-    04-distributed/{cap-theorem-consistency, consensus-leader-election}
-    05-messaging/{messaging-queue-pubsub}
-  04-database/                        23 bài · 0 khung
+    03-networking/{networking-overview, osi-model, dns-tls, tcp-http, rest-api-design}
+  04-distributed/                6 bài · 0 khung
+    01-overview/{distributed-overview}
+    02-fundamentals/{cap-theorem-consistency}
+    03-scaling/{caching, load-balancing, sharding-replication}
+    04-messaging/{messaging-queue-pubsub}
+  05-sql/                        12 bài · 0 khung
     01-overview/{db-overview}
-    02-relational-basics/{relational-overview, relational-model, constraints-integrity, db-normalization, er-modeling}
-    03-sql-basics/{sql-basics-overview, sql-select-filter, sql-join, sql-group-aggregate, sql-subquery-cte}
-    04-sql-advanced/{sql-advanced-overview, sql-window-functions, sql-index-query-plan, transaction-isolation, query-tuning}
-    05-beyond-sql/{nosql-landscape, sharding-replication}
-    06-data-systems/{oltp-vs-olap, data-warehouse-lake, etl-elt, batch-stream-processing, data-quality}
-  05-machine-learning/                        39 bài · 0 khung
+    02-relational-basics/{relational-model, constraints-integrity, db-normalization, er-modeling}
+    03-sql-basics/{sql-select-filter, sql-join, sql-group-aggregate, sql-subquery-cte}
+    04-sql-advanced/{sql-window-functions, sql-index-query-plan, transaction-isolation}
+  06-nosql-data/                 4 bài · 0 khung
+    01-overview/{nosql-data-overview}
+    02-nosql/{nosql-landscape, oltp-vs-olap}
+    03-data-systems/{data-systems}
+  07-machine-learning/           35 bài · 0 khung
     01-overview/{ml-overview}
-    02-math-foundations/{math-foundations-overview, probability-basics, expectation-variance, bayes-theorem, linear-algebra-ml, gradient-optimization, mle-map}
-    03-statistics/{statistics, ab-testing}
+    02-math-foundations/{math-foundations-overview, probability, linear-algebra, calculus, statistics}
     04-core-concepts/{core-concepts-overview, supervised-unsupervised, bias-variance-tradeoff, train-val-test-cv, overfitting-regularization, feature-engineering}
     05-classical-ml/{classical-models-overview, linear-regression, logistic-regression, ridge-lasso-elasticnet, svm, knn, naive-bayes}
     06-tree-models/{tree-family-overview, decision-tree, random-forest, adaboost, gradient-boosting, xgboost, lightgbm}
     07-clustering/{clustering-overview, kmeans-clustering, dbscan, hdbscan}
     08-dimensionality/{pca-dimensionality}
     09-evaluation/{evaluation-overview, metrics-confusion-matrix, roc-auc-pr, calibration}
-  06-deep-learning/                        4 bài · 14 khung
+  08-deep-learning/              4 bài · 11 khung
     01-overview/{dl-overview*}
     02-neural-network/{neural-network-overview*, perceptron-mlp*, activation-functions*, backpropagation, weight-initialization, normalization, optimizer-sgd-adam*, dropout-regularization*}
     03-cnn/{convolution-basics*, cnn-mobilenet}
     04-sequence/{rnn*, lstm-gru*}
-    05-training/{training-recipe*, debug-training*}
-    06-generative/{autoencoder*, vae*, gan*}
-  07-transformer/                        2 bài · 14 khung
+    05-training/{training-recipe-debug*}
+    06-generative/{generative-models*}
+  09-transformer/                2 bài · 14 khung
     01-overview/{architecture-overview*}
     02-transformer-core/{transformer-core-overview*, tokenization*, embedding*, positional-encoding*, self-attention, transformer-architecture}
     03-model-families/{families-overview*, bert*, gpt*, encoder-decoder*}
     04-beyond-transformer/{beyond-overview*, ssm*, mamba*, hybrid-hymba*}
     05-efficient/{efficient-attention*}
-  08-llm/                        4 bài · 27 khung
+  10-llm/                        4 bài · 26 khung
     01-overview/{llm-overview*}
     02-training/{training-overview*, pretraining*, scaling-law*, sft-alignment, peft-lora-qlora}
     03-techniques/{techniques-overview*, moe*, long-context*, chain-of-thought*}
@@ -79,19 +83,19 @@ content/                         ← thứ tự dưới đây = đúng thứ t�
     06-agents/{agent-tool-use*}
     07-model-labs/{model-labs-overview*, llama*, qwen*, deepseek*, mixtral*, closed-models*}
     08-rag-evaluation/{rag-evaluation*}
-    09-multimodal/{clip*, vlm*, diffusion-models*, audio-models*}
-  09-ml-system-design/                        1 bài · 4 khung
+    09-multimodal/{clip-vlm*, diffusion-models*, audio-models*}
+  11-ml-system-design/           1 bài · 4 khung
     01-overview/{mlsd-overview*}
     02-frameworks/{ml-system-design}
     03-case-studies/{recommendation-system*, search-ranking*, llm-rag-system*}
-  10-mlops/                        1 bài · 13 khung
+  12-mlops/                      1 bài · 12 khung
     01-overview/{mlops-overview*}
     02-engineering/{git-workflow*, docker-container*, linux-shell*, fastapi-service*}
     03-lifecycle/{experiment-tracking*, ci-cd-ml*, mlops-serving}
     04-infra/{gpu-inference*}
     05-serving-engines/{serving-engines-comparison*}
     06-ai-reliability/{hallucination*, guardrails-reliability*}
-    07-ai-security/{prompt-injection*, ai-security-threats*}
+    07-ai-security/{ai-security*}
 tools/build.py                   ← quét content/ sinh lại catalog.js + search-index.js, và ghi lại meta trong <head>
 tools/make-icons.py              ← vẽ lại bộ icon từ dấu ◆ thương hiệu (chỉ chạy khi đổi logo)
 archive/mazeai-single-file.html  ← bản gốc gộp 1 file, KHÔNG đụng vào, giữ để đối chiếu
@@ -104,14 +108,14 @@ trong `category.json`. Kệ chỉ có đúng một nhóm thì trang chủ không
 
 ## Bộ nhớ giữa các phiên
 
-[`.claude/memory/`](.claude/memory/) giữ những thứ **không suy ra được từ code**, chia ba chỗ:
-`bai-mau/` là bản mẫu để mở ra xem, `chuan/` là luật viết bài (còn đúng mãi), `nhat-ky/` là việc đã
-làm tới đâu ở từng kệ.
-**Đọc [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) trước khi bắt tay vào việc** — nó là
-chỉ mục một dòng một ghi chú. Sắp sửa nội dung thì đọc hết `chuan/` **và mở
-[`bai-mau/random-forest.html`](.claude/memory/bai-mau/random-forest.html) bằng trình duyệt** — bản
-đó là thước đo chất lượng của cả kho (chốt 2026-09-24), luật rút từ nó nằm ở
-[`chuan/chuan-bai-mau.md`](.claude/memory/chuan/chuan-bai-mau.md). Quy ước ghi nằm trong `MEMORY.md`.
+> **Language rule (2026-10-04): everything in this repo is English — lessons, UI, docs, memory notes.
+> Talk to the user in Vietnamese.** The rest of this file is still Vietnamese and describes the old
+> template; [`standards/lesson-standard.md`](.claude/memory/standards/lesson-standard.md) overrides it.
+
+[`.claude/memory/`](.claude/memory/) holds what cannot be derived from code: `standards/` (how to
+write a lesson) and `log/` (where the migration stands). **Read
+[`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) first.** Reference lessons: the whole
+`content/05-sql/` shelf.
 
 Ranh giới: `CLAUDE.md` mô tả kho **đang như thế nào** (cấu trúc, quy ước, cách build), thư mục
 memory ghi việc **đang làm tới đâu và vì sao chọn cách đó**. Cùng một điều đừng viết ở cả hai chỗ.
@@ -159,6 +163,9 @@ về thuần file://, vẫn chạy bình thường.
    - mỗi mục là một `<section id="SLUG-sN">` mở đầu bằng
      `<div class="sh"><b>01</b><h2>Tên mục</h2></div>` — mục lục bên trái và breadcrumb tự dựng
      từ đây, không phải khai báo ở đâu khác;
+   - mục lớn gồm nhiều phần ngang hàng (1NF/2NF/3NF) thì chia **mục con** bên trong `<section>`:
+     `<div class="subsec" id="SLUG-sN-M"><h3 class="ssh"><b>N.M</b>Tên</h3><p class="skey">…</p>…</div>`
+     — mục lục tự thụt vào một cấp, mỗi mục con vẫn phải có hình;
    - `data-base` ở `<html>` và mọi đường dẫn `assets/` phải đúng số cấp `../`.
 3. Thêm tên thư mục vào `books` của đúng nhóm trong `category.json`.
 4. Chạy `python3 tools/build.py`.
@@ -226,7 +233,7 @@ Bài `*-overview` có **hai khuôn, chọn theo bản chất nhóm** — đừng
 
 **Nhóm là các biến thể cạnh tranh nhau** (bagging vs boosting, k-means vs DBSCAN) — hiểu cái sau
 *cần* hiểu cái trước sinh ra để chữa gì. Chuỗi nhân quả đó chính là nội dung, nên dùng khuôn của
-[Bản đồ nhánh cây](content/05-machine-learning/06-tree-models/tree-family-overview/index.html):
+[Bản đồ nhánh cây](content/07-machine-learning/06-tree-models/tree-family-overview/index.html):
 vấn đề → ý tưởng đầu tiên → vì sao chưa đủ → dòng thời gian → các nhánh → học theo thứ tự nào →
 từ điển bỏ túi.
 
@@ -296,33 +303,49 @@ chuyển link sang bài mới đó.
 
 ## Ngôn ngữ thiết kế
 
-Chất riêng của kho: **nền mực ám nâu, nhấn cam đất, tiêu đề serif** — gần với một cuốn sách
+Chất riêng của kho: **nền giấy trắng, nhấn xanh biển, tiêu đề serif** — gần với một cuốn sách
 chuyên khảo hơn là một dashboard. Toàn bộ nằm trong `assets/style.css`; sửa token ở `:root`
-là đổi cả kho. Đừng viết màu thẳng vào bài, luôn dùng `var(--…)` hoặc `rgba(var(--blue-a),…)`.
+là đổi cả kho. Đừng viết màu thẳng vào bài, luôn dùng `var(--…)` hoặc `rgba(var(--blue-a),…)`
+— `tools/soat.py` phép 2 bắt mọi mã hex lọt vào `content/`.
 
-**Bề mặt & chữ** — phân tầng bằng độ sáng, không bằng viền dày:
+**Bề mặt & chữ** — phân tầng bằng xám biển rất nhạt, không bằng viền dày:
 
 | Token | Giá trị | Dùng cho |
 |---|---|---|
-| `--bg` | `#14110E` | nền trang, mực ám nâu |
-| `--panel` | `#1C1815` | thẻ, khối, bảng |
-| `--raise` | `#241F1A` | ô nổi lên trên panel |
-| `--sunk` | `#0E0C0A` | ô lõm: nền code, track tiến độ |
-| `--rule` · `--rule-hi` | `#2E2822` · `#3D352C` | hai mức đường kẻ |
-| `--text` → `--faint` | `#EDE7DE` → `#7A6F63` | bốn mức chữ |
+| `--page` | `#E9EFF6` | nền trang, ngả xanh rất nhạt để các khối trắng nổi lên |
+| `--bg` · `--panel` | `#FFFFFF` | mọi khối: hero, index, kệ, tờ bài, nút |
+| `--raise` | `#F4F7FB` | ô nổi: hàng bảng khi hover |
+| `--sunk` | `#F0F4F8` | ô lõm: nền code, hình, track tiến độ |
+| `--rule` · `--rule-hi` | `#D9E2EC` · `#B9C8D9` | hai mức đường kẻ |
+| `--text` → `--faint` | `#0B1726` → `#6B7F95` | bốn mức chữ |
+| `--on-fill` · `--strong` | `#FFFFFF` · `#06101C` | chữ trên nền đã tô màu · mực đậm nhất |
 
-**Cam đất `--clay` `#E0855C`** là màu thương hiệu: logo, chữ nghiêng trong tiêu đề, nút chính,
-link trong bài, viền mục đang đọc, vạch hover ở đầu mỗi hàng. **Nó không mang nghĩa nội dung —
-tuyệt đối không dùng trong hình.**
+**Xanh biển `--brand` `#1668AA`** là màu thương hiệu (đậm `--brand-hi` `#0F558C` cho chữ trên nền xanh nhạt;
+`--brand-lt` `#3E93D4` chỉ cho gradient/trang trí, không dùng cho chữ vì thiếu tương phản): logo, chữ nghiêng trong tiêu đề, nút chính,
+link trong bài, mục đang đọc, nền hover của mỗi hàng. **Nó không mang nghĩa nội dung.** Trong hình
+nó chỉ được làm **bề mặt trung tính** (ô nhớ, khung scope, ngăn stack — thứ chưa có gì xảy ra),
+không bao giờ mang nghĩa đúng/sai/con trỏ/kết quả. `--clay` và `--clay-a` là **tên cũ trỏ vào
+`--brand`**, giữ lại vì hơn 1600 lượt dùng trong `content/`; viết mới thì dùng `--brand`.
 
-**Bốn màu ngữ nghĩa** — nghĩa cố định cho mọi hình, mỗi màu kèm một biến `rgb` để pha nền mờ:
+**Bốn màu ngữ nghĩa** — nghĩa cố định cho mọi hình, mỗi màu kèm một biến `rgb` để pha nền mờ.
+Chúng **đậm hơn** bản nền tối một nấc: màu pastel đặt trên giấy trắng thì mất chữ.
 
 | Token | Giá trị | Nghĩa |
 |---|---|---|
-| `--filled` / `--blue-a` | `#8CA9F2` | dữ liệu, thứ đang xét |
-| `--probe` / `--amber-a` | `#EDB44A` | con trỏ, điểm nhấn, đáp án |
-| `--tomb` / `--red-a` | `#F2718A` | sai, bị loại, chưa thoả |
-| `--ok` / `--green-a` | `#5BCFA0` | đúng, kết quả, đã thoả |
+| `--filled` / `--blue-a` | `#4257CE` | dữ liệu, thứ đang xét |
+| `--probe` / `--amber-a` | `#A66200` | con trỏ, điểm nhấn, đáp án |
+| `--tomb` / `--red-a` | `#C62B4C` | sai, bị loại, chưa thoả |
+| `--ok` / `--green-a` | `#0A8460` | đúng, kết quả, đã thoả |
+
+**Mọi vùng là một khối trắng** (`--bg` + viền `--rule` + `--sh-box`, bo `--r-lg`) đặt trên nền `--page`:
+hero, cột index, tiến độ, từng kệ, tờ bài, mục lục.
+Ngoại lệ duy nhất là hero trang chủ (`.mast.home`): một khối xanh đậm gradient, chữ trắng —
+điểm nhấn của cả trang. Đừng nhân bản kiểu khối tối này sang chỗ khác, nó mất tác dụng nhấn.
+
+**Nút là một box**, không phải viên thuốc: `border-radius:var(--r-btn)` (9px), luôn có viền, nền
+trắng khi nghỉ và `--brand-soft` + `--sh-btn` khi hover — di chuột thì **sáng lên** một nấc chứ không
+tối đi. `--r-pill` chỉ còn dùng cho nhãn tròn. Một hàng bài hover thì đổi nền sang `--brand-soft`
+và hiện vạch xanh ở lề trái.
 
 **Chữ** — cả ba font đều có bộ dấu tiếng Việt đầy đủ, đã kiểm bằng subset `vietnamese` của
 Google Fonts. **Trước khi đổi font phải kiểm lại subset này** — Instrument Serif chẳng hạn
@@ -334,10 +357,15 @@ Google Fonts. **Trước khi đổi font phải kiểm lại subset này** — I
 | `--body` | Be Vietnam Pro | phần đọc, nút, nhãn |
 | `--mono` | JetBrains Mono | code, số thứ tự, nhãn nhỏ chữ hoa |
 
-**Bố cục trang thư viện** dựng như **mục lục một cuốn sách**: mỗi kệ là một chương có số treo
-ở lề trái, mỗi bài là **một hàng** (số · tên serif · tóm tắt · nhãn · mũi tên) chứ không phải thẻ —
-34 mục quét bằng mắt nhanh hơn hẳn. Trục dọc của số chương và số bài trùng nhau ở mốc `78px`;
-đổi `grid-template-columns` của `.shelfhead` hoặc `.bk` thì phải chỉnh cả hai cho khớp lại.
+**Bố cục trang thư viện** dựng như **mục lục một cuốn sách**, hai cột: `.libcols` chia
+`var(--side)` cho cột index dính bên trái (`nav.side` — mỗi kệ một hàng, tự sáng theo vị trí cuộn)
+và phần còn lại cho các kệ. Mỗi bài là **một hàng** (số · tên serif · tóm tắt · nhãn · mũi tên)
+chứ không phải thẻ — gần 200 mục quét bằng mắt nhanh hơn hẳn. Trang bài dùng **đúng một hình
+dáng đó**: `nav.toc` bên trái cũng rộng `var(--side)`, cùng kiểu hàng, cùng cách tô mục đang đọc.
+Dưới 900px cả hai cột rút lại thành một khối xếp trên nội dung.
+
+Số chương và số bài gióng theo cùng một trục; đổi `grid-template-columns` của `.shelfhead` hoặc
+`.bk` thì phải chỉnh cả hai cho khớp lại.
 
 `app.js` dựng cả hai trang: trang chủ đọc `CATALOG` sinh chương + hàng + thanh kệ dính;
 trang bài dựng mục lục từ chính các `<section>`, scrollspy, breadcrumb, nút trước/sau,
@@ -402,12 +430,16 @@ Không có test suite. Cách kiểm tối thiểu sau khi sửa giao diện:
 
 ```bash
 python3 tools/build.py                       # không được có cảnh báo
+python3 tools/soat.py                        # phép 2 phải là 0: không mã hex nào lọt vào content/
 ```
 
 Rồi mở bằng trình duyệt và soát: trang chủ, một bài có SVG (`dict-hash-table`),
 một bài có lab (`binary-search`), `kit.html`, và màn hình hẹp ~490px.
 Ba chỗ dễ vỡ nhất: tràn ngang trên mobile, `[hidden]` bị thua `display:grid/flex`
 khi bật kết quả tìm kiếm, và màu hardcode trong SVG/lab lệch khỏi bảng màu mới.
+Đổi màu nền thì phải sửa **bốn chỗ cùng lúc**, không thì icon và thanh trình duyệt lệch màu trang:
+`:root` trong `style.css`, `THEME` trong `build.py`, `site.webmanifest`, và cặp
+`assets/favicon.svg` + `tools/make-icons.py` (chạy lại `make-icons.py` sau khi sửa).
 
 ## Việc còn lại
 
@@ -421,11 +453,13 @@ nhất khi một khái niệm chạm nhiều kệ.
 |---|---|
 | DSA — data structures & algorithms | ✅ **xong** — 24 bài, không còn khung |
 | Python | ✅ **xong** — 16 bài, không còn khung |
-| CS fundamentals | ✅ **xong** — 13 bài, không còn khung |
-| Database & SQL | ✅ **xong** — 23 bài, không còn khung |
-| Machine learning | ✅ **xong** — 39 bài, không còn khung |
-| Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe · Debugging training · **Autoencoder · VAE · GAN** |
-| Transformer & architectures | Architecture overview · Transformer core overview · Tokenization · Embedding · Positional encoding · Encoder, decoder & both · BERT — encoder-only · GPT — decoder-only · T5 — encoder-decoder · Beyond Transformer overview · State space models · Mamba · Hybrid — Hymba · **Efficient attention** |
-| LLM & GenAI | LLM overview · LLM training overview · Pretraining · Scaling law · LLM techniques overview · Mixture of Experts · Long context · Chain-of-Thought · Inference overview · Decoding strategies · Quantization · RAG overview · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use · Model labs overview · LLaMA · Qwen · DeepSeek · Mistral & Mixtral · GPT, Claude & Gemini · **RAG evaluation · CLIP · Vision-language model · Diffusion models · Audio models** |
+| CS fundamentals | ✅ **xong** — 9 bài, không còn khung |
+| Distributed systems | ✅ **xong** — 6 bài, không còn khung |
+| SQL & relational | ✅ **xong** — 12 bài, không còn khung |
+| NoSQL & data systems | ✅ **xong** — 4 bài, không còn khung |
+| Machine learning | ✅ **xong** — 35 bài, không còn khung |
+| Deep learning | Deep learning overview · Neural network overview · Perceptron & MLP · Activation functions · Optimizer — SGD tới Adam · Dropout & regularization · Convolution · RNN · LSTM & GRU · Training recipe & debugging · Autoencoder, VAE & GAN |
+| Transformer & architectures | Architecture overview · Transformer core overview · Tokenization · Embedding · Positional encoding · Encoder, decoder & both · BERT — encoder-only · GPT — decoder-only · T5 — encoder-decoder · Beyond Transformer overview · State space models · Mamba · Hybrid — Hymba · Efficient attention |
+| LLM & GenAI | LLM overview · LLM training overview · Pretraining · Scaling law · LLM techniques overview · Mixture of Experts · Long context · Chain-of-Thought · Inference overview · Decoding strategies · Quantization · RAG overview · Chunking strategy · Vector database · Reranking & hybrid search · Agent & tool use · Model labs overview · LLaMA · Qwen · DeepSeek · Mistral & Mixtral · GPT, Claude & Gemini · Đo một hệ RAG · CLIP & vision-language model · Diffusion models · Audio models |
 | ML system design | ML system design overview · Recommendation system · Search & ranking · LLM/RAG system |
-| MLOps & engineering | MLOps overview · Git · Docker · Linux & shell · Model serving API · Experiment tracking & versioning · CI/CD cho ML · GPU & inference · **vLLM/SGLang/TensorRT-LLM · Hallucination · Guardrails & reliability · Prompt injection & jailbreak · Data poisoning/model extraction/access control** |
+| MLOps & engineering | MLOps overview · Git · Docker · Linux & shell · Model serving API · Experiment tracking & versioning · CI/CD cho ML · GPU & inference · vLLM, SGLang & TensorRT-LLM · Hallucination · Guardrails & production reliability · AI security |

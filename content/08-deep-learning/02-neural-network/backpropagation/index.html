@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backpropagation — MazeAI</title>
+<meta name="description" content="A 2-2-1 network with real numbers, why softmax + CE gives gradient p − y, vanishing and exploding gradients, and a debug checklist.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/08-deep-learning/02-neural-network/backpropagation/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Backpropagation">
+<meta property="og:description" content="A 2-2-1 network with real numbers, why softmax + CE gives gradient p − y, vanishing and exploding gradients, and a debug checklist.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/08-deep-learning/02-neural-network/backpropagation/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-backprop" data-title="Backpropagation" data-tag="Gradient" data-blurb="A 2-2-1 network with real numbers, why softmax + CE gives gradient p − y, vanishing and exploding gradients, and a debug checklist.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · gradient</p>
+  <h1><em>Backpropagation</em></h1>
+  <p class="lede">Not magic — just the <b>chain rule</b> applied in a clever order.</p>
+  <p>This lesson walks through a 2–2–1 network with <b>real numbers</b>.</p>
+  <p>Then it explains why the gradient of softmax plus cross-entropy collapses to <code>p − y</code>, and why gradients shrink across many layers.</p>
+  <p>And why the initialization formula contains <code>√(1/n)</code>.</p>
+</header>
+
+
+<section id="backprop-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The forward pass records the path taken; <em>one reverse multiplication on the way back yields the gradient of every parameter</em>.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<text class="sv-hv" x="372" y="18">ONE PASS, ALL PARAMS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Not a learning algorithm</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">only computes gradients; optimizer updates</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Costs about one forward pass</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">independent of #params</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">The price: keep activations</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">that is where training memory goes</text>
+</svg>
+  <figcaption>Read the four boxes top to bottom: the first two are the mechanism, the third is the result, the red one is where it breaks. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+<div class="stack">
+    <div class="s"><b>Forward — x → z₁ → a₁ → z₂ → a₂ → L</b><span>compute and <b>store</b> every intermediate value</span></div>
+    <div class="s ok"><b>Backward — L → ∂L/∂a₂ → ∂L/∂z₂ → ∂L/∂W₂ → … → ∂L/∂W₁</b><span>go backwards, each step multiplies in one local derivative</span></div>
+    <div class="s"><b>Update — W ← W − η · ∂L/∂W</b><span>subtract a small step along the gradient</span></div>
+  </div>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    Every node in the network needs to know only two things: <strong>its own local derivative</strong>, and <strong>the gradient received from behind</strong>. Multiply the two and pass the result upstream. No node needs to know anything about the whole network — that is why backprop works for every architecture.
+  </div>
+</section>
+
+<section id="backprop-s2">
+  <div class="sh"><b>02</b><h2>Why not compute gradients numerically</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 280" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHY NOT NUMERICAL</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Finite diffs</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">one forward per param — a million for a million params</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Rounding error</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">small h subtracts near-equal numbers</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Backprop: one pass for all</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">exact to machine precision</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Still used for checking</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">gradient check for a new layer</text>
+</svg>
+  <figcaption>Three reasons to drop numerical gradients, and the one place they are still used.</figcaption>
+  </figure>
+
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>∂L/∂w<sub>i</sub></span></span>
+      <span class="op">≈</span>
+      <span class="t r"><span>[ L(w + ε·e<sub>i</sub>) − L(w) ] / ε</span><em>finite difference — a separate forward pass per parameter</em></span>
+    </div>
+  </div>
+  <div class="bars">
+    <div class="b bad"><i>finite difference · model with 100M parameters</i><u style="width:100%"></u><b>100M forward passes</b></div>
+    <div class="b hi"><i>backprop</i><u style="width:1%"></u><b>1 forward + 1 backward</b></div>
+  </div>
+  <p class="stripnote"><span>To get the gradient of <em>all</em> parameters, the backward pass costs only about 2 forward passes.</span><span>That is the whole value of backprop: the cost <em>does not grow with the parameter count</em>.</span></p>
+  <p>That is the whole value of backprop: the cost <strong>does not grow with the parameter count</strong>.</p>
+  <p>It achieves this by reusing intermediate results instead of recomputing them.</p>
+  <div class="note">
+    <h4>Numerical gradients are still useful in one place</h4>
+    To <strong>verify</strong> hand-written backprop code. Compute the gradient both ways on a few random parameters and compare — the relative difference should be below about <code>1e-7</code>. This is gradient checking, and naming it is a good answer to "how do you know your backprop code is correct".
+  </div>
+</section>
+
+<section id="backprop-s3">
+  <div class="sh"><b>03</b><h2>Chain rule</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — CHAIN RULE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">dL/dx = dL/dy · dy/dx</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">composite deriv = product on path</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Branches add up</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">a var used twice gets both flows</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Each node needs only its local deriv</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">no global view needed</text>
+</svg>
+  <figcaption>Three rules are enough to run backward on any graph.</figcaption>
+  </figure>
+
+<div class="cmp two">
+    <div><h5>One path — multiply</h5><p>If <code>L = f(g(h(x)))</code> then <code>∂L/∂x = ∂L/∂f · ∂f/∂g · ∂g/∂h · ∂h/∂x</code>.</p></div>
+    <div><h5>Many paths — add</h5><p>If a variable is used in several places, <code>∂L/∂x</code> is the <b>sum</b> of the gradients along each path.</p></div>
+  </div>
+  <p>The sum rule for a variable used several times is important and often overlooked:</p>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>∂L/∂a₁</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>contribution via neuron 1</span><em>a₁ is used here</em></span>
+      <span class="op">+</span>
+      <span class="t b"><span>contribution via neuron 2</span><em>and also here</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>∂L/∂a₁</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>W₂<sup>T</sup> · ∂L/∂z₂</span><em>the matrix form packs that sum into one multiplication</em></span>
+    </div>
+  </div>
+  <div class="note warn">
+    <h4>This is the number-one source of bugs when implementing backprop</h4>
+    Forgetting to sum gradients when a tensor is used several times — for example with a residual connection, or weights shared across layers. The gradient ends up partial; the model still learns, but slowly and never well. In PyTorch this is exactly why <code>loss.backward()</code> <em>accumulates</em> into <code>.grad</code>, and why you must call <code>optimizer.zero_grad()</code> every step.
+  </div>
+</section>
+
+<section id="backprop-s4">
+  <div class="sh"><b>04</b><h2>Computation graph</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--filled)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — COMPUTATION GRAPH</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Nodes are ops, edges tensors</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Forward stores each node's input</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">for backward reuse</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Autograd builds it at runtime</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">PyTorch — so if/for in a model still work</text>
+</svg>
+  <figcaption>The data structure both passes run on.</figcaption>
+  </figure>
+
+  <figure class="scrollx">
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Forward and backward computation graph">
+      <rect class="sv-b" x="20" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="50" y="93" text-anchor="middle">x</text>
+      <rect class="sv-b" x="120" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="150" y="93" text-anchor="middle">z₁</text>
+      <rect class="sv-b" x="220" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="250" y="93" text-anchor="middle">a₁</text>
+      <rect class="sv-b" x="320" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="350" y="93" text-anchor="middle">z₂</text>
+      <rect class="sv-b" x="420" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="450" y="93" text-anchor="middle">a₂</text>
+      <rect class="sv-b" x="520" y="70" width="60" height="36" rx="5"/><text class="sv-t" x="550" y="93" text-anchor="middle">L</text>
+
+      <path d="M80 82 L120 82" stroke="var(--filled)" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M180 82 L220 82" stroke="var(--filled)" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M280 82 L320 82" stroke="var(--filled)" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M380 82 L420 82" stroke="var(--filled)" stroke-width="2" marker-end="url(#f)"/>
+      <path d="M480 82 L520 82" stroke="var(--filled)" stroke-width="2" marker-end="url(#f)"/>
+
+      <path d="M520 96 L480 96" stroke="var(--probe)" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M420 96 L380 96" stroke="var(--probe)" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M320 96 L280 96" stroke="var(--probe)" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M220 96 L180 96" stroke="var(--probe)" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M120 96 L80 96" stroke="var(--probe)" stroke-width="2" marker-end="url(#b)"/>
+
+      <text class="sv-l" x="20" y="45" fill="var(--filled)">forward — compute values, store them for backward</text>
+      <text class="sv-l" x="20" y="140" fill="var(--probe)">backward — multiply local derivs</text>
+      <text class="sv-l" x="120" y="160">W₁, b₁</text>
+      <text class="sv-l" x="320" y="160">W₂, b₂</text>
+      <defs>
+        <marker id="f" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 z" fill="var(--filled)"/></marker>
+        <marker id="b" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 z" fill="var(--probe)"/></marker>
+      </defs>
+    </svg>
+    <figcaption>The forward pass must <strong>store</strong> intermediate values because the backward pass needs them. That is why training uses far more memory than inference.</figcaption>
+  </figure>
+  <div class="note key">
+    <h4>Practical consequence for memory</h4>
+    Inference needs only the weights. Training needs the weights, the activations of <em>every</em> layer, the gradients, and the optimizer state — with Adam that is two more copies the size of the weights. That is why a large batch size runs out of VRAM, and why <em>gradient checkpointing</em> exists: drop some stored activations and recompute them when needed, trading time for memory.
+  </div>
+</section>
+
+<section id="backprop-s5">
+  <div class="sh"><b>05</b><h2>Lab: a 2–2–1 network with real numbers</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — REAL-NUMBER LAB</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">2–2–1 net</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">small enough to do by hand</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Watch gradients flow node by node</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Compare to finite differences</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">both must agree to several digits</text>
+</svg>
+  <figcaption>The lab runs exactly the backward box, one step at a time.</figcaption>
+  </figure>
+
+  <p>Two inputs, two sigmoid hidden neurons, one sigmoid output, log loss. Click step by step to go through the forward pass and then the backward pass.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>learning rate</label><input type="number" id="blr" value="0.5" step="0.1" min="0.01" max="5"></div>
+      <div><label>true label y</label>
+        <select id="by"><option value="1" selected>1</option><option value="0">0</option></select>
+      </div>
+      <button id="bstep3">Next step</button>
+      <button class="ghost" id="bauto3">Auto run</button>
+      <button class="ghost" id="bupd">Update weights</button>
+      <button class="ghost" id="brst3">Reset</button>
+    </div>
+    <div id="bview3"></div>
+    <div class="stat">
+      <u>loss <b id="bloss">–</b></u>
+      <u>updates <b id="bupdn">0</b></u>
+    </div>
+    <div class="steps" id="blog3"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Run one full pass, then click <strong>Update weights</strong> several times:</p>
+  <p>The loss goes down. Switch the label <code>y</code> to 0 to see every gradient flip sign.</p>
+  <p>Note the line <code>∂L/∂z₂ = a₂ − y</code> — a surprisingly neat formula, and section 07 explains why.</p>
+  </div>
+</section>
+
+<section id="backprop-s6">
+  <div class="sh"><b>06</b><h2>Derivatives of basic ops</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — BASIC DERIVATIVES</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Add: copies gradient to both branches</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--filled)">Mul: swaps the inputs crosswise</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">ReLU: blocks the negative side</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--probe)">Max: only the winner gets gradient</text>
+</svg>
+  <figcaption>Four ops make up most of any network.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Op</th><th>Forward</th><th>Backward — receives <code>g</code> from behind</th></tr>
+    <tr><td>Add</td><td><code>c = a + b</code></td><td><code>∂a = g</code>, <code>∂b = g</code> — just passes through</td></tr>
+    <tr><td>Multiply</td><td><code>c = a · b</code></td><td><code>∂a = g·b</code>, <code>∂b = g·a</code> — swapped</td></tr>
+    <tr><td>Matrix multiply</td><td><code>Z = X W</code></td><td><code>∂X = g Wᵀ</code>, <code>∂W = Xᵀ g</code></td></tr>
+    <tr><td>ReLU</td><td><code>a = max(0, z)</code></td><td><code>∂z = g</code> if <code>z &gt; 0</code>, else <code>0</code> — like a valve</td></tr>
+    <tr><td>Sigmoid</td><td><code>a = σ(z)</code></td><td><code>∂z = g · a(1 − a)</code> — reuses <code>a</code> computed in forward</td></tr>
+    <tr><td>Tanh</td><td><code>a = tanh(z)</code></td><td><code>∂z = g · (1 − a²)</code></td></tr>
+    <tr><td>Softmax + CE</td><td><code>p = softmax(z)</code></td><td><code>∂z = p − y</code> — see section 07</td></tr>
+  </table>
+  <div class="note">
+    <h4>Two things worth noticing in the table</h4>
+    <p><strong>Sigmoid and tanh reuse their own output</strong> to compute the gradient; <code>z</code> is not needed.</p>
+  <p>That is why frameworks store <code>a</code> rather than <code>z</code> for these layers —</p>
+  <p>It saves memory.</p>
+    <p><strong>ReLU is an on/off valve.</strong> It does not shrink the gradient like sigmoid; it either lets it through or blocks it entirely.</p>
+  <p>This is the main reason ReLU solves the vanishing-gradient problem.</p>
+  </div>
+</section>
+
+<section id="backprop-s7">
+  <div class="sh"><b>07</b><h2>Softmax + cross-entropy: why the gradient is <code>p − y</code></h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — SOFTMAX WITH CROSS-ENTROPY</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Fuse two ops into one</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">softmax's denominator cancels out</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Gradient is just p − y</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">one subtraction, no division</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Computed separately: overflow</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">so libraries fuse them</text>
+</svg>
+  <figcaption>The most elegant chain-rule simplification in all of deep learning.</figcaption>
+  </figure>
+
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>p<sub>i</sub></span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>e^z<sub>i</sub> / Σ e^z<sub>j</sub></span><em>softmax</em></span>
+      <span class="op">·</span>
+      <span class="t p"><span>L = −Σ y<sub>i</sub> log p<sub>i</sub></span><em>cross-entropy</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>∂p<sub>i</sub>/∂z<sub>j</sub></span></span>
+      <span class="op">=</span>
+      <span class="t r"><span>p<sub>i</sub>(δ<sub>ij</sub> − p<sub>j</sub>)</span><em>computed alone: a messy Jacobian matrix</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>∂L/∂z<sub>i</sub></span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>p<sub>i</sub> − y<sub>i</sub></span><em>combine the two steps and everything cancels</em></span>
+    </div>
+  </div>
+  <p>The same result as the sigmoid + log loss pair in binary classification, and the identity + MSE pair in regression.</p>
+  <p>This is no coincidence — it is a property of <strong>canonical link functions</strong> in the exponential family.</p>
+  <table>
+    <tr><th>Task</th><th>Output function</th><th>Loss function</th><th>Gradient w.r.t. z</th></tr>
+    <tr><td>Regression</td><td>none</td><td>MSE</td><td><code>ŷ − y</code></td></tr>
+    <tr><td>Binary classification</td><td>sigmoid</td><td>log loss</td><td><code>p − y</code></td></tr>
+    <tr><td>Multi-class classification</td><td>softmax</td><td>cross-entropy</td><td><code>p − y</code></td></tr>
+  </table>
+  <div class="note key">
+    <h4>Two practical consequences</h4>
+    <p><strong>1. Frameworks always fuse the two steps.</strong> PyTorch's <code>CrossEntropyLoss</code> takes <em>logits</em>, not probabilities, and applies softmax internally.</p>
+  <p>Because fused, no Jacobian is needed, and overflow is avoided when computing <code>e^z</code> for large <code>z</code>.</p>
+    <p><strong>2. Applying softmax yourself and feeding it into CrossEntropyLoss is a bug.</strong> Softmax gets applied twice, gradients are wrong and the model learns very poorly — an extremely common silent bug.</p>
+  </div>
+</section>
+
+<section id="backprop-s8">
+  <div class="sh"><b>08</b><h2>Matrix form and shapes</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — SHAPE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">dL/dW has W's shape</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">always true; a quick check</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Matrices transpose going back</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">dL/dx = dL/dy · Wᵀ</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Batch: sum over batch axis</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">W's gradient sums over samples</text>
+</svg>
+  <figcaption>Three shape rules are enough to write a layer without dimension errors.</figcaption>
+  </figure>
+
+<div class="strip">
+    <div class="c"><i>forward</i><b>X : (N, D)</b><u>batch of N samples, D input dims</u></div>
+    <div class="c"><i>forward</i><b>W : (D, H)</b><u>H output dims</u></div>
+    <div class="c on"><i>forward</i><b>Z = X @ W + b</b><u>(N, H)</u></div>
+  </div>
+  <div class="strip">
+    <div class="c t"><i>backward</i><b>dW = X.T @ dZ</b><u>(D, H) — matches W's shape</u></div>
+    <div class="c t"><i>backward</i><b>dX = dZ @ W.T</b><u>(N, D) — matches X's shape</u></div>
+    <div class="c t"><i>backward</i><b>db = dZ.sum(0)</b><u>(H,) — summed over the batch axis</u></div>
+  </div>
+  <div class="note key">
+    <h4>A trick that works everywhere</h4>
+    No need to memorize formulas. <strong>The gradient of a tensor always has the same shape as that tensor.</strong> Given that constraint, there is exactly one way to arrange the matrix multiplication to get the right shape — so you can derive the formula on the spot. Stating this trick in an interview when asked to write a layer's backward is the safest approach.
+  </div>
+  <details class="deep">
+    <summary>Why must <code>db</code> be summed over the batch axis?</summary>
+    <div class="body">
+      <p>The same <code>b</code> is used for all N samples, so it takes part in N different computation paths. By the sum rule in section 03, the gradient is the sum of contributions from every path. For the same reason, the gradient of weights shared across time steps in an RNN must also be accumulated over every step.</p>
+    </div>
+  </details>
+</section>
+
+<section id="backprop-s9">
+  <div class="sh"><b>09</b><h2>Vanishing and exploding gradients</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — TO 0 OR ∞</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">N factors &lt;1: product → 0</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">sigmoid max deriv is 0.25</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">N factors &gt;1: explodes</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">loss is NaN in a few steps</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Residual: adds a path with product 1</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--probe)">Gradient clipping: caps the norm</text>
+</svg>
+  <figcaption>Two directions the same product can drift, and two fixes.</figcaption>
+  </figure>
+
+<p>The gradient through <code>L</code> layers is a <b>product</b> of <code>L</code> factors — the last layer's derivative times the previous one's, all the way back to the first layer:</p>
+  <div class="bars">
+    <div class="b bad"><i>each factor ≈ 0.9 · over 50 layers</i><u style="width:0.5%"></u><b>0.005 — vanishes</b></div>
+    <div class="b hi"><i>each factor ≈ 1.0</i><u style="width:1%"></u><b>1.0 — preserved</b></div>
+    <div class="b bad"><i>each factor ≈ 1.1 · over 50 layers</i><u style="width:100%"></u><b>117 — explodes</b></div>
+  </div>
+  <p>The problem is the <strong>product</strong> itself: deviate from 1 just slightly and, over many layers, the deviation grows exponentially.</p>
+  <table>
+    <tr><th>Cause</th><th>Fix</th></tr>
+    <tr><td>Sigmoid and tanh saturate — sigmoid's derivative peaks at only 0.25</td><td>Use <strong>ReLU</strong>: derivative is 0 or 1, no shrinking</td></tr>
+    <tr><td>Weights initialized too small or too large</td><td><strong>Xavier</strong> or <strong>He</strong> — see section 10</td></tr>
+    <tr><td>Network too deep, gradient path too long</td><td><strong>Residual connection</strong>: <code>x + f(x)</code> gives the gradient a path with derivative 1</td></tr>
+    <tr><td>Activation magnitude drifts across layers</td><td><strong>BatchNorm / LayerNorm</strong></td></tr>
+    <tr><td>Sudden gradient explosion</td><td><strong>Gradient clipping</strong>: clip the norm to a threshold — almost mandatory for RNNs and Transformers</td></tr>
+  </table>
+  <div class="note">
+    <h4>Why residual connections work so well</h4>
+    With <code>y = x + f(x)</code>, <code>∂y/∂x = 1 + ∂f/∂x</code>. That <strong>1</strong> term creates a path for the gradient to flow back without being multiplied by anything. So even if <code>∂f/∂x</code> vanishes to 0, the gradient still passes through intact. That is why such a simple idea makes it possible to train networks hundreds of layers deep.
+  </div>
+</section>
+
+<section id="backprop-s10">
+  <div class="sh"><b>10</b><h2>Weight initialization — why <code>√(1/n)</code></h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — INIT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Keep variance across layers</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Var[out] = n · Var[w] · Var[in]</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">so Var[w] must equal 1/n</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Xavier for tanh, He for ReLU</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">He doubles: ReLU cuts half</text>
+</svg>
+  <figcaption>Why √(1/n) is not a trick but a consequence.</figcaption>
+  </figure>
+
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>Var(z)</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>n · Var(w) · Var(x)</span><em>one neuron with n inputs, w and x independent, zero mean</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Var(z) = Var(x)</span><em>want signal magnitude unchanged across layers</em></span>
+      <span class="op">⇒</span>
+      <span class="t g"><span>std(w) = √(1/n)</span></span>
+    </div>
+  </div>
+  <table>
+    <tr><th>Method</th><th>Variance</th><th>Use with</th></tr>
+    <tr><td>Xavier / Glorot</td><td><code>2 / (n_in + n_out)</code></td><td>tanh, sigmoid — balances both forward and backward passes</td></tr>
+    <tr><td>He / Kaiming</td><td><code>2 / n_in</code></td><td><strong>ReLU</strong> — the factor 2 compensates for what ReLU cuts off</td></tr>
+    <tr><td>All zeros</td><td>—</td><td><strong>Never</strong> — every neuron in a layer stays identical forever</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Why zero initialization makes the network useless</h4>
+    If all weights in a layer are equal, every neuron in that layer computes <em>the same value</em>, receives <em>the same gradient</em>, and is updated <em>identically</em>. They stay identical forever — the whole layer acts as a single neuron. Random initialization exists to <strong>break that symmetry</strong>. Biases, however, are perfectly fine at 0, because the weights already break the symmetry.</p>
+  </div>
+  <p><strong>Why He has a factor of 2:</strong> ReLU sets half the inputs to 0, so the output variance is only about half.</p>
+  <p>Multiplying the initialization variance by 2 compensates for exactly that loss, keeping the signal magnitude from shrinking across layers.</p>
+</section>
+
+<section id="backprop-s11">
+  <div class="sh"><b>11</b><h2>How normalization helps gradients</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHAT NORM DOES</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Keeps activations in good-grad zone</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Smoother loss surface</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">larger learning rates stay stable</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">No substitute for good init</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">they fix different things</text>
+</svg>
+  <figcaption>Norm fixes the same red box, but by a different route.</figcaption>
+  </figure>
+
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>y</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>γ</span><em>learned scale</em></span>
+      <span class="op">·</span>
+      <span class="t b"><span>(x − μ) / √(σ<sup>2</sup> + ε)</span><em>normalize to mean 0, variance 1</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span>β</span><em>learned shift</em></span>
+    </div>
+    <dl>
+      <dt>BatchNorm</dt><dd>μ, σ computed along the <b>BATCH</b> axis, per feature</dd>
+      <dt>LayerNorm</dt><dd>μ, σ computed along the <b>FEATURE</b> axis, per sample</dd>
+    </dl>
+  </div>
+  <table>
+    <tr><th>Effect</th><th>Mechanism</th></tr>
+    <tr><td>Keeps activation magnitude stable</td><td>Stops it drifting across layers, so gradients neither vanish nor explode</td></tr>
+    <tr><td>Allows a larger learning rate</td><td>The loss surface becomes smoother, so large steps stay safe</td></tr>
+    <tr><td>Less dependence on initialization</td><td>A wrong scale at initialization is renormalized right at the first layer</td></tr>
+    <tr><td>Mild regularization effect</td><td>BatchNorm only — noise from per-batch statistics acts like random noise</td></tr>
+  </table>
+  <div class="note">
+    <h4>Why Transformers use LayerNorm</h4>
+    Three reasons, ordered by importance in deployment: LayerNorm <strong>does not depend on batch size</strong>, so serving single requests is still correct; it is unaffected by padding tokens when sequences in a batch have different lengths; and it behaves <em>identically</em> in training and inference, whereas BatchNorm must keep running-average statistics and so has two different modes.
+  </div>
+</section>
+
+<section id="backprop-s12">
+  <div class="sh"><b>12</b><h2>Model not learning — an ordered checklist</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — CHECKLIST WHEN NOT LEARNING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">1. Can it overfit a tiny batch?</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">if not, the bug is in code, not data</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">2. Are gradients zero or NaN?</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--filled)">3. Is the LR off by orders?</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">4. Forgot zero_grad or train mode?</text>
+</svg>
+  <figcaption>Four questions in strict order; stop at the first one that fails.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s ok"><b>1 · Memorize 8 samples</b><span>turn off regularization, train until loss is near 0. If it will not go down, it is a code bug, not the data or learning rate</span></div>
+    <div class="s"><b>2 · Initial loss ≈ ln(C)</b><span>with 10 classes it should be about 2.30. Far off: wrong label format, or double softmax</span></div>
+    <div class="s"><b>3 · Sweep the learning rate</b><span>log scale from 1e-5 to 1e-1. <code>NaN</code> means too large, flat means too small</span></div>
+    <div class="s"><b>4 · Gradient norm</b><span>near 0 is vanishing, huge is exploding, exactly 0 means the computation graph is broken</span></div>
+    <div class="s"><b>5 · <code>zero_grad()</code></b><span>without it, gradients accumulate across steps</span></div>
+    <div class="s"><b>6 · Normalize inputs</b><span>unnormalized inputs are a very common reason a network fails to converge</span></div>
+    <div class="s"><b>7 · Labels</b><span>off by one, shuffled relative to inputs, or a class missing entirely</span></div>
+    <div class="s"><b>8 · <code>model.eval()</code></b><span>forget it and dropout and BatchNorm misbehave at evaluation</span></div>
+  </div>
+  <p class="stripnote"><span>do first</span><span><em>in this order, each step rules out a whole class of causes</em></span><span>do later</span></p>
+  <div class="note key">
+    <h4>Step 1 matters more than the other seven</h4>
+    If the model cannot memorize 8 samples, then tuning the learning rate, switching optimizers or adding data is all pointless — there is a bug somewhere in the code. This test takes two minutes and rules out a whole class of causes. Bringing it up when asked "your model does not converge, how do you debug it" is the answer of someone who has done the real work.
+  </div>
+</section>
+
+<section id="backprop-s13">
+  <div class="sh"><b>13</b><h2>Formula summary</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="Four-box map of backpropagation: the forward pass records the input of every op, the chain rule lets derivatives be multiplied along the path, one reverse backward pass yields the gradient of every parameter, and the price is that products of long chains easily vanish to 0 or explode">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Forward — record the path</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each op stores its input</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">Chain rule on the graph</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">composite deriv = path product</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Backward — one reverse pass</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">one sweep for all params</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Long product chains drift</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">gradients vanish or explode</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — FORMULA SHEET</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">One local-derivative line per op</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">For writing a new layer</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Verify with gradient check</text>
+</svg>
+  <figcaption>A reference table, not reading material — come back when needed.</figcaption>
+  </figure>
+
+<pre><code>Two-layer network, binary classification:
+
+FORWARD
+    z₁ = W₁x + b₁
+    a₁ = σ(z₁)          or    relu(z₁)
+    z₂ = W₂a₁ + b₂
+    a₂ = σ(z₂)
+    L  = -[y log a₂ + (1-y) log(1-a₂)]
+
+BACKWARD
+    dz₂ = a₂ - y                        ← neat thanks to sigmoid + log loss
+    dW₂ = dz₂ · a₁ᵀ
+    db₂ = dz₂
+    da₁ = W₂ᵀ · dz₂
+    dz₁ = da₁ ⊙ a₁(1-a₁)                ← ⊙ is element-wise multiply
+                                          or da₁ ⊙ (z₁ &gt; 0) with ReLU
+    dW₁ = dz₁ · xᵀ
+    db₁ = dz₁
+
+UPDATE
+    W ← W - η · dW</code></pre>
+  <p>Being able to rewrite this table from scratch without looking it up is enough preparation for a whiteboard question on backprop.</p>
+</section>
+
+<section id="backprop-s14">
+  <div class="sh"><b>14</b><h2>Common mistakes</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Forgetting <code>zero_grad()</code></h4><p>Gradients accumulate across steps. The loss fluctuates erratically and does not converge.</p></div>
+    <div class="card bad"><h4>Applying softmax before CrossEntropyLoss</h4><p>Double softmax. The model still runs, learns very poorly, and no error is raised.</p></div>
+    <div class="card bad"><h4>Initializing weights to 0</h4><p>Every neuron in the layer stays identical forever. The whole layer becomes one neuron.</p></div>
+    <div class="card bad"><h4>Not summing gradients for a tensor used several times</h4><p>The gradient is partial. Happens when hand-implementing residuals or shared weights.</p></div>
+    <div class="card bad"><h4>Not normalizing inputs</h4><p>The loss surface becomes a narrow valley; every learning rate is wrong.</p></div>
+    <div class="card bad"><h4>Forgetting <code>model.eval()</code></h4><p>Dropout stays on and BatchNorm uses batch statistics during evaluation.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · backpropagation · formulas are written for a single sample; the batch form only adds a sum over the batch axis for the bias and weight gradients.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

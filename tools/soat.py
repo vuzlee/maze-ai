@@ -18,22 +18,36 @@ for cd,b in W:
         t=t[:-11] if t.endswith('/index.html') else t
         if t in SK: print("  ",p.replace('content/',''),"->",t.replace('content/','')); n+=1
 print("   tổng:",n); issues+=n
-# 2 mau la
-print("\n== 2. Màu lạ, không có trong bảng token của style.css ==")
+# 2 mau cung trong bai
+# Mọi màu trong bài phải đi qua token, không có ngoại lệ: đổi bảng màu ở :root là
+# đổi cả kho, còn một mã hex lọt vào bài là một chỗ lệch màu phải đi tìm bằng mắt.
+# Chỉ <meta name="theme-color"> được phép mang hex — build.py tự ghi lại dòng đó.
+print("\n== 2. Màu cứng trong bài — phải dùng var(--…) ==")
 n=0
+HEX=re.compile(r'#[0-9a-fA-F]{6}\b')
 for cd,b in B:
-    p=b['path']; h=open(p,encoding='utf-8').read()
-    for m in re.finditer(r'#[0-9a-fA-F]{6}',h):
-        if m.group(0).upper() not in tok:
+    p=b['path']
+    for line in open(p,encoding='utf-8'):
+        if 'name="theme-color"' in line: continue
+        for m in HEX.finditer(line):
             print("  ",p.replace('content/',''),m.group(0)); n+=1
+for p in sorted(__import__('glob').glob('content/**/lab.js',recursive=True)):
+    for m in HEX.finditer(open(p,encoding='utf-8').read()):
+        print("  ",p.replace('content/',''),m.group(0)); n+=1
 print("   tổng:",n); issues+=n
-# 3 clay trong hinh
-print("\n== 3. Màu thương hiệu clay dùng trong hình (cấm) ==")
+# 3 mau thuong hieu mang nghia trong hinh
+# Xanh biển được làm BỀ MẶT TRUNG TÍNH trong hình (ô nhớ, khung scope, ngăn stack),
+# nhưng không bao giờ mang nghĩa — đúng/sai/con trỏ/kết quả vẫn phải là bốn màu ngữ nghĩa.
+# Máy không đọc được ý nghĩa, nên phép này chỉ bắt dạng tô ĐẬM: một Ô bị đổ nền đặc
+# var(--clay)/var(--brand) — thứ nhìn như một trạng thái chứ không như vật chứa.
+# Chỉ xét <rect>: đầu mũi tên (<polygon>) và chấm nối (<circle> bán kính nhỏ) tô màu
+# thương hiệu là nét dẫn trung tính, không phải ô mang nghĩa.
+print("\n== 3. Màu thương hiệu tô đặc một ô trong hình (phải là màu ngữ nghĩa) ==")
 n=0
 for cd,b in B:
     p=b['path']; h=open(p,encoding='utf-8').read()
-    for m in re.finditer(r'(?:fill|stroke)="(#(?:E0855C|EE9E7A|C96A44))"',h,re.I):
-        print("  ",p.replace('content/',''),m.group(1)); n+=1
+    for m in re.finditer(r'<rect[^>]*\bfill="var\(--(?:clay|brand)\)"',h):
+        print("  ",p.replace('content/',''),m.group(0)[:60]); n+=1
 print("   tổng:",n); issues+=n
 # 4 dau muc dem so
 print("\n== 4. Đầu mục đếm số ==")
@@ -83,7 +97,7 @@ DICH = {
 MIEN = {('memory-management-gc','thu gom rác'), ('sql-subquery-cte','duyệt cây')}
 # Chữ là thuật ngữ ở kệ này nhưng là từ thường ở kệ khác — chỉ soát trong kệ ghi ở đây.
 # «hàng xóm»: thuật ngữ của KNN/DBSCAN, nhưng ở DSA và OS nó là từ thường (ô kề, khối liền kề).
-KE_RIENG = {'hàng xóm': '05-machine-learning'}
+KE_RIENG = {'hàng xóm': '07-machine-learning'}
 print("\n== 6. Thuật ngữ bị dịch ra tiếng Việt ==")
 n=0
 for cd,b in B:
@@ -122,7 +136,10 @@ print("   tổng:",n); issues+=n
 VIS=('class="strip','class="flow','class="cmp','class="stack','class="mtx',
      'class="axis','class="seq','class="bars','class="eq','<table','class="probs')
 NOFIG=('lỗi hay gặp','hỏi đáp','mẫu code','lab','từ điển bỏ túi','bài leetcode',
-       'học theo thứ tự nào','đọc tiếp')
+       'học theo thứ tự nào','đọc tiếp',
+       # English headings after the 2026-10 translation
+       'common mistakes','common pitfalls','q&amp;a','code template','template to memorise',
+       'glossary','leetcode problems','learning order','reading order','further reading','read next')
 print("\n== 8. Nợ luật 1 — bài dài chưa có figure.gist (dài trước) ==")
 no=[]
 for cd,b in W:

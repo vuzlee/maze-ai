@@ -6,7 +6,7 @@ function render(note){
   const cells = [...S].map((ch, i) => {
     const inWin = i >= L && i <= R;
     const bg = inWin ? "var(--filled)" : "var(--raise)";
-    const fg = inWin ? "#14110E" : "var(--muted)";
+    const fg = inWin ? "var(--on-fill)" : "var(--muted)";
     const mark = i === L ? "L" : (i === R ? "R" : "");
     return `<div class="slot" style="border-color:${inWin?'var(--filled)':'var(--rule)'}">
               <i>${mark || i}</i>
@@ -15,7 +15,7 @@ function render(note){
   }).join("");
   document.getElementById("view").innerHTML =
     `<div class="rail" style="grid-template-columns:repeat(${Math.min(S.length,16)},minmax(0,1fr))">${cells}</div>`;
-  document.getElementById("cur").textContent = R < L ? "rỗng" : S.slice(L, R+1) + ` (${R-L+1})`;
+  document.getElementById("cur").textContent = R < L ? "empty" : S.slice(L, R+1) + ` (${R-L+1})`;
   document.getElementById("best").textContent = best;
   document.getElementById("steps").textContent = steps;
   if(note){
@@ -28,15 +28,15 @@ function render(note){
 function step(){
   if(done) return;
   R++;
-  if(R >= S.length){ done = true; stopAuto(); render("xong — kết quả " + best); return; }
+  if(R >= S.length){ done = true; stopAuto(); render("done — result " + best); return; }
   steps++;
   const ch = S[R];
   let note;
   if(last[ch] !== undefined && last[ch] >= L){
     const old = L; L = last[ch] + 1;
-    note = `'${ch}' đã có ở ${last[ch]} → L nhảy ${old}→${L}`;
+    note = `'${ch}' already at ${last[ch]} → L jumps ${old}→${L}`;
   } else {
-    note = `thêm '${ch}' — cửa sổ vẫn hợp lệ`;
+    note = `add '${ch}' — window still valid`;
   }
   last[ch] = R;
   best = Math.max(best, R - L + 1);
@@ -50,7 +50,7 @@ function reset(){
   render(null);
 }
 function stopAuto(){ if(timer){ clearInterval(timer); timer = null;
-  document.getElementById("auto").textContent = "Tự chạy"; } }
+  document.getElementById("auto").textContent = "Auto run"; } }
 
 document.getElementById("step").addEventListener("click", step);
 document.getElementById("rst").addEventListener("click", reset);
@@ -58,7 +58,7 @@ document.getElementById("str").addEventListener("change", reset);
 document.getElementById("auto").addEventListener("click", () => {
   if(timer) return stopAuto();
   if(done) reset();
-  document.getElementById("auto").textContent = "Dừng";
+  document.getElementById("auto").textContent = "Stop";
   timer = setInterval(() => { step(); if(done) stopAuto(); }, 650);
 });
 reset();

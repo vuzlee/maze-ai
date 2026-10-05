@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model evaluation overview — MazeAI</title>
+<meta name="description" content="Three independent questions about a model — ranking, decision, probability — and a lookup table for choosing a metric by task and by class ratio.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/09-evaluation/evaluation-overview/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Model evaluation overview">
+<meta property="og:description" content="Three independent questions about a model — ranking, decision, probability — and a lookup table for choosing a metric by task and by class ratio.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/09-evaluation/evaluation-overview/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-evov" data-title="Model evaluation overview" data-tag="Overview" data-blurb="Three independent questions about a model — ranking, decision, probability — and a lookup table for choosing a metric by task and by class ratio.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · opening the Model evaluation group</p>
+  <h1>Model evaluation — <em>lookup table</em></h1>
+  <p class="lede">One model, <b>three different questions</b>, three groups of metrics that cannot stand in for each other. This lesson covers how to read the table and pick a measure; how each measure works lives in the next three lessons.</p>
+</header>
+
+<section id="evov-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+
+  <p class="key">Asking "is this model good" is an incomplete question. <em>There are at least three questions, and a model can ace one and fail another.</em> Rewrite the scores with an increasing function and <b>F1 changes 5.5×</b> while ROC-AUC does not move by a thousandth.</p>
+
+<figure class="gist">
+<svg viewBox="0 0 860 296" role="img" aria-label="Three evaluation axes and a measurement table proving they are independent: rewriting the score as p squared or square root of p keeps ROC-AUC at 0.969 while F1 and ECE change several times over">
+<text class="sv-hv" x="0" y="18">QUESTIONS</text>
+<rect x="0" y="26" width="300" height="60" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="47" fill="var(--filled)">RANKING</text>
+<text class="sv-d" x="14" y="64" fill="var(--dim)">positives pushed up?</text>
+<text class="sv-l" x="14" y="80" fill="var(--muted)">ROC-AUC · PR-AUC</text>
+<rect x="0" y="96" width="300" height="60" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="117" fill="var(--probe)">DECISION</text>
+<text class="sv-d" x="14" y="134" fill="var(--dim)">after the cut, how right/wrong?</text>
+<text class="sv-l" x="14" y="150" fill="var(--muted)">precision · recall · F1</text>
+<rect x="0" y="166" width="300" height="60" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="14" y="187" fill="var(--ok)">PROBABILITY</text>
+<text class="sv-d" x="14" y="204" fill="var(--dim)">does 0.7 mean 70% right?</text>
+<text class="sv-l" x="14" y="220" fill="var(--muted)">ECE · Brier</text>
+<text class="sv-s" x="0" y="250" fill="var(--dim)">Three truly independent —</text>
+<text class="sv-s" x="0" y="266" fill="var(--dim)">the table is the proof.</text>
+<text class="sv-hv" x="360" y="18" fill="var(--muted)">ONE MODEL · 3 SCORE REWRITES · 5,000 SAMPLES, 3% POSITIVE</text>
+<text class="sv-s" x="360" y="36" fill="var(--dim)">p² and √p only squeeze scores monotonically — same ranking order</text>
+<text class="sv-hv" x="376" y="60" fill="var(--muted)">SCORE USED</text>
+<text class="sv-h" x="560" y="60" fill="var(--filled)" text-anchor="middle">ROC-AUC</text>
+<text class="sv-h" x="690" y="60" fill="var(--probe)" text-anchor="middle">F1 @ 0.5</text>
+<text class="sv-h" x="810" y="60" fill="var(--ok)" text-anchor="middle">ECE</text>
+<rect x="510" y="70" width="100" height="106" rx="5" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.2"/>
+<text class="sv-d" x="376" y="94" fill="var(--text)">p — raw score</text>
+<text class="sv-l" x="560" y="94" fill="var(--filled)" text-anchor="middle">0.969</text>
+<text class="sv-l" x="690" y="94" fill="var(--probe)" text-anchor="middle">0.264</text>
+<text class="sv-l" x="810" y="94" fill="var(--ok)" text-anchor="middle">0.288</text>
+<text class="sv-d" x="376" y="128" fill="var(--text)">p² — squeezed</text>
+<text class="sv-l" x="560" y="128" fill="var(--filled)" text-anchor="middle">0.969</text>
+<text class="sv-l" x="690" y="128" fill="var(--probe)" text-anchor="middle">0.563</text>
+<text class="sv-l" x="810" y="128" fill="var(--ok)" text-anchor="middle">0.112</text>
+<text class="sv-d" x="376" y="162" fill="var(--text)">√p — lifted</text>
+<text class="sv-l" x="560" y="162" fill="var(--filled)" text-anchor="middle">0.969</text>
+<text class="sv-l" x="690" y="162" fill="var(--probe)" text-anchor="middle">0.103</text>
+<text class="sv-l" x="810" y="162" fill="var(--ok)" text-anchor="middle">0.506</text>
+<text class="sv-s" x="376" y="200" fill="var(--faint)">this col STAYS</text>
+<text class="sv-s" x="560" y="200" fill="var(--filled)" text-anchor="middle">0 change</text>
+<text class="sv-s" x="690" y="200" fill="var(--probe)" text-anchor="middle">5.5× spread</text>
+<text class="sv-s" x="810" y="200" fill="var(--ok)" text-anchor="middle">4.5× spread</text>
+<line x1="360" y1="218" x2="500" y2="218" stroke="var(--rule)" stroke-width="1"/>
+<rect x="360" y="230" width="500" height="52" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.4"/>
+<text class="sv-t" x="376" y="250" fill="var(--tomb)">AND A MODEL THAT LEARNED NOTHING: always "no"</text>
+<text class="sv-d" x="376" y="269" fill="var(--muted)">accuracy 0.970 — higher than the real model (0.846) — yet ROC-AUC 0.500.</text>
+</svg>
+<figcaption>The three rows of the table are <b>the same model</b>, with the same ranking order &#8212; only the way the numbers are written differs. That is why the ROC-AUC column stays perfectly still while the other two jump around: proof that the three axes cannot replace each other. The red cell is the reverse case &#8212; a model that <em>learned nothing</em> still scores 0.970 accuracy just because positives are rare.</figcaption>
+</figure>
+
+  <ul class="why">
+    <li>The three axes break in three different ways, so <b>one number is never enough</b>: the <span class="mth">&#8730;<var>p</var></span> row catches all 148 positives (recall 1.000) but brings <b>2,588 false alarms</b> &#8212; F1 shows it, ROC-AUC does not.</li>
+    <li>Not every task needs all three: <b>if you only take the top-k, axis one is enough</b>; only probabilities that get multiplied by money need axis three.</li>
+    <li>Reading order: <a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a> &#8594; <a href="../roc-auc-pr/index.html">ROC-AUC &amp; PR curve</a> &#8594; <a href="../calibration/index.html">Probability calibration</a>.</li>
+  </ul>
+</section>
+
+<section id="evov-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Choosing a metric</h2></div>
+
+  <p class="key">Two questions settle most of the table: <em>what share of the data is positive, and where will this number go after it is reported.</em></p>
+
+  <table>
+    <tr><th>Situation</th><th>Main metric</th><th>Owner lesson</th></tr>
+    <tr><td>Balanced classification</td><td>Accuracy or ROC-AUC</td><td><a href="../roc-auc-pr/index.html">ROC-AUC &amp; PR curve</a></td></tr>
+    <tr><td><b>Rare positive class</b>, positives matter</td><td><strong>PR-AUC</strong> + precision/recall at the chosen threshold</td><td><a href="../roc-auc-pr/index.html">ROC-AUC &amp; PR curve</a></td></tr>
+    <tr><td>Real cost of FP and FN is known</td><td><strong>Expected cost</strong> — always the best when you have this information</td><td><a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a></td></tr>
+    <tr><td>Probabilities feed further computation</td><td>Log loss or Brier score, plus a reliability diagram</td><td><a href="../calibration/index.html">Probability calibration</a></td></tr>
+    <tr><td>Ranking, recommender systems</td><td>Precision@k, Recall@k, NDCG, MRR</td><td><a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a></td></tr>
+    <tr><td>Multiclass, with rare classes</td><td>Macro-F1</td><td><a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a></td></tr>
+    <tr><td>Regression</td><td>MAE if you care about the typical error · RMSE if large errors are very bad</td><td><a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a></td></tr>
+  </table>
+
+  <ul class="why">
+    <li>The middle column is the <b>main metric</b>, not the only one. One number plus a confusion matrix is the safest way to report.</li>
+    <li>The most common mistake is row two: <b>ROC-AUC still looks good when positives are rare</b> because FPR divides by a very large denominator.</li>
+    <li>Every number only means something when measured on data the model has not seen — leakage traps are in <a href="../../04-core-concepts/train-val-test-cv/index.html">Train, validation &amp; test</a>.</li>
+  </ul>
+</section>
+
+<section id="evov-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>From offline metrics to real impact</h2></div>
+
+  <p class="key">Every measure in this group is an <em>offline metric</em> — it measures the model, not the product.</p>
+
+  <div class="flow">
+    <div class="n"><h5>Metric offline</h5><p>AUC, F1, Brier &#8212; computed on the test set</p></div>
+    <div class="a act"><i>does it carry over?</i>&#8594;</div>
+    <div class="n"><h5>Product metric</h5><p>click rate, revenue, fraud cases blocked</p></div>
+    <div class="a act"><i>measure the gap</i>&#8594;</div>
+    <div class="n ok"><h5>A/B test</h5><p>is the gap real or just noise</p></div>
+  </div>
+
+  <ul class="why">
+    <li>The two ends <b>do not match automatically</b>: AUC goes up while the product does not budge — that is common.</li>
+    <li>What to do early: <b>check whether the offline metric correlates with the product metric</b>, before using it to pick models for months.</li>
+    <li>Proving a gap is real takes a completely different tool — see <a href="../../02-math-foundations/statistics/index.html#stats-s7">A/B testing</a>.</li>
+  </ul>
+
+  <div class="note key">
+    <h4>Start now</h4>
+    Next lesson: <a href="../metrics-confusion-matrix/index.html"><strong>Metric &amp; confusion matrix</strong></a> — four cells that produce every other number, with a lab that changes the threshold and class ratio so you see them move together.
+  </div>
+</section>
+
+<footer>Machine learning · Model evaluation · group map · three evaluation axes, three detailed lessons.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K-means &amp; clustering — MazeAI</title>
+<meta name="description" content="Iterate two steps around k centroids, pick k with the elbow and silhouette, and the four hidden assumptions that make it split wrongly when clusters are not round.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/07-clustering/kmeans-clustering/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="K-means &amp; clustering">
+<meta property="og:description" content="Iterate two steps around k centroids, pick k with the elbow and silhouette, and the four hidden assumptions that make it split wrongly when clusters are not round.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/07-clustering/kmeans-clustering/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-kmeans" data-title="K-means &amp; clustering" data-tag="ML" data-blurb="Iterate two steps around k centroids, pick k with the elbow and silhouette, and the four hidden assumptions that make it split wrongly when clusters are not round.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Clustering</p>
+  <h1>K-means &amp; <em>clustering</em></h1>
+  <p class="lede">The algorithm fits in ten lines of code. The real questions are <b>how to choose k</b> and <b>when its output is meaningless</b>.</p>
+</header>
+
+<section id="kmeans-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The lesson is the <em>five parts</em> below. Every later section redraws this map and highlights the box being studied.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 338" role="img" aria-label="five-part map of k-means: the problem, the two-step loop, inertia, choosing k, and three hidden assumptions">
+<rect x="0" y="26" width="340" height="56" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">group points into k</text>
+<text class="sv-d" x="13" y="79" fill="var(--dim)">no labels at all</text>
+<line x1="170.0" y1="82" x2="170.0" y2="92" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,100 165.8,92 174.2,92" fill="var(--rule-hi)"/>
+<rect x="0" y="104" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="124" fill="var(--dim)">② MECHANISM — 2 STEPS</text>
+<text class="sv-d" x="13" y="142" fill="var(--dim)">assign to nearest · move centroid</text>
+<line x1="170.0" y1="145" x2="170.0" y2="155" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,163 165.8,155 174.2,155" fill="var(--rule-hi)"/>
+<rect x="0" y="167" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="187" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="205" fill="var(--dim)">inertia — sum of squares to centroid</text>
+<line x1="170.0" y1="208" x2="170.0" y2="218" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,226 165.8,218 174.2,218" fill="var(--rule-hi)"/>
+<rect x="0" y="230" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="250" fill="var(--dim)">④ PICK k</text>
+<text class="sv-d" x="13" y="268" fill="var(--dim)">elbow · silhouette</text>
+<line x1="170.0" y1="271" x2="170.0" y2="281" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,289 165.8,281 174.2,281" fill="var(--rule-hi)"/>
+<rect x="0" y="293" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="313" fill="var(--dim)">⑤ HIDDEN ASSUMPTIONS</text>
+<text class="sv-d" x="13" y="331" fill="var(--dim)">round, even, dense</text>
+<text class="sv-hv" x="372" y="18">THE LESSON IN FIVE PARTS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">A two-step loop, repeated until stable</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">the simplest of all clustering algorithms</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">The price: 3 hidden assumptions</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">round, even-sized, no noise — few problems meet all three</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Know the assumptions, know when not to use it</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">and that is exactly where DBSCAN steps in</text>
+</svg>
+  <figcaption>Map of the whole lesson. Every later section redraws this figure and <strong>highlights the box being studied</strong>.</figcaption>
+  </figure>
+</section>
+
+<section id="kmeans-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>The problem it solves</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 338" role="img" aria-label="five-part map of k-means: the problem, the two-step loop, inertia, choosing k, and three hidden assumptions">
+<rect x="0" y="26" width="340" height="56" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">group points into k</text>
+<text class="sv-d" x="13" y="79" fill="var(--muted)">no labels at all</text>
+<line x1="170.0" y1="82" x2="170.0" y2="92" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,100 165.8,92 174.2,92" fill="var(--rule-hi)"/>
+<rect x="0" y="104" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="124" fill="var(--dim)">② MECHANISM — 2 STEPS</text>
+<text class="sv-d" x="13" y="142" fill="var(--dim)">assign to nearest · move centroid</text>
+<line x1="170.0" y1="145" x2="170.0" y2="155" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,163 165.8,155 174.2,155" fill="var(--rule-hi)"/>
+<rect x="0" y="167" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="187" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="205" fill="var(--dim)">inertia — sum of squares to centroid</text>
+<line x1="170.0" y1="208" x2="170.0" y2="218" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,226 165.8,218 174.2,218" fill="var(--rule-hi)"/>
+<rect x="0" y="230" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="250" fill="var(--dim)">④ PICK k</text>
+<text class="sv-d" x="13" y="268" fill="var(--dim)">elbow · silhouette</text>
+<line x1="170.0" y1="271" x2="170.0" y2="281" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,289 165.8,281 174.2,281" fill="var(--rule-hi)"/>
+<rect x="0" y="293" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="313" fill="var(--dim)">⑤ HIDDEN ASSUMPTIONS</text>
+<text class="sv-d" x="13" y="331" fill="var(--dim)">round, even, dense</text>
+<line x1="340" y1="54.0" x2="372" y2="54.0" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">THE CLUSTERING TASK</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">No labels to grade right or wrong</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">so there is no "right answer" — only a usable one</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">k must be set first</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">yet k is often the very thing we want to know</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Use for quick segmentation</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">customers, products, image regions — tight, separate</text>
+</svg>
+  <figcaption>Box ① — the clustering task.</figcaption>
+  </figure>
+
+
+  <p class="key">Nobody labels anything for you. <em>There is just a table of numbers, and the question "how many natural groups are in here".</em></p>
+
+  <p>Ten thousand customers, each with a few dozen numbers: age, purchase frequency, average order value, days since last purchase.</p>
+
+  <ul class="why">
+    <li>No column says <em>this is a loyal customer</em> or <em>this customer is about to leave</em> — if one did, it would already be a <a href="../../04-core-concepts/supervised-unsupervised/index.html">supervised</a> problem.</li>
+    <li>The job is to find out for yourself: <b>who is similar enough to be treated as one group</b>.</li>
+  </ul>
+
+  <div class="flow">
+    <div class="n"><h5>Table of numbers, no labels</h5><p>10,000 customers &#183; a few dozen columns</p></div>
+    <div class="a act"><i>assume</i>&#8594;</div>
+    <div class="n"><h5>Each group has a centroid</h5><p>one central point representing the whole group</p></div>
+    <div class="a act"><i>so</i>&#8594;</div>
+    <div class="n ok"><h5>Each customer belongs to the nearest centroid</h5><p>the assignment rule, nothing more</p></div>
+  </div>
+  <p>The whole algorithm is just finding those k centroids.</p>
+
+  <ul class="why">
+    <li>The input is <b>k</b> — the number of clusters — which a person must set in advance. It is both the biggest weakness and the reason it runs fast.</li>
+    <li>The output is <b>one cluster label per point</b> plus k centroid coordinates. The centroid is the group's "average customer".</li>
+    <li>There is no right answer to compare against, so <b>there is no accuracy</b>. Every measure here is indirect — see section 03.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Mechanism — a two-step loop</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 338" role="img" aria-label="five-part map of k-means: the problem, the two-step loop, inertia, choosing k, and three hidden assumptions">
+<rect x="0" y="26" width="340" height="56" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">group points into k</text>
+<text class="sv-d" x="13" y="79" fill="var(--dim)">no labels at all</text>
+<line x1="170.0" y1="82" x2="170.0" y2="92" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,100 165.8,92 174.2,92" fill="var(--rule-hi)"/>
+<rect x="0" y="104" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="124" fill="var(--probe)">② MECHANISM — 2 STEPS</text>
+<text class="sv-d" x="13" y="142" fill="var(--muted)">assign to nearest · move centroid</text>
+<line x1="170.0" y1="145" x2="170.0" y2="155" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,163 165.8,155 174.2,155" fill="var(--rule-hi)"/>
+<rect x="0" y="167" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="187" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="205" fill="var(--dim)">inertia — sum of squares to centroid</text>
+<line x1="170.0" y1="208" x2="170.0" y2="218" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,226 165.8,218 174.2,218" fill="var(--rule-hi)"/>
+<rect x="0" y="230" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="250" fill="var(--dim)">④ PICK k</text>
+<text class="sv-d" x="13" y="268" fill="var(--dim)">elbow · silhouette</text>
+<line x1="170.0" y1="271" x2="170.0" y2="281" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,289 165.8,281 174.2,281" fill="var(--rule-hi)"/>
+<rect x="0" y="293" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="313" fill="var(--dim)">⑤ HIDDEN ASSUMPTIONS</text>
+<text class="sv-d" x="13" y="331" fill="var(--dim)">round, even, dense</text>
+<line x1="340" y1="124.5" x2="372" y2="124.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">TWO STEPS, LOOP UNTIL STABLE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Assign: each point to nearest centroid</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">Euclidean distance, so standardize first</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Update: centroid to its cluster's mean</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">the literal "means" in the name</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Loop until no point changes cluster</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">always stops, but maybe in a local min</text>
+</svg>
+  <figcaption>Box ② — two steps, looped until stable.</figcaption>
+  </figure>
+
+
+  <p class="key">Assign points to the nearest centroid, then move each centroid to the middle of the points it just got. <em>Repeat until nobody changes cluster.</em></p>
+
+  <div class="flow">
+    <div class="n"><h5>k initial centroids</h5><p>k-means++ picks them smartly instead of at random</p></div>
+    <div class="a act"><i>assign each point to the nearest centroid</i>&#8594;</div>
+    <div class="n"><h5>Every point has a cluster</h5><p>by Euclidean distance</p></div>
+    <div class="a act"><i>move centroids to the cluster mean</i>&#8594;</div>
+    <div class="n"><h5>k new centroids</h5><p>repeat from the assign step</p></div>
+    <div class="a act"><i>until no point changes cluster</i>&#8635;</div>
+    <div class="n ok"><h5>Converged</h5><p>usually under 20 rounds</p></div>
+  </div>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>Inertia</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>&#931; &#8214; <var>x</var>&#8339; &#8722; <var>&#956;</var><sub><var>c</var>(<var>i</var>)</sub> &#8214;&#178;</span><em>sum of squared distances to each point's own centroid</em></span>
+    </div>
+    <p class="read">The <b>assign</b> step holds μ fixed and chooses c(i) to reduce inertia. The <b>update</b> step holds c fixed and chooses μ to reduce inertia.</p>
+  </div>
+
+  <p>Because each step can only lower inertia or keep it the same, and the number of possible partitions is finite, the algorithm <b>is guaranteed to stop</b>.</p>
+  <p>But where it stops is only a local minimum, not the best partition — just as the <a href="../../02-math-foundations/calculus/index.html">calculus</a> lesson said about non-convex functions.</p>
+
+  <ul class="why">
+    <li>That is why libraries <b>rerun it many times with different initializations</b> and keep the run with the lowest inertia. Do not lower <code>n_init</code> to 1.</li>
+    <li><b>k-means++</b> picks initial centroids far apart instead of at random. Cheap, and less likely to land in a bad minimum — it is now the default.</li>
+    <li>Each round costs <b>O(n · k · d)</b> — the reason k-means survives even though better algorithms exist.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Loss function</h2></div>
+  <p class="key">k-means <em>does</em> have a loss function you can write down — <b>inertia</b> — and the two steps in the previous section are just a way of lowering it.</p>
+
+  <figure>
+<svg viewBox="0 0 860 838" role="img" aria-label="The k-means loss function inertia, both loop steps lower inertia, a table of inertia by k showing the elbow at k equals 4, and a table of 50 initializations showing the algorithm still gets stuck in bad minima">
+<text class="sv-hv" x="0" y="18">THE K-MEANS LOSS FUNCTION — ONE LINE, AND THE 2 STEPS JUST LOWER IT</text>
+<text class="sv-n" x="0" y="86" fill="var(--muted)">inertia  =</text>
+<rect x="112" y="60" width="300" height="38" rx="5" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.3"/>
+<text class="sv-n" x="262" y="85" fill="var(--filled)" text-anchor="middle">Σ  ‖ x  −  μ(x) ‖²</text>
+<text class="sv-d" x="112" y="118" fill="var(--filled)">how far each point is from its cluster's centroid — squared, summed</text>
+<text class="sv-hv" x="0" y="154">TWO LOOP STEPS — EACH CAN ONLY LOWER inertia, NEVER RAISE IT</text>
+<rect x="0" y="176" width="400" height="66" rx="5" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.3"/>
+<text class="sv-d" x="14" y="200" fill="var(--probe)">① assign to nearest centroid</text>
+<text class="sv-d" x="14" y="220" fill="var(--muted)">centroids fixed, labels change — each point picks the nearest, so its</text>
+<text class="sv-d" x="14" y="236" fill="var(--muted)">term shrinks</text>
+<rect x="440" y="176" width="400" height="66" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.3"/>
+<text class="sv-d" x="454" y="200" fill="var(--ok)">② move centroid to the mean</text>
+<text class="sv-d" x="454" y="220" fill="var(--muted)">labels fixed, centroids move — the mean minimizes the sum of</text>
+<text class="sv-d" x="454" y="236" fill="var(--muted)">squares</text>
+<text class="sv-s" x="0" y="264" fill="var(--dim)">Since neither step increases it and the number of partitions is finite, the algorithm must stop. But no one promises which minimum —</text>
+<text class="sv-s" x="0" y="282" fill="var(--dim)">that is what the tables say.</text>
+<line x1="0" y1="306" x2="860" y2="306" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0" y="330">MEASURED · 600 points · 4 real round clusters · best of 10 runs</text>
+<text class="sv-s" x="0" y="356" fill="var(--dim)">k</text>
+<text class="sv-s" x="40" y="356" fill="var(--dim)">inertia</text>
+<text class="sv-n" x="0" y="382" fill="var(--muted)">1</text>
+<text class="sv-n" x="40" y="382" fill="var(--muted)">11,547.2</text>
+<rect x="150" y="371" width="400.0" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<text class="sv-n" x="0" y="406" fill="var(--muted)">2</text>
+<text class="sv-n" x="40" y="406" fill="var(--muted)">5,889.7</text>
+<rect x="150" y="395" width="204.02175419149228" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<text class="sv-n" x="0" y="430" fill="var(--muted)">3</text>
+<text class="sv-n" x="40" y="430" fill="var(--muted)">3,220.7</text>
+<rect x="150" y="419" width="111.56644034917555" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<rect x="0" y="439" width="600" height="22" rx="3" fill="none" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-n" x="0" y="454" fill="var(--ok)">4</text>
+<text class="sv-n" x="40" y="454" fill="var(--ok)">982.6</text>
+<rect x="150" y="443" width="34.0376887903561" height="14" rx="2" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="0"/>
+<text class="sv-n" x="0" y="478" fill="var(--muted)">5</text>
+<text class="sv-n" x="40" y="478" fill="var(--muted)">884.6</text>
+<rect x="150" y="467" width="30.642926423721768" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<text class="sv-n" x="0" y="502" fill="var(--muted)">6</text>
+<text class="sv-n" x="40" y="502" fill="var(--muted)">801.6</text>
+<rect x="150" y="491" width="27.76777054177636" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<text class="sv-n" x="0" y="526" fill="var(--muted)">7</text>
+<text class="sv-n" x="40" y="526" fill="var(--muted)">713.9</text>
+<rect x="150" y="515" width="24.729804627961755" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<text class="sv-n" x="0" y="550" fill="var(--muted)">8</text>
+<text class="sv-n" x="40" y="550" fill="var(--muted)">626.3</text>
+<rect x="150" y="539" width="21.69530275737841" height="14" rx="2" fill="rgba(var(--blue-a),.30)" stroke="var(--rule-hi)" stroke-width="0"/>
+<text class="sv-d" x="614" y="454" fill="var(--ok)">← elbow</text>
+<text class="sv-d" x="614" y="478" fill="var(--muted)">a 5th cluster only saves 98</text>
+<text class="sv-s" x="0" y="584" fill="var(--dim)">inertia ALWAYS falls as k grows — with k equal to the number of points it is 0. So k cannot be chosen by minimizing it; the elbow</text>
+<text class="sv-s" x="0" y="602" fill="var(--dim)">(3,220 → 982 then levels off) is the signal.</text>
+<line x1="0" y1="630" x2="860" y2="630" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0" y="654">SAME k = 4, RUN 50 TIMES, DIFFERENT INITS</text>
+<text class="sv-s" x="0" y="680" fill="var(--dim)">initial centroid choice</text>
+<text class="sv-s" x="220" y="680" fill="var(--dim)">best run</text>
+<text class="sv-s" x="360" y="680" fill="var(--dim)">worst run</text>
+<text class="sv-s" x="500" y="680" fill="var(--dim)">runs stuck in bad min</text>
+<rect x="0" y="692" width="660" height="23" rx="3" fill="none" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-d" x="0" y="708" fill="var(--tomb)">random</text>
+<text class="sv-n" x="220" y="708" fill="var(--tomb)">982.6</text>
+<text class="sv-n" x="360" y="708" fill="var(--tomb)">3,125.3</text>
+<text class="sv-n" x="500" y="708" fill="var(--tomb)">3 / 50</text>
+<rect x="0" y="718" width="660" height="23" rx="3" fill="none" stroke="var(--probe)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-d" x="0" y="734" fill="var(--probe)">k-means++</text>
+<text class="sv-n" x="220" y="734" fill="var(--probe)">982.6</text>
+<text class="sv-n" x="360" y="734" fill="var(--probe)">3,125.3</text>
+<text class="sv-n" x="500" y="734" fill="var(--probe)">2 / 50</text>
+<text class="sv-s" x="0" y="772" fill="var(--dim)">Same loss function, same data, yet results differ by over 3× — inertia is non-convex, so it just slides into the nearest minimum.</text>
+<text class="sv-s" x="0" y="790" fill="var(--dim)">k-means++ spreads the initial centroids apart, which helps but does not fix it: the only sure way is many runs, keeping the lowest</text>
+<text class="sv-s" x="0" y="808" fill="var(--dim)">inertia (n_init).</text>
+</svg>
+    <figcaption>One formula, two loop steps, and two places where it still breaks: choosing k and initialization.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>Both steps can only lower inertia.</b> The assign step holds the centroids fixed and lets each point pick the nearest one, so its term shrinks. The update step holds the labels fixed and puts the centroid at the cluster mean — exactly the point that minimizes the sum of squares. The number of partitions is finite, so the algorithm is guaranteed to stop.</li>
+    <li><b>But inertia is non-convex, so no one promises where it stops.</b> Measured on 600 points with 4 real clusters, 50 runs with <span class="mth"><var>k</var> = 4</span>: best run 982.6, worst run 3,125.3 — over three times apart on the same data. k-means++ only cuts the stuck runs from 3/50 to 2/50; it does not eliminate them. The only sure fix is a large <code>n_init</code>.</li>
+    <li><b>Do not use inertia itself to choose k.</b> It always falls as <span class="mth"><var>k</var></span> rises — with <span class="mth"><var>k</var></span> equal to the number of points it is 0. In the table, 3,220 drops to 982 at <span class="mth"><var>k</var> = 4</span> and then levels off (884, 801, 713): the <em>break</em> is the signal, not the smallest value. The next section covers a score with a real maximum.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Choosing k</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 338" role="img" aria-label="five-part map of k-means: the problem, the two-step loop, inertia, choosing k, and three hidden assumptions">
+<rect x="0" y="26" width="340" height="56" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">group points into k</text>
+<text class="sv-d" x="13" y="79" fill="var(--dim)">no labels at all</text>
+<line x1="170.0" y1="82" x2="170.0" y2="92" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,100 165.8,92 174.2,92" fill="var(--rule-hi)"/>
+<rect x="0" y="104" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="124" fill="var(--dim)">② MECHANISM — 2 STEPS</text>
+<text class="sv-d" x="13" y="142" fill="var(--dim)">assign to nearest · move centroid</text>
+<line x1="170.0" y1="145" x2="170.0" y2="155" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,163 165.8,155 174.2,155" fill="var(--rule-hi)"/>
+<rect x="0" y="167" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="187" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="205" fill="var(--dim)">inertia — sum of squares to centroid</text>
+<line x1="170.0" y1="208" x2="170.0" y2="218" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,226 165.8,218 174.2,218" fill="var(--rule-hi)"/>
+<rect x="0" y="230" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="250" fill="var(--ok)">④ PICK k</text>
+<text class="sv-d" x="13" y="268" fill="var(--muted)">elbow · silhouette</text>
+<line x1="170.0" y1="271" x2="170.0" y2="281" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,289 165.8,281 174.2,281" fill="var(--rule-hi)"/>
+<rect x="0" y="293" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="313" fill="var(--dim)">⑤ HIDDEN ASSUMPTIONS</text>
+<text class="sv-d" x="13" y="331" fill="var(--dim)">round, even, dense</text>
+<line x1="340" y1="250.5" x2="372" y2="250.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HOW TO PICK k</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Elbow: where inertia stops falling fast</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">read by eye, so often vague</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Silhouette: own cluster vs the next one</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">a concrete number to compare, beats elbow</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Or k comes from the task</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">need 5 marketing segments? k = 5, no measuring</text>
+</svg>
+  <figcaption>Box ④ — how to choose k.</figcaption>
+  </figure>
+
+
+  <p class="key">Inertia always falls as <span class="mth"><var>k</var></span> grows — at <span class="mth"><var>k</var> = <var>n</var></span> it is 0. <em>So you cannot choose k by looking for the smallest inertia.</em></p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Elbow — look for the break</h5>
+      <p>Plot inertia against k. The point where the curve <b>bends like an elbow</b> is a candidate.</p>
+      <p><b>The problem:</b> a lot of real data gives a smooth curve with no clear elbow. Then the elbow answers nothing.</p>
+    </div>
+    <div>
+      <h5>Silhouette — score every point</h5>
+      <p>For each point: <span class="mth"><span class="frac"><i><var>b</var> − <var>a</var></i><i><b class="fn">max</b>(<var>a</var>, <var>b</var>)</i></span></span>, where <b>a</b> is the mean distance to its own cluster and <b>b</b> to the nearest other cluster.</p>
+      <p>From <b>−1 to 1</b>. Near 1 means sitting snugly in its own cluster; negative means <b>it is assigned to the wrong cluster</b>.</p>
+    </div>
+  </div>
+
+  <div class="bars">
+    <div class="b bad"><i><span class="mth"><var>k</var> = 2</span></i><u style="width:41%"></u><b>silhouette 0.41</b></div>
+    <div class="b hi"><i><span class="mth"><var>k</var> = 3</span></i><u style="width:68%"></u><b>0.68 ← highest</b></div>
+    <div class="b"><i><span class="mth"><var>k</var> = 4</span></i><u style="width:52%"></u><b>0.52</b></div>
+    <div class="b"><i><span class="mth"><var>k</var> = 5</span></i><u style="width:44%"></u><b>0.44</b></div>
+  </div>
+  <p class="stripnote"><span>silhouette has a real peak</span><span><em>pick k at the peak, not at the tail</em></span></p>
+
+  <ul class="why">
+    <li>Silhouette <b>has a maximum</b>, so it can be chosen automatically, unlike inertia. This is the default measure to use.</li>
+    <li>But it <b>favors round clusters</b>: arc-shaped clusters score low even when split correctly. Do not use it to compare k-means with DBSCAN.</li>
+    <li>Often <b>business constraints choose k</b>: if marketing can run three campaigns, <span class="mth"><var>k</var> = 3</span>, even if silhouette says 7.</li>
+  </ul>
+
+  <div class="stack">
+    <div class="s"><b>Silhouette</b><span>higher is better, range [−1, 1] — the easiest to understand</span></div>
+    <div class="s"><b>Davies–Bouldin</b><span>lower is better, faster to compute on large data</span></div>
+    <div class="s"><b>Calinski–Harabasz</b><span>higher is better, but it grows with k, so look at the shape rather than taking the maximum</span></div>
+  </div>
+  <p class="stripnote"><span>all three measure whether clusters are tight and separate</span><span><em>none measures whether the split means anything</em></span></p>
+</section>
+
+<section id="kmeans-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>The hidden assumptions of k-means</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 338" role="img" aria-label="five-part map of k-means: the problem, the two-step loop, inertia, choosing k, and three hidden assumptions">
+<rect x="0" y="26" width="340" height="56" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">group points into k</text>
+<text class="sv-d" x="13" y="79" fill="var(--dim)">no labels at all</text>
+<line x1="170.0" y1="82" x2="170.0" y2="92" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,100 165.8,92 174.2,92" fill="var(--rule-hi)"/>
+<rect x="0" y="104" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="124" fill="var(--dim)">② MECHANISM — 2 STEPS</text>
+<text class="sv-d" x="13" y="142" fill="var(--dim)">assign to nearest · move centroid</text>
+<line x1="170.0" y1="145" x2="170.0" y2="155" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,163 165.8,155 174.2,155" fill="var(--rule-hi)"/>
+<rect x="0" y="167" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="187" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="205" fill="var(--dim)">inertia — sum of squares to centroid</text>
+<line x1="170.0" y1="208" x2="170.0" y2="218" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,226 165.8,218 174.2,218" fill="var(--rule-hi)"/>
+<rect x="0" y="230" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="250" fill="var(--dim)">④ PICK k</text>
+<text class="sv-d" x="13" y="268" fill="var(--dim)">elbow · silhouette</text>
+<line x1="170.0" y1="271" x2="170.0" y2="281" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,289 165.8,281 174.2,281" fill="var(--rule-hi)"/>
+<rect x="0" y="293" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="313" fill="var(--tomb)">⑤ HIDDEN ASSUMPTIONS</text>
+<text class="sv-d" x="13" y="331" fill="var(--muted)">round, even, dense</text>
+<line x1="340" y1="313.5" x2="372" y2="313.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">3 HIDDEN ASSUMPTIONS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Round, equal clusters</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">centroid + Euclid ⇒ the boundary is always a straight bisector</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Every point must be in one</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">no notion of noise — outliers drag centroids</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Clusters of similar size</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">a big cluster eats a small neighbor</text>
+</svg>
+  <figcaption>Box ⑤ — three hidden assumptions.</figcaption>
+  </figure>
+
+
+  <p class="key">K-means never raises an error. <em>If the clusters have the wrong shape, it still returns a split that looks very confident.</em></p>
+
+  <div class="stack">
+    <div class="s warn"><b>Clusters are <b>round</b>, spread evenly around the centroid</b><span>breaks on long ellipses, C shapes, two concentric rings → cuts across real clusters, splitting what should be one</span></div>
+    <div class="s warn"><b>Clusters are <b>of similar size</b></b><span>breaks when a 9,000-point cluster sits next to a 200-point one → the big cluster is torn in two, the small one swallowed</span></div>
+    <div class="s warn"><b>Clusters have <b>similar density</b></b><span>breaks when a dense region sits next to a sparse one → the boundary gets pushed toward the sparse region</span></div>
+    <div class="s warn"><b><b>Every point belongs to a cluster</b></b><span>breaks when the data has real outliers → outliers drag the centroids off, and there is no notion of a "noise point"</span></div>
+  </div>
+
+  <ul class="why">
+    <li><b>Standardizing the scales first is mandatory.</b> Euclidean distance adds up the differences in every column — a salary column drowns out an age column, just like <a href="../../05-classical-ml/knn/index.html">KNN</a>.</li>
+    <li>In high dimensions all distances <b>draw close together</b> and "nearest" loses its meaning. Reduce dimensions with PCA before clustering.</li>
+    <li>When an assumption breaks, change the algorithm family rather than tuning parameters: arbitrary shapes, noise → <a href="../dbscan/index.html">DBSCAN</a>; overlapping → Gaussian Mixture.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Pros and cons</h2></div>
+
+  <p class="key">Every strength of k-means comes from <em>keeping only <var>k</var> centroids</em>. Every weakness comes from exactly the same place.</p>
+
+  <table>
+    <tr><th>Aspect</th><th>Pros</th><th>Cons</th></tr>
+    <tr><td>Speed</td><td>Linear in the number of points &#8212; runs on millions of rows</td><td>&#8212;</td></tr>
+    <tr><td>Model</td><td>Compact: only <var>k</var> centroid coordinates, assigning a new point is one distance comparison</td><td>&#8212;</td></tr>
+    <tr><td>Results</td><td>&#8212;</td><td>Depends on initialization, each run is different</td></tr>
+    <tr><td>Cluster shape</td><td>&#8212;</td><td>Only finds round clusters of similar size and density</td></tr>
+    <tr><td>Noise</td><td>&#8212;</td><td>No notion of a noise point &#8212; outliers drag centroids off</td></tr>
+    <tr><td>Preparation</td><td>&#8212;</td><td>Must set <var>k</var> in advance, and standardizing scales is mandatory</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Choose k-means when the data is <b>large</b> and the clusters are <b>fairly well separated</b>: customer segmentation, image color quantization, grouping vectors to build an index.</li>
+    <li>When the assumptions above break, change the algorithm family rather than tuning parameters: arbitrary shapes, noise &#8594; <a href="../dbscan/index.html">DBSCAN</a>.</li>
+    <li>Always run it many times with different initializations (<code>n_init</code>) and keep the run with the lowest inertia.</li>
+  </ul>
+</section>
+
+<section id="kmeans-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Common mistakes</h2></div>
+
+  <p class="key">Most mistakes do not make the program crash — they produce a result that looks reasonable but is meaningless.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Not standardizing the scales</h4><p>The column with the biggest unit decides the whole split. The most common mistake, and the most silent.</p></div>
+    <div class="card bad"><h4>Feeding one-hot categorical variables in directly</h4><p>The distance between two one-hot values is always <span class="mth">√2</span>, carrying no information. You need k-prototypes or a different encoding.</p></div>
+    <div class="card bad"><h4>Choosing k by the smallest inertia</h4><p>Always picks the largest k tried. Inertia is only for looking at the shape of the curve.</p></div>
+    <div class="card bad"><h4>Setting <code>n_init=1</code> to save time</h4><p>One bad initialization gives one bad result, and nothing tells you.</p></div>
+    <div class="card bad"><h4>Naming a cluster and believing it</h4><p>Call cluster 2 "VIP customers" and from then on everyone treats it as fact. Check it against outside data first.</p></div>
+    <div class="card bad"><h4>Comparing clusters across two runs by their index</h4><p>Cluster labels are arbitrary numbers — cluster 0 this run may be cluster 2 next run. Match them by centroid.</p></div>
+  </div>
+</section>
+
+
+<footer>Machine learning · Clustering · the group's foundation lesson; for non-round clusters go to <a href="../dbscan/index.html">DBSCAN</a>, the map of the four families is in <a href="../clustering-overview/index.html">Clustering overview</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

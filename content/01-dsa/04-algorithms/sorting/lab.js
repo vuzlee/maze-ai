@@ -1,7 +1,7 @@
 (function () {
-/* ---------------- lab: sáu thuật toán sort trên cùng một mảng ----------------
-   Mỗi cột là một phần tử có danh tính riêng: nó trượt sang chỗ mới chứ không
-   biến mất rồi hiện lại, nên mắt theo được đúng cái đang bị di chuyển.        */
+/* ---------------- lab: six sorting algorithms on the same array ----------------
+   Each bar is an element with its own identity: it slides to its new place rather
+   than vanishing and reappearing, so the eye can follow exactly what is moving. */
 
 var el = function (id) { return document.getElementById(id); };
 
@@ -10,21 +10,21 @@ var DATA = {
   sorted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
   rev:    [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
 };
-var SCEN = [["rand", "lộn xộn"], ["sorted", "đã sắp sẵn"], ["rev", "đảo ngược"]];
-var SPEED = [["chậm", 620], ["vừa", 300], ["nhanh", 130]];
+var SCEN = [["rand", "shuffled"], ["sorted", "already sorted"], ["rev", "reversed"]];
+var SPEED = [["slow", 620], ["medium", 300], ["fast", 130]];
 
 var ALGO = {
-  bub: { name: "Bubble",    idea: "đổi chỗ hai cái kề nhau cho tới khi hết sai", mem: "O(1)",     run: rBubble },
-  sel: { name: "Selection", idea: "mỗi vòng quét tìm cái nhỏ nhất, đem ra đầu",  mem: "O(1)",     run: rSelect },
-  ins: { name: "Insertion", idea: "lấy từng cái, lùi về cắm vào đúng chỗ",       mem: "O(1)",     run: rInsert },
-  mer: { name: "Merge",     idea: "trộn từng cặp đoạn đã sắp, đoạn dài dần lên", mem: "O(n)",     run: rMerge  },
-  qui: { name: "Quick",     idea: "chọn chốt, dồn nhỏ sang trái lớn sang phải",  mem: "O(log n)", run: rQuick  },
-  hea: { name: "Heap",      idea: "dựng heap rồi rút dần cái lớn nhất về cuối",  mem: "O(1)",     run: rHeap   }
+  bub: { name: "Bubble",    idea: "swap adjacent pairs until nothing is out of order", mem: "O(1)",     run: rBubble },
+  sel: { name: "Selection", idea: "each round scan for the smallest, move it to the front",  mem: "O(1)",     run: rSelect },
+  ins: { name: "Insertion", idea: "take each one, step back and slot it into place",       mem: "O(1)",     run: rInsert },
+  mer: { name: "Merge",     idea: "merge pairs of sorted runs, runs keep growing", mem: "O(n)",     run: rMerge  },
+  qui: { name: "Quick",     idea: "pick a pivot, push smaller left and larger right",  mem: "O(log n)", run: rQuick  },
+  hea: { name: "Heap",      idea: "build a heap, then move the largest to the end, one by one",  mem: "O(1)",     run: rHeap   }
 };
 
-/* ---------------- bộ sinh bước ----------------
-   Phần tử là {v, id}: id không đổi suốt cả lượt chạy, nhờ đó khi vẽ biết
-   cột nào vừa đi từ đâu tới đâu. Mỗi bước là một ảnh chụp thứ tự các id.   */
+/* ---------------- step generator ----------------
+   An element is {v, id}: the id never changes during a run, so when drawing we know
+   which bar just moved from where to where. Each step is a snapshot of the id order. */
 
 function Rec(vals) {
   var self = {
@@ -40,7 +40,7 @@ function Rec(vals) {
         hi:   o.hi   || [],
         lift: o.lift || [],
         pin:  o.pin === undefined ? -1 : o.pin,
-        cold: o.cold || null,          /* [từ, tới) — phần ngoài cuộc lúc này */
+        cold: o.cold || null,          /* [from, to) — the part currently out of play */
         done: Object.keys(self.done).map(Number),
         cmp: self.cmp, swp: self.swp, ph: o.ph || ""
       });
@@ -50,11 +50,11 @@ function Rec(vals) {
 
     allDone: function () {
       for (var i = 0; i < self.a.length; i++) self.done[i] = 1;
-      self.snap({ ph: "xong — mảng đã sắp" });
+      self.snap({ ph: "done — the array is sorted" });
       return self.F;
     }
   };
-  self.snap({ ph: "mảng ban đầu" });
+  self.snap({ ph: "initial array" });
   return self;
 }
 
@@ -64,16 +64,16 @@ function rBubble(vals) {
     var moved = false;
     for (var j = 0; j < n - i - 1; j++) {
       r.cmp++;
-      r.snap({ hi: [j, j + 1], ph: "so " + r.v(j) + " với " + r.v(j + 1) });
+      r.snap({ hi: [j, j + 1], ph: "compare " + r.v(j) + " with " + r.v(j + 1) });
       if (r.v(j) > r.v(j + 1)) {
         var big = r.v(j);
         r.swap(j, j + 1); moved = true;
-        r.snap({ hi: [j, j + 1], lift: [j + 1], ph: big + " lớn hơn → đổi chỗ, nó trôi thêm một ô về phải" });
+        r.snap({ hi: [j, j + 1], lift: [j + 1], ph: big + " is larger → swap, it drifts one cell right" });
       }
     }
     r.done[n - i - 1] = 1;
-    r.snap({ ph: "cái lớn nhất còn lại đã nổi tới cuối — chốt ô đó lại" });
-    if (!moved) { r.snap({ ph: "một lượt không phải đổi chỗ lần nào → dừng sớm" }); break; }
+    r.snap({ ph: "the largest remaining has bubbled to the end — lock that cell" });
+    if (!moved) { r.snap({ ph: "a full pass with no swaps → stop early" }); break; }
   }
   return r.allDone();
 }
@@ -82,19 +82,19 @@ function rSelect(vals) {
   var r = Rec(vals), n = r.a.length;
   for (var i = 0; i < n - 1; i++) {
     var m = i;
-    r.snap({ hi: [i], pin: m, ph: "quét cả phần chưa sắp để tìm cái nhỏ nhất" });
+    r.snap({ hi: [i], pin: m, ph: "scan the whole unsorted part for the smallest" });
     for (var j = i + 1; j < n; j++) {
       r.cmp++;
-      r.snap({ hi: [j], pin: m, ph: "so " + r.v(j) + " với nhỏ nhất đang giữ là " + r.v(m) });
-      if (r.v(j) < r.v(m)) { m = j; r.snap({ hi: [j], pin: m, ph: r.v(m) + " nhỏ hơn → đổi mốc sang đây" }); }
+      r.snap({ hi: [j], pin: m, ph: "compare " + r.v(j) + " with the smallest held, " + r.v(m) });
+      if (r.v(j) < r.v(m)) { m = j; r.snap({ hi: [j], pin: m, ph: r.v(m) + " is smaller → move the marker here" }); }
     }
     if (m !== i) {
       var sm = r.v(m);
       r.swap(i, m);
-      r.snap({ hi: [i, m], lift: [i], ph: "đem " + sm + " về đầu phần chưa sắp" });
+      r.snap({ hi: [i, m], lift: [i], ph: "move " + sm + " to the front of the unsorted part" });
     }
     r.done[i] = 1;
-    r.snap({ ph: "quét hết cả đoạn mới đổi đúng một lần" });
+    r.snap({ ph: "scan the whole range, then swap exactly once" });
   }
   return r.allDone();
 }
@@ -102,23 +102,23 @@ function rSelect(vals) {
 function rInsert(vals) {
   var r = Rec(vals), n = r.a.length;
   r.done[0] = 1;
-  r.snap({ ph: "coi ô đầu tiên là đoạn đã sắp, dài đúng một ô" });
+  r.snap({ ph: "treat the first cell as a sorted run of length one" });
   for (var i = 1; i < n; i++) {
     var x = r.v(i), j = i;
-    r.snap({ hi: [i], lift: [i], ph: "cầm " + x + " lên, lùi về trái tìm chỗ cắm" });
+    r.snap({ hi: [i], lift: [i], ph: "pick up " + x + ", step left to find its slot" });
     while (j > 0) {
       r.cmp++;
-      r.snap({ hi: [j - 1, j], lift: [j], ph: "so " + x + " đang cầm với " + r.v(j - 1) + " bên trái" });
+      r.snap({ hi: [j - 1, j], lift: [j], ph: "compare the held " + x + " with " + r.v(j - 1) + " on the left" });
       if (r.v(j - 1) > x) {
         r.swap(j - 1, j); j--;
-        r.snap({ hi: [j, j + 1], lift: [j], ph: r.v(j + 1) + " lớn hơn → " + x + " bước qua nó sang trái" });
+        r.snap({ hi: [j, j + 1], lift: [j], ph: r.v(j + 1) + " is larger → " + x + " steps past it to the left" });
       } else {
-        r.snap({ hi: [j - 1, j], lift: [j], ph: r.v(j - 1) + " nhỏ hơn rồi → dừng, đây là chỗ của " + x });
+        r.snap({ hi: [j - 1, j], lift: [j], ph: r.v(j - 1) + " is smaller → stop, this is " + x + "'s place" });
         break;
       }
     }
     for (var d = 0; d <= i; d++) r.done[d] = 1;
-    r.snap({ ph: "đoạn đã sắp dài thêm một ô, giờ là " + (i + 1) + " ô" });
+    r.snap({ ph: "the sorted run grew by one cell, now " + (i + 1) + " cells" });
   }
   return r.allDone();
 }
@@ -131,16 +131,16 @@ function rMerge(vals) {
       if (mid >= hi) continue;
       var seg = [];
       for (var q = lo; q < hi; q++) seg.push(q);
-      r.snap({ hi: seg, cold: [lo, hi], ph: "hai đoạn dài " + w + " này đều đã sắp sẵn → trộn lại" });
+      r.snap({ hi: seg, cold: [lo, hi], ph: "these two runs of length " + w + " are both sorted → merge them" });
       var i = lo, j = mid, k = lo;
       while (i < mid && j < hi) { r.cmp++; buf[k++] = (r.a[i].v <= r.a[j].v) ? r.a[i++] : r.a[j++]; }
       while (i < mid) buf[k++] = r.a[i++];
       while (j < hi)  buf[k++] = r.a[j++];
       for (var t = lo; t < hi; t++) { r.a[t] = buf[t]; r.swp++; }
-      r.snap({ hi: seg, cold: [lo, hi], ph: "mỗi lần chỉ so hai cái đầu hai đoạn → ra đoạn dài " + (hi - lo) + " đã sắp" });
+      r.snap({ hi: seg, cold: [lo, hi], ph: "each step compares only the two run heads → a sorted run of length " + (hi - lo) });
     }
     if (w * 2 >= n) for (var d = 0; d < n; d++) r.done[d] = 1;
-    r.snap({ ph: "hết một vòng — các đoạn sắp sẵn dài gấp đôi, còn " + Math.ceil(n / (2 * w)) + " đoạn" });
+    r.snap({ ph: "round done — sorted runs doubled in length, " + Math.ceil(n / (2 * w)) + " runs left" });
   }
   return r.allDone();
 }
@@ -150,19 +150,19 @@ function rQuick(vals) {
   while (st.length) {
     var s = st.pop(), lo = s[0], hi = s[1];
     if (lo > hi) continue;
-    if (lo === hi) { r.done[lo] = 1; r.snap({ hi: [lo], cold: [lo, hi + 1], ph: "đoạn còn đúng một ô → xong" }); continue; }
+    if (lo === hi) { r.done[lo] = 1; r.snap({ hi: [lo], cold: [lo, hi + 1], ph: "one cell left in the range → done" }); continue; }
     var p = r.v(hi), i = lo;
-    r.snap({ pin: hi, cold: [lo, hi + 1], ph: "lấy " + p + " ở cuối đoạn làm chốt" });
+    r.snap({ pin: hi, cold: [lo, hi + 1], ph: "take " + p + " at the end of the range as the pivot" });
     for (var j = lo; j < hi; j++) {
       r.cmp++;
-      r.snap({ hi: [j], pin: hi, cold: [lo, hi + 1], ph: "so " + r.v(j) + " với chốt " + p });
+      r.snap({ hi: [j], pin: hi, cold: [lo, hi + 1], ph: "compare " + r.v(j) + " with pivot " + p });
       if (r.v(j) < p) {
-        if (i !== j) { var mv = r.v(j); r.swap(i, j); r.snap({ hi: [i, j], lift: [i], pin: hi, cold: [lo, hi + 1], ph: mv + " nhỏ hơn chốt → đẩy về bên trái" }); }
+        if (i !== j) { var mv = r.v(j); r.swap(i, j); r.snap({ hi: [i, j], lift: [i], pin: hi, cold: [lo, hi + 1], ph: mv + " is smaller than the pivot → push it left" }); }
         i++;
       }
     }
     r.swap(i, hi); r.done[i] = 1;
-    r.snap({ hi: [i], lift: [i], cold: [lo, hi + 1], ph: "chốt " + p + " về đúng chỗ — trái nó toàn nhỏ hơn, phải nó toàn lớn hơn" });
+    r.snap({ hi: [i], lift: [i], cold: [lo, hi + 1], ph: "pivot " + p + " in place — everything left is smaller, everything right is larger" });
     st.push([lo, i - 1]); st.push([i + 1, hi]);
   }
   return r.allDone();
@@ -180,24 +180,24 @@ function rHeap(vals) {
       r.snap({ hi: [root, big], cold: [0, end], ph: note });
       var up = r.v(big);
       r.swap(root, big);
-      r.snap({ hi: [root, big], lift: [root], cold: [0, end], ph: up + " lớn hơn cha → đổi chỗ, nó leo lên một tầng" });
+      r.snap({ hi: [root, big], lift: [root], cold: [0, end], ph: up + " is larger than its parent → swap, it climbs one level" });
       root = big;
     }
   }
 
-  for (var i = Math.floor(n / 2) - 1; i >= 0; i--) sift(i, n, "dựng heap: xét ô " + i + " với hai con của nó");
-  r.snap({ hi: [0], ph: "heap dựng xong — cái lớn nhất luôn bị đẩy lên ô đầu" });
+  for (var i = Math.floor(n / 2) - 1; i >= 0; i--) sift(i, n, "build heap: check cell " + i + " against its two children");
+  r.snap({ hi: [0], ph: "heap built — the largest is always pushed to the first cell" });
   for (var e = n - 1; e > 0; e--) {
     var top = r.v(0);
     r.swap(0, e); r.done[e] = 1;
-    r.snap({ hi: [0, e], lift: [e], cold: [0, e], ph: "đưa " + top + " về cuối, thu vùng heap lại một ô" });
-    sift(0, e, "cái vừa đưa lên đầu thì nhỏ, cho nó chìm xuống");
+    r.snap({ hi: [0, e], lift: [e], cold: [0, e], ph: "move " + top + " to the end, shrink the heap by one cell" });
+    sift(0, e, "the one just moved to the top is small, let it sink");
   }
   r.done[0] = 1;
   return r.allDone();
 }
 
-/* ---------------- vẽ ---------------- */
+/* ---------------- drawing ---------------- */
 
 var FR = [], IDX = 0, TIMER = null, SCE = "rand", DUR = 300, BARS = null, VAL = [];
 var H = 132, GAP = 4, LIFT = 12;
@@ -233,7 +233,7 @@ function build() {
 
   el("smem").textContent = A.mem;
   el("snote").children[0].innerHTML = "<b>" + A.name + "</b> — " + A.idea;
-  el("snote").children[1].innerHTML = "<em>" + (FR.length - 1) + " bước trên mảng này</em>";
+  el("snote").children[1].innerHTML = "<em>" + (FR.length - 1) + " steps on this array</em>";
   render();
 }
 
@@ -268,11 +268,11 @@ function render() {
   el("sidx").textContent = IDX + " / " + (FR.length - 1);
 }
 
-function stop() { if (TIMER) { clearInterval(TIMER); TIMER = null; el("sauto").textContent = "Tự chạy"; } }
+function stop() { if (TIMER) { clearInterval(TIMER); TIMER = null; el("sauto").textContent = "Auto run"; } }
 function step() { if (IDX < FR.length - 1) { IDX++; render(); } else stop(); }
 function back() { if (IDX > 0) { IDX--; render(); } }
 
-/* ---------------- nối vào giao diện ---------------- */
+/* ---------------- wiring to the UI ---------------- */
 
 var sc = el("sscen");
 SCEN.forEach(function (s, i) {
@@ -310,7 +310,7 @@ el("salgo").onchange = function () { stop(); build(); };
 el("sauto").onclick = function () {
   if (TIMER) return stop();
   if (IDX >= FR.length - 1) { IDX = 0; render(); }
-  el("sauto").textContent = "Dừng";
+  el("sauto").textContent = "Stop";
   TIMER = setInterval(step, DUR + 40);
 };
 

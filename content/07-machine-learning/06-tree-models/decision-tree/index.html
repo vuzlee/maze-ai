@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision tree — MazeAI</title>
+<meta name="description" content="Reading a tree, how the machine picks questions, Gini and information gain, why a tree memorizes the data, and three hyperparameters to rein it in.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/06-tree-models/decision-tree/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Decision tree">
+<meta property="og:description" content="Reading a tree, how the machine picks questions, Gini and information gain, why a tree memorizes the data, and three hyperparameters to rein it in.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/06-tree-models/decision-tree/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+<div class="wrap">
+<div id="results" class="res" hidden></div>
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" data-progress="1" id="art-dtree" data-title="Decision tree" data-tag="ML" data-blurb="Reading a tree, how the machine picks questions, Gini and information gain, why a tree memorizes the data, and three hyperparameters to rein it in.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Tree models</p>
+  <h1>Decision <em>tree</em></h1>
+  <p class="lede">In goes a data table, out comes a tree of questions. Three things to remember:</p>
+  <ul class="ledelist">
+    <li>how a data table becomes a tree</li>
+    <li>how one node splits</li>
+    <li>why a tree memorizes, and how to rein it in</li>
+  </ul>
+</header>
+<section id="dtree-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">A tree only knows how to ask one kind of question: <span class="mth"><var>x</var> &lt; threshold ?</span> — and then <em>repeat</em> it.</p>
+  <figure class="gist">
+  <svg viewBox="0 0 860 306" role="img" aria-label="How a tree is built: the data table goes into the root node, the node scores every threshold and splits the table in two, each half comes back as a new node, and when it stops it becomes a leaf with the majority label; that recursion does not stop on its own, hence the hyperparameters"><style>@keyframes dtmin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){.dtm1{animation:dtmin .45s ease-out 0.00s both}.dtm2{animation:dtmin .45s ease-out 0.80s both}.dtm3{animation:dtmin .45s ease-out 1.60s both}.dtm4{animation:dtmin .45s ease-out 2.40s both}.dtm5{animation:dtmin .45s ease-out 3.20s both}}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><g class="dtm1">
+  <text class="sv-hv" x="0" y="16">ONE DATA TABLE GROWS INTO A TREE</text>
+  <text class="sv-d" x="0" y="46" fill="var(--muted)">Section 02 · data in</text>
+  <rect x="0" y="56" width="186" height="160" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <text class="sv-d" x="93" y="80" text-anchor="middle" fill="var(--text)">a table</text>
+  <rect x="18" y="94" width="44" height="12" rx="2" fill="var(--rule-hi)"/>
+  <rect x="70" y="94" width="44" height="12" rx="2" fill="var(--rule-hi)"/>
+  <rect x="122" y="94" width="44" height="12" rx="2" fill="var(--rule-hi)"/>
+  <rect x="18" y="112" width="44" height="12" rx="2" fill="var(--filled)"/>
+  <rect x="70" y="112" width="44" height="12" rx="2" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="122" y="112" width="44" height="12" rx="2" fill="var(--ok)"/>
+  <rect x="18" y="130" width="44" height="12" rx="2" fill="var(--filled)"/>
+  <rect x="70" y="130" width="44" height="12" rx="2" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="122" y="130" width="44" height="12" rx="2" fill="var(--tomb)"/>
+  <rect x="18" y="148" width="44" height="12" rx="2" fill="var(--filled)"/>
+  <rect x="70" y="148" width="44" height="12" rx="2" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="122" y="148" width="44" height="12" rx="2" fill="var(--ok)"/>
+  <text class="sv-d" x="93" y="186" text-anchor="middle" fill="var(--muted)">feature cols · label col</text>
+  <text class="sv-d" x="93" y="206" text-anchor="middle" fill="var(--text)">put the table at root</text>
+  <line x1="190" y1="136" x2="214" y2="136" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <polygon points="222,136 212,131 212,141" fill="var(--rule-hi)"/>
+  </g><g class="dtm2"><text class="sv-d" x="224" y="46" fill="var(--probe)">Section 03 · impurity metrics</text>
+  <rect x="224" y="56" width="186" height="160" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <text class="sv-d" x="317" y="80" text-anchor="middle" fill="var(--text)">try every col × threshold</text>
+  <line x1="244" y1="172" x2="392" y2="172" stroke="var(--rule-hi)" stroke-width="1"/>
+  <rect x="250" y="150" width="14" height="22" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="272" y="136" width="14" height="36" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="294" y="158" width="14" height="14" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="316" y="102" width="14" height="70" fill="var(--probe)"/>
+  <rect x="338" y="144" width="14" height="28" fill="rgba(var(--blue-a),.5)"/>
+  <rect x="360" y="156" width="14" height="16" fill="rgba(var(--blue-a),.5)"/>
+  <text class="sv-d" x="323" y="96" text-anchor="middle" fill="var(--probe)">highest</text>
+  <text class="sv-m" x="317" y="191" text-anchor="middle" fill="var(--muted)">gain = Gini before − after</text>
+  <text class="sv-d" x="317" y="206" text-anchor="middle" fill="var(--probe)">take the largest gain</text>
+  <line x1="414" y1="136" x2="438" y2="136" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <polygon points="446,136 436,131 436,141" fill="var(--rule-hi)"/>
+  </g><g class="dtm3"><text class="sv-d" x="448" y="46" fill="var(--ok)">Section 04 · classification</text>
+  <rect x="448" y="56" width="186" height="160" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <text class="sv-d" x="541" y="80" text-anchor="middle" fill="var(--text)">age &lt; 31.5 ?</text>
+  <rect x="506" y="94" width="70" height="20" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.2"/>
+  <line x1="541" y1="114" x2="500" y2="146" stroke="var(--ok)" stroke-width="1.2"/>
+  <line x1="541" y1="114" x2="582" y2="146" stroke="var(--ok)" stroke-width="1.2"/>
+  <rect x="468" y="146" width="64" height="20" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.2"/>
+  <rect x="550" y="146" width="64" height="20" rx="4" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.2"/>
+  <text class="sv-d" x="500" y="160" text-anchor="middle" fill="var(--filled)">left half</text>
+  <text class="sv-d" x="582" y="160" text-anchor="middle" fill="var(--filled)">right half</text>
+  <text class="sv-d" x="541" y="190" text-anchor="middle" fill="var(--muted)">table splits into two tables</text>
+  <text class="sv-d" x="541" y="206" text-anchor="middle" fill="var(--ok)">each half is a node again</text>
+  <line x1="638" y1="136" x2="662" y2="136" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <polygon points="670,136 660,131 660,141" fill="var(--rule-hi)"/>
+  </g><g class="dtm4"><text class="sv-d" x="672" y="46" fill="var(--tomb)">Section 06 · stop</text>
+  <rect x="672" y="56" width="186" height="160" rx="6" fill="var(--sunk)" stroke="var(--rule-hi)" stroke-width="1.4"/>
+  <text class="sv-d" x="765" y="80" text-anchor="middle" fill="var(--text)">node becomes leaf</text>
+  <rect x="700" y="100" width="130" height="24" rx="12" fill="rgba(var(--green-a),.14)" stroke="var(--ok)" stroke-width="1.4"/>
+  <text class="sv-d" x="765" y="117" text-anchor="middle" fill="var(--ok)">buy</text>
+  <rect x="700" y="134" width="86" height="12" rx="2" fill="var(--ok)"/>
+  <rect x="700" y="152" width="32" height="12" rx="2" fill="var(--tomb)"/>
+  <text class="sv-d" x="796" y="144" fill="var(--muted)">7</text>
+  <text class="sv-d" x="742" y="162" fill="var(--muted)">2</text>
+  <text class="sv-d" x="765" y="190" text-anchor="middle" fill="var(--muted)">take remaining majority</text>
+  <text class="sv-d" x="765" y="206" text-anchor="middle" fill="var(--tomb)">prediction = buy</text>
+  </g><g class="dtm5"><path d="M 541 216 V 236 H 317 V 224" fill="none" stroke="var(--ok)" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <polygon points="317,216 312,226 322,226" fill="var(--ok)"/>
+  <text class="sv-d" x="0" y="258" fill="var(--ok)">recursion — repeat ① and ② for each half; no separate algorithm for the tree</text>
+  <rect x="0" y="278" width="3" height="20" rx="1.5" fill="var(--tomb)"/>
+  <text class="sv-d" x="14" y="293" fill="var(--tomb)">recursion never self-stops</text>
+  <text class="sv-d" x="238" y="293" fill="var(--muted)">unless forbidden, it splits to one sample per leaf — §06 reins it in</text>
+  </g></svg>
+    <figcaption>Four stages, four sections. The dashed arrow is where it loops back.</figcaption>
+  </figure>
+  <ul class="why">
+    <li>Computing impurity and splitting in two are two jobs of <b>the same node</b>.</li>
+    <li>The dashed arrow goes back — that is <b>recursion</b>.</li>
+    <li>Recursion does not stop on its own: that is why there are <b>hyperparameters</b>.</li>
+    <li>The building block of <a href="../random-forest/index.html">Random forest</a>, <a href="../gradient-boosting/index.html">Gradient boosting</a>, <a href="../xgboost/index.html">XGBoost</a>, <a href="../lightgbm/index.html">LightGBM</a>.</li>
+  </ul>
+</section>
+<section id="dtree-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Data in</h2></div>
+  <p class="key">Each row is a sample, each column a feature, <em>the last column is the label</em>.</p>
+  <figure class="scrollx">
+  <table>
+    <thead><tr><th>age</th><th>income</th><th>bought before</th><th>buy?</th></tr></thead>
+    <tbody>
+      <tr><td>24</td><td>12k</td><td>no</td><td>no buy</td></tr>
+      <tr><td>28</td><td>22k</td><td>no</td><td>no buy</td></tr>
+      <tr><td>35</td><td>18k</td><td>yes</td><td>buy</td></tr>
+      <tr><td>41</td><td>26k</td><td>yes</td><td>buy</td></tr>
+      <tr><td>52</td><td>30k</td><td>yes</td><td>no buy</td></tr>
+      <tr><td>60</td><td>34k</td><td>no</td><td>buy</td></tr>
+    </tbody>
+  </table>
+    <figcaption>Three feature columns, one label column. The tree learns from this table.</figcaption>
+  </figure>
+  <ul class="steps">
+    <li>The whole table goes into the <b>root node</b>.</li>
+    <li>Pick a column and a threshold, <b>split the table in two</b>.</li>
+    <li>Each half is a node again — repeat step 2.</li>
+    <li class="end">When it stops, that node becomes a <b>leaf node</b>, carrying the majority label of the remaining half-table.</li>
+  </ul>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 306" role="img" aria-label="A four-level tree in three bands: the root band with one node asking about age, an internal band of two question levels, a leaves band of eight conclusions; the left margin marks d0 to d3, a yellow path runs from the root down to a buy leaf">
+<text class="sv-hv" x="0.0" y="18" fill="var(--muted)">THREE NAMES</text>
+<rect x="0" y="56" width="860" height="32" rx="4" fill="var(--sunk)"/>
+<rect x="0" y="56" width="3" height="32" rx="1.5" fill="var(--filled)"/>
+<text class="sv-h" x="14.0" y="76" fill="var(--filled)">ROOT · depth 0</text>
+<rect x="0" y="114" width="860" height="94" rx="4" fill="var(--sunk)"/>
+<rect x="0" y="114" width="3" height="94" rx="1.5" fill="var(--probe)"/>
+<text class="sv-h" x="14.0" y="132" fill="var(--probe)">INTERNAL · depth 1–2</text>
+<text class="sv-s" x="14.0" y="148" fill="var(--dim)">one question per node</text>
+<rect x="0" y="230" width="860" height="32" rx="4" fill="var(--sunk)"/>
+<rect x="0" y="230" width="3" height="32" rx="1.5" fill="var(--ok)"/>
+<text class="sv-h" x="14.0" y="250" fill="var(--ok)">LEAVES · depth 3</text>
+<line x1="505.0" y1="84" x2="327.5" y2="118" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="505.0" y1="84" x2="682.5" y2="118" stroke="var(--probe)" stroke-width="2"/>
+<line x1="327.5" y1="142" x2="238.8" y2="176" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="327.5" y1="142" x2="416.2" y2="176" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="682.5" y1="142" x2="593.8" y2="176" stroke="var(--probe)" stroke-width="2"/>
+<line x1="682.5" y1="142" x2="771.2" y2="176" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="238.8" y1="200" x2="194.4" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="238.8" y1="200" x2="283.1" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="416.2" y1="200" x2="371.9" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="416.2" y1="200" x2="460.6" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="593.8" y1="200" x2="549.4" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="593.8" y1="200" x2="638.1" y2="234" stroke="var(--probe)" stroke-width="2"/>
+<line x1="771.2" y1="200" x2="726.9" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="771.2" y1="200" x2="815.6" y2="234" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<rect x="430.0" y="60" width="150.0" height="24" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.0"/>
+<text class="sv-d" x="505.0" y="76" fill="var(--filled)" text-anchor="middle">age &lt; 31.5 ?</text>
+<text class="sv-d" x="435.0" y="110" fill="var(--faint)" text-anchor="end">yes</text>
+<text class="sv-d" x="575.0" y="110" fill="var(--probe)">no</text>
+<rect x="243.5" y="118" width="168.0" height="24" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.0"/>
+<text class="sv-d" x="327.5" y="134" fill="var(--filled)" text-anchor="middle">income &lt; 20k ?</text>
+<rect x="598.5" y="118" width="168.0" height="24" rx="5" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-d" x="682.5" y="134" fill="var(--probe)" text-anchor="middle">bought before ?</text>
+<rect x="162.8" y="176" width="152.0" height="24" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.0"/>
+<text class="sv-d" x="238.8" y="192" fill="var(--filled)" text-anchor="middle">bought before ?</text>
+<rect x="340.2" y="176" width="152.0" height="24" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.0"/>
+<text class="sv-d" x="416.2" y="192" fill="var(--filled)" text-anchor="middle">bought before ?</text>
+<rect x="517.8" y="176" width="152.0" height="24" rx="5" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-d" x="593.8" y="192" fill="var(--probe)" text-anchor="middle">income ≥ 20k ?</text>
+<rect x="695.2" y="176" width="152.0" height="24" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.0"/>
+<text class="sv-d" x="771.2" y="192" fill="var(--filled)" text-anchor="middle">income ≥ 20k ?</text>
+<rect x="154.4" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.0"/>
+<text class="sv-d" x="194.4" y="250" fill="var(--tomb)" text-anchor="middle">no buy</text>
+<rect x="243.1" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.0"/>
+<text class="sv-d" x="283.1" y="250" fill="var(--ok)" text-anchor="middle">buy</text>
+<rect x="331.9" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.0"/>
+<text class="sv-d" x="371.9" y="250" fill="var(--tomb)" text-anchor="middle">no buy</text>
+<rect x="420.6" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.0"/>
+<text class="sv-d" x="460.6" y="250" fill="var(--ok)" text-anchor="middle">buy</text>
+<rect x="509.4" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.0"/>
+<text class="sv-d" x="549.4" y="250" fill="var(--tomb)" text-anchor="middle">no buy</text>
+<rect x="598.1" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--green-a),.20)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-d" x="638.1" y="250" fill="var(--ok)" text-anchor="middle">buy</text>
+<rect x="686.9" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.0"/>
+<text class="sv-d" x="726.9" y="250" fill="var(--ok)" text-anchor="middle">buy</text>
+<rect x="775.6" y="234" width="80.0" height="24" rx="12" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.0"/>
+<text class="sv-d" x="815.6" y="250" fill="var(--tomb)" text-anchor="middle">no buy</text>
+<text class="sv-h" x="0.0" y="290" fill="var(--probe)">INFERENCE</text>
+<text class="sv-s" x="150.0" y="294" fill="var(--probe)">follow the yellow path — age ≥ 30 · bought before · income ≥ 20k  →  the leaf returns  buy</text>
+</svg>
+    <figcaption>Three bands = three names. The line joining two nodes is a <strong>branch</strong>, the number of levels is the <strong>depth</strong>.</figcaption>
+  </figure>
+  <ul class="why">
+    <li>Going from root to leaf, collecting the <b>split conditions</b> along the way — that is how a tree produces a prediction.</li>
+    <li>The longest path is the <b>depth</b>. The larger the depth, the more easily the tree memorizes.</li>
+    <li>A leaf returns <b>the class proportions</b> inside it, not logits — a tree has no continuous computation at all.</li>
+  </ul>
+</section>
+<section id="dtree-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Impurity metrics</h2></div>
+  <p class="key">The machine needs <em>one number</em> measuring impurity, to compare which of two splits is better.</p>
+  <h3>Three measures</h3>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 196" role="img" aria-label="Three impurity measures: Gini and entropy for classification and variance for regression, each with a formula and a note">
+<text class="sv-hv" x="0" y="18">3 MEASURES</text>
+<rect x="0" y="36" width="3" height="42" rx="1.5" fill="var(--probe)"/>
+<text class="sv-d" x="16" y="54" fill="var(--probe)">Gini</text>
+<text class="sv-m" x="160" y="54" fill="var(--muted)">1 − Σ <tspan class="v">p</tspan><tspan baseline-shift="super" font-size="8">2</tspan></text>
+<text class="sv-s" x="16" y="72" fill="var(--dim)">classification · the default measure</text>
+<rect x="0" y="90" width="3" height="42" rx="1.5" fill="var(--filled)"/>
+<text class="sv-d" x="16" y="108" fill="var(--filled)">Entropy</text>
+<text class="sv-m" x="160" y="108" fill="var(--muted)">− Σ <tspan class="v">p</tspan> <tspan class="fn">log</tspan> <tspan class="v">p</tspan></text>
+<text class="sv-s" x="16" y="126" fill="var(--dim)">classification · information theory, used by ID3 and C4.5</text>
+<rect x="0" y="144" width="3" height="42" rx="1.5" fill="var(--ok)"/>
+<text class="sv-d" x="16" y="162" fill="var(--ok)">Variance</text>
+<text class="sv-m" x="160" y="162" fill="var(--muted)">Σ (<tspan class="v">y</tspan> − <tspan class="v">ȳ</tspan>)<tspan baseline-shift="super" font-size="8">2</tspan> / <tspan class="v">n</tspan></text>
+<text class="sv-s" x="16" y="180" fill="var(--dim)">regression · with numeric labels, "impure" means spread out</text>
+</svg>
+    <figcaption>If the label is a <strong>class</strong>, use Gini or entropy; if it is a <strong>number</strong>, use variance. Same algorithm — change the measure and you change the problem.</figcaption>
+  </figure>
+  <h3>Gini — the formula</h3>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 214" role="img" aria-label="The Gini formula and its meaning: draw two samples from the node at random, the probability they are of different classes; the scale runs from 0 pure to 0.50 most mixed">
+<text class="sv-hv" x="0" y="18">GINI</text>
+<rect x="0" y="34" width="3" height="28" rx="1.5" fill="var(--probe)"/>
+<text class="sv-m" x="24" y="54" fill="var(--probe)">Gini = 1 − <tspan class="v">p</tspan><tspan dy="4" font-size="10">A</tspan><tspan dy="-11" font-size="10">2</tspan><tspan dy="7"> − </tspan><tspan class="v">p</tspan><tspan dy="4" font-size="10">B</tspan><tspan dy="-11" font-size="10">2</tspan></text>
+<text class="sv-d" x="300" y="46" fill="var(--muted)">p<tspan dy="3" font-size="9">A</tspan><tspan dy="-3">, p</tspan><tspan dy="3" font-size="9">B</tspan><tspan dy="-3"> = share of each class</tspan></text>
+<text class="sv-s" x="300" y="62" fill="var(--dim)">draw two samples at random — chance they differ in class</text>
+<text class="sv-d" x="0" y="100" fill="var(--muted)">10 A · 0 B</text>
+<rect x="120" y="87" width="6" height="18" rx="3" fill="rgb(var(--green-a))"/>
+<text class="sv-l" x="140" y="101" fill="var(--ok)">0.00</text>
+<text class="sv-d" x="480" y="101" fill="var(--ok)">pure — nothing left to do</text>
+<text class="sv-d" x="0" y="126" fill="var(--muted)">9 A · 1 B</text>
+<rect x="120" y="113" width="108" height="18" rx="3" fill="rgb(var(--blue-a))" fill-opacity=".55"/>
+<text class="sv-l" x="242" y="127" fill="var(--filled)">0.18</text>
+<text class="sv-d" x="0" y="152" fill="var(--muted)">7 A · 3 B</text>
+<rect x="120" y="139" width="252" height="18" rx="3" fill="rgb(var(--blue-a))" fill-opacity=".55"/>
+<text class="sv-l" x="386" y="153" fill="var(--filled)">0.42</text>
+<text class="sv-d" x="0" y="178" fill="var(--muted)">5 A · 5 B</text>
+<rect x="120" y="165" width="300" height="18" rx="3" fill="rgb(var(--red-a))" fill-opacity=".7"/>
+<text class="sv-l" x="434" y="179" fill="var(--tomb)">0.50</text>
+<text class="sv-d" x="480" y="179" fill="var(--tomb)">most mixed — no help guessing</text>
+<text class="sv-s" x="0" y="204" fill="var(--dim)">with two classes Gini runs from 0 to 0.50, never above</text>
+</svg>
+    <figcaption>0 is pure, 0.50 is most mixed. Every split is a way of pulling this number down.</figcaption>
+  </figure>
+  <h3>Gini — a worked example</h3>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 190" role="img" aria-label="Three steps to compute Gini for an eight-sample node: count the two classes, get the proportions, plug into the formula">
+<text class="sv-hv" x="0" y="18">NODE OF 8 · 6 A · 2 B</text>
+<text class="sv-h" x="0" y="52" fill="var(--filled)">1</text>
+<text class="sv-d" x="40" y="52" fill="var(--muted)">Count each class</text>
+<rect x="300" y="38" width="180" height="18" rx="3" fill="rgb(var(--green-a))"/>
+<rect x="480" y="38" width="60" height="18" rx="3" fill="rgb(var(--red-a))"/>
+<text class="sv-s" x="310" y="52" fill="var(--bg)">6 A</text>
+<text class="sv-s" x="530" y="52" fill="var(--bg)" text-anchor="end">2 B</text>
+<text class="sv-h" x="0" y="96" fill="var(--filled)">2</text>
+<text class="sv-d" x="40" y="96" fill="var(--muted)">Divide by total for shares</text>
+<text class="sv-m" x="300" y="96" fill="var(--ok)"><tspan class="v">p</tspan><tspan baseline-shift="sub" font-size="8">A</tspan> =</text>
+<text class="sv-m" x="352" y="89" text-anchor="middle" fill="var(--ok)">6</text>
+<line x1="341" y1="93" x2="363" y2="93" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-m" x="352" y="107" text-anchor="middle" fill="var(--ok)">8</text>
+<text class="sv-m" x="370" y="96" fill="var(--ok)">= 0.75</text>
+<text class="sv-m" x="480" y="96" fill="var(--tomb)"><tspan class="v">p</tspan><tspan baseline-shift="sub" font-size="8">B</tspan> =</text>
+<text class="sv-m" x="532" y="89" text-anchor="middle" fill="var(--tomb)">2</text>
+<line x1="521" y1="93" x2="543" y2="93" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-m" x="532" y="107" text-anchor="middle" fill="var(--tomb)">8</text>
+<text class="sv-m" x="550" y="96" fill="var(--tomb)">= 0.25</text>
+<text class="sv-h" x="0" y="140" fill="var(--filled)">3</text>
+<text class="sv-d" x="40" y="140" fill="var(--muted)">Plug into formula</text>
+<text class="sv-m" x="300" y="140" fill="var(--probe)">Gini = 1 − 0.75<tspan baseline-shift="super" font-size="8">2</tspan> − 0.25<tspan baseline-shift="super" font-size="8">2</tspan></text>
+<text class="sv-m" x="300" y="164" fill="var(--probe)">     = 1 − 0.5625 − 0.0625 = 0.375</text>
+<text class="sv-s" x="600" y="164" fill="var(--dim)">closer to 0 than 0.50 — fairly pure node</text>
+</svg>
+    <figcaption>Count · divide · plug in. A tree does exactly these three steps at every node.</figcaption>
+  </figure>
+  <h3>Which measure to choose</h3>
+  <div class="cmp">
+    <div><b>Gini vs Entropy</b><p>They measure the same thing and almost always give the same tree. Entropy penalizes mixed nodes slightly more, so the tree is sometimes more balanced.</p></div>
+    <div><b>What to choose</b><p>Gini — because it is cheaper, no logarithm to compute. Only switch to entropy once you have run out of hyperparameter tuning.</p></div>
+  </div>
+</section>
+<section id="dtree-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Classification</h2></div>
+  <p class="key">The label is <em>a class</em>. The whole tree is just the node-splitting step <em>repeated</em>.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 1180" role="img" aria-label="Five steps turning a six-row table into a tree: count the two classes and compute Gini, build a trial stump at threshold 31.5 and compute the Gini of each half then take the difference as gain, compare the gain of every threshold to choose, repeat on any half that is still mixed, and the tree running the full recursion ends with three questions and four pure leaves">
+<text class="sv-hv" x="0" y="18" fill="var(--muted)">FROM A TABLE TO ONE NODE</text>
+<text class="sv-h" x="0" y="50" fill="var(--filled)">STEP 1</text>
+<text class="sv-s" x="80" y="50" fill="var(--dim)">Count the 2 classes, then compute Gini</text>
+<rect x="0" y="66" width="150" height="128" rx="4" fill="var(--sunk)"/>
+<text class="sv-s" x="10" y="80" fill="var(--faint)">age</text>
+<text class="sv-s" x="140" y="80" fill="var(--faint)" text-anchor="end">buy ?</text>
+<text class="sv-d" x="10" y="100" fill="var(--text)">24</text>
+<text class="sv-d" x="140" y="100" fill="var(--tomb)" text-anchor="end">no</text>
+<text class="sv-d" x="10" y="118" fill="var(--text)">28</text>
+<text class="sv-d" x="140" y="118" fill="var(--tomb)" text-anchor="end">no</text>
+<text class="sv-d" x="10" y="136" fill="var(--text)">35</text>
+<text class="sv-d" x="140" y="136" fill="var(--ok)" text-anchor="end">buy</text>
+<text class="sv-d" x="10" y="154" fill="var(--text)">41</text>
+<text class="sv-d" x="140" y="154" fill="var(--ok)" text-anchor="end">buy</text>
+<text class="sv-d" x="10" y="172" fill="var(--text)">52</text>
+<text class="sv-d" x="140" y="172" fill="var(--tomb)" text-anchor="end">no</text>
+<text class="sv-d" x="10" y="190" fill="var(--text)">60</text>
+<text class="sv-d" x="140" y="190" fill="var(--ok)" text-anchor="end">buy</text>
+<line x1="166" y1="128" x2="196" y2="128" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<polygon points="204,128 196,124 196,132" fill="var(--rule-hi)"/>
+<text class="sv-s" x="220" y="80" fill="var(--dim)">Count</text>
+<rect x="220" y="90" width="110" height="20" rx="3" fill="rgb(var(--green-a))"/>
+<rect x="330" y="90" width="110" height="20" rx="3" fill="rgb(var(--red-a))"/>
+<text class="sv-s" x="230" y="104" fill="var(--bg)">3 buy</text>
+<text class="sv-s" x="430" y="104" fill="var(--bg)" text-anchor="end">3 no</text>
+<text class="sv-m" x="460" y="105" fill="var(--muted)">6 rows</text>
+<text class="sv-m" x="220" y="136" fill="var(--ok)">p<tspan baseline-shift="sub" font-size="8">buy</tspan> =</text>
+<text class="sv-m" x="288" y="129" text-anchor="middle" fill="var(--ok)">3</text>
+<line x1="277" y1="133" x2="299" y2="133" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-m" x="288" y="147" text-anchor="middle" fill="var(--ok)">6</text>
+<text class="sv-m" x="306" y="136" fill="var(--ok)">= 0.5</text>
+<text class="sv-m" x="430" y="136" fill="var(--tomb)">p<tspan baseline-shift="sub" font-size="8">no</tspan> =</text>
+<text class="sv-m" x="510" y="129" text-anchor="middle" fill="var(--tomb)">3</text>
+<line x1="499" y1="133" x2="521" y2="133" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-m" x="510" y="147" text-anchor="middle" fill="var(--tomb)">6</text>
+<text class="sv-m" x="528" y="136" fill="var(--tomb)">= 0.5</text>
+<rect x="220" y="152" width="3" height="20" rx="1.5" fill="var(--probe)"/>
+<text class="sv-m" x="234" y="167" fill="var(--probe)">Gini = 1 − 0.5<tspan baseline-shift="super" font-size="8">2</tspan> − 0.5<tspan baseline-shift="super" font-size="8">2</tspan> = 0.50</text>
+<text class="sv-s" x="234" y="187" fill="var(--dim)">0 is one pure class · 0.5 is most mixed — this table is worst</text>
+<line x1="0" y1="212" x2="860" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-h" x="0" y="238" fill="var(--filled)">STEP 2</text>
+<text class="sv-s" x="80" y="238" fill="var(--dim)">Try threshold 31.5 — table splits in two, each group to a node</text>
+<rect x="320" y="254" width="220" height="42" rx="5" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-m" x="430" y="272" fill="var(--probe)" text-anchor="middle">age &lt; 31.5 ?</text>
+<text class="sv-s" x="430" y="288" fill="var(--dim)" text-anchor="middle">6 rows · Gini before = 0.50</text>
+<line x1="380" y1="296" x2="200" y2="326" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<line x1="480" y1="296" x2="660" y2="326" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-s" x="268" y="314" fill="var(--ok)">yes</text>
+<text class="sv-s" x="566" y="314" fill="var(--tomb)">no</text>
+<rect x="80" y="326" width="220" height="46" rx="5" fill="var(--sunk)" stroke="var(--ok)" stroke-width="1.3"/>
+<rect x="92" y="336" width="196" height="12" rx="3" fill="rgb(var(--red-a))"/>
+<text class="sv-s" x="92" y="364" fill="var(--muted)">0 buy · 2 no</text>
+<text class="sv-m" x="288" y="364" fill="var(--ok)" text-anchor="end">Gini = 0</text>
+<rect x="80" y="384" width="220" height="68" rx="4" fill="var(--sunk)"/>
+<text class="sv-s" x="92" y="400" fill="var(--faint)">age</text>
+<text class="sv-s" x="288" y="400" fill="var(--faint)" text-anchor="end">buy ?</text>
+<text class="sv-d" x="92" y="418" fill="var(--text)">24</text>
+<text class="sv-d" x="288" y="418" fill="var(--tomb)" text-anchor="end">no</text>
+<text class="sv-d" x="92" y="436" fill="var(--text)">28</text>
+<text class="sv-d" x="288" y="436" fill="var(--tomb)" text-anchor="end">no</text>
+<text class="sv-m" x="92" y="496" fill="var(--muted)">p<tspan baseline-shift="sub" font-size="8">buy</tspan> =</text>
+<text class="sv-m" x="146" y="489" text-anchor="middle" fill="var(--muted)">0</text>
+<line x1="135" y1="493" x2="157" y2="493" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-m" x="146" y="507" text-anchor="middle" fill="var(--muted)">2</text>
+<text class="sv-m" x="164" y="496" fill="var(--muted)">= 0</text>
+<text class="sv-m" x="210" y="496" fill="var(--muted)">p<tspan baseline-shift="sub" font-size="8">no</tspan> =</text>
+<text class="sv-m" x="288" y="489" text-anchor="middle" fill="var(--muted)">2</text>
+<line x1="277" y1="493" x2="299" y2="493" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-m" x="288" y="507" text-anchor="middle" fill="var(--muted)">2</text>
+<text class="sv-m" x="306" y="496" fill="var(--muted)">= 1</text>
+<text class="sv-m" x="92" y="528" fill="var(--ok)">Gini = 1 − 0<tspan baseline-shift="super" font-size="8">2</tspan> − 1<tspan baseline-shift="super" font-size="8">2</tspan> = 0</text>
+<rect x="540" y="326" width="220" height="46" rx="5" fill="var(--sunk)" stroke="var(--tomb)" stroke-width="1.3"/>
+<rect x="552" y="336" width="147" height="12" rx="3" fill="rgb(var(--green-a))"/>
+<rect x="699" y="336" width="49" height="12" rx="3" fill="rgb(var(--red-a))"/>
+<text class="sv-s" x="552" y="364" fill="var(--muted)">3 buy · 1 no</text>
+<text class="sv-m" x="748" y="364" fill="var(--tomb)" text-anchor="end">Gini = 0.375</text>
+<rect x="540" y="384" width="220" height="104" rx="4" fill="var(--sunk)"/>
+<text class="sv-s" x="552" y="400" fill="var(--faint)">age</text>
+<text class="sv-s" x="748" y="400" fill="var(--faint)" text-anchor="end">buy ?</text>
+<text class="sv-d" x="552" y="418" fill="var(--text)">35</text>
+<text class="sv-d" x="748" y="418" fill="var(--ok)" text-anchor="end">buy</text>
+<text class="sv-d" x="552" y="436" fill="var(--text)">41</text>
+<text class="sv-d" x="748" y="436" fill="var(--ok)" text-anchor="end">buy</text>
+<text class="sv-d" x="552" y="454" fill="var(--text)">52</text>
+<text class="sv-d" x="748" y="454" fill="var(--tomb)" text-anchor="end">no</text>
+<text class="sv-d" x="552" y="472" fill="var(--text)">60</text>
+<text class="sv-d" x="748" y="472" fill="var(--ok)" text-anchor="end">buy</text>
+<text class="sv-m" x="552" y="496" fill="var(--muted)">p<tspan baseline-shift="sub" font-size="8">buy</tspan> =</text>
+<text class="sv-m" x="606" y="489" text-anchor="middle" fill="var(--muted)">3</text>
+<line x1="595" y1="493" x2="617" y2="493" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-m" x="606" y="507" text-anchor="middle" fill="var(--muted)">4</text>
+<text class="sv-m" x="624" y="496" fill="var(--muted)">= 0.75</text>
+<text class="sv-m" x="700" y="496" fill="var(--muted)">p<tspan baseline-shift="sub" font-size="8">no</tspan> =</text>
+<text class="sv-m" x="778" y="489" text-anchor="middle" fill="var(--muted)">1</text>
+<line x1="767" y1="493" x2="789" y2="493" stroke="var(--muted)" stroke-width="1"/>
+<text class="sv-m" x="778" y="507" text-anchor="middle" fill="var(--muted)">4</text>
+<text class="sv-m" x="796" y="496" fill="var(--muted)">= 0.25</text>
+<text class="sv-m" x="552" y="528" fill="var(--probe)">Gini = 1 − 0.75<tspan baseline-shift="super" font-size="8">2</tspan> − 0.25<tspan baseline-shift="super" font-size="8">2</tspan> = 0.375</text>
+<line x1="0" y1="536" x2="860" y2="536" stroke="var(--rule)" stroke-width="1"/>
+<rect x="0" y="552" width="3" height="20" rx="1.5" fill="var(--filled)"/>
+<text class="sv-m" x="14" y="567" fill="var(--filled)">Gini after =</text>
+<text class="sv-m" x="105" y="560" text-anchor="middle" fill="var(--filled)">2</text>
+<line x1="94" y1="564" x2="116" y2="564" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-m" x="105" y="578" text-anchor="middle" fill="var(--filled)">6</text>
+<text class="sv-m" x="121" y="567" fill="var(--filled)">× 0 +</text>
+<text class="sv-m" x="180" y="560" text-anchor="middle" fill="var(--filled)">4</text>
+<line x1="169" y1="564" x2="191" y2="564" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-m" x="180" y="578" text-anchor="middle" fill="var(--filled)">6</text>
+<text class="sv-m" x="196" y="567" fill="var(--filled)">× 0.375 = 0.25</text>
+<text class="sv-s" x="380" y="567" fill="var(--dim)">weighted by group size</text>
+<rect x="600" y="552" width="3" height="20" rx="1.5" fill="var(--probe)"/>
+<text class="sv-m" x="614" y="567" fill="var(--probe)">gain = 0.50 − 0.25 = 0.25</text>
+<line x1="0" y1="600" x2="860" y2="600" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-h" x="0" y="626" fill="var(--filled)">STEP 3</text>
+<text class="sv-s" x="80" y="626" fill="var(--dim)">Repeat STEP 2 for every threshold, pick the top gain</text>
+<text class="sv-m" x="0" y="657" fill="var(--muted)">age &lt; 26</text>
+<rect x="130" y="646" width="44" height="14" rx="3" fill="var(--filled)" fill-opacity=".5"/>
+<text class="sv-s" x="300" y="657" fill="var(--dim)">gain 0.10</text>
+<text class="sv-m" x="0" y="677" fill="var(--probe)">age &lt; 31.5</text>
+<rect x="130" y="666" width="110" height="14" rx="3" fill="var(--probe)" fill-opacity=".95"/>
+<text class="sv-s" x="300" y="677" fill="var(--probe)">gain 0.25</text>
+<text class="sv-s" x="400" y="677" fill="var(--probe)">← largest gain: the node picks 31.5, the stump we just built</text>
+<text class="sv-m" x="0" y="697" fill="var(--muted)">age &lt; 38</text>
+<rect x="130" y="686" width="26" height="14" rx="3" fill="var(--filled)" fill-opacity=".5"/>
+<text class="sv-s" x="300" y="697" fill="var(--dim)">gain 0.06</text>
+<text class="sv-m" x="0" y="717" fill="var(--muted)">age &lt; 46.5</text>
+<text class="sv-s" x="300" y="717" fill="var(--dim)">gain 0.00</text>
+<text class="sv-m" x="0" y="737" fill="var(--muted)">age &lt; 56</text>
+<rect x="130" y="726" width="44" height="14" rx="3" fill="var(--filled)" fill-opacity=".5"/>
+<text class="sv-s" x="300" y="737" fill="var(--dim)">gain 0.10</text>
+<line x1="0" y1="756" x2="860" y2="756" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-h" x="0" y="782" fill="var(--filled)">STEP 4</text>
+<text class="sv-s" x="80" y="782" fill="var(--dim)">Each child: pure → stop, still mixed → back to STEP 1</text>
+<rect x="0" y="798" width="3" height="20" rx="1.5" fill="var(--ok)"/>
+<text class="sv-d" x="14" y="813" fill="var(--ok)">Gini = 0 → leaf</text>
+<rect x="300" y="798" width="3" height="20" rx="1.5" fill="var(--tomb)"/>
+<text class="sv-d" x="314" y="813" fill="var(--tomb)">Gini &gt; 0 → back to STEP 1</text>
+<text class="sv-s" x="640" y="813" fill="var(--dim)">recursion — that's all</text>
+<line x1="0" y1="838" x2="860" y2="838" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-h" x="0" y="864" fill="var(--filled)">STEP 5</text>
+<text class="sv-s" x="80" y="864" fill="var(--dim)">Run the full recursion on this six-row table — stops when all leaves pure</text>
+<rect x="300" y="886" width="150" height="26" rx="5" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-d" x="375" y="903" fill="var(--probe)" text-anchor="middle">age &lt; 31.5 ?</text>
+<line x1="336" y1="912" x2="160" y2="944" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="414" y1="912" x2="560" y2="944" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<text class="sv-s" x="228" y="924" fill="var(--faint)">yes</text>
+<text class="sv-s" x="480" y="924" fill="var(--faint)">no</text>
+<rect x="108" y="944" width="104" height="26" rx="13" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="160" y="961" fill="var(--tomb)" text-anchor="middle">no buy</text>
+<text class="sv-m" x="160" y="988" fill="var(--faint)" text-anchor="middle">2 rows</text>
+<rect x="478" y="944" width="164" height="26" rx="5" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-d" x="560" y="961" fill="var(--probe)" text-anchor="middle">age &lt; 46.5 ?</text>
+<line x1="522" y1="970" x2="400" y2="1002" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="598" y1="970" x2="726" y2="1002" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<text class="sv-s" x="440" y="982" fill="var(--faint)">yes</text>
+<text class="sv-s" x="652" y="982" fill="var(--faint)">no</text>
+<rect x="365" y="1002" width="70" height="26" rx="13" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="400" y="1019" fill="var(--ok)" text-anchor="middle">buy</text>
+<text class="sv-m" x="400" y="1046" fill="var(--faint)" text-anchor="middle">2 rows</text>
+<rect x="651" y="1002" width="150" height="26" rx="5" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-d" x="726" y="1019" fill="var(--probe)" text-anchor="middle">age &lt; 56 ?</text>
+<line x1="690" y1="1028" x2="620" y2="1060" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<line x1="762" y1="1028" x2="812" y2="1060" stroke="var(--rule-hi)" stroke-width="1.1"/>
+<text class="sv-s" x="630" y="1044" fill="var(--faint)" text-anchor="end">yes</text>
+<text class="sv-s" x="782" y="1044" fill="var(--faint)">no</text>
+<rect x="568" y="1060" width="104" height="26" rx="13" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-d" x="620" y="1077" fill="var(--tomb)" text-anchor="middle">no buy</text>
+<text class="sv-m" x="620" y="1104" fill="var(--faint)" text-anchor="middle">1 row</text>
+<rect x="777" y="1060" width="70" height="26" rx="13" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-d" x="812" y="1077" fill="var(--ok)" text-anchor="middle">buy</text>
+<text class="sv-m" x="812" y="1104" fill="var(--faint)" text-anchor="middle">1 row</text>
+<line x1="0" y1="1126" x2="860" y2="1126" stroke="var(--rule)" stroke-width="1"/>
+<rect x="0" y="1146" width="3" height="20" rx="1.5" fill="var(--tomb)"/>
+<text class="sv-d" x="14" y="1161" fill="var(--text)">3 questions · 4 leaves · depth 3</text>
+<text class="sv-s" x="250" y="1161" fill="var(--tomb)">1–2 samples per leaf: the tree memorized the table — §06 reins it in</text>
+</svg>
+    <figcaption>One node = count · try · compare. Gain is the impurity removed; repeat that step until nothing is mixed and you get the whole tree.</figcaption>
+  </figure>
+  <ul class="why">
+    <li>Step 2 scores <b>every column × every threshold</b>, not just the age column.</li>
+    <li>It always takes the highest gain <b>right now</b> — <b>greedy</b>, never looking more than one step ahead.</li>
+    <li>Unless forbidden, it repeats until <b>one sample per leaf</b> — the tree memorizes the old data.</li>
+    <li>All three questions in STEP 5 land on the age column: a column that never wins on gain <b>never enters the tree</b> — <b>feature selection</b> is something the tree does by itself.</li>
+  </ul>
+</section>
+<section id="dtree-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Regression</h2></div>
+  <p class="key">The same four steps. Change <em>the measure</em> and <em>what a leaf returns</em>, and you are done.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 560" role="img" aria-label="The four regression steps on the same six-row table from the previous section, with the label changed from buy-or-not to amount spent: compute the table's variance, try threshold 31.5 and compute each half's variance then take the difference as gain, the leaf returns the mean">
+<text class="sv-hv" x="0" y="18" fill="var(--muted)">SAME TABLE · LABEL IS A NUMBER</text>
+<text class="sv-h" x="0" y="50" fill="var(--filled)">STEP 1</text>
+<text class="sv-s" x="80" y="50" fill="var(--dim)">swap Gini for variance of the label col</text>
+<rect x="0" y="66" width="190" height="128" rx="4" fill="var(--sunk)"/>
+<text class="sv-s" x="10" y="80" fill="var(--faint)">age</text>
+<text class="sv-s" x="180" y="80" fill="var(--faint)" text-anchor="end">spend</text>
+<text class="sv-d" x="10" y="100" fill="var(--text)">24</text>
+<text class="sv-d" x="180" y="100" fill="var(--ok)" text-anchor="end">10</text>
+<text class="sv-d" x="10" y="118" fill="var(--text)">28</text>
+<text class="sv-d" x="180" y="118" fill="var(--ok)" text-anchor="end">12</text>
+<text class="sv-d" x="10" y="136" fill="var(--text)">35</text>
+<text class="sv-d" x="180" y="136" fill="var(--ok)" text-anchor="end">30</text>
+<text class="sv-d" x="10" y="154" fill="var(--text)">41</text>
+<text class="sv-d" x="180" y="154" fill="var(--ok)" text-anchor="end">34</text>
+<text class="sv-d" x="10" y="172" fill="var(--text)">52</text>
+<text class="sv-d" x="180" y="172" fill="var(--ok)" text-anchor="end">28</text>
+<text class="sv-d" x="10" y="190" fill="var(--text)">60</text>
+<text class="sv-d" x="180" y="190" fill="var(--ok)" text-anchor="end">36</text>
+<line x1="206" y1="128" x2="236" y2="128" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<polygon points="244,128 236,124 236,132" fill="var(--rule-hi)"/>
+<text class="sv-s" x="260" y="80" fill="var(--dim)">take the mean first — add six numbers, divide by 6</text>
+<text class="sv-m" x="260" y="105" fill="var(--ok)"><tspan class="v">ȳ</tspan> =</text>
+<text class="sv-m" x="322" y="98" text-anchor="middle" fill="var(--ok)">150</text>
+<line x1="304" y1="102" x2="340" y2="102" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-m" x="322" y="116" text-anchor="middle" fill="var(--ok)">6</text>
+<text class="sv-m" x="352" y="105" fill="var(--ok)">= 25</text>
+<text class="sv-s" x="260" y="140" fill="var(--dim)">then measure how spread the numbers are</text>
+<rect x="260" y="152" width="3" height="20" rx="1.5" fill="var(--probe)"/>
+<text class="sv-m" x="274" y="167" fill="var(--probe)">variance = Σ (<tspan class="v">y</tspan> − 25)<tspan baseline-shift="super" font-size="8">2</tspan> / 6 = 105</text>
+<text class="sv-s" x="274" y="187" fill="var(--dim)">0 means every sample has one value · bigger = more spread — no cap like Gini</text>
+<line x1="0" y1="212" x2="860" y2="212" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-h" x="0" y="238" fill="var(--filled)">STEP 2</text>
+<text class="sv-s" x="80" y="238" fill="var(--dim)">try threshold 31.5 — same split as before</text>
+<rect x="320" y="254" width="220" height="42" rx="5" fill="rgba(var(--amber-a),.12)" stroke="var(--probe)" stroke-width="1.4"/>
+<text class="sv-m" x="430" y="272" fill="var(--probe)" text-anchor="middle">age &lt; 31.5 ?</text>
+<text class="sv-s" x="430" y="288" fill="var(--dim)" text-anchor="middle">6 rows · variance before = 105</text>
+<line x1="380" y1="296" x2="200" y2="326" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<line x1="480" y1="296" x2="660" y2="326" stroke="var(--rule-hi)" stroke-width="1.2"/>
+<text class="sv-s" x="268" y="314" fill="var(--ok)">yes</text>
+<text class="sv-s" x="566" y="314" fill="var(--tomb)">no</text>
+<rect x="80" y="326" width="220" height="86" rx="5" fill="var(--sunk)" stroke="var(--ok)" stroke-width="1.3"/>
+<text class="sv-s" x="92" y="344" fill="var(--faint)">2 rows</text>
+<text class="sv-d" x="92" y="366" fill="var(--text)">10 · 12</text>
+<text class="sv-m" x="92" y="388" fill="var(--muted)"><tspan class="v">ȳ</tspan> = 11</text>
+<text class="sv-m" x="288" y="388" fill="var(--ok)" text-anchor="end">variance = 1</text>
+<text class="sv-s" x="92" y="404" fill="var(--dim)">two close values — little spread</text>
+<rect x="540" y="326" width="220" height="86" rx="5" fill="var(--sunk)" stroke="var(--tomb)" stroke-width="1.3"/>
+<text class="sv-s" x="552" y="344" fill="var(--faint)">4 rows</text>
+<text class="sv-d" x="552" y="366" fill="var(--text)">30 · 34 · 28 · 36</text>
+<text class="sv-m" x="552" y="388" fill="var(--muted)"><tspan class="v">ȳ</tspan> = 32</text>
+<text class="sv-m" x="748" y="388" fill="var(--tomb)" text-anchor="end">variance = 10</text>
+<text class="sv-s" x="552" y="404" fill="var(--dim)">still spread, can split further</text>
+<line x1="0" y1="428" x2="860" y2="428" stroke="var(--rule)" stroke-width="1"/>
+<rect x="0" y="444" width="3" height="20" rx="1.5" fill="var(--filled)"/>
+<text class="sv-m" x="14" y="459" fill="var(--filled)">variance after =</text>
+<text class="sv-m" x="160" y="452" text-anchor="middle" fill="var(--filled)">2</text>
+<line x1="149" y1="456" x2="171" y2="456" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-m" x="160" y="470" text-anchor="middle" fill="var(--filled)">6</text>
+<text class="sv-m" x="176" y="459" fill="var(--filled)">× 1 +</text>
+<text class="sv-m" x="232" y="452" text-anchor="middle" fill="var(--filled)">4</text>
+<line x1="221" y1="456" x2="243" y2="456" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-m" x="232" y="470" text-anchor="middle" fill="var(--filled)">6</text>
+<text class="sv-m" x="248" y="459" fill="var(--filled)">× 10 = 7</text>
+<text class="sv-s" x="380" y="459" fill="var(--dim)">weighted by size — same as §04</text>
+<rect x="600" y="444" width="3" height="20" rx="1.5" fill="var(--probe)"/>
+<text class="sv-m" x="614" y="459" fill="var(--probe)">gain = 105 − 7 = 98</text>
+<line x1="0" y1="490" x2="860" y2="490" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-h" x="0" y="516" fill="var(--filled)">STEP 3 · 4</text>
+<text class="sv-s" x="110" y="516" fill="var(--dim)">same as §04 — compare every threshold, take top gain, then repeat</text>
+<rect x="0" y="532" width="3" height="20" rx="1.5" fill="var(--ok)"/>
+<text class="sv-d" x="14" y="547" fill="var(--ok)">a leaf returns its group's mean</text>
+<text class="sv-d" x="420" y="547" fill="var(--muted)">left leaf says 11 · right leaf says 32</text>
+</svg>
+    <figcaption>Only step 1 differs. Variance replaces Gini, the mean replaces the majority label.</figcaption>
+  </figure>
+  <h3>Consequence: the graph is a staircase</h3>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 300" role="img" aria-label="The tree's regression graph: dots are real data, the staircase line is the prediction, each step is a leaf returning the mean of the group of points inside it; beyond the trained range the last step extends forever">
+<text class="sv-hv" x="0" y="18">WHAT A REGRESSION TREE SAYS AT EACH x</text>
+<text class="sv-s" x="0" y="38" fill="var(--dim)">dots = real data seen at train time · bold line = tree output</text>
+<line x1="60" y1="56" x2="60" y2="196" stroke="var(--rule)" stroke-width="1"/>
+<line x1="60" y1="196" x2="840" y2="196" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-m" x="52" y="62" fill="var(--faint)" text-anchor="end">y</text>
+<text class="sv-m" x="838" y="212" fill="var(--faint)" text-anchor="end">x</text>
+<line x1="70" y1="182" x2="560" y2="72" stroke="var(--faint)" stroke-dasharray="5 5" stroke-width="1"/>
+<text class="sv-s" x="566" y="76" fill="var(--faint)">true relation</text>
+<circle cx="80" cy="182" r="3" fill="var(--probe)"/><circle cx="110" cy="168" r="3" fill="var(--probe)"/><circle cx="140" cy="174" r="3" fill="var(--probe)"/>
+<circle cx="180" cy="158" r="3" fill="var(--probe)"/><circle cx="210" cy="144" r="3" fill="var(--probe)"/><circle cx="240" cy="148" r="3" fill="var(--probe)"/>
+<circle cx="280" cy="134" r="3" fill="var(--probe)"/><circle cx="310" cy="118" r="3" fill="var(--probe)"/><circle cx="340" cy="120" r="3" fill="var(--probe)"/>
+<circle cx="380" cy="108" r="3" fill="var(--probe)"/><circle cx="410" cy="96" r="3" fill="var(--probe)"/><circle cx="440" cy="94" r="3" fill="var(--probe)"/>
+<circle cx="480" cy="86" r="3" fill="var(--probe)"/><circle cx="510" cy="74" r="3" fill="var(--probe)"/><circle cx="540" cy="72" r="3" fill="var(--probe)"/>
+<line x1="60" y1="174" x2="160" y2="174" stroke="var(--filled)" stroke-width="2.6"/>
+<line x1="160" y1="174" x2="160" y2="150" stroke="var(--filled)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="160" y1="150" x2="260" y2="150" stroke="var(--filled)" stroke-width="2.6"/>
+<line x1="260" y1="150" x2="260" y2="124" stroke="var(--filled)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="260" y1="124" x2="360" y2="124" stroke="var(--filled)" stroke-width="2.6"/>
+<line x1="360" y1="124" x2="360" y2="99" stroke="var(--filled)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="360" y1="99" x2="460" y2="99" stroke="var(--filled)" stroke-width="2.6"/>
+<line x1="460" y1="99" x2="460" y2="77" stroke="var(--filled)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="460" y1="77" x2="560" y2="77" stroke="var(--filled)" stroke-width="2.6"/>
+<line x1="560" y1="182" x2="830" y2="182" stroke="var(--rule)" stroke-width="1"/>
+<line x1="560" y1="72" x2="830" y2="33" stroke="var(--faint)" stroke-dasharray="5 5" stroke-width="1"/>
+<text class="sv-s" x="836" y="33" fill="var(--faint)" text-anchor="end">true relation still rises</text>
+<rect x="560" y="56" width="270" height="140" fill="rgba(var(--red-a),.06)"/>
+<line x1="560" y1="77" x2="830" y2="77" stroke="var(--tomb)" stroke-width="2.6" stroke-dasharray="6 5"/>
+<line x1="700" y1="77" x2="700" y2="196" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="2 4"/>
+<circle cx="700" cy="77" r="4" fill="var(--tomb)"/>
+<line x1="160" y1="56" x2="160" y2="196" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 4"/>
+<line x1="260" y1="56" x2="260" y2="196" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 4"/>
+<line x1="360" y1="56" x2="360" y2="196" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 4"/>
+<line x1="460" y1="56" x2="460" y2="196" stroke="var(--rule)" stroke-width="1" stroke-dasharray="2 4"/>
+<line x1="560" y1="56" x2="560" y2="196" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-s" x="310" y="112" fill="var(--filled)" text-anchor="middle">mean of the 3 dots in range</text>
+<text class="sv-m" x="110" y="214" fill="var(--dim)" text-anchor="middle">leaf 1</text>
+<text class="sv-m" x="210" y="214" fill="var(--dim)" text-anchor="middle">leaf 2</text>
+<text class="sv-m" x="310" y="214" fill="var(--dim)" text-anchor="middle">leaf 3</text>
+<text class="sv-m" x="410" y="214" fill="var(--dim)" text-anchor="middle">leaf 4</text>
+<text class="sv-m" x="510" y="214" fill="var(--dim)" text-anchor="middle">leaf 5</text>
+<text class="sv-s" x="310" y="236" fill="var(--dim)" text-anchor="middle">thresholds the tree learned cut the x-axis into 5 ranges</text>
+<text class="sv-m" x="700" y="214" fill="var(--tomb)" text-anchor="middle">new x</text>
+<text class="sv-s" x="858" y="236" fill="var(--tomb)" text-anchor="end">beyond every train x → lands in leaf 5</text>
+<line x1="0" y1="256" x2="860" y2="256" stroke="var(--rule)" stroke-width="1"/>
+<rect x="0" y="268" width="3" height="20" rx="1.5" fill="var(--tomb)"/>
+<text class="sv-d" x="14" y="283" fill="var(--tomb)">leaf 5 is the highest step the tree ever learned, so every larger x gets that number — the tree underpredicts more and more</text>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Predictions take only <b>a finite set of values</b>: as many numbers as there are leaves — so the graph is a staircase, not a curve.</li>
+  </ul>
+</section>
+<section id="dtree-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Stop criteria and pruning</h2></div>
+  <p class="key">Two ways to rein it in: <em>forbid further splits</em> during training, or <em>cut some off</em> after training.</p>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 262" role="img" aria-label="Two ways to rein in a tree: on the left, pre-pruning blocks at max_depth so the lower levels never grow, the last level drawn dashed; on the right, post-pruning lets the tree grow fully then merges a grown branch into one leaf">
+<text class="sv-hv" x="0" y="18">PRE-PRUNING · BLOCK AT TRAIN</text>
+<text class="sv-hv" x="430" y="18">POST-PRUNING · CUT AFTER TRAINING</text>
+<text class="sv-h" x="396" y="60" text-anchor="end" fill="var(--dim)">d0</text>
+<text class="sv-h" x="396" y="102" text-anchor="end" fill="var(--dim)">d1</text>
+<text class="sv-h" x="396" y="144" text-anchor="end" fill="var(--dim)">d2</text>
+<text class="sv-h" x="396" y="186" text-anchor="end" fill="var(--dim)">d3</text>
+<line x1="200" y1="56" x2="120" y2="98" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="200" y1="56" x2="280" y2="98" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="120" y1="98" x2="80" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="120" y1="98" x2="160" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="280" y1="98" x2="240" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="280" y1="98" x2="320" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="80" y1="140" x2="60" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="80" y1="140" x2="100" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="160" y1="140" x2="140" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="160" y1="140" x2="180" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="240" y1="140" x2="220" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="240" y1="140" x2="260" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="320" y1="140" x2="300" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="320" y1="140" x2="340" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="200" cy="56" r="8" fill="var(--filled)"/>
+<circle cx="120" cy="98" r="7" fill="var(--filled)"/>
+<circle cx="280" cy="98" r="7" fill="var(--filled)"/>
+<circle cx="80" cy="140" r="7" fill="var(--probe)"/>
+<circle cx="160" cy="140" r="7" fill="var(--probe)"/>
+<circle cx="240" cy="140" r="7" fill="var(--probe)"/>
+<circle cx="320" cy="140" r="7" fill="var(--probe)"/>
+<circle cx="60" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="100" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="140" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="180" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="220" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="260" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="300" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="340" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="0" y1="161" x2="370" y2="161" stroke="var(--probe)" stroke-width="1" stroke-dasharray="4 4"/>
+<text class="sv-l" x="0" y="126" fill="var(--probe)">max_depth = 2</text>
+<text class="sv-s" x="0" y="212" fill="var(--dim)">this level never grows — the machine never saw it</text>
+<line x1="630" y1="56" x2="550" y2="98" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="630" y1="56" x2="710" y2="98" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="550" y1="98" x2="510" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="550" y1="98" x2="590" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="710" y1="98" x2="670" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="710" y1="98" x2="750" y2="140" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="510" y1="140" x2="490" y2="182" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="510" y1="140" x2="530" y2="182" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="590" y1="140" x2="570" y2="182" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="590" y1="140" x2="610" y2="182" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="670" y1="140" x2="650" y2="182" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="670" y1="140" x2="690" y2="182" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="750" y1="140" x2="730" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<line x1="750" y1="140" x2="770" y2="182" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="630" cy="56" r="8" fill="var(--filled)"/>
+<circle cx="550" cy="98" r="7" fill="var(--filled)"/>
+<circle cx="710" cy="98" r="7" fill="var(--filled)"/>
+<circle cx="510" cy="140" r="7" fill="var(--filled)"/>
+<circle cx="590" cy="140" r="7" fill="var(--filled)"/>
+<circle cx="670" cy="140" r="7" fill="var(--filled)"/>
+<circle cx="750" cy="140" r="7" fill="var(--probe)"/>
+<circle cx="490" cy="182" r="6" fill="var(--ok)"/>
+<circle cx="530" cy="182" r="6" fill="var(--ok)"/>
+<circle cx="570" cy="182" r="6" fill="var(--ok)"/>
+<circle cx="610" cy="182" r="6" fill="var(--ok)"/>
+<circle cx="650" cy="182" r="6" fill="var(--ok)"/>
+<circle cx="690" cy="182" r="6" fill="var(--ok)"/>
+<circle cx="730" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<circle cx="770" cy="182" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/>
+<rect x="716" y="126" width="68" height="70" rx="6" fill="none" stroke="var(--tomb)" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M750 122 V108 H840" stroke="var(--tomb)" stroke-width="1" fill="none"/>
+<path d="M834 104 l6 4 -6 4" fill="none" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-l" x="860" y="92" text-anchor="end" fill="var(--tomb)">merged into one leaf</text>
+<text class="sv-s" x="430" y="212" fill="var(--dim)">grow fully then try merges, keep those that don't hurt validation</text>
+<circle cx="8" cy="240" r="6" fill="var(--filled)"/><text class="sv-d" x="22" y="244" fill="var(--muted)">still splitting</text>
+<circle cx="146" cy="240" r="6" fill="var(--probe)"/><text class="sv-d" x="160" y="244" fill="var(--muted)">leaf because reined in</text>
+<circle cx="322" cy="240" r="6" fill="var(--ok)"/><text class="sv-d" x="336" y="244" fill="var(--muted)">natural leaf</text>
+<circle cx="496" cy="240" r="6" fill="none" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="2 2"/><text class="sv-d" x="510" y="244" fill="var(--muted)">not in the final tree</text>
+</svg>
+    <figcaption>The same tree, two moments to intervene. Pre-pruning decides <strong>before seeing</strong> the lower levels; post-pruning decides <strong>having seen the whole tree</strong> — that is the whole trade-off between the two columns in the table.</figcaption>
+  </figure>
+  <table>
+    <tr><th></th><th>Pre-pruning · stop criteria</th><th>Post-pruning</th></tr>
+    <tr><td>When</td><td>Forbid splitting during training</td><td>Grow fully, then cut back from the leaves up</td></tr>
+    <tr><td>Parameters</td><td><code>max_depth</code> · <code>min_samples_leaf</code> · <code>min_impurity_decrease</code></td><td><code>ccp_alpha</code> — the larger, the harder it cuts</td></tr>
+    <tr><td>Basis for cutting</td><td>Preset thresholds: too deep, too few samples in a leaf, gain too low</td><td>Merge a branch into a leaf, keep it if the validation score does not get worse</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>The default is <b>no reining in</b> — the tree grows to one sample per leaf; you must set at least the depth yourself.</li>
+    <li>Pre-pruning is fast so it is usually tried first; post-pruning is more accurate because it <b>sees the whole tree</b>.</li>
+    <li>The stronger cure is in the next lesson: <b>do not rein in one tree, grow many trees</b>.</li>
+  </ul>
+</section>
+<section id="dtree-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Loss function</h2></div>
+  <p class="key">A tree does not follow the gradient of a smooth function. What it minimizes is <em>error on train plus a penalty for each leaf</em>.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><b class="fn">R</b><sub>α</sub>(<var>T</var>)</span><em>total cost of a tree</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span><b class="fn">R</b>(<var>T</var>)</span><em>error rate on train</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span>α · |<var>T</var>|</span><em>penalty per leaf</em></span>
+    </div>
+  </div>
+  <dl class="defs">
+    <dt><var>T</var></dt><dd>the tree under consideration, <span class="mth">|<var>T</var>|</span> is its number of leaves</dd>
+    <dt><b class="fn">R</b>(<var>T</var>)</dt><dd>the share of training data the tree gets wrong</dd>
+    <dt><span class="mth"><var>α</var></span></dt><dd>the price paid per leaf — set via <code>ccp_alpha</code></dd>
+  </dl>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 306" role="img" aria-label="A tree does not minimize a smooth function but cost-complexity: error on train plus alpha times the number of leaves; small alpha keeps 62 leaves and 19.3 percent test error, medium alpha keeps 14 leaves and 14.2 percent error, large alpha cuts down to 2 leaves and 32.5 percent error"><style>@keyframes lfin{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:no-preference){}.sy{transform-box:fill-box;transform-origin:50% 100%}.sy *{vector-effect:non-scaling-stroke}</style><text class="sv-d" x="10" y="20" fill="var(--muted)" style="fill:var(--muted)">same full-grown tree · only change α, then re-prune</text><text class="sv-d" x="560" y="20" fill="var(--faint)" style="fill:var(--faint)">leaves left</text><text class="sv-d" x="10" y="68" fill="var(--text)" style="fill:var(--text)">small α</text><text class="sv-d" x="10" y="88" fill="var(--faint)" style="fill:var(--faint)">memorizes train</text><text class="sv-d" x="158" y="66" fill="var(--filled)" style="fill:var(--filled)" text-anchor="end">train</text><rect x="168" y="54" width="3" height="16" rx="4" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="181" y="66" fill="var(--filled)" style="fill:var(--filled)">0.0%</text><text class="sv-d" x="158" y="94" fill="var(--probe)" style="fill:var(--probe)" text-anchor="end">test</text><rect x="168" y="82" width="57.9" height="16" rx="4" fill="rgba(var(--amber-a),.30)" stroke="var(--probe)" stroke-width="1.2"/><text class="sv-d" x="235.9" y="94" fill="var(--probe)" style="fill:var(--probe)">19.3%</text><text class="sv-d" x="586" y="82" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">62</text><rect x="0" y="124" width="660" height="72" rx="6" fill="none" stroke="var(--ok)" stroke-width="1.3"/><text class="sv-d" x="10" y="150" fill="var(--ok)" style="fill:var(--ok)">mid α</text><text class="sv-d" x="10" y="170" fill="var(--faint)" style="fill:var(--faint)">few leaves, best test</text><text class="sv-d" x="158" y="148" fill="var(--filled)" style="fill:var(--filled)" text-anchor="end">train</text><rect x="168" y="136" width="26.099999999999998" height="16" rx="4" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="204.1" y="148" fill="var(--filled)" style="fill:var(--filled)">8.7%</text><text class="sv-d" x="158" y="176" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">test</text><rect x="168" y="164" width="42.599999999999994" height="16" rx="4" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="220.6" y="176" fill="var(--ok)" style="fill:var(--ok)">14.2%</text><text class="sv-d" x="586" y="164" fill="var(--ok)" style="fill:var(--ok)" text-anchor="end">14</text><text class="sv-d" x="10" y="232" fill="var(--text)" style="fill:var(--text)">large α</text><text class="sv-d" x="10" y="252" fill="var(--faint)" style="fill:var(--faint)">over-pruned</text><text class="sv-d" x="158" y="230" fill="var(--filled)" style="fill:var(--filled)" text-anchor="end">train</text><rect x="168" y="218" width="89.1" height="16" rx="4" fill="rgba(var(--blue-a),.30)" stroke="var(--filled)" stroke-width="1.2"/><text class="sv-d" x="267.1" y="230" fill="var(--filled)" style="fill:var(--filled)">29.7%</text><text class="sv-d" x="158" y="258" fill="var(--tomb)" style="fill:var(--tomb)" text-anchor="end">test</text><rect x="168" y="246" width="97.5" height="16" rx="4" fill="rgba(var(--red-a),.30)" stroke="var(--tomb)" stroke-width="1.2"/><text class="sv-d" x="275.5" y="258" fill="var(--tomb)" style="fill:var(--tomb)">32.5%</text><text class="sv-d" x="586" y="246" fill="var(--muted)" style="fill:var(--muted)" text-anchor="end">2</text><text class="sv-d" x="10" y="296" fill="var(--muted)" style="fill:var(--muted)">too few leaves underfit, too many memorize — α is where you choose between them</text></svg>
+    <figcaption>Measured on 400 points, circular boundary, 8% label noise.</figcaption>
+  </figure>
+  <ul class="why">
+    <li>At <span class="mth"><var>α</var> = 0</span> the tree grows to <b>62 leaves</b>, <b>0%</b> error on train but <b>19.3%</b> on test — a formula that penalizes nothing reins in nothing.</li>
+    <li>The gain at each node <b>jumps in steps</b> with the threshold, not continuously — so a tree tries everything; there is no derivative to follow.</li>
+  </ul>
+</section>
+<section id="dtree-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Pros and cons</h2></div>
+
+  <p class="key">Every strength of a tree comes from <em>comparing within one column at a time</em>. Every weakness comes from exactly the same place.</p>
+
+  <table>
+    <tr><th>Aspect</th><th>Pros</th><th>Cons</th></tr>
+    <tr><td>Preparation</td><td>No <b>scaling</b> needed</td><td>—</td></tr>
+    <tr><td>Reading the model</td><td>Print the tree and it becomes if-else rules</td><td>—</td></tr>
+    <tr><td>Column types</td><td>Numeric and categorical share one tree</td><td>—</td></tr>
+    <tr><td>Prediction range</td><td>—</td><td>No <b>extrapolation</b>: train on prices of 1–5 billion and it only ever predicts within 1–5 billion</td></tr>
+    <tr><td>Stability</td><td>—</td><td>Change a few rows and the whole tree is completely different</td></tr>
+    <tr><td>Accuracy</td><td>—</td><td>One tree usually loses to a forest of trees</td></tr>
+    <tr><td>Defaults</td><td>—</td><td><code>max_depth</code> defaults to <b>unlimited</b> — leave it unset and the tree splits to one sample per leaf</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Choose a single tree when you need to <b>explain every prediction</b>: application review, processes with a human checker.</li>
+    <li>Instability sounds like bad news, but <b>it is exactly what makes Random forest work</b>.</li>
+    <li>Choose <code>max_depth</code> and <code>ccp_alpha</code> by <b>cross-validation</b>, not by eyeballing a picture of the tree.</li>
+    <li>For more accuracy, move on to <a href="../random-forest/index.html">Random forest</a> or <a href="../xgboost/index.html">XGBoost</a>.</li>
+  </ul>
+</section>
+<footer>Machine learning · Tree models · next lesson in the branch: <a href="../random-forest/index.html">Random forest</a>.</footer>
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+</div>
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

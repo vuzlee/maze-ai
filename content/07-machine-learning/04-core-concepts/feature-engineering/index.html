@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature engineering — MazeAI</title>
+<meta name="description" content="Encoding categoricals, handling missing values, scaling, interaction features — and when to let the model handle it.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/04-core-concepts/feature-engineering/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Feature engineering">
+<meta property="og:description" content="Encoding categoricals, handling missing values, scaling, interaction features — and when to let the model handle it.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/04-core-concepts/feature-engineering/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-feat" data-title="Feature engineering" data-tag="ML" data-blurb="Encoding categoricals, handling missing values, scaling, interaction features — and when to let the model handle it.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Core concepts</p>
+  <h1>Feature <em>engineering</em></h1>
+  <p class="lede">On tabular data, this is usually where <b>you gain more than by switching models</b>. Four jobs — encode, impute, scale, create new features — each with one question attached: <em>does the model I'm using actually need this</em>.</p>
+</header>
+
+<section id="feat-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The whole lesson is the <em>four ideas</em> below. Each later section redraws this map and highlights the box being covered.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="map of the four ideas of feature engineering: categorical variables, missing values, scaling, and creating new features">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CATEGORICAL</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">one-hot · target · ordinal</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MISSING DATA</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">random, or missing for a reason</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ SCALING</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">only some models need it</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ NEW FEATURES</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">from domain knowledge</text>
+<text class="sv-hv" x="372" y="18">THE LESSON, FOUR IDEAS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Three cleanup jobs, one creative</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">first three are musts; the last earns points</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Every step here must fit on train</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">fit on all data = leakage, the most common mistake</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Needs differ by model</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">trees don't need scaling; linear models must</text>
+</svg>
+  <figcaption>The map of the whole lesson. Each later section redraws it and <strong>highlights the box being covered</strong>.</figcaption>
+  </figure>
+</section>
+
+<section id="feat-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Categorical variables</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="map of the four ideas of feature engineering: categorical variables, missing values, scaling, and creating new features">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--probe)">① CATEGORICAL</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">one-hot · target · ordinal</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MISSING DATA</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">random, or missing for a reason</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ SCALING</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">only some models need it</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ NEW FEATURES</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">from domain knowledge</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">CATEGORICAL: THREE WAYS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">One-hot — safe, but widens data</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">for few values with no natural order</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Target encoding — replace with label mean</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">powerful but leaks easily; do it per fold</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Ordinal — only for a real order</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">S < M < L is fine; city names are not</text>
+</svg>
+  <figcaption>Box ① — categorical variables, three ways.</figcaption>
+  </figure>
+
+
+  <p class="key">Models only take numbers. The problem is <em>turning text into numbers without inventing an order that isn't there</em>.</p>
+
+  <table>
+    <tr><th>Method</th><th>Mechanism</th><th>Use when</th><th>Cost</th></tr>
+    <tr><td><b>One-hot</b></td><td>Each value becomes a 0/1 column</td><td>Few distinct values (under ~15), linear models</td><td>Dimensionality explodes with many values</td></tr>
+    <tr><td><b>Ordinal</b></td><td>Assign integers in order</td><td>Values <em>really</em> are ordered — small/medium/large</td><td>Invents an order if used in the wrong place</td></tr>
+    <tr><td><b>Target encoding</b></td><td>Replace each value with the mean label of its group</td><td>Very many values — postal codes, product IDs</td><td><em>Label leakage</em> if you're not careful</td></tr>
+    <tr><td><b>Hashing</b></td><td>Hash values into n fixed buckets</td><td>Number of values unknown in advance, streaming data</td><td>Hash collisions, loss of interpretability</td></tr>
+  </table>
+
+  <p class="key">The quietest bug in the table is <em>ordinal on a variable with no inherent order</em>:</p>
+
+  <div class="axis">
+    <div class="stop"><b>1</b><span>Paris</span></div>
+    <div class="stop on"><b>2</b><span>Rome</span></div>
+    <div class="stop"><b>3</b><span>Berlin</span></div>
+  </div>
+  <p class="axiscap"><span>assign integers to three cities</span><span><em>a linear model reads it as: Rome lies between the other two cities</em></span><span>a relationship that doesn't exist</span></p>
+
+  <ul class="why">
+    <li>Trees suffer less because they only split on thresholds — but they spend many splits on what should take one.</li>
+  </ul>
+
+  <p class="key">Target encoding, on the other hand, leaks like this: <em>the row's own label goes into the number used to encode it</em>.</p>
+
+  <div class="strip">
+    <div class="c"><i>product ID</i><b>A</b><u>label 1</u></div>
+    <div class="c"><i>product ID</i><b>A</b><u>label 0</u></div>
+    <div class="c"><i>product ID</i><b>A</b><u>label 1</u></div>
+    <div class="c on"><i>product ID — only 1 row</i><b>Z</b><u>label 0</u></div>
+  </div>
+  <div class="strip">
+    <div class="c t"><i>encoded column</i><b>0.67</b><u>mean of 3 rows</u></div>
+    <div class="c t"><i>encoded column</i><b>0.67</b><u></u></div>
+    <div class="c t"><i>encoded column</i><b>0.67</b><u></u></div>
+    <div class="c f"><i>encoded column</i><b>0.00</b><u>is the label itself</u></div>
+  </div>
+  <p class="stripnote"><span>for a large group, the mean is still a mean</span><span><em>for a one-row group, the encoded column copies the label — the model just reads it off</em></span></p>
+
+  <ul class="why">
+    <li>Fix it with three things: compute the mean <b>within each fold</b>, <b>leave the current row out</b>, <b>smooth toward the global mean</b>.</li>
+  </ul>
+</section>
+
+<section id="feat-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Missing values</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="map of the four ideas of feature engineering: categorical variables, missing values, scaling, and creating new features">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CATEGORICAL</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">one-hot · target · ordinal</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--tomb)">② MISSING DATA</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">random, or missing for a reason</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ SCALING</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">only some models need it</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ NEW FEATURES</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">from domain knowledge</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">WHY IS IT MISSING?</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Random gaps ⇒ just impute</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">numeric: median; categorical: mode</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Missing for a reason ⇒ it's a signal</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">undisclosed income is rarely random</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Add a was-missing flag column</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">keeps the info that imputing just erased</text>
+</svg>
+  <figcaption>Box ② — missing at random or for a reason.</figcaption>
+  </figure>
+
+
+  <p class="key">The question isn't "what to fill it with" but <em>why it is missing</em> — the fact of being missing often carries information.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Missing at random</h5>
+      <p>Broken sensor, logging error.</p>
+      <p><b>Handling</b> fill with the median (numeric) or mode (categorical).</p>
+      <p>Nothing significant is lost.</p>
+    </div>
+    <div>
+      <h5>Missing with meaning</h5>
+      <p>Income left blank because it's low; no history because the customer is new.</p>
+      <p><b>Handling</b> fill <em>and</em> add a <code>was_missing</code> flag column.</p>
+      <p>Dropping the flag column throws away a strong signal.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>XGBoost and LightGBM <b>handle missing values inside the algorithm</b>: each node learns which branch to send them to.</li>
+    <li>Dropping rows with missing values is a dangerous choice: if the missingness isn't random, you've just deleted a specific subpopulation.</li>
+    <li>Every imputation step must be fit on the <b>training set</b> and then applied to the evaluation sets — see <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</li>
+  </ul>
+</section>
+
+<section id="feat-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Scaling</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="map of the four ideas of feature engineering: categorical variables, missing values, scaling, and creating new features">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CATEGORICAL</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">one-hot · target · ordinal</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MISSING DATA</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">random, or missing for a reason</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--filled)">③ SCALING</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">only some models need it</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ NEW FEATURES</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">from domain knowledge</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">WHO NEEDS SCALING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Yes: linear, SVM, k-NN, neural nets</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">anything using distances or gradients</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">No: tree-based models</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">trees only compare; units don't matter</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Standard hay MinMax</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">with outliers, use RobustScaler instead</text>
+</svg>
+  <figcaption>Box ③ — which models need scaling.</figcaption>
+  </figure>
+
+
+  <p class="key">Not every model needs it. <em>Whether it does depends on whether the model uses distances or gradients.</em></p>
+
+  <table>
+    <tr><th>Model</th><th>Needs scaling?</th><th>Why</th></tr>
+    <tr><td>Trees, Random Forest, Gradient Boosting</td><td><b>No</b></td><td>Only compares thresholds within each column; units don't matter</td></tr>
+    <tr><td>KNN, SVM, K-means</td><td><b>Required</b></td><td>Uses distances — a column with large units drowns out all the others</td></tr>
+    <tr><td>Linear regression with regularization</td><td><b>Required</b></td><td>The L1/L2 penalty applies to the weights, and the weights depend on units</td></tr>
+    <tr><td>Neural networks</td><td><b>Required</b></td><td>Gradient descent converges slowly and unstably when dimensions are on different scales</td></tr>
+    <tr><td>Plain linear regression</td><td>Not required</td><td>The solution doesn't change; it only helps iterative solvers converge faster</td></tr>
+  </table>
+
+  <p class="key">Why distance-based models <em>require</em> it: when two columns differ in units, the large one swallows the other.</p>
+
+  <div class="bars">
+    <div class="b bad"><i>income gap (VND)</i><u style="width:100%"></u><b>2,000,000 — contributes nearly all of the distance</b></div>
+    <div class="b"><i>age gap (years)</i><u style="width:1%"></u><b>5 — as good as nonexistent</b></div>
+  </div>
+  <p class="stripnote"><span>the same Euclidean distance</span><span><em>after scaling, the two columns finally weigh the same</em></span></p>
+
+  <div class="cmp two">
+    <div><h5>Standardization</h5><p>Shift to mean 0, standard deviation 1.</p><p><b>Good default</b> — tolerates moderate outliers.</p></div>
+    <div><h5>Min-max</h5><p>Squeeze into the range [0, 1].</p><p>Use it when you need clear bounds, but <b>one big enough outlier pushes everything else close to 0</b>.</p></div>
+  </div>
+
+  <ul class="why">
+    <li>Heavily skewed features — income, view counts — should be <b>log-transformed before scaling</b>.</li>
+    <li>With data full of outliers, <code>RobustScaler</code> uses the median and interquartile range and is far safer than the two above.</li>
+  </ul>
+</section>
+
+<section id="feat-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Creating new features</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="map of the four ideas of feature engineering: categorical variables, missing values, scaling, and creating new features">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CATEGORICAL</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">one-hot · target · ordinal</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MISSING DATA</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">random, or missing for a reason</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ SCALING</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">only some models need it</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">④ NEW FEATURES</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">from domain knowledge</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">NEW FEATURES — WHERE YOU SCORE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">A ratio beats two raw numbers</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">price per m² says more than price and area</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Split time into components</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">hour of day, day of week, holiday or not</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Pool rare values</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">values seen just a few times are noise</text>
+</svg>
+  <figcaption>Box ④ — creating new features.</figcaption>
+  </figure>
+
+
+  <p class="key">A linear model only adds columns together. <em>If you want it to see a multiplicative or curved relationship, you have to feed it that column ready-made.</em></p>
+
+  <table>
+    <tr><th>Type</th><th>Example</th><th>What it captures</th></tr>
+    <tr><td><b>Ratio</b></td><td><code>debt / income</code>, <code>price / area</code></td><td>A relationship that neither column shows on its own</td></tr>
+    <tr><td><b>Interaction</b></td><td><code>age × income</code></td><td>The effect of one column depends on the other</td></tr>
+    <tr><td><b>Nonlinear</b></td><td><code>x²</code>, <code>log(x)</code></td><td>Curved relationships</td></tr>
+    <tr><td><b>Time</b></td><td>Day of week, hour of day, days since last purchase</td><td>Cycles and recency — a raw <code>timestamp</code> column is nearly useless</td></tr>
+    <tr><td><b>Group aggregates</b></td><td>Customer's average spend over the last 30 days</td><td>Historical context; <em>must be cut off at the prediction time</em></td></tr>
+  </table>
+
+  <p><b>Trees and ensembles find interactions on their own</b> — every path from root to leaf is itself a combination of conditions.</p>
+
+  <ul class="why">
+    <li>On tabular data with boosting, effort spent on <b>interaction features</b> usually pays off little.</li>
+    <li>Far more worth the effort are features that <em>carry new domain information</em>: a column like "days since the last complaint" is something no algorithm can invent by itself.</li>
+      <li>The general dividing line: <b>on tabular data, feature engineering decides the result</b>; for images, audio and text, let the neural network learn the features.</li>
+    <li>More features is not better: every added column adds variance — see <a href="../overfitting-regularization/index.html">Overfitting &amp; regularization</a>.</li>
+    <li>Group aggregate features are the <b>number one source of leakage</b>: it is very easy to average over future data too.</li>
+  </ul>
+</section>
+
+<section id="feat-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Common mistakes</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Target encoding computed on the whole dataset</h4><p>The row's own label leaks into the encoded column. Compute it within each fold and leave the current row out.</p></div>
+    <div class="card bad"><h4>Fitting the scaler before splitting the data</h4><p>The mean and standard deviation already contain information from the evaluation set. Use a <code>Pipeline</code>.</p></div>
+    <div class="card bad"><h4>Ordinal on a variable with no order</h4><p>Invents a greater/less relationship between cities or categories. Use one-hot.</p></div>
+    <div class="card bad"><h4>One-hot on a column with thousands of values</h4><p>Dimensionality explodes, the matrix is sparse, the model is slow and overfits. Use target encoding or hashing.</p></div>
+    <div class="card bad"><h4>Imputing missing values, then dropping the flag column</h4><p>Throws away the "why it's missing" information, which is often a stronger signal than the imputed value itself.</p></div>
+    <div class="card bad"><h4>Aggregate features not cut off by time</h4><p>The mean is computed over future data too. Great offline score, collapse in production.</p></div>
+  </div>
+</section>
+
+
+<footer>Machine learning · Core concepts · preparing features. Name the problem type in <a href="../supervised-unsupervised/index.html">Supervised, unsupervised &amp; reinforcement</a>; avoid leakage in <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROC-AUC & PR curve — MazeAI</title>
+<meta name="description" content="Two curves for when the threshold is not fixed yet: the probabilistic meaning of AUC, why ROC lies when positives are rare, and why the PR-AUC baseline is not 0.5.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/09-evaluation/roc-auc-pr/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="ROC-AUC &amp; PR curve">
+<meta property="og:description" content="Two curves for when the threshold is not fixed yet: the probabilistic meaning of AUC, why ROC lies when positives are rare, and why the PR-AUC baseline is not 0.5.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/09-evaluation/roc-auc-pr/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-roc" data-title="ROC-AUC &amp; PR curve" data-tag="Evaluation" data-blurb="Two curves for when the threshold is not fixed yet: the probabilistic meaning of AUC, why ROC lies when positives are rare, and why the PR-AUC baseline is not 0.5.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Model evaluation</p>
+  <h1>ROC-AUC &amp; PR <em>curve</em></h1>
+  <p class="lede">Continuing from <a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a>: when <b>the threshold is not fixed yet</b>, what do you evaluate a model with — and why two curves drawn from the same model tell opposite stories.</p>
+</header>
+
+<section id="roc-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The lesson is the <em>four parts</em> below. Every later section redraws this map and highlights the box being studied.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="four-part map: from confusion matrix to curve, reading ROC and AUC, PR curve, and which curve to pick">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CONFUSION MATRIX</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">vary threshold ⇒ get a curve</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② ROC & AUC</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">TPR vs FPR · AUC = prob. of right order</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ PR CURVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">precision vs recall</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ WHICH CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">imbalanced→PR, balanced→ROC</text>
+<text class="sv-hv" x="372" y="18">THE LESSON IN FOUR PARTS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">One model, many thresholds, many matrices</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">join them and you get a curve</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Two curves, two different questions</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">ROC asks about both classes, PR only positives</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Pick the wrong curve, wrong conclusion</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">heavy imbalance is where ROC lies</text>
+</svg>
+  <figcaption>Map of the whole lesson. Every later section redraws this figure and <strong>highlights the box being studied</strong>.</figcaption>
+  </figure>
+</section>
+
+<section id="roc-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>From confusion matrix to curve</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="four-part map: from confusion matrix to curve, reading ROC and AUC, PR curve, and which curve to pick">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--probe)">① CONFUSION MATRIX</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">vary threshold ⇒ get a curve</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② ROC & AUC</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">TPR vs FPR · AUC = prob. of right order</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ PR CURVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">precision vs recall</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ WHICH CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">imbalanced→PR, balanced→ROC</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">1 THRESHOLD, 1 MATRIX</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Model gives scores, not labels</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">labels only appear once a threshold is set</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">New threshold ⇒ 4 new cells</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">lower threshold: catch more, but more false alarms too</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Sweep every threshold ⇒ a curve</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">so the curve is about the MODEL, not 1 threshold</text>
+</svg>
+  <figcaption>Box ① — one threshold, one matrix.</figcaption>
+  </figure>
+
+
+  <p class="key">A confusion matrix needs a threshold to be computed. <em>But the threshold is a business decision, made later — so we need an evaluation that does not depend on it.</em></p>
+
+  <p>The model does not return labels but <b>scores</b>, usually probabilities.</p>
+
+  <ul class="why">
+    <li>Set the threshold at 0.5 and you get one confusion matrix, set it at 0.3 and you get another — lowering the threshold makes <b>recall rise and precision fall</b>.</li>
+    <li>Each threshold is one point; sweep every threshold and the points join into a <b>curve</b>.</li>
+  </ul>
+
+  <div class="flow">
+    <div class="n"><h5>Scores</h5><p>the model ranks every sample by how confident it is that it is positive</p></div>
+    <div class="a act"><i>pick a threshold</i>&#8594;</div>
+    <div class="n"><h5>One confusion matrix</h5><p>one pair of metrics</p></div>
+    <div class="a act"><i>sweep every threshold</i>&#8594;</div>
+    <div class="n"><h5>One point per threshold</h5><p>scattered as a cloud of points on the plane</p></div>
+    <div class="a act"><i>join them</i>&#8594;</div>
+    <div class="n ok"><h5>Curve</h5><p>the area under it = one single number</p></div>
+  </div>
+
+  <ul class="why">
+    <li>The two curves differ only in <b>which pair of metrics forms the two axes</b>: ROC uses FPR–TPR, PR uses recall–precision.</li>
+    <li>AUC measures <b>ranking ability</b>, not decision quality: a perfect ranking still makes bad decisions if the threshold is wrong.</li>
+    <li>Neither one <b>says anything about whether the probabilities can be trusted</b> — that is axis three, in <a href="../calibration/index.html">Probability calibration</a>.</li>
+  </ul>
+</section>
+
+<section id="roc-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Reading ROC &amp; what AUC means</h2></div>
+
+  <p class="key">AUC has an exact probabilistic interpretation, and it is worth remembering that one rather than "area under the curve".</p>
+
+  <figure>
+    <svg viewBox="0 0 900 260" role="img" aria-label="Three ROC curves: perfect, good, and the random diagonal">
+      <line x1="90" y1="24" x2="90" y2="200" stroke="var(--rule-hi)"></line>
+      <line x1="90" y1="200" x2="330" y2="200" stroke="var(--rule-hi)"></line>
+      <text class="sv-l" x="80" y="28" text-anchor="end">TPR 1</text>
+      <text class="sv-l" x="210" y="220" text-anchor="middle">FPR →</text>
+      <line x1="90" y1="200" x2="330" y2="24" stroke="var(--faint)" stroke-dasharray="5 4"></line>
+      <path d="M90 200 C130 100 200 44 330 24" fill="none" stroke="var(--ok)" stroke-width="2.5"></path>
+      <text class="sv-l" x="330" y="60" text-anchor="end" fill="var(--ok)">AUC 0.90</text>
+      <text class="sv-l" x="330" y="176" text-anchor="end" fill="var(--faint)">AUC 0.50</text>
+
+      <text class="sv-t" x="430" y="40" fill="var(--text)">AUC = probability a <tspan fill="var(--ok)">positive</tspan> scores higher than a <tspan fill="var(--tomb)">negative</tspan>,</text>
+      <text class="sv-t" x="430" y="62" fill="var(--text)">drawing one of each at random.</text>
+      <g>
+        <text class="sv-l" x="430" y="94">draw 10 pairs:</text>
+        <g>
+          <rect x="430" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="470" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="510" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="550" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="590" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="630" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="670" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="710" y="106" width="34" height="26" rx="4" fill="rgba(var(--green-a),.14)" stroke="var(--ok)"></rect>
+          <rect x="750" y="106" width="34" height="26" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)"></rect>
+          <rect x="790" y="106" width="34" height="26" rx="4" fill="rgba(var(--red-a),.14)" stroke="var(--tomb)"></rect>
+        </g>
+        <text class="sv-l" x="430" y="152" fill="var(--ok)">8 pairs ordered right</text>
+        <text class="sv-l" x="750" y="152" fill="var(--tomb)">2 wrong</text>
+        <text class="sv-t" x="430" y="184" fill="var(--probe)">→ AUC = 0.80</text>
+      </g>
+      <text class="sv-l" x="430" y="222">0.5 = random ranking · 1.0 = perfect separation</text>
+    </svg>
+  </figure>
+
+  <table>
+    <tr><th>Pros</th><th>Cons</th></tr>
+    <tr><td>Threshold-independent — measures <em>ranking ability</em></td><td><strong>Independent of class ratio</strong> — sounds nice but is exactly the trap</td></tr>
+    <tr><td>Comparable across models on the same data</td><td>Says nothing about whether the probabilities are calibrated</td></tr>
+    <tr><td>Clear probabilistic meaning, easy to explain</td><td>Treats FP and FN the same, even though their real costs differ</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Both ROC axes are rates <b>within a single class</b>: TPR divides by the total positives, FPR divides by the total negatives.</li>
+    <li>So when negatives outnumber positives a thousand to one, FPR still looks small even though the absolute FP count is huge.</li>
+    <li>A model can have ROC-AUC 0.95 and be completely unusable — the next section has concrete numbers.</li>
+  </ul>
+</section>
+
+<section id="roc-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>PR curve — with concrete numbers</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="four-part map: from confusion matrix to curve, reading ROC and AUC, PR curve, and which curve to pick">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CONFUSION MATRIX</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">vary threshold ⇒ get a curve</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② ROC & AUC</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">TPR vs FPR · AUC = prob. of right order</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--ok)">③ PR CURVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">precision vs recall</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ WHICH CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">imbalanced→PR, balanced→ROC</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PR CURVE — POSITIVES ONLY</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Precision: of flagged, how many are right</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">recall: of those to catch, how many caught</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Neither uses the true negative cell</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">so a crowd of negatives can't flatter the score</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Baseline = positive rate</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">at 1% positives, AP 0.10 is already 10× random guess</text>
+</svg>
+  <figcaption>Box ③ — the PR curve looks only at the positive class.</figcaption>
+  </figure>
+
+
+  <p class="key">Same model, same dataset. <em>ROC says "excellent", PR says "only 1 in every 10 alerts is right".</em></p>
+
+  <p>10,000 transactions, of which <b>100 are fraud</b>. The model catches all 100, but raises false alarms on <b>900</b> normal ones.</p>
+
+  <div class="cmp two">
+    <div>
+      <h5>What ROC sees</h5>
+      <p>FPR = 900 / <b>9,900 normal cases</b></p>
+      <p><b>= 0.09</b> — only 9%, sounds great</p>
+    </div>
+    <div>
+      <h5>What PR sees</h5>
+      <p>precision = 100 / <b>1,000 alerts</b></p>
+      <p><b>= 0.10</b> — 9 in 10 alerts are wrong</p>
+    </div>
+  </div>
+  <p class="stripnote"><span>same model, same dataset</span><span><em>the only difference is the denominator</em></span></p>
+
+  <div class="bars">
+    <div class="b"><i>FPR denominator — number of normal cases</i><u style="width:100%"></u><b>9,900</b></div>
+    <div class="b hi"><i>precision denominator — number of alerts</i><u style="width:10%"></u><b>1,000 · exactly the pile a real person must review</b></div>
+  </div>
+
+  <table>
+    <tr><th></th><th>ROC-AUC</th><th>PR-AUC</th></tr>
+    <tr><td>Axis</td><td>FPR — divides by NEGATIVES</td><td>Precision — divides by PREDICTED POSITIVES</td></tr>
+    <tr><td>Affected by class ratio</td><td>No</td><td><strong>Yes</strong> — and that is what we want</td></tr>
+    <tr><td>Baseline of a random model</td><td>Always 0.5</td><td>Equal to the positive class rate — 0.01 in the example above</td></tr>
+    <tr><td>Use when</td><td>The two classes are fairly balanced; both classes matter</td><td><strong>The positive class is rare</strong> and is the one you care about</td></tr>
+  </table>
+
+  <p><strong>Worth remembering:</strong> the PR-AUC baseline is not 0.5 but the positive class rate itself.</p>
+  <p>So a PR-AUC of 0.30 on data with 1% positives is a <em>very good</em> result — 30× the random level. Without knowing this, it is easy to think the model is bad.</p>
+</section>
+
+<section id="roc-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Which curve to pick</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 260" role="img" aria-label="four-part map: from confusion matrix to curve, reading ROC and AUC, PR curve, and which curve to pick">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① CONFUSION MATRIX</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">vary threshold ⇒ get a curve</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② ROC & AUC</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">TPR vs FPR · AUC = prob. of right order</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ PR CURVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">precision vs recall</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--tomb)">④ WHICH CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">imbalanced→PR, balanced→ROC</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">WHICH CURVE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Balanced ⇒ ROC</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">easy to read, baseline is 0.5</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Imbalanced ⇒ PR</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">ROC looks good: FPR divides by 1M true negatives</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Say AUC, say which curve</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">ROC-AUC and PR-AUC are two numbers</text>
+</svg>
+  <figcaption>Box ④ — which curve to pick.</figcaption>
+  </figure>
+
+
+  <p class="key">There is only one deciding question: <em>what share of the data is positive, and which class do you care about.</em></p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Use ROC-AUC when</h5>
+      <p>the two classes are <b>fairly balanced</b> — a ratio from 1:1 up to about 1:10</p>
+      <p>you care about <b>both classes</b> equally, with no class being "the one to find"</p>
+      <p>you need to compare models across <b>datasets with different class ratios</b> — here the invariance becomes a strength</p>
+    </div>
+    <div>
+      <h5>Use PR-AUC when</h5>
+      <p>the positive class is <b>rare</b> — fraud, rare disease, equipment faults, search</p>
+      <p>you only care about <b>the positive class</b>; TN is so plentiful it carries no information</p>
+      <p>a real person must <b>handle each alert</b> — precision is exactly the share of effort not wasted</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>It is not pick-one-drop-the-other — <b>reporting both</b> is normal, as long as you say which number drives the decision.</li>
+    <li>Neither is <b>for setting the threshold</b> — they pick the model; to pick the threshold, compute expected cost (<a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a>).</li>
+    <li>If you know the real operating region there is something better than global AUC: <b>precision at fixed recall</b> or <b>recall at fixed FPR</b>.</li>
+  </ul>
+</section>
+
+<section id="roc-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Common mistakes</h2></div>
+
+  <p class="key">Both curves can be drawn for any model, and neither warns you when it is misread.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Using ROC-AUC when positives are very rare</h4><p>The number looks falsely good because FPR divides by a huge negative count. This is the most common mistake in the group.</p></div>
+    <div class="card bad"><h4>Comparing PR-AUC against 0.5</h4><p>The PR-AUC baseline is the positive class rate. 0.30 on 1% data is very good, not bad.</p></div>
+    <div class="card bad"><h4>Comparing AUC across two datasets with different class ratios</h4><p>Fine for ROC, <em>not</em> for PR — the PR baseline moves with the class ratio.</p></div>
+    <div class="card bad"><h4>Concluding a model is good because AUC is high</h4><p>AUC only speaks to ranking. Decisions still depend on the threshold, and probabilities still need calibrating.</p></div>
+    <div class="card bad"><h4>Trusting AUC on a very small test set</h4><p>With a few dozen positives, AUC swings wildly. Report a bootstrap confidence interval alongside it.</p></div>
+    <div class="card bad"><h4>Setting the threshold at the point nearest the top-left corner</h4><p>That point implicitly treats FP and FN as equally costly. Real costs often differ by tens of times.</p></div>
+  </div>
+</section>
+
+
+<footer>Machine learning · Model evaluation · continues from <a href="../metrics-confusion-matrix/index.html">Metric &amp; confusion matrix</a>; the third axis is <a href="../calibration/index.html">Probability calibration</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 # TAXONOMY — luật viết bài & bản đồ bài
 
 Tài liệu nội bộ. **Phần A** — sửa bài thì đọc. **Phần B** — thêm/bớt/tách bài thì đọc.
-Số liệu ghi 2026-09-02, đừng tin — chạy lệnh §A1 lấy số thật.
+Số liệu ghi 2026-09-27, đừng tin — chạy lệnh §A1 lấy số thật.
 
 ---
 
@@ -19,15 +19,15 @@ Số liệu ghi 2026-09-02, đừng tin — chạy lệnh §A1 lấy số thật
 
 Rồi soát mắt 5 chỗ: trang chủ · `dict-hash-table` (SVG) · `binary-search` (lab) · `kit.html` · màn hình ~490px.
 
-## A2. Năm luật máy kiểm được — đang nợ 49 chỗ
+## A2. Năm luật máy kiểm được — đang nợ 4 chỗ
 
 | # | Luật | Vì sao | Sai | Ở đâu |
 |---|---|---|---:|---|
-| A3 | Không link vào bài còn là khung | bấm vào ra trang rỗng | **6** | tự hết khi viết `er-modeling` (3), `data-quality` (2), `vector-database` (1) |
-| A4 | Chỉ dùng màu có trong `style.css` | lệch bảng màu | **2** | `thread-process-gil` dùng `#E06C7A` → sửa `#F2718A` |
+| A3 | Không link vào bài còn là khung | bấm vào ra trang rỗng | **0** | ✅ sạch |
+| A4 | Chỉ dùng màu có trong `style.css` | lệch bảng màu | **0** | ✅ sạch |
 | A5 | Clay `#E0855C` không vào hình | nó là màu thương hiệu, không mang nghĩa nội dung | **0** | ✅ sạch |
-| A6 | Đầu mục không đếm số | thêm bớt một thẻ là số sai, không ai nhớ sửa | **36** | phải đọc từng chỗ — xem ngoại lệ dưới |
-| A7 | Dòng `<pre>` dưới ~92 ký tự | dài hơn thì điện thoại bị đẩy ngang | **5** | dài nhất `db-normalization` (101) |
+| A6 | Đầu mục không đếm số | thêm bớt một thẻ là số sai, không ai nhớ sửa | **4** | cả bốn thuộc loại ✅ **giữ** — xem ngoại lệ dưới |
+| A7 | Dòng `<pre>` dưới ~92 ký tự | dài hơn thì điện thoại bị đẩy ngang | **0** | ✅ sạch |
 
 **A3 chi tiết** — muốn nhắc khái niệm mà bài chủ chưa viết: **nói tên trong văn xuôi, đừng đặt link**.
 
@@ -48,8 +48,9 @@ Bốn màu ngữ nghĩa, nghĩa cố định trong mọi hình:
 | ✅ **Giữ** | `Bốn ô — mọi metric đều từ đây` · `Bốn loại join` · `Bốn mức cô lập` |
 | ❌ **Bỏ** | `Sáu cách regularize` → `Cách regularize` · `Ba mẫu code cần thuộc` → `Mẫu code cần thuộc` · `Bốn bài của nhóm` → `Học theo thứ tự nào` |
 
-Vì thế `soat.py` chỉ **liệt kê** chứ không kết luận sai. Phần lớn 36 chỗ thuộc loại ❌, dồn ở
-[04-database](content/04-database/) (9) và [05-machine-learning](content/05-machine-learning/) (8).
+Vì thế `soat.py` chỉ **liệt kê** chứ không kết luận sai. Bốn chỗ còn lại (2026-09-27) đều thuộc
+loại ✅: `Bảy tầng` (OSI) · `Ba phiên bản HTTP` · `Bốn khối chạy khi nào` (try/except/else/finally) ·
+`Bốn giả định` (OLS). Số nằm trong bản chất chủ đề, **đừng bỏ**.
 
 ## A3. Ba luật máy không kiểm được — tự đọc
 
@@ -63,16 +64,16 @@ Vì thế `soat.py` chỉ **liệt kê** chứ không kết luận sai. Phần l
 | 4 | **Link** tới bài chủ |
 
 > Mẫu đúng: mục *Sharding & partitioning* trong `cap-theorem-consistency` — gọi tên range / hash /
-> consistent hashing, nói cái giá khi rebalance, link sang `04-database/sharding-replication`,
+> consistent hashing, nói cái giá khi rebalance, link sang `04-distributed/03-scaling/sharding-replication`,
 > không giảng lại cách chọn shard key.
 
 Ba chỗ dễ chồng chéo, viết tới thì rà trước:
 
 | Khái niệm | Chủ duy nhất |
 |---|---|
-| Sharding / partitioning | `04-database/sharding-replication` |
-| GPU & training systems | `10-mlops/gpu-inference` — không lặp ở Deep learning |
-| Distributed systems | chồng được cả CS fundamentals · Database · MLSD |
+| Sharding / partitioning | `04-distributed/03-scaling/sharding-replication` |
+| GPU & training systems | `12-mlops/04-infra/gpu-inference` — không lặp ở Deep learning |
+| Distributed systems | kệ `04-distributed` là chủ — CS fundamentals chỉ giữ phần một máy |
 
 **② Mỗi mục một hình.** Cần hai hình = dấu hiệu mục nên tách đôi. Hình phải **thay được** đoạn văn,
 không minh hoạ thêm. Chữ trong hình càng ít càng tốt. Đang vượt đúng một chỗ: `decision-tree#dtree-s2` (3 hình).
@@ -82,7 +83,7 @@ vẽ → cắt còn 1–2 câu + link. Chọn khuôn theo bản chất nhóm:
 
 | Nhóm là… | Khuôn |
 |---|---|
-| các biến thể cạnh tranh nhau (bagging vs boosting) | kể chuyện nhân quả — [tree-family-overview](content/05-machine-learning/06-tree-models/tree-family-overview/index.html) |
+| các biến thể cạnh tranh nhau (bagging vs boosting) | kể chuyện nhân quả — [tree-family-overview](content/07-machine-learning/06-tree-models/tree-family-overview/index.html) |
 | các công cụ song song (array, hash map, heap) | ngắn 2–3 mục — [data-structures-overview](content/01-dsa/03-data-structures/data-structures-overview/index.html) |
 
 ## A4. Hai luật cũ đã chết
@@ -115,27 +116,39 @@ Hai lá cùng cấp vẫn ra hai kết quả khác nhau: dưới *Retrieval*, `T
 *Sliding window* không thuộc "Searching" trong taxonomy CS nhưng là hai pattern trung tâm khi luyện
 đề. Cây taxonomy CS chỉ dùng để **kiểm chéo** đã đủ pattern chưa.
 
-## B2. Tiến độ — 94/196 bài
+## B2. Tiến độ — 121/188 bài
+
+Mười hai kệ, sau đợt tái cấu trúc 2026-09-27 (tách SQL / NoSQL, tách CS fundamentals /
+Distributed systems, gom Math foundations còn 4 bài). Số ở đây **chốt theo `python3 tools/build.py`**
+— lệch thì tin log, đừng tin bảng.
 
 | Kệ | Đã viết | Khung | Đã quyết gì |
 |---|---:|---:|---|
 | 01 · DSA | 24 | — | ✅ xong trọn · `leetcode-toolkit` chuyển từ kệ Python sang đây 2026-09-26: nó là bộ công cụ **giải bài**, chủ phải là kệ dùng nó |
-| 02 · Python | 16 | — | ✅ `oop-python` + `typing-dataclass` là hai lỗ thật, đã viết · `performance-profiling` tách riêng khỏi `leetcode-toolkit` (bài đó giờ ở kệ DSA) · Testing/Logging/Packaging **cố ý bỏ**, để bên MLOps |
-| 03 · CS fundamentals | 13 | — | ✅ thêm `cap-theorem-consistency`, `consensus-leader-election`, `messaging-queue-pubsub` · Concurrency giữ một bài `lock-deadlock-race` · `process-thread-scheduling` đã gộp vào `thread-process-gil` bên kệ Python 2026-09-26 |
-| 04 · Database | 21 | 2 | nhóm mới *Data systems* chặn ở đúng 6 khái niệm · còn `er-modeling`, `data-quality` |
-| 05 · Machine learning | 10 | 28 | cây đã khớp sẵn · Data leakage + Distribution shift làm mục thêm, không tách bài |
-| 06 · Deep learning | 4 | 14 | *Generative models* ba bài **cố ý ngắn** · GPU/FLOPs/distributed **không tạo mới** |
-| 07 · Transformer | 2 | 14 | thêm `efficient-attention` — hay bị hỏi ở vòng sâu |
-| 08 · LLM | 4 | 27 | thêm `rag-evaluation` · nhóm mới *Multimodal* |
-| 09 · ML system design | 1 | 4 | đã khớp sẵn · "Production design" **không làm bài riêng** |
-| 10 · MLOps | 1 | 13 | ba nhóm mới: *Serving engines* · *AI reliability* · *AI security* |
+| 02 · Python | 16 | — | ✅ `oop-python` + `typing-dataclass` là hai lỗ thật, đã viết · `performance-profiling` **giữ** (người dùng chốt) · Testing/Logging/Packaging **cố ý bỏ**, để bên MLOps |
+| 03 · CS fundamentals | 9 | — | ✅ còn đúng phần chạy trên **một máy**: OS · networking. `osi-model` **giữ** · Concurrency giữ một bài `lock-deadlock-race` |
+| 04 · Distributed systems | 6 | — | ✅ kệ mới 2026-09-27, gom từ CS + Database: CAP · consensus · caching · load balancing · sharding-replication · messaging. Ranh giới: **nhiều máy thì sang đây** |
+| 05 · SQL & relational | 15 | — | ✅ kệ mới (tách khỏi Database) · `constraints-integrity` đứng riêng · `query-tuning` đã gộp vào `sql-index-query-plan` |
+| 06 · NoSQL & data systems | 4 | — | ✅ kệ mới · bốn bài data-systems gộp thành một `data-systems` |
+| 07 · Machine learning | 35 | — | ✅ Math foundations gom 9 → **4 bài** (Probability · Linear algebra · Calculus · Statistics), nhóm `03-statistics` xoá hẳn |
+| 08 · Deep learning | 4 | 11 | *Generative models* gộp còn một `generative-models` · `training-recipe` + `debug-training` gộp |
+| 09 · Transformer | 2 | 14 | `efficient-attention` giữ — hay bị hỏi ở vòng sâu · Beyond Transformer **giữ riêng** |
+| 10 · LLM | 4 | 26 | các bài model (LLaMA/Qwen/DeepSeek/Mixtral) **giữ riêng** · CLIP + VLM gộp thành `clip-vlm`, `audio-models` giữ |
+| 11 · ML system design | 1 | 4 | `recommendation-system` và `search-ranking` **giữ riêng** |
+| 12 · MLOps | 1 | 12 | `git-workflow` · `docker-container` · `linux-shell` **giữ** (học dạng concept) · `prompt-injection` + `ai-security-threats` gộp thành `ai-security` |
 
 **Gộp làm mục, không tách bài** — ghi lại để khỏi ai tách ra lại:
 
 | Kệ | Gộp vào bài |
 |---|---|
 | Python | Scope/Modules/Exceptions → `language-core-overview` · `collections` → `list-tuple-set` + `dict-hash-table` · Closure → `decorator-context-manager` · Lambda + higher-order function |
-| CS | File systems + IPC → `os-overview` · HTTP/2 + HTTP/3 + WebSocket → `tcp-http` · RPC + gRPC → `rest-api-design` · Sharding → mục ngắn trong `cap-theorem-consistency` |
+| CS | File systems + IPC → `os-overview` · HTTP/2 + HTTP/3 + WebSocket → `tcp-http` · RPC + gRPC → `rest-api-design` |
+| Distributed | `consensus-leader-election` → `cap-theorem-consistency` |
+| SQL | `query-tuning` → `sql-index-query-plan` |
+| NoSQL | `data-warehouse-lake` + `etl-elt` + `batch-stream-processing` + `data-quality` → `data-systems` |
+| DL | `autoencoder` + `vae` + `gan` → `generative-models` · `training-recipe` + `debug-training` → `training-recipe-debug` |
+| LLM | `clip` + `vlm` → `clip-vlm` |
+| MLOps | `prompt-injection` + `ai-security-threats` → `ai-security` |
 
 > **Ghi chú quan hệ, không phải cấu trúc trang:** Messaging hiển thị ngang hàng với Distributed
 > systems cho dễ điều hướng, nhưng về mental model nó là *một phần của* Distributed systems.
@@ -146,9 +159,9 @@ Hai lá cùng cấp vẫn ra hai kết quả khác nhau: dưới *Retrieval*, `T
 
 | Chỗ | Chặn ở đâu |
 |---|---|
-| **Data systems** (Database) | đúng 6 khái niệm: OLTP vs OLAP · Data warehouse · Data lake · ETL/ELT · Batch vs stream · Data quality. **Không phình thành chương trình Data engineering** |
-| **Generative models** (DL) | `autoencoder` là cầu nối lịch sử dẫn tới VAE · `vae` ngắn nhưng đủ để bắc cầu sang Diffusion, cần rõ **vì sao Diffusion thắng thế** · `gan` rất ngắn, chỉ cần nhận ra tên, **không đào sâu training GAN** |
-| **Multimodal** (LLM) | CLIP · VLM · Diffusion · Audio — **mỗi khái niệm một bài ngắn trước**, chưa chẻ Diffusion thành overview + DDPM + score-based + latent |
+| **Data systems** (NoSQL) | gộp còn **một bài** `data-systems`: warehouse/lake → ETL/ELT → batch vs stream → data quality, đọc như một đường ống. **Không phình thành chương trình Data engineering** |
+| **Generative models** (DL) | gộp còn **một bài**: autoencoder là cầu nối lịch sử dẫn tới VAE, VAE bắc cầu sang Diffusion (rõ **vì sao Diffusion thắng thế**), GAN chỉ cần nhận ra tên — **không đào sâu training GAN** |
+| **Multimodal** (LLM) | ba bài: `clip-vlm` (CLIP và VLM chung một mạch contrastive → nối vào LLM) · `diffusion-models` · `audio-models`. Chưa chẻ Diffusion thành overview + DDPM + score-based + latent |
 
 > **Còn mở, chưa quyết:** `optimizer-sgd-adam` đang gộp SGD/Momentum/AdaGrad/RMSProp/Adam/AdamW.
 > Theo B1②, Adam và SGD chắc đáng bài riêng (hay bị hỏi "vì sao Adam mà không SGD"); AdaGrad/RMSProp
@@ -158,11 +171,11 @@ Hai lá cùng cấp vẫn ra hai kết quả khác nhau: dưới *Retrieval*, `T
 
 | | Việc | Được gì |
 |---|---|---|
-| 1 | `er-modeling` + `data-quality` | xong Database, tự hết 5/6 chỗ vi phạm A3 |
-| 2 | Sửa `#E06C7A` ở `thread-process-gil` | một phút, hết A4 |
-| 3 | Rà 36 đầu mục đếm số | hết A6 — phải đọc từng chỗ |
-| 4 | MLOps: Serving engines · AI reliability · AI security | chỗ trống lớn nhất |
-| 5 | LLM: nhóm Multimodal | |
+| 1 | Viết nội dung kệ **Deep learning** (11 khung) | mở được cả dây DL → Transformer → LLM |
+| 2 | **Transformer core** (tokenization → embedding → positional encoding → self-attention) | phần bị hỏi nhiều nhất |
+| 3 | MLOps: Serving engines · AI reliability · AI security | chỗ trống lớn nhất |
+| 4 | LLM: nhóm RAG rồi tới Multimodal | |
+| 5 | Ba bài tổng `rag-end-to-end` · `inference-optimization` · `mlops-serving`: rút còn ~1200 chữ và đẩy xuống cuối nhóm | **hoãn tới khi bài con viết xong** — chúng đang là chỗ duy nhất có nội dung của nhóm |
 
 ## B5. Đã hoãn
 

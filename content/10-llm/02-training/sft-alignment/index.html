@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SFT & alignment — MazeAI</title>
+<meta name="description" content="When to fine-tune instead of using RAG, masking the loss on the prompt, three-step RLHF, DPO dropping the reward model entirely, and how to evaluate after fine-tuning.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/10-llm/02-training/sft-alignment/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="SFT &amp; alignment">
+<meta property="og:description" content="When to fine-tune instead of using RAG, masking the loss on the prompt, three-step RLHF, DPO dropping the reward model entirely, and how to evaluate after fine-tuning.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/10-llm/02-training/sft-alignment/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-sft" data-title="SFT & alignment" data-tag="LLM" data-blurb="When to fine-tune instead of using RAG, masking the loss on the prompt, three-step RLHF, DPO dropping the reward model entirely, and how to evaluate after fine-tuning.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · fine-tuning</p>
+  <h1>SFT <em>&amp; alignment</em></h1>
+  <p class="lede">The most-asked boundary: <b>fine-tuning teaches behavior, RAG supplies knowledge</b> —</p>
+  <p>Get this wrong and the whole project fails. This lesson goes from SFT and the trick of masking the loss on the prompt, to three-step RLHF, then to DPO —</p>
+  <p>How to drop the reward model entirely and still learn from comparison pairs.</p>
+</header>
+
+<section id="sft-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Pretraining makes the model <em>know</em>; fine-tuning and alignment teach it <em>how to answer the way the asker wants</em>.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<text class="sv-hv" x="372" y="18">TWO STAGES, TWO DIFFERENT JOBS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">SFT: FORM</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">what an answer looks like</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Alignment: QUALITY</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">of two answers, which is better</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Can't replace pretrain</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">knowledge is there; this tunes behavior</text>
+</svg>
+  <figcaption>Read the five boxes top to bottom: the red top box is the problem, the three middle boxes are the mechanism, the red bottom box is the cost. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+<p class="key">Three layers in sequence: <em>can write → can follow instructions → can pick the answer people prefer</em>.</p>
+  <div class="stack">
+    <div class="s"><b>Pretraining</b><span>predict the next token over trillions of tokens → knows language and facts, but can only continue text</span></div>
+    <div class="s"><b>SFT</b><span>learns from (request, sample response) pairs → can <strong>follow instructions</strong> instead of just continuing</span></div>
+    <div class="s ok"><b>Alignment</b><span>learns from <strong>comparing</strong> two responses — RLHF (reward model + PPO, three steps) or DPO (one step)</span></div>
+  </div>
+  <p>A second axis, independent of the three layers above, is <strong>how many weights get updated</strong>:</p>
+  <div class="bars">
+    <div class="b bad"><i>full fine-tune</i><u style="width:100%"></u><b>100% of parameters</b></div>
+    <div class="b hi"><i>LoRA · adds two small matrices</i><u style="width:1%"></u><b>0.1–1% of parameters</b></div>
+    <div class="b hi"><i>QLoRA · LoRA on a 4-bit compressed model</i><u style="width:1%"></u><b>0.1–1% · runs on a single GPU</b></div>
+  </div>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    SFT teaches the model <strong>format and behavior</strong>; alignment teaches it <strong>preferences</strong>; and LoRA is only a <strong>resource-saving</strong> technique — it does not change whether you are doing SFT or DPO. Mixing up these three axes is the most common conceptual mistake when discussing fine-tuning.
+  </div>
+</section>
+
+<section id="sft-s2">
+  <div class="sh"><b>02</b><h2>Should you fine-tune</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — SHOULD YOU FINE-TUNE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Try prompt engineering first</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">cheapest, fixed in minutes</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Missing private knowledge? Use RAG</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">fine-tuning can't inject new facts</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Fine-tune to change behavior or tone</text>
+<rect x="372" y="194" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--tomb)">Needs data, evals and upkeep</text>
+<text class="sv-s" x="388" y="234" fill="var(--dim)">this is the real cost</text>
+</svg>
+  <figcaption>The order to try things; stop at the first step that is good enough.</figcaption>
+  </figure>
+
+  <p>This is the question to answer first, and in most cases the answer is <em>no</em>.</p>
+  <div class="stack">
+    <div class="s"><b>Model needs to <em>know</em> internal information → RAG</b><span>knowledge changes; fine-tuning would need retraining on every update</span></div>
+    <div class="s"><b>Need an exact output format → prompt + structured output</b><span>cheap, fixable immediately, no data needed</span></div>
+    <div class="s ok"><b>Need a fixed writing style → fine-tune</b><span>style is hard to fully express in instructions</span></div>
+    <div class="s ok"><b>Need a smaller model for a narrow job → fine-tune + distillation</b><span>a fine-tuned 7B model can beat a large model on a narrow task, at far lower cost</span></div>
+    <div class="s ok"><b>Need lower latency and cost → fine-tune to drop a long prompt</b><span>no need to send 2000 tokens of instructions on every call</span></div>
+    <div class="s ok"><b>Need high accuracy in a narrow domain → fine-tune, once RAG is exhausted</b><span>specialist jargon, unusual formats that prompting cannot cover</span></div>
+  </div>
+  <div class="note warn">
+    <h4>The boundary to remember</h4>
+    <strong>Fine-tuning teaches behavior; it cannot reliably inject knowledge.</strong> The model may learn to talk about an event yet still get the details wrong, because training only shifts a distribution rather than creating an exact lookup. If the knowledge can change, use RAG. This is the most common wrong answer to "when should you fine-tune".
+  </div>
+  <p><strong>Order to try:</strong> a better prompt → few-shot → RAG → fine-tune.</p>
+  <p>Each step costs tens of times more than the previous one in effort and running cost, so go in order and only move up when the step below is exhausted.</p>
+</section>
+
+<section id="sft-s3">
+  <div class="sh"><b>03</b><h2>SFT — supervised fine-tuning</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — SFT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Still next-token prediction</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">nothing new in the loss function</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Only data differs: prompt-answer pairs</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Learning rate far below pretraining's</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">too high: forgets</text>
+<rect x="372" y="194" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--ok)">LoRA, not full fine-tune</text>
+<text class="sv-s" x="388" y="234" fill="var(--dim)">cheaper, keeps original</text>
+</svg>
+  <figcaption>SFT is just continued pretraining on differently shaped data.</figcaption>
+  </figure>
+
+<pre><code>Data: (request, sample response) pairs, written or curated by humans
+
+Training objective: EXACTLY the same as pretraining — predict the next token.
+The only difference: the data is dialogue, and the loss is computed ONLY on the response.</code></pre>
+  <h3>Chat template — a detail you must get right</h3>
+<pre><code>Each model has its own format. Get it wrong and quality drops sharply
+with no error reported:
+
+&lt;|im_start|&gt;system
+You are a helpful assistant.&lt;|im_end|&gt;
+&lt;|im_start|&gt;user
+What is the capital of France?&lt;|im_end|&gt;
+&lt;|im_start|&gt;assistant
+Paris.&lt;|im_end|&gt;
+
+→ always use tokenizer.apply_chat_template() instead of concatenating strings yourself.</code></pre>
+  <div class="stack">
+    <div class="s"><b>learning rate — <code>1e-5</code>…<code>2e-5</code> full, <code>1e-4</code>…<code>3e-4</code> LoRA</b><span>LoRA tolerates much higher learning rates</span></div>
+    <div class="s warn"><b>epochs — 1–3</b><span>beyond 3 it usually starts memorizing the data</span></div>
+    <div class="s"><b>effective batch size — 32–128</b><span>use gradient accumulation if VRAM is limited</span></div>
+    <div class="s warn"><b>sequence length — enough for the longest sample</b><span>truncation cuts off the end of responses and teaches the model to stop in the wrong place</span></div>
+    <div class="s"><b>warmup — 3–5% of steps</b><span>avoids wrecking the weights in the first steps</span></div>
+  </div>
+</section>
+
+<section id="sft-s4">
+  <div class="sh"><b>04</b><h2>Masking the loss on the prompt</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — LOSS MASKING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Compute loss only on the answer</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">Unmasked, it learns to write the prompt</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">dilutes the real signal</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Set labels to −100 on the prompt</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">most common silent bug in DIY code</text>
+</svg>
+  <figcaption>One implementation detail, and the quietest place for things to break.</figcaption>
+  </figure>
+
+<div class="strip">
+    <div class="c dim"><i>system</i><b>-100</b><u>masked</u></div>
+    <div class="c dim"><i>user · question</i><b>-100</b><u>masked</u></div>
+    <div class="cut"></div>
+    <div class="c t"><i>assistant · answer</i><b>real tokens</b><u>loss computed here</u></div>
+  </div>
+  <p class="stripnote"><span>no loss</span><span><em>-100 is the index PyTorch ignores</em></span><span>the part the model must learn to generate</span></p>
+  <p><strong>Why mask:</strong> if the loss also covers the prompt, the model is being taught <em>to generate the user's question</em> —</p>
+  <p>A pointless task that dilutes the learning signal. With long prompts and short responses, most of the gradient goes into memorizing the prompt.</p>
+  <div class="note">
+    <h4>When NOT masking is right</h4>
+    When you want the model to learn <em>the distribution of the whole conversation</em>, for example continued training on domain data so the model gets used to specialist terminology. Then learning the user's part is useful too. But for instruction-following SFT, masking is the correct default, and libraries like TRL already handle it through a config parameter.
+  </div>
+  <p>In multi-turn dialogue, every assistant turn contributes to the loss, and every user turn is masked.</p>
+  <p>This implementation detail is often gotten wrong when writing your own data-preparation function.</p>
+</section>
+
+<section id="sft-s5">
+  <div class="sh"><b>05</b><h2>RLHF — three steps</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — THREE-STEP RLHF</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">1. SFT builds the base</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">2. Reward model learns from pairs</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">humans rank, a model learns it</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">3. PPO optimizes reward</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">KL penalty keeps it near the original</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--tomb)">Three models at once: costly, unstable</text>
+</svg>
+  <figcaption>Three steps, and why people want to cut some.</figcaption>
+  </figure>
+
+<div class="stack">
+    <div class="s"><b>Step 1 · SFT</b><span>train on sample responses → yields model <code>π_ref</code>, used as the reference point</span></div>
+    <div class="s"><b>Step 2 · Reward model</b><span>humans label pairs (preferred response, rejected response) → train a scoring model <code>r(x, y)</code></span></div>
+    <div class="s warn"><b>Step 3 · PPO</b><span>optimize the policy for high reward without drifting too far from <code>π_ref</code></span></div>
+  </div>
+  <div class="eq">
+    <div class="line"><span class="t"><span>max</span></span><span class="t b"><span>E[ r(x, y) ]</span><em>high reward</em></span><span class="op">−</span><span class="t r"><span>β · KL( π ‖ π_ref )</span><em>penalty pulling back to reference</em></span></div>
+    <div class="line"><span class="t"><span>reward model loss</span></span><span class="op">=</span><span class="t p"><span>−log σ( r(x, y_chosen) − r(x, y_rejected) )</span><em>Bradley-Terry</em></span></div>
+  </div>
+  <div class="note key">
+    <h4>Why the KL penalty is needed</h4>
+    Without it, the policy finds ways to <strong>exploit holes in the reward model</strong> — producing bizarre text that the reward model scores highly, known as reward hacking. The reward model is only an approximation of human preference, and every approximation has holes when optimized too hard. The KL penalty keeps the policy in the region where that approximation is still trustworthy.
+  </div>
+  <p><strong>Why RLHF is hard to deploy:</strong> it needs <em>four</em> models in memory at once —</p>
+  <p>The policy being trained, the reference model, the reward model, and PPO's value model.</p>
+  <p>On top of that, RL is inherently sensitive to hyperparameters and hard to reproduce.</p>
+  <p>That is the entire motivation for DPO.</p>
+</section>
+
+<section id="sft-s6">
+  <div class="sh"><b>06</b><h2>DPO — dropping the reward model entirely</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DPO</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">No reward model, no RL loop</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--filled)">Optimize directly on win/lose pairs</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">Just one loss function, trained like SFT</text>
+<rect x="372" y="154" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--tomb)">Sensitive to pair quality</text>
+<text class="sv-s" x="388" y="194" fill="var(--dim)">noisy pairs mislead the model</text>
+</svg>
+  <figcaption>Same goal as RLHF, with far fewer moving parts.</figcaption>
+  </figure>
+
+<p class="key">The "maximize reward under a KL constraint" problem has a <em>closed-form solution</em> — so the reward can be rewritten in terms of the policy itself, and the reward model disappears.</p>
+  <div class="eq">
+    <div class="line"><span class="t"><span>r(x, y)</span></span><span class="op">=</span><span class="t b"><span>β · log[ π(y|x) / π_ref(y|x) ]</span><em>reward hidden in the policy</em></span><span class="op">+</span><span class="t"><span>const</span></span></div>
+    <div class="line"><span class="t"><span>L</span></span><span class="op">=</span><span class="t g"><span>−log σ( β·log[π(y_chosen)/π_ref(y_chosen)] − β·log[π(y_rejected)/π_ref(y_rejected)] )</span><em>plug into Bradley-Terry, only the policy remains</em></span></div>
+    <p class="read">Raise the probability of the preferred response, lower the probability of the rejected one —</p>
+  <p>Both are measured <strong>relative to the reference model</strong>. That "relative" part plays the role of the KL penalty, so no separate term is needed.</p>
+  </div>
+  <p>The formula in words: <em>raise the probability of the preferred response, lower the probability of the rejected one.</em></p>
+  <p>Both terms are measured relative to the reference model — so the KL penalty is already built into the formula.</p>
+  <div class="cmp two">
+    <div><h5>RLHF (PPO)</h5>
+      <p><b>Models in memory</b> 4</p>
+      <p><b>Separate reward model</b> yes</p>
+      <p><b>Loop</b> RL — sample, score, update</p>
+      <p><b>Stability</b> sensitive to hyperparameters</p>
+      <p><b>Data</b> freshly generated during training (online)</p>
+      <p><b>Peak quality</b> can be higher if done well</p></div>
+    <div><h5>DPO</h5>
+      <p><b>Models in memory</b> 2 — policy and reference</p>
+      <p><b>Separate reward model</b> no</p>
+      <p><b>Loop</b> ordinary supervised learning</p>
+      <p><b>Stability</b> much more stable</p>
+      <p><b>Data</b> fixed</p>
+      <p><b>Peak quality</b> nearly as good, much easier to reach</p></div>
+  </div>
+  <div class="note warn">
+    <h4>DPO's weakness</h4>
+    It learns from a <strong>fixed</strong> dataset, so it cannot explore the responses the current policy produces — whereas RLHF scores the very samples the policy just generated. As a result, DPO can drift if the preference data was generated by a very different model. Online DPO variants were created to fill exactly this gap.
+  </div>
+</section>
+
+<section id="sft-s7">
+  <div class="sh"><b>07</b><h2>Comparison of alignment methods</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — COMPARING METHODS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">RLHF</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">strongest, costly, unstable</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">DPO</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">nearly as good, far simpler — today's norm</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">KTO, ORPO</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">only good/bad labels, no pairs needed</text>
+</svg>
+  <figcaption>A lookup table; come back when choosing how to align.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>SFT — sample responses · 1 model</b><span>mandatory foundation before everything else</span></div>
+    <div class="s warn"><b>RLHF / PPO — comparison pairs · 4 models</b><span>strongest if done well; complex, expensive, hard to reproduce</span></div>
+    <div class="s ok"><b>DPO — comparison pairs · 2 models</b><span>today's practical default — simple, stable</span></div>
+    <div class="s"><b>ORPO — comparison pairs · 1 model</b><span>folds in the SFT loss, no reference model needed</span></div>
+    <div class="s"><b>KTO — good/bad labels, no pairs needed · 2 models</b><span>usable when you only have scattered likes/dislikes from users</span></div>
+    <div class="s"><b>RLAIF — comparison pairs judged by AI · 4 models</b><span>cheaper than hiring human raters; quality depends on the judge model</span></div>
+  </div>
+  <div class="note">
+    <h4>KTO is worth knowing for a practical reason</h4>
+    Real user feedback is almost always <em>unpaired</em> — one turn gets a dislike, another gets a like, and there are never two responses to the same question to compare. DPO needs pairs, so it cannot use this directly. KTO accepts exactly that kind of data, making it the natural choice when you have real product logs rather than paid annotations.
+  </div>
+</section>
+
+<section id="sft-s8">
+  <div class="sh"><b>08</b><h2>Data — quality over quantity</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DATA</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Few thousand clean > million noisy</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Task diversity beats sheer volume</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--tomb)">Dedupe, filter test-set leaks</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">leaks void every number</text>
+</svg>
+  <figcaption>Three rules; the last is the one most often missed.</figcaption>
+  </figure>
+
+<div class="bars">
+    <div class="b hi"><i>LIMA · 1,000 carefully curated examples</i><u style="width:3%"></u><b>instruction following: equal</b></div>
+    <div class="b"><i>tens of thousands of average-quality examples</i><u style="width:100%"></u><b>instruction following: equal</b></div>
+  </div>
+  <p class="stripnote"><span>tens of times more data</span><span><em>yet the same result</em></span></p>
+  <p>The explanation: the knowledge is already there from pretraining. SFT only teaches the model the <strong>format and style</strong> of responses — and that does not take much data.</p>
+  <div class="stack">
+    <div class="s"><b>Consistent formatting</b><span>models pick up surface patterns very fast — messy formatting teaches messiness</span></div>
+    <div class="s ok"><b>No wrong responses</b><span>one wrong example does more harm than ten correct ones can undo — the model cannot tell which is right</span></div>
+    <div class="s"><b>Diverse request types</b><span>1000 examples of one kind teach only that one kind</span></div>
+    <div class="s"><b>Sensible response length</b><span>all-long responses teach the model to always write long, even when the question needs one word</span></div>
+    <div class="s warn"><b>Include refusal examples</b><span>every example answerable → the model learns it must always have an answer — the root of making things up</span></div>
+  </div>
+  <div class="note key">
+    <h4>The last row is the most often overlooked</h4>
+    If the SFT data only contains questions the model <em>can answer</em>, you are teaching it that <strong>there must always be an answer</strong>. If you want the model to say "I don't know" or "this information is not in the documents", the training data must contain such examples. This is also a direct link to RAG systems, where refusing when there is no evidence is the desired behavior.
+  </div>
+</section>
+
+<section id="sft-s9">
+  <div class="sh"><b>09</b><h2>Evaluating the model after fine-tuning</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of fine-tuning and alignment: a pretrained model only predicts the next word so it cannot follow instructions, SFT teaches it answer format from sample pairs, alignment teaches it which answer is better from pairwise comparisons, data quality decides the outcome, and the cost is forgetting old knowledge so out-of-domain benchmarks must be measured too">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Base model just predicts next word</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">knows a lot, can't follow orders</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">SFT — teaches answer format</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learns from prompt + sample answer</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Alignment — which answer is better</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">RLHF or DPO, learns from pairs</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Data quality decides everything</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">few thousand clean > million noisy</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: forgets old knowledge, scores drop</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">also test out-of-domain benchmarks</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — EVALUATING AFTER FINE-TUNE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Also test out-of-domain</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">to catch forgetting</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Pairwise vs. base</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">win rate reads easier than scores</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">LLM-as-judge is biased</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">favors long answers and its own style</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">A human must still read samples</text>
+</svg>
+  <figcaption>Four ways to measure; none is enough on its own.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s warn"><b>Held-out loss</b><span>measures distribution fit · does <b>not</b> correlate well with perceived quality</span></div>
+    <div class="s"><b>Task benchmarks</b><span>measure accuracy · only usable if the task has a clear right answer</span></div>
+    <div class="s ok"><b>Human-judged win rate</b><span>direct comparison with the base model · most reliable, but slow and expensive</span></div>
+    <div class="s warn"><b>LLM as judge</b><span>approximates win rate · biased toward long responses and responses in its own style</span></div>
+    <div class="s ok"><b>Regression test suite</b><span>checks whether any capability was lost · mandatory, and the easiest to skip</span></div>
+  </div>
+  <div class="note warn">
+    <h4>On using an LLM as judge</h4>
+    It is fast and cheap, so using it is almost unavoidable, but you must know its two biases: it <strong>prefers longer responses</strong>, and it <strong>prefers a style like its own</strong>. Mitigations: swap the order of the two responses and judge twice, use a rubric with concrete criteria instead of "which is better", and always verify a small sample with real humans.
+  </div>
+</section>
+
+<section id="sft-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Common mistakes</h2></div>
+
+  <p class="key">None of these five mistakes <em>raises any error</em> — the model still finishes training, it just gets worse.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Fine-tuning to inject knowledge</h4><p>The model learns to talk about the topic but still gets details wrong. If the knowledge can change, use RAG.</p></div>
+    <div class="card bad"><h4>Wrong chat template</h4><p>Quality drops sharply with no error. Use <code>apply_chat_template</code>.</p></div>
+    <div class="card bad"><h4>Not masking the loss on the prompt</h4><p>The model learns to generate the user's question; the learning signal gets diluted.</p></div>
+    <div class="card bad"><h4>No refusal examples in the data</h4><p>Teaches the model there must always be an answer — the root of making things up.</p></div>
+    <div class="card bad"><h4>No regression test suite</h4><p>You cannot detect that the model just lost an old capability.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · SFT &amp; alignment · LoRA, QLoRA and the memory problem are covered in <a href="../peft-lora-qlora/index.html">PEFT — LoRA &amp; QLoRA</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

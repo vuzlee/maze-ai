@@ -18,16 +18,18 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets"
 
-BG = (20, 17, 14, 255)          # --bg   #14110E
-CLAY_HI = (238, 158, 122)       # --clay-hi #EE9E7A
-CLAY_LO = (201, 106, 68)        # nhánh tối của gradient .mk
+BG = (253, 253, 255, 255)       # --bg #FDFDFF — maze walls
+CLAY_HI = (133, 147, 216)       # --brand-lt #8593D8
+CLAY_LO = (64, 69, 106)         # --brand-ink #40456A
+DOT = (173, 183, 235, 255)      # --brand-line #ADB7EB — the goal
 
-SS = 8                          # khử răng cưa bằng cách vẽ to rồi thu nhỏ
+SS = 8                          # supersample, then downscale
 
-# toạ độ theo khung 32 đơn vị, đúng bằng assets/favicon.svg
+# coordinates on the 32-unit grid of assets/favicon.svg
 RADIUS = 9
-BARS = [(7, 8, 18, 3), (7, 14.5, 10, 3), (14, 21, 11, 3)]
-
+WALLS = [[(8, 8), (24, 8), (24, 18)], [(8, 8), (8, 24), (19, 24)], [(13, 13), (19, 13), (19, 19)]]
+STROKE = 2.6
+GOAL = (24, 24, 2.4)
 
 def gradient(size):
     """Chéo 145° từ --clay-hi xuống nhánh tối, xấp xỉ bằng nội suy theo (x+y)."""
@@ -55,8 +57,15 @@ def mark(px, pad_ratio=0.0, opaque=False):
     plate.paste(tile, (0, 0), mask)
 
     d = ImageDraw.Draw(plate)
-    for x, y, w, h in BARS:
-        d.rounded_rectangle([x * u, y * u, (x + w) * u, (y + h) * u], radius=1.5 * u, fill=BG)
+    w = max(1, round(STROKE * u))
+    for poly in WALLS:
+        pts = [(x * u, y * u) for x, y in poly]
+        d.line(pts, fill=BG, width=w, joint="curve")
+        for x, y in pts:                                   # round caps
+            r = w / 2
+            d.ellipse([x - r, y - r, x + r, y + r], fill=BG)
+    gx, gy, gr = GOAL
+    d.ellipse([(gx - gr) * u, (gy - gr) * u, (gx + gr) * u, (gy + gr) * u], fill=DOT)
 
     canvas = Image.new("RGBA", (side, side), BG if opaque else (0, 0, 0, 0))
     canvas.paste(plate, (pad, pad), plate)

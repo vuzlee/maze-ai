@@ -87,3 +87,21 @@ báo 0 lỗi, mắt thấy ngay. Vẽ đường cong thì viết hẳn một hà
 Còn một chỗ hay báo nhầm: **đừng chạy nó trên cả file `index.html`**. Một bài có
 mười hình, mỗi hình một hệ toạ độ riêng; gộp lại một mặt phẳng thì sinh hàng chục
 va chạm ma. Chạy từng file `.svg` mới là bản đúng.
+
+## anim.py — hình động dựng theo bước
+
+Mỗi bước một `<g class="kN">`, hiện dần rồi **giữ tới 100%** (không mốc tắt), và `opacity:0` ban
+đầu nằm trong `@media (prefers-reduced-motion:no-preference)` nên tắt hoạt hoạ là hình hiện đủ.
+
+```python
+from svgkit.anim import *
+f = Fig()
+f.add(0, T(0, 16, "TIÊU ĐỀ", MU, "sv-hv"))   # 0 = nền, luôn hiện
+f.add(1, BADGE(0, 40, "a = [1, 2]", AM))
+f.add(2, OBJ(0, 90, "[1, 2]", 2))
+open("n1.svg", "w").write(f.render(860, 300, "mô tả cho aria-label", 10.0))
+```
+
+Bố cục phải cho **mỗi bước một hàng/cột riêng**. Vẽ đè lên cùng một chỗ thì bước sau buộc phải
+tắt bước trước, và khung cuối không còn kể được cả câu chuyện — bẫy #7 của
+`.claude/memory/chuan/hinh-dong.md`.

@@ -1,5 +1,5 @@
 (function(){
-/* ---------------- lab: DSU từng bước ---------------- */
+/* ---------------- lab: DSU step by step ---------------- */
 let UE = [], UI = 0, UP = [], USZ = [], UHOPS = 0, UCYC = 0, UDONE = false, UTIMER = null, UN = 8, UHOT = [];
 
 function uParse(){
@@ -29,38 +29,38 @@ function uRender(note){
     const hot = UHOT.includes(i);
     const root = p === i;
     let bg = root ? "var(--ok)" : "var(--raise)";
-    let fg = root ? "#14110E" : "var(--text)";
-    if(hot){ bg = "var(--probe)"; fg = "#14110E"; }
+    let fg = root ? "var(--on-fill)" : "var(--text)";
+    if(hot){ bg = "var(--probe)"; fg = "var(--on-fill)"; }
     return `<div class="slot" style="min-width:40px;border-color:${hot?'var(--probe)':'var(--rule)'}">
       <i>${i}</i><u style="background:${bg};color:${fg};font-weight:600">${p}</u></div>`;
   }).join("");
   let groups = 0;
   for(let i = 0; i < UN; i++) if(UP[i] === i) groups++;
   document.getElementById("uview").innerHTML =
-    `<p class="legend" style="margin:2px 0 6px"><span>parent[i] — ô xanh là gốc của một nhóm</span></p>
+    `<p class="legend" style="margin:2px 0 6px"><span>parent[i] — a green cell is the root of a group</span></p>
      <div style="display:flex;gap:4px;flex-wrap:wrap">${cells}</div>
-     <p class="legend" style="margin-top:10px"><span>cạnh còn lại: ${
-       UE.slice(UI).map(e => e[0]+"–"+e[1]).join(", ") || "hết"}</span></p>`;
+     <p class="legend" style="margin-top:10px"><span>remaining edges: ${
+       UE.slice(UI).map(e => e[0]+"–"+e[1]).join(", ") || "none"}</span></p>`;
   document.getElementById("ugroups").textContent = groups;
   document.getElementById("uhops").textContent = UHOPS;
   document.getElementById("ucycles").textContent = UCYC;
   if(note){
     const log = document.getElementById("ulog");
-    log.insertAdjacentHTML("afterbegin", `<div><span>#${UI}</span><span>${note}</span><span>${UHOPS} bước leo</span></div>`);
+    log.insertAdjacentHTML("afterbegin", `<div><span>#${UI}</span><span>${note}</span><span>${UHOPS} climb steps</span></div>`);
     while(log.children.length > 8) log.removeChild(log.lastChild);
   }
 }
 function uStep(){
   if(UDONE) return;
-  if(UI >= UE.length){ UDONE = true; UHOT = []; uRender("hết cạnh"); return; }
+  if(UI >= UE.length){ UDONE = true; UHOT = []; uRender("no edges left"); return; }
   const [a, b] = UE[UI++];
   const ra = uFind(a), rb = uFind(b);
   UHOT = [a, b];
-  if(ra === rb){ UCYC++; uRender(`${a}–${b}: đã cùng nhóm → union trả False, cạnh tạo chu trình`); return; }
+  if(ra === rb){ UCYC++; uRender(`${a}–${b}: already same group → union returns False, edge makes a cycle`); return; }
   let x = ra, y = rb;
   if(document.getElementById("usize").checked && USZ[x] < USZ[y]){ x = rb; y = ra; }
   UP[y] = x; USZ[x] += USZ[y];
-  uRender(`${a}–${b}: gộp gốc ${y} vào gốc ${x} (nhóm mới ${USZ[x]} phần tử)`);
+  uRender(`${a}–${b}: merge root ${y} into root ${x} (new group of ${USZ[x]} elements)`);
 }
 function uReset(){
   uStop();
@@ -73,7 +73,7 @@ function uReset(){
   uRender(null);
 }
 function uStop(){ if(UTIMER){ clearInterval(UTIMER); UTIMER = null;
-  document.getElementById("uauto").textContent = "Tự chạy"; } }
+  document.getElementById("uauto").textContent = "Auto run"; } }
 
 document.getElementById("ustep").addEventListener("click", uStep);
 document.getElementById("urst").addEventListener("click", uReset);
@@ -81,7 +81,7 @@ document.getElementById("urst").addEventListener("click", uReset);
 document.getElementById("uauto").addEventListener("click", () => {
   if(UTIMER) return uStop();
   if(UDONE) uReset();
-  document.getElementById("uauto").textContent = "Dừng";
+  document.getElementById("uauto").textContent = "Stop";
   UTIMER = setInterval(() => { uStep(); if(UDONE) uStop(); }, 700);
 });
 uReset();

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overfitting &amp; regularization — MazeAI</title>
+<meta name="description" content="Diagnose with numbers, read learning curves to decide whether to add data, the ways to regularize, and why random search beats grid.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/04-core-concepts/overfitting-regularization/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Overfitting &amp; regularization">
+<meta property="og:description" content="Diagnose with numbers, read learning curves to decide whether to add data, the ways to regularize, and why random search beats grid.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/04-core-concepts/overfitting-regularization/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-overfit" data-title="Overfitting &amp; regularization" data-tag="Generalization" data-blurb="Diagnose with numbers, read learning curves to decide whether to add data, the ways to regularize, and why random search beats grid.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Core concepts</p>
+  <h1>Overfitting &amp;<br><em>regularization</em></h1>
+  <p class="lede">The model memorizes the data instead of learning the pattern. This lesson is the <b>diagnosis and treatment</b>: read the train–validation gap to see what is broken, read the <b>learning curve</b> to decide between more data and a stronger model, and pick the regularization that fits the problem.</p>
+</header>
+
+<section id="overfit-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The whole lesson is the <em>four ideas</em> below: three steps from diagnosis to treatment, plus one box for when it runs for real.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 260" role="img" aria-label="map of four ideas: spot overfitting by the numbers, lacking data or lacking model, how to regularize, and why it is still bad in production">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① SPOT BY NUMBERS</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">train–val gap</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② NEED DATA OR NEED MODEL?</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">learning curve answers</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ REGULARIZE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">penalty · stop early · data</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ WHY STILL BAD IN PROD</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">good val ≠ good production</text>
+<text class="sv-hv" x="372" y="18">THE LESSON IN FOUR IDEAS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">First three: diagnose, fix</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">measure the gap → find cause → pick the fix</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Box ④ is where all of that fails</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">shifted distribution, leakage, val seen too often</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Treat the wrong cause, waste it</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">more data won't help when the model is too weak</text>
+</svg>
+  <figcaption>Map of the whole lesson. Each section below opens one box of this figure.</figcaption>
+  </figure>
+</section>
+
+<section id="overfit-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Spot it by numbers, not by feel</h2></div>
+
+  <p class="key">Overfitting and underfitting are not visible by intuition. <em>They are two numbers side by side</em>: the error on the training set and the error on the validation set.</p>
+
+  <ul class="why">
+    <li>Why those two numbers separate two kinds of failure, and why you cannot fix both at once — see <a href="../bias-variance-tradeoff/index.html">Bias–variance tradeoff</a>.</li>
+    <li>How to split data so these two numbers can be trusted is in <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</li>
+    <li>This lesson starts from the point where you already have both numbers in hand.</li>
+  </ul>
+
+  <div class="mtx">
+    <div class="hd"></div><div class="hd">Low validation error</div><div class="hd">High validation error</div>
+    <div class="hd rl">Low train<br>error</div>
+    <div class="q ok"><b>Good</b><span>but if it looks too good, check for data leakage before celebrating</span></div>
+    <div class="q bad"><b>Overfit</b><span>high variance — add data, increase regularization, reduce complexity</span></div>
+    <div class="hd rl">High train<br>error</div>
+    <div class="q bad"><b>Anomaly</b><span>validation too easy, a bad split, or dropout still on while measuring train</span></div>
+    <div class="q bad"><b>Underfit</b><span>high bias — add features, a stronger model, train longer, reduce regularization</span></div>
+  </div>
+
+</section>
+
+<section id="overfit-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Learning curve — need data or need model</h2></div>
+
+  <p class="key">The table above says how the model is broken. <em>The learning curve goes further: is collecting more data worth it?</em> — and the answer does not depend on the data, it depends on the <b>model</b>: same dataset, same 4,980 extra samples bought, one model cuts its error by 97% and the other by 6%.</p>
+
+<figure class="scrollx">
+<svg viewBox="0 0 860 382" role="img" aria-label="Measured learning curves of a degree-9 and a degree-1 model on the same dataset, with the validation error bought by adding 4,980 samples">
+<text class="sv-hv" x="0" y="18">SAME DATA · ERROR VS NUMBER OF TRAIN SAMPLES</text>
+<text class="sv-d" x="0" y="40" fill="var(--text)">degree 9</text>
+<text class="sv-d" x="340" y="40" fill="var(--probe)" text-anchor="end">val</text>
+<text class="sv-d" x="306" y="40" fill="var(--filled)" text-anchor="end">train</text>
+<line x1="46" y1="148.6" x2="334" y2="148.6" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 4"/>
+<text class="sv-d" x="334" y="143.6" fill="var(--faint)" text-anchor="end">floor 0.300</text>
+<line x1="46" y1="62" x2="46" y2="184" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="46" y1="184" x2="334" y2="184" stroke="var(--rule-hi)" stroke-width="1"/>
+<polyline points="46.0,66.0 82.2,75.2 118.3,145.8 154.5,147.2 190.6,148.1 226.8,148.4 262.9,148.5 299.1,148.6 334.0,148.6" fill="none" stroke="var(--probe)" stroke-width="2"/>
+<circle cx="46.0" cy="66.0" r="2.6" fill="var(--probe)"/>
+<circle cx="82.2" cy="75.2" r="2.6" fill="var(--probe)"/>
+<circle cx="118.3" cy="145.8" r="2.6" fill="var(--probe)"/>
+<circle cx="154.5" cy="147.2" r="2.6" fill="var(--probe)"/>
+<circle cx="190.6" cy="148.1" r="2.6" fill="var(--probe)"/>
+<circle cx="226.8" cy="148.4" r="2.6" fill="var(--probe)"/>
+<circle cx="262.9" cy="148.5" r="2.6" fill="var(--probe)"/>
+<circle cx="299.1" cy="148.6" r="2.6" fill="var(--probe)"/>
+<circle cx="334.0" cy="148.6" r="2.6" fill="var(--probe)"/>
+<polyline points="46.0,161.5 82.2,153.4 118.3,151.7 154.5,149.5 190.6,149.1 226.8,148.6 262.9,149.0 299.1,148.6 334.0,148.6" fill="none" stroke="var(--filled)" stroke-width="2"/>
+<circle cx="46.0" cy="161.5" r="2.6" fill="var(--filled)"/>
+<circle cx="82.2" cy="153.4" r="2.6" fill="var(--filled)"/>
+<circle cx="118.3" cy="151.7" r="2.6" fill="var(--filled)"/>
+<circle cx="154.5" cy="149.5" r="2.6" fill="var(--filled)"/>
+<circle cx="190.6" cy="149.1" r="2.6" fill="var(--filled)"/>
+<circle cx="226.8" cy="148.6" r="2.6" fill="var(--filled)"/>
+<circle cx="262.9" cy="149.0" r="2.6" fill="var(--filled)"/>
+<circle cx="299.1" cy="148.6" r="2.6" fill="var(--filled)"/>
+<circle cx="334.0" cy="148.6" r="2.6" fill="var(--filled)"/>
+<line x1="46.0" y1="66.0" x2="46.0" y2="161.462" stroke="var(--ok)" stroke-width="2"/>
+<line x1="334.0" y1="148.6" x2="334.0" y2="148.6" stroke="var(--ok)" stroke-width="2"/>
+<polygon points="46.0,55 41.4,64 50.6,64" fill="var(--probe)"/>
+<text class="sv-d" x="56.0" y="64" fill="var(--probe)">val = 9.25, off chart</text>
+<text class="sv-d" x="40" y="70" fill="var(--faint)" text-anchor="end">1.0</text>
+<text class="sv-d" x="40" y="188" fill="var(--faint)" text-anchor="end">0</text>
+<text class="sv-d" x="46" y="200" fill="var(--faint)">20 pts</text>
+<text class="sv-d" x="334" y="200" fill="var(--ok)" text-anchor="end">gap 9.06 → 0.00 · more data WORKS</text>
+<text class="sv-d" x="0" y="214" fill="var(--text)">degree 1</text>
+<line x1="46" y1="308.6" x2="334" y2="308.6" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 4"/>
+<text class="sv-d" x="334" y="303.6" fill="var(--faint)" text-anchor="end">floor 0.300</text>
+<line x1="46" y1="222" x2="46" y2="344" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="46" y1="344" x2="334" y2="344" stroke="var(--rule-hi)" stroke-width="1"/>
+<polyline points="46.0,254.9 82.2,257.7 118.3,259.3 154.5,259.7 190.6,260.0 226.8,260.1 262.9,260.2 299.1,260.2 334.0,260.2" fill="none" stroke="var(--probe)" stroke-width="2"/>
+<circle cx="46.0" cy="254.9" r="2.6" fill="var(--probe)"/>
+<circle cx="82.2" cy="257.7" r="2.6" fill="var(--probe)"/>
+<circle cx="118.3" cy="259.3" r="2.6" fill="var(--probe)"/>
+<circle cx="154.5" cy="259.7" r="2.6" fill="var(--probe)"/>
+<circle cx="190.6" cy="260.0" r="2.6" fill="var(--probe)"/>
+<circle cx="226.8" cy="260.1" r="2.6" fill="var(--probe)"/>
+<circle cx="262.9" cy="260.2" r="2.6" fill="var(--probe)"/>
+<circle cx="299.1" cy="260.2" r="2.6" fill="var(--probe)"/>
+<circle cx="334.0" cy="260.2" r="2.6" fill="var(--probe)"/>
+<polyline points="46.0,263.6 82.2,261.2 118.3,259.5 154.5,259.2 190.6,259.6 226.8,258.7 262.9,258.6 299.1,258.7 334.0,259.0" fill="none" stroke="var(--filled)" stroke-width="2"/>
+<circle cx="46.0" cy="263.6" r="2.6" fill="var(--filled)"/>
+<circle cx="82.2" cy="261.2" r="2.6" fill="var(--filled)"/>
+<circle cx="118.3" cy="259.5" r="2.6" fill="var(--filled)"/>
+<circle cx="154.5" cy="259.2" r="2.6" fill="var(--filled)"/>
+<circle cx="190.6" cy="259.6" r="2.6" fill="var(--filled)"/>
+<circle cx="226.8" cy="258.7" r="2.6" fill="var(--filled)"/>
+<circle cx="262.9" cy="258.6" r="2.6" fill="var(--filled)"/>
+<circle cx="299.1" cy="258.7" r="2.6" fill="var(--filled)"/>
+<circle cx="334.0" cy="259.0" r="2.6" fill="var(--filled)"/>
+<line x1="46.0" y1="254.91" x2="46.0" y2="263.642" stroke="var(--ok)" stroke-width="2"/>
+<line x1="334.0" y1="260.22" x2="334.0" y2="259.04" stroke="var(--ok)" stroke-width="2"/>
+<text class="sv-d" x="40" y="230" fill="var(--faint)" text-anchor="end">1.0</text>
+<text class="sv-d" x="40" y="348" fill="var(--faint)" text-anchor="end">0</text>
+<text class="sv-d" x="46" y="360" fill="var(--faint)">20 pts</text>
+<text class="sv-d" x="334" y="360" fill="var(--tomb)" text-anchor="end">gap is 0 from n = 80 · more data USELESS</text>
+<text class="sv-hv" x="372" y="18">WHAT 4,980 MORE BUYS YOU</text>
+<rect x="372" y="40" width="196" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="61.0" fill="var(--ok)">deg 9:  9.25 → 0.30</text>
+<text class="sv-d" x="582" y="61.0" fill="var(--muted)">val error -97%</text>
+<rect x="372" y="80" width="196" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="101.0" fill="var(--tomb)">deg 1:  0.76 → 0.71</text>
+<text class="sv-d" x="582" y="101.0" fill="var(--muted)">val error -6%</text>
+<text class="sv-d" x="372" y="136" fill="var(--muted)">Two models, one dataset, one budget. The difference is not which model is "better" —</text>
+<text class="sv-d" x="372" y="152" fill="var(--muted)">at n = 20 degree 1 already beats degree 9 twelvefold. It is what blocks each:</text>
+<text class="sv-d" x="372" y="168" fill="var(--muted)">deg 9 is blocked by data, deg 1 by itself.</text>
+<rect x="372" y="192" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="214" fill="var(--ok)">Gap still &gt; 0 and closing</text>
+<text class="sv-s" x="388" y="232" fill="var(--dim)">deg 9: buying data buys what is missing</text>
+<rect x="372" y="252" width="488" height="50" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="274" fill="var(--tomb)">Gap is 0, and 0 at a HIGH level</text>
+<text class="sv-s" x="388" y="292" fill="var(--dim)">deg 1: stops at 0.710 — 2.4× the 0.300 floor</text>
+<text class="sv-s" x="372" y="330" fill="var(--dim)">Floor 0.300 is the noise that made the data — no model can go below.</text>
+<text class="sv-s" x="372" y="350" fill="var(--dim)">Degree 9 hits the floor at n = 640. Degree 1 stays 0.410 above, any n.</text>
+</svg>
+    <figcaption>Two models run on <strong>the same dataset</strong> (a sine plus Gaussian noise of 0.300), n growing from 20 to 5,000. The gap between the two lines at the right edge is the whole answer: degree 9 has a gap of 9.06 that closes to 0 — buying samples buys exactly what it lacks; degree 1 has a gap of 0 <b>already at n = 80</b> and sits at 0.710, so the next 4,920 samples buy exactly 0.005.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>Labeling is the most expensive part of an ML project. This figure answers "are 10,000 more samples worth it" with <b>evidence</b>, before you spend the money.</li>
+    <li>Read the <b>gap</b>, not the height: degree 1 at n = 20 has error 0.755 — <em>twelve times lower</em> than degree 9, yet it is the model that should not get more data.</li>
+    <li>The <b>noise floor</b> is the level no model can go below. Two lines meeting <em>at the floor</em> means the job is done; meeting <em>above the floor</em> is underfitting.</li>
+  </ul>
+</section>
+
+<section id="overfit-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>How to regularize</h2></div>
+
+  <p class="key"><b>Regularization</b> is any way of <em>deliberately constraining the model</em> so it does not memorize noise — at the cost of being slightly more wrong on the training data.</p>
+
+  <ul class="why">
+    <li>It comes in many forms: add a <b>penalty term to the loss</b>, <b>cut the model's capacity</b>, <b>stop early</b>, or <b>add noise to the data</b>.</li>
+    <li>Every form is <b>the same trade</b>: accept a little more bias in exchange for much less variance. They differ in what they pay with.</li>
+  </ul>
+
+  <table>
+    <tr><th>Method</th><th>Mechanism</th><th>Used for</th></tr>
+    <tr><td><strong>More data</strong></td><td>Noise is harder to memorize with many samples</td><td>Always best if feasible</td></tr>
+    <tr><td>L2 (weight decay)</td><td>Penalize the sum of squared weights → weights uniformly small</td><td>Linear models, neural networks</td></tr>
+    <tr><td>L1</td><td>Penalize the sum of absolute values → some weights become exactly 0</td><td>When you suspect most features are useless</td></tr>
+    <tr><td>Dropout</td><td>Randomly switch off some neurons during training → the network does not rely on a few paths</td><td>Neural networks; off at inference</td></tr>
+    <tr><td>Early stopping</td><td>Stop when validation error starts to rise</td><td><strong>Any</strong> iterative method — boosting, neural networks</td></tr>
+    <tr><td>Data augmentation</td><td>Generate plausible variants of samples — flip images, swap synonyms</td><td>Images, audio, text</td></tr>
+  </table>
+
+  <p><strong>Reducing complexity</strong> is also regularization, even if it is rarely called that: lower a tree's <code>max_depth</code>, use fewer network layers, drop features. Usually the fastest thing to try.</p>
+
+  <div class="axis">
+    <div class="stop"><b>λ = 0</b><span>no restraint · overfit</span></div>
+    <div class="stop on"><b>moderate λ</b><span>lowest validation error</span></div>
+    <div class="stop"><b>large λ</b><span>coefficients squeezed to almost nothing · underfit</span></div>
+  </div>
+  <p class="axiscap"><span>hugs the training data</span><span><em>overcorrect and you fall to the other side</em></span><span>model is nearly a constant</span></p>
+
+  <ul class="why">
+    <li>Order to try: reduce complexity first (cheap, fast), then parameterized regularization, and only last collect more data.</li>
+  </ul>
+
+</section>
+
+<section id="overfit-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Hyperparameter tuning</h2></div>
+
+  <p class="key">Regularization strength is a hyperparameter — <em>and finding it is a search problem with a budget</em>. How you spend that budget matters more than people think.</p>
+
+  <table>
+    <tr><th>Method</th><th>Mechanism</th><th>Pros / cons</th></tr>
+    <tr><td>Grid search</td><td>Try every combination on a predefined grid</td><td>Exhaustive, but combinations grow exponentially with the number of parameters</td></tr>
+    <tr><td><strong>Random search</strong></td><td>Sample randomly in the space</td><td>Usually better than grid for the same budget — see below</td></tr>
+    <tr><td>Bayesian / TPE</td><td>Use past trials to guess which region is worth trying next</td><td>Most efficient when each trial is very expensive; adds complexity</td></tr>
+    <tr><td>Successive halving</td><td>Try many configurations with few resources, prune gradually, pour resources into the survivors</td><td>Very efficient for neural networks and boosting</td></tr>
+  </table>
+
+  <h3>Why random beats grid</h3>
+<p class="key">Same <em>9 trials</em>, two parameters, but only one really matters — measured on a degree-9 model with 40 samples, λ decides almost everything while the other parameter changes almost nothing:</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 370" role="img" aria-label="Distribution of validation error over 400 runs of 9-point random search versus one 3×3 grid on the same problem">
+<text class="sv-hv" x="0" y="18">SAME 9 TRIALS · 400 RANDOM REPEATS</text>
+<rect x="32.0" y="52.0" width="26.6" height="150.0" rx="3" fill="rgba(var(--green-a),.42)" stroke="var(--ok)" stroke-width="1.6"/>
+<rect x="62.6" y="81.5" width="26.6" height="120.5" rx="3" fill="rgba(var(--green-a),.42)" stroke="var(--ok)" stroke-width="1.6"/>
+<rect x="93.2" y="101.6" width="26.6" height="100.4" rx="3" fill="rgba(var(--green-a),.42)" stroke="var(--ok)" stroke-width="1.6"/>
+<rect x="123.8" y="137.0" width="26.6" height="65.0" rx="3" fill="rgba(var(--green-a),.42)" stroke="var(--ok)" stroke-width="1.6"/>
+<rect x="154.4" y="179.6" width="26.6" height="22.4" rx="3" fill="rgba(var(--green-a),.42)" stroke="var(--ok)" stroke-width="1.6"/>
+<rect x="185.0" y="191.4" width="26.6" height="10.6" rx="3" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.6"/>
+<rect x="215.6" y="199.6" width="26.6" height="2.4" rx="3" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.6"/>
+<rect x="307.4" y="200.8" width="26.6" height="1.2" rx="3" fill="rgba(var(--red-a),.42)" stroke="var(--tomb)" stroke-width="1.6"/>
+<line x1="30" y1="202" x2="336" y2="202" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="179.0" y1="36" x2="179.0" y2="202" stroke="var(--probe)" stroke-width="2"/>
+<text class="sv-d" x="179.0" y="30" fill="var(--probe)" text-anchor="middle">grid 3×3 = 0.837</text>
+<text class="sv-d" x="30" y="218" fill="var(--faint)">0.40 · lower = better</text>
+<text class="sv-d" x="336" y="218" fill="var(--faint)" text-anchor="end">1.30</text>
+<text class="sv-d" x="30" y="236" fill="var(--ok)">random beats grid 387 / 400</text>
+<text class="sv-d" x="30" y="254" fill="var(--tomb)">loses 13 / 400</text>
+<text class="sv-hv" x="372" y="18">WHY — COUNT THE VALUES ACTUALLY TRIED</text>
+<rect x="372" y="40" width="196" height="32" rx="4" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="61.0" fill="var(--tomb)">3×3 grid · 9 runs</text>
+<text class="sv-d" x="582" y="61.0" fill="var(--muted)">only 3 distinct λ values</text>
+<rect x="372" y="80" width="196" height="32" rx="4" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.2"/>
+<text class="sv-d" x="384" y="101.0" fill="var(--ok)">random · 9 runs</text>
+<text class="sv-d" x="582" y="101.0" fill="var(--muted)">9 distinct λ values</text>
+<text class="sv-d" x="372" y="136" fill="var(--muted)">Two hyperparams: λ decides nearly all, the fit-sample ratio almost nothing.</text>
+<text class="sv-d" x="372" y="152" fill="var(--muted)">Grid must split the budget evenly over both — each λ value is rerun three times just to</text>
+<text class="sv-d" x="372" y="168" fill="var(--muted)">probe a useless axis</text>
+<rect x="372" y="192" width="488" height="50" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="214" fill="var(--ok)">random median 0.515 · best 0.410</text>
+<text class="sv-s" x="388" y="232" fill="var(--dim)">a 201-point sweep puts the true optimum at 0.415 — random hit it</text>
+<rect x="372" y="252" width="488" height="50" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="274" fill="var(--tomb)">grid 0.837 · twice optimum</text>
+<text class="sv-s" x="388" y="292" fill="var(--dim)">not bad luck: a good λ just isn't on the three-point grid</text>
+<text class="sv-s" x="372" y="330" fill="var(--dim)">Holds only when a few hyperparameters dominate — Bergstra &amp; Bengio 2012.</text>
+<text class="sv-s" x="372" y="350" fill="var(--dim)">More useless params, worse grid loses: 3 levels, k params = 3^k runs.</text>
+</svg>
+    <figcaption>Same problem, same <strong>9 runs</strong>: the 3×3 grid stops at 0.837, while 400 random repeats give a median of 0.515 and <b>beat grid 387 times</b>. Not because grid was unlucky — a dense 201-point sweep puts the true optimum at 0.415, meaning a good λ <em>does not fall on</em> the three-point grid, and none of grid's nine runs ever had a chance to reach it.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>The advantage does not come from luck but from <b>how many distinct values get tried</b> on the axis that matters: a 3×3 grid tries 3, random with 9 runs tries 9.</li>
+    <li>So it holds only when <b>a few hyperparameters dominate</b> — which is almost always the case in practice.</li>
+    <li>For parameters spanning several orders of magnitude — learning rate, regularization strength — sample on a <b>log scale</b>: sampling uniformly between 0.0001 and 0.1 puts 99% of samples above 0.001.</li>
+  </ul>
+
+</section>
+
+<section id="overfit-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Good validation, bad production</h2></div>
+
+  <p class="key">Fixing overfitting on the offline set does not finish the job. <em>There is another layer of failure that only shows up when the model meets real data.</em></p>
+
+  <table>
+    <tr><th>Cause</th><th>Symptom</th><th>Check</th></tr>
+    <tr><td><strong>Data leakage</strong></td><td>Unusually high offline score</td><td>Inspect each feature: is this value available at prediction time?</td></tr>
+    <tr><td>Wrong split</td><td>Shuffled time series, or the same group on both sides</td><td>Re-split <a href="../train-val-test-cv/index.html">by time or by group</a> and measure again</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>The two causes above are flaws of the offline set itself, so they can be fixed within this lesson.</li>
+    <li>The remaining group cannot: real data changes over time (<b>data drift</b>, <b>concept drift</b>), or features at training and at serving time are computed by two different pieces of code (<b>training–serving skew</b> — the reason <b>feature stores</b> exist).</li>
+    <li>The cost of that group is building monitoring and retraining, i.e. moving from a model problem to a system problem: see <a href="../../../12-mlops/03-lifecycle/mlops-serving/index.html">Model serving &amp; monitoring</a> and <a href="../../../11-ml-system-design/02-frameworks/ml-system-design/index.html">ML system design</a>.</li>
+  </ul>
+</section>
+
+<section id="overfit-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Reading a real case</h2></div>
+
+  <p class="key">Each section above teaches <em>one</em> gate. With a real result in hand you go through all four in order — and the <em>order</em> is what none of the sections above can tell you.</p>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 384" role="img" aria-label="A real case passing through four diagnostic gates, and two validation-error curves for turning λ versus lowering the model degree">
+<text class="sv-hv" x="0" y="18">REAL CASE · DEG 9, n = 20, val = 9.26</text>
+<rect x="0" y="44" width="340" height="62" rx="5" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.3"/>
+<text class="sv-d" x="14" y="64" fill="var(--tomb)">① train/val</text>
+<text class="sv-d" x="14" y="82" fill="var(--muted)">train 0.195 · val 9.26</text>
+<text class="sv-d" x="14" y="98" fill="var(--text)">gap 47× → overfit</text>
+<rect x="0" y="118" width="340" height="62" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.3"/>
+<text class="sv-d" x="14" y="138" fill="var(--ok)">② learning curve</text>
+<text class="sv-d" x="14" y="156" fill="var(--muted)">n = 20 → 5,000: val 0.30</text>
+<text class="sv-d" x="14" y="172" fill="var(--text)">gap closing → more data works</text>
+<rect x="0" y="192" width="340" height="62" rx="5" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.3"/>
+<text class="sv-d" x="14" y="212" fill="var(--probe)">③ but no data budget yet</text>
+<text class="sv-d" x="14" y="230" fill="var(--muted)">turn λ, keep n = 20</text>
+<text class="sv-d" x="14" y="246" fill="var(--text)">λ = 0.1 → val 0.64</text>
+<rect x="0" y="266" width="340" height="62" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.3"/>
+<text class="sv-d" x="14" y="286" fill="var(--ok)">④ or drop λ, cut degree</text>
+<text class="sv-d" x="14" y="304" fill="var(--muted)">degree 9 → 5, keep n = 20</text>
+<text class="sv-d" x="14" y="320" fill="var(--text)">val 0.41 · cheaper, beats ③</text>
+<text class="sv-d" x="0" y="342" fill="var(--muted)">Four gates, one model, not one row of data changed. Only ②</text>
+<text class="sv-d" x="0" y="358" fill="var(--muted)">costs</text>
+<text class="sv-hv" x="372" y="18">SAME n = 20 · TWO KNOBS</text>
+<text class="sv-d" x="372" y="42" fill="var(--text)">③ L2 penalty — a param to tune</text>
+<line x1="406" y1="50" x2="406" y2="128" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="406" y1="128" x2="764" y2="128" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="406" y1="128" x2="764" y2="128" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 4"/>
+<polyline points="406.0,55.6 445.8,57.0 485.6,65.2 525.3,72.1 565.1,80.9 604.9,98.1 644.7,112.0 684.4,109.4 724.2,105.8 764.0,104.7" fill="none" stroke="var(--filled)" stroke-width="2"/>
+<circle cx="406.0" cy="55.6" r="2.6" fill="var(--filled)"/>
+<circle cx="445.8" cy="57.0" r="2.6" fill="var(--filled)"/>
+<circle cx="485.6" cy="65.2" r="2.6" fill="var(--filled)"/>
+<circle cx="525.3" cy="72.1" r="2.6" fill="var(--filled)"/>
+<circle cx="565.1" cy="80.9" r="2.6" fill="var(--filled)"/>
+<circle cx="604.9" cy="98.1" r="2.6" fill="var(--filled)"/>
+<circle cx="644.7" cy="112.0" r="4.4" fill="var(--probe)"/>
+<circle cx="684.4" cy="109.4" r="2.6" fill="var(--filled)"/>
+<circle cx="724.2" cy="105.8" r="2.6" fill="var(--filled)"/>
+<circle cx="764.0" cy="104.7" r="2.6" fill="var(--filled)"/>
+<text class="sv-d" x="644.6666666666666" y="100.01031907430678" fill="var(--probe)" text-anchor="middle">0.64</text>
+<text class="sv-d" x="406" y="144" fill="var(--faint)">λ = 0</text>
+<text class="sv-d" x="764" y="144" fill="var(--faint)" text-anchor="end">λ = 100</text>
+<text class="sv-d" x="398" y="132" fill="var(--faint)" text-anchor="end">floor</text>
+<text class="sv-d" x="398" y="58" fill="var(--faint)" text-anchor="end">val</text>
+<text class="sv-d" x="372" y="164" fill="var(--text)">④ lower degree — no new parameter</text>
+<line x1="406" y1="172" x2="406" y2="250" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="406" y1="250" x2="764" y2="250" stroke="var(--rule-hi)" stroke-width="1"/>
+<line x1="406" y1="250" x2="764" y2="250" stroke="var(--rule-hi)" stroke-width="1" stroke-dasharray="3 4"/>
+<polyline points="406.0,230.5 477.6,228.7 549.2,243.2 620.8,243.4 692.4,213.5 764.0,177.6" fill="none" stroke="var(--filled)" stroke-width="2"/>
+<circle cx="406.0" cy="230.5" r="2.6" fill="var(--filled)"/>
+<circle cx="477.6" cy="228.7" r="2.6" fill="var(--filled)"/>
+<circle cx="549.2" cy="243.2" r="2.6" fill="var(--filled)"/>
+<circle cx="620.8" cy="243.4" r="4.4" fill="var(--probe)"/>
+<circle cx="692.4" cy="213.5" r="2.6" fill="var(--filled)"/>
+<circle cx="764.0" cy="177.6" r="2.6" fill="var(--filled)"/>
+<text class="sv-d" x="620.8" y="231.35644942124947" fill="var(--probe)" text-anchor="middle">0.41</text>
+<text class="sv-d" x="406" y="266" fill="var(--faint)">deg 1</text>
+<text class="sv-d" x="764" y="266" fill="var(--faint)" text-anchor="end">deg 9</text>
+<text class="sv-d" x="398" y="254" fill="var(--faint)" text-anchor="end">floor</text>
+<text class="sv-d" x="398" y="180" fill="var(--faint)" text-anchor="end">val</text>
+<text class="sv-d" x="372" y="294" fill="var(--muted)">Both curves hit bottom then rise: overcorrect and you fall to the other side. But ④'s</text>
+<text class="sv-d" x="372" y="310" fill="var(--muted)">bottom is below ③'s — lowering degree is cheaper (no λ to tune) and better, so it tops</text>
+<text class="sv-d" x="372" y="326" fill="var(--muted)">the order in 04.</text>
+<text class="sv-s" x="372" y="360" fill="var(--dim)">Log vertical axis, floor = noise 0.300. Both minima above — n = 20 is few.</text>
+</svg>
+    <figcaption>Degree-9 model on 20 samples: val 9.26 while train is 0.195. Gate ② says buying samples will work — but the labeling budget is not available today, so you have to fix it with what you have. Gate ③ turns λ and gets val 0.64; gate ④ lowers degree 9 to degree 5 and gets <b>0.41</b> without adding a single hyperparameter to tune. That is why "reduce complexity" tops the order of things to try in section 04, not because it sounds simpler.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>The four gates <b>do not replace each other</b>: ② says whether to spend money, ③④ say what to do while you cannot spend yet.</li>
+    <li>Both curves in the right panel <b>hit bottom then rise</b> — overcorrect and you fall into underfitting, so λ and complexity must both be chosen with validation, not guessed.</li>
+    <li>The 0.41 minimum is still well above the 0.300 noise floor: regularization <b>cannot replace</b> data, it only buys time until data arrives.</li>
+    <li>Why you cannot fix both bias and variance at once: <a href="../bias-variance-tradeoff/index.html">Bias–variance tradeoff</a>. Shape of the L1 and L2 penalty regions: <a href="../../05-classical-ml/ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; ElasticNet</a>.</li>
+  </ul>
+</section>
+
+<section id="overfit-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Common mistakes</h2></div>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Fixing overfitting by switching models</h4><p>Switching to a stronger model while variance is high makes it worse. Read the diagnosis first, pick the fix second.</p></div>
+    <div class="card bad"><h4>Adding data when the problem is bias</h4><p>Once the learning curves have met, more samples just cost money. You need new features or a stronger model.</p></div>
+    <div class="card bad"><h4>Increasing regularization until it underfits</h4><p>Overcorrect and you fall to the other side. Always watch <em>both</em> numbers, not just the gap between them.</p></div>
+    <div class="card bad"><h4>Forgetting to turn off dropout at inference</h4><p>Results fluctuate between runs and fall short of what the model can really do.</p></div>
+    <div class="card bad"><h4>Boosting without early stopping</h4><p>With a large <code>n_estimators</code> overfitting is certain, only a matter of when.</p></div>
+    <div class="card bad"><h4>Sampling learning rate on a linear scale</h4><p>You miss the region of small values. Use a log scale.</p></div>
+  </div>
+</section>
+
+
+<footer>Machine learning · Core concepts · diagnosis and treatment. Error decomposition is in <a href="../bias-variance-tradeoff/index.html">Bias–variance tradeoff</a>; how to split data is in <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

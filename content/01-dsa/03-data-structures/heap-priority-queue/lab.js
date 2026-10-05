@@ -1,5 +1,5 @@
 (function(){
-/* ---------------- lab: dựng heap ---------------- */
+/* ---------------- lab: build a heap ---------------- */
 let HA = [], HMODE = "heapify", HQ = [], HCMP = 0, HSWP = 0, HDONE = false, HTIMER = null, HHI = [];
 
 function hParse(){
@@ -14,7 +14,7 @@ function hRender(note){
     for(let k = 0; k < w && i < n; k++, i++){
       const hot = HHI.includes(i);
       const bg = hot ? "var(--probe)" : "var(--raise)";
-      const fg = hot ? "#14110E" : "var(--text)";
+      const fg = hot ? "var(--on-fill)" : "var(--text)";
       cells.push(`<div class="slot" style="border-color:${hot?'var(--probe)':'var(--rule)'};min-width:44px">
         <i>${i}</i><u style="background:${bg};color:${fg};font-weight:${hot?600:400}">${HA[i]}</u></div>`);
     }
@@ -22,13 +22,13 @@ function hRender(note){
     w *= 2;
   }
   document.getElementById("hview").innerHTML =
-    rows + `<p class="legend" style="margin-top:8px"><span>mảng: [${HA.join(", ")}]</span></p>`;
+    rows + `<p class="legend" style="margin-top:8px"><span>array: [${HA.join(", ")}]</span></p>`;
   document.getElementById("hcmp").textContent = HCMP;
   document.getElementById("hswp").textContent = HSWP;
-  document.getElementById("hstate").textContent = HDONE ? "xong — đã là heap" : "đang dựng";
+  document.getElementById("hstate").textContent = HDONE ? "done — it is a heap" : "building";
   if(note){
     const log = document.getElementById("hlog");
-    log.insertAdjacentHTML("afterbegin", `<div><span>${HSWP} đổi</span><span>${note}</span><span></span></div>`);
+    log.insertAdjacentHTML("afterbegin", `<div><span>${HSWP} swaps</span><span>${note}</span><span></span></div>`);
     while(log.children.length > 8) log.removeChild(log.lastChild);
   }
 }
@@ -44,21 +44,21 @@ function siftDownOnce(i, n){
 function hStep(){
   if(HDONE) return;
   if(HMODE === "heapify"){
-    if(!HQ.length){ HDONE = true; HHI = []; hRender("hết nút cần sift — mảng đã là heap"); return; }
+    if(!HQ.length){ HDONE = true; HHI = []; hRender("no nodes left to sift — the array is a heap"); return; }
     let i = HQ[0];
     const m = siftDownOnce(i, HA.length);
-    if(m === -1){ HQ.shift(); HHI = [i]; hRender(`nút ${i} đã đúng chỗ`); }
-    else { HQ[0] = m; HHI = [i, m]; hRender(`đổi ${i} ↔ ${m} — tiếp tục chìm`); }
+    if(m === -1){ HQ.shift(); HHI = [i]; hRender(`node ${i} is already in place`); }
+    else { HQ[0] = m; HHI = [i, m]; hRender(`swap ${i} ↔ ${m} — keep sinking`); }
   } else {
-    if(HQ.length === 0){ HDONE = true; HHI = []; hRender("đã push hết — mảng là heap"); return; }
+    if(HQ.length === 0){ HDONE = true; HHI = []; hRender("all pushed — the array is a heap"); return; }
     let i = HQ[0];
-    if(i === 0){ HQ.shift(); HHI = [0]; hRender("phần tử 0 không có cha"); return; }
+    if(i === 0){ HQ.shift(); HHI = [0]; hRender("element 0 has no parent"); return; }
     const p = (i - 1) >> 1;
     HCMP++;
-    if(HA[p] <= HA[i]){ HQ.shift(); HHI = [i]; hRender(`a[${p}] ≤ a[${i}] → đúng chỗ, push tiếp`); }
+    if(HA[p] <= HA[i]){ HQ.shift(); HHI = [i]; hRender(`a[${p}] ≤ a[${i}] → in place, push next`); }
     else {
       [HA[p], HA[i]] = [HA[i], HA[p]]; HSWP++;
-      HQ[0] = p; HHI = [p, i]; hRender(`đổi ${i} ↔ ${p} — tiếp tục nổi lên`);
+      HQ[0] = p; HHI = [p, i]; hRender(`swap ${i} ↔ ${p} — keep rising`);
     }
   }
 }
@@ -76,7 +76,7 @@ function hReset(){
   hRender(null);
 }
 function hStop(){ if(HTIMER){ clearInterval(HTIMER); HTIMER = null;
-  document.getElementById("hauto").textContent = "Tự chạy"; } }
+  document.getElementById("hauto").textContent = "Auto run"; } }
 
 document.getElementById("hstep").addEventListener("click", hStep);
 document.getElementById("hrst").addEventListener("click", hReset);
@@ -84,7 +84,7 @@ document.getElementById("hrst").addEventListener("click", hReset);
 document.getElementById("hauto").addEventListener("click", () => {
   if(HTIMER) return hStop();
   if(HDONE) hReset();
-  document.getElementById("hauto").textContent = "Dừng";
+  document.getElementById("hauto").textContent = "Stop";
   HTIMER = setInterval(() => { hStep(); if(HDONE) hStop(); }, 550);
 });
 hReset();

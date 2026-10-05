@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OLTP vs OLAP — MazeAI</title>
+<meta name="description" content="Two workloads pull design in opposite directions: row-oriented versus column-oriented, and why the two systems must be split.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/06-nosql-data/02-nosql/oltp-vs-olap/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="OLTP vs OLAP">
+<meta property="og:description" content="Two workloads pull design in opposite directions: row-oriented versus column-oriented, and why the two systems must be split.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/06-nosql-data/02-nosql/oltp-vs-olap/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" data-progress="1" id="art-oltpolap" data-title="OLTP vs OLAP" data-tag="Database" data-blurb="Two workloads pull design in opposite directions: row-oriented versus column-oriented, and why the two systems must be split.">
+        <header class="hero">
+  <p class="eyebrow">Database · data systems</p>
+  <h1>OLTP vs <em>OLAP</em></h1>
+  <p class="lede">One system for transactions, one for analytics. Three things to remember:</p>
+  <ul class="ledelist">
+    <li>OLTP touches <b>a few rows in milliseconds</b>; OLAP scans <b>millions of rows and aggregates</b></li>
+    <li>they differ down at the disk layer: <b>row-oriented</b> vs <b>column-oriented</b></li>
+    <li>split the systems because <b>the two workloads compete</b> for CPU and snapshots</li>
+  </ul>
+</header>
+
+<section id="oltp-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>OLTP and OLAP workloads</h2></div>
+  <p class="key">OLTP optimizes for <em>writes and point lookups</em>, OLAP optimizes for <em>reading large blocks and aggregating</em> — two nearly opposite goals.</p>
+  <figure class="gist">
+    <svg viewBox="0 0 860 410" role="img" aria-label="Two workloads pull design in opposite directions. OLTP is transactional: decrement stock by one, write one login row, very many statements, each touching a few rows, must answer in milliseconds, writes all the time. OLAP is analytical: total revenue by month by region, very few statements, each touching millions of rows, seconds to minutes is acceptable, almost read-only. OLTP optimizes for writes and point lookups, OLAP for reading large blocks and aggregating, so they are split into two systems joined by a pipeline." data-anim><style>@keyframes s1_k1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s1_k2{0%{animation-timing-function:ease-in-out;opacity:0}20.500%{animation-timing-function:ease-in-out;opacity:0}26.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s1_k3{0%{animation-timing-function:ease-in-out;opacity:0}39.000%{animation-timing-function:ease-in-out;opacity:0}44.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s1_k4{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}63.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s1_k5{0%{animation-timing-function:ease-in-out;opacity:0}76.000%{animation-timing-function:ease-in-out;opacity:0}81.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s1_k6{0%{animation-timing-function:ease-in-out;opacity:0}94.500%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.s1_k1{opacity:0;animation:s1_k1 7.0s linear 1 forwards}.s1_k2{opacity:0;animation:s1_k2 7.0s linear 1 forwards}.s1_k3{opacity:0;animation:s1_k3 7.0s linear 1 forwards}.s1_k4{opacity:0;animation:s1_k4 7.0s linear 1 forwards}.s1_k5{opacity:0;animation:s1_k5 7.0s linear 1 forwards}.s1_k6{opacity:0;animation:s1_k6 7.0s linear 1 forwards}}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">TWO WORKLOADS PULL DESIGN IN OPPOSITE DIRECTIONS</text>
+<g class="s1_k1"><rect x="30.0" y="44.0" width="390.0" height="140.0" rx="6" fill="rgba(var(--green-a),.09)" stroke="var(--ok)" stroke-width="1.6"/><text class="sv-d" x="42" y="68" fill="var(--ok)" style="fill:var(--ok)">OLTP — transact</text><text class="sv-d" x="42" y="94" fill="var(--muted)" style="fill:var(--muted)">decrement stock by 1, write one login row</text><text class="sv-d" x="42" y="118" fill="var(--muted)" style="fill:var(--muted)">many statements, each touches few rows</text><text class="sv-d" x="42" y="142" fill="var(--muted)" style="fill:var(--muted)">must answer in milliseconds</text><text class="sv-d" x="42" y="166" fill="var(--muted)" style="fill:var(--muted)">writes all day long</text></g>
+<g class="s1_k2"><rect x="440.0" y="44.0" width="390.0" height="140.0" rx="6" fill="rgba(var(--amber-a),.09)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="452" y="68" fill="var(--probe)" style="fill:var(--probe)">OLAP — analytic</text><text class="sv-d" x="452" y="94" fill="var(--muted)" style="fill:var(--muted)">total revenue by month by region</text><text class="sv-d" x="452" y="118" fill="var(--muted)" style="fill:var(--muted)">few statements, each hits millions of rows</text><text class="sv-d" x="452" y="142" fill="var(--muted)" style="fill:var(--muted)">seconds to minutes is acceptable</text><text class="sv-d" x="452" y="166" fill="var(--muted)" style="fill:var(--muted)">near read-only</text></g>
+<g class="s1_k3"><text class="sv-d" x="30" y="212" fill="var(--probe)" style="fill:var(--probe)">OLTP optimizes for WRITES and POINT LOOKUPS · OLAP for BIG READS + AGGREGATION</text></g>
+<g class="s1_k4"><text class="sv-d" x="30" y="236" fill="var(--muted)" style="fill:var(--muted)">Two nearly opposite physical goals, so one system rarely does both well</text></g>
+<g class="s1_k5"><rect x="30.0" y="268.0" width="800.0" height="48.0" rx="6" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="42" y="290" fill="var(--tomb)" style="fill:var(--tomb)">So the fix is not clever tuning — it is two systems joined by a pipeline</text><text class="sv-d" x="42" y="310" fill="var(--muted)" style="fill:var(--muted)">that pipeline is ETL/ELT, landing in a data warehouse — next two lessons</text></g>
+<g class="s1_k6"><rect x="0.0" y="346.0" width="3.0" height="20.0" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="361" fill="var(--probe)" style="fill:var(--probe)">Here the course leaves the single database and looks at company-wide data</text><text class="sv-d" x="14" y="378" fill="var(--muted)" style="fill:var(--muted)">Until now every lesson was about one DB serving one app.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>OLTP: very many statements, each touching a few rows, must finish in milliseconds.</li>
+    <li>OLAP: very few statements, each touching millions of rows; a few seconds of latency is fine.</li>
+    <li>The fix is not clever tuning but splitting into two systems joined by a <a href="../../03-data-systems/data-systems/index.html">pipeline</a>.</li>
+    <li>This is where the course leaves the single database and looks at data at company scale.</li>
+  </ul>
+</section>
+
+<section id="oltp-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Row-oriented and column-oriented</h2></div>
+  <p class="key">The deepest difference is <em>how data is laid out on disk</em> — which decides what a single disk access reads.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 402" role="img" aria-label="A SELECT SUM revenue query on a table with 40 columns and 50 million rows. Row-oriented stores each row contiguously, so one disk access fetches the whole 40-column row even though only one column is used, reading nearly 40 times more data than needed. Column-oriented stores each column contiguously, so it reads only the revenue column, many times faster, and compresses very well since a column holds values of one type. Conversely, OLTP writes a whole row, so row-oriented touches only one place." data-anim><style>@keyframes s2_k1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k2{0%{animation-timing-function:ease-in-out;opacity:0}9.115%{animation-timing-function:ease-in-out;opacity:0}14.615%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k3{0%{animation-timing-function:ease-in-out;opacity:0}16.231%{animation-timing-function:ease-in-out;opacity:0}21.731%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k4{0%{animation-timing-function:ease-in-out;opacity:0}23.346%{animation-timing-function:ease-in-out;opacity:0}28.846%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k5{0%{animation-timing-function:ease-in-out;opacity:0}30.462%{animation-timing-function:ease-in-out;opacity:0}35.962%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k6{0%{animation-timing-function:ease-in-out;opacity:0}37.577%{animation-timing-function:ease-in-out;opacity:0}43.077%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k7{0%{animation-timing-function:ease-in-out;opacity:0}44.692%{animation-timing-function:ease-in-out;opacity:0}50.192%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k8{0%{animation-timing-function:ease-in-out;opacity:0}51.808%{animation-timing-function:ease-in-out;opacity:0}57.308%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k9{0%{animation-timing-function:ease-in-out;opacity:0}58.923%{animation-timing-function:ease-in-out;opacity:0}64.423%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k10{0%{animation-timing-function:ease-in-out;opacity:0}66.038%{animation-timing-function:ease-in-out;opacity:0}71.538%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k11{0%{animation-timing-function:ease-in-out;opacity:0}73.154%{animation-timing-function:ease-in-out;opacity:0}78.654%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k12{0%{animation-timing-function:ease-in-out;opacity:0}80.269%{animation-timing-function:ease-in-out;opacity:0}85.769%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k13{0%{animation-timing-function:ease-in-out;opacity:0}87.385%{animation-timing-function:ease-in-out;opacity:0}92.885%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s2_k14{0%{animation-timing-function:ease-in-out;opacity:0}94.500%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.s2_k1{opacity:0;animation:s2_k1 15.0s linear 1 forwards}.s2_k2{opacity:0;animation:s2_k2 15.0s linear 1 forwards}.s2_k3{opacity:0;animation:s2_k3 15.0s linear 1 forwards}.s2_k4{opacity:0;animation:s2_k4 15.0s linear 1 forwards}.s2_k5{opacity:0;animation:s2_k5 15.0s linear 1 forwards}.s2_k6{opacity:0;animation:s2_k6 15.0s linear 1 forwards}.s2_k7{opacity:0;animation:s2_k7 15.0s linear 1 forwards}.s2_k8{opacity:0;animation:s2_k8 15.0s linear 1 forwards}.s2_k9{opacity:0;animation:s2_k9 15.0s linear 1 forwards}.s2_k10{opacity:0;animation:s2_k10 15.0s linear 1 forwards}.s2_k11{opacity:0;animation:s2_k11 15.0s linear 1 forwards}.s2_k12{opacity:0;animation:s2_k12 15.0s linear 1 forwards}.s2_k13{opacity:0;animation:s2_k13 15.0s linear 1 forwards}.s2_k14{opacity:0;animation:s2_k14 15.0s linear 1 forwards}}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">ROW-ORIENTED VS COLUMN-ORIENTED · HOW DATA IS LAID OUT ON DISK</text>
+<g class="s2_k1"><rect x="30.0" y="30.0" width="361.4" height="26.0" rx="5" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="41" y="48" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">SELECT SUM(revenue) FROM orders   -- 40 columns, 50M rows</text></g>
+<g class="s2_k2"><text class="sv-d" x="30" y="88" fill="var(--ok)" style="fill:var(--ok)">row-oriented — each row is contiguous</text></g>
+<g class="s2_k3"><text class="sv-d" x="38" y="108" fill="var(--muted)" style="fill:var(--muted)">id</text><text class="sv-d" x="99" y="108" fill="var(--muted)" style="fill:var(--muted)">cust</text><text class="sv-d" x="160" y="108" fill="var(--muted)" style="fill:var(--muted)">revenue</text><text class="sv-d" x="253" y="108" fill="var(--muted)" style="fill:var(--muted)">city</text></g>
+<g class="s2_k4"><rect x="30.0" y="116.0" width="58.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="38" y="137" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">1</text><rect x="91.0" y="116.0" width="58.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="99" y="137" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">10</text><rect x="152.0" y="116.0" width="90.0" height="30.0" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="160" y="137" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">500k</text><rect x="245.0" y="116.0" width="74.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="253" y="137" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">Paris</text><rect x="30.0" y="150.0" width="58.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="38" y="171" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">2</text><rect x="91.0" y="150.0" width="58.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="99" y="171" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">11</text><rect x="152.0" y="150.0" width="90.0" height="30.0" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="160" y="171" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">200k</text><rect x="245.0" y="150.0" width="74.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="253" y="171" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">Rome</text><rect x="30.0" y="184.0" width="58.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="38" y="205" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">3</text><rect x="91.0" y="184.0" width="58.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="99" y="205" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">10</text><rect x="152.0" y="184.0" width="90.0" height="30.0" rx="3" fill="rgba(var(--green-a),.30)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="160" y="205" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">300k</text><rect x="245.0" y="184.0" width="74.0" height="30.0" rx="3" fill="rgba(var(--green-a),.12)" stroke="var(--ok)" stroke-width="1.2"/><text class="sv-d" x="253" y="205" style="fill:var(--ok);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">Paris</text></g>
+<g class="s2_k5"><text class="sv-d" x="30" y="232" fill="var(--tomb)" style="fill:var(--tomb)">one disk read fetches THE WHOLE ROW — 40 cols, 1 used</text></g>
+<g class="s2_k6"><text class="sv-d" x="30" y="254" fill="var(--tomb)" style="fill:var(--tomb)">→ reads nearly 40× the data needed</text></g>
+<g class="s2_k7"><text class="sv-d" x="450" y="88" fill="var(--probe)" style="fill:var(--probe)">column-oriented — each col contiguous</text></g>
+<g class="s2_k8"><text class="sv-d" x="450" y="130" fill="var(--muted)" style="fill:var(--muted)">id      1 2 3</text><text class="sv-d" x="450" y="158" fill="var(--muted)" style="fill:var(--muted)">cust    10 11 10</text></g>
+<g class="s2_k9"><rect x="444.0" y="176.0" width="320.0" height="30.0" rx="4" fill="rgba(var(--amber-a),.26)" stroke="var(--probe)" stroke-width="1.6"/><text class="sv-d" x="452" y="197" style="fill:var(--probe);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">revenue 500k 200k 300k</text></g>
+<g class="s2_k10"><text class="sv-d" x="450" y="226" fill="var(--muted)" style="fill:var(--muted)">city    Paris Rome Paris</text></g>
+<g class="s2_k11"><text class="sv-d" x="450" y="254" fill="var(--ok)" style="fill:var(--ok)">reads only the revenue column — many× faster</text></g>
+<g class="s2_k12"><text class="sv-d" x="30" y="286" fill="var(--muted)" style="fill:var(--muted)">Reversed: OLTP writes a whole row, so row-oriented touches just one place</text></g>
+<g class="s2_k13"><text class="sv-d" x="30" y="308" fill="var(--ok)" style="fill:var(--ok)">Column-oriented also compresses well: one column = one type, often repeated</text></g>
+<g class="s2_k14"><rect x="0.0" y="338.0" width="3.0" height="20.0" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="353" fill="var(--probe)" style="fill:var(--probe)">This is the physical reason no one system does both well — the disk layouts differ</text><text class="sv-d" x="14" y="370" fill="var(--muted)" style="fill:var(--muted)">Snowflake, BigQuery, Redshift are all column-oriented engines.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Row-oriented: the whole row sits contiguously, good for writing and reading a full record.</li>
+    <li>Column-oriented: the whole column sits contiguously, so <code>SUM</code> over one column skips the other 39.</li>
+    <li>A column holds values of one type, so it compresses very well — another IO win.</li>
+    <li>Because they differ at the disk layer, no single system does both well.</li>
+  </ul>
+</section>
+
+<section id="oltp-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Schema shape</h2></div>
+  <p class="key">The same data exists in <em>two shapes</em> — because normalization pays off for writes, and OLAP barely writes.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 350" role="img" aria-label="Same data, two shapes. OLTP normalizes into orders, customers, products and cities; each fact lives in exactly one place, so renaming a customer edits one row, but reports must JOIN four tables every time. OLAP denormalizes into one wide fact table plus a few descriptive tables; customer and city names are copied in, so aggregation needs no JOIN, but renaming a customer means reloading a whole chunk. Duplicating data in OLAP is a deliberate trade-off because this side is almost read-only." data-anim><style>@keyframes s3_k1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k2{0%{animation-timing-function:ease-in-out;opacity:0}15.214%{animation-timing-function:ease-in-out;opacity:0}20.714%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k3{0%{animation-timing-function:ease-in-out;opacity:0}28.429%{animation-timing-function:ease-in-out;opacity:0}33.929%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k4{0%{animation-timing-function:ease-in-out;opacity:0}41.643%{animation-timing-function:ease-in-out;opacity:0}47.143%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k5{0%{animation-timing-function:ease-in-out;opacity:0}54.857%{animation-timing-function:ease-in-out;opacity:0}60.357%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k6{0%{animation-timing-function:ease-in-out;opacity:0}68.071%{animation-timing-function:ease-in-out;opacity:0}73.571%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k7{0%{animation-timing-function:ease-in-out;opacity:0}81.286%{animation-timing-function:ease-in-out;opacity:0}86.786%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s3_k8{0%{animation-timing-function:ease-in-out;opacity:0}94.500%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.s3_k1{opacity:0;animation:s3_k1 9.0s linear 1 forwards}.s3_k2{opacity:0;animation:s3_k2 9.0s linear 1 forwards}.s3_k3{opacity:0;animation:s3_k3 9.0s linear 1 forwards}.s3_k4{opacity:0;animation:s3_k4 9.0s linear 1 forwards}.s3_k5{opacity:0;animation:s3_k5 9.0s linear 1 forwards}.s3_k6{opacity:0;animation:s3_k6 9.0s linear 1 forwards}.s3_k7{opacity:0;animation:s3_k7 9.0s linear 1 forwards}.s3_k8{opacity:0;animation:s3_k8 9.0s linear 1 forwards}}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">SAME DATA, TWO SHAPES · BECAUSE THE TWO SIDES DO DIFFERENT JOBS</text>
+<g class="s3_k1"><text class="sv-d" x="30" y="46" fill="var(--ok)" style="fill:var(--ok)">OLTP: normalized</text></g>
+<g class="s3_k2"><rect x="30.0" y="56.0" width="390.0" height="118.0" rx="6" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.5"/><text class="sv-d" x="42" y="80" fill="var(--ok)" style="fill:var(--ok)">orders · customers · products · cities</text><text class="sv-d" x="42" y="104" fill="var(--muted)" style="fill:var(--muted)">each fact lives in one place</text><text class="sv-d" x="42" y="126" fill="var(--ok)" style="fill:var(--ok)">rename customer → edit one row</text><text class="sv-d" x="42" y="148" fill="var(--tomb)" style="fill:var(--tomb)">reports JOIN 4 tables every time</text><text class="sv-d" x="42" y="168" fill="var(--muted)" style="fill:var(--muted)">fits: OLTP writes all day long</text></g>
+<g class="s3_k3"><text class="sv-d" x="450" y="46" fill="var(--probe)" style="fill:var(--probe)">OLAP — denormalized</text></g>
+<g class="s3_k4"><rect x="440.0" y="56.0" width="390.0" height="118.0" rx="6" fill="rgba(var(--amber-a),.08)" stroke="var(--probe)" stroke-width="1.5"/><text class="sv-d" x="452" y="80" fill="var(--probe)" style="fill:var(--probe)">1 wide fact table + few dim tables</text><text class="sv-d" x="452" y="104" fill="var(--muted)" style="fill:var(--muted)">customer and city names copied right in</text><text class="sv-d" x="452" y="126" fill="var(--ok)" style="fill:var(--ok)">aggregate with no JOIN, or very few</text><text class="sv-d" x="452" y="148" fill="var(--tomb)" style="fill:var(--tomb)">rename customer → reload a chunk</text><text class="sv-d" x="452" y="168" fill="var(--muted)" style="fill:var(--muted)">fine: OLAP is near read-only</text></g>
+<g class="s3_k5"><text class="sv-d" x="30" y="206" fill="var(--probe)" style="fill:var(--probe)">Duplicate data in OLAP is not a bug — it is a deliberate trade</text></g>
+<g class="s3_k6"><text class="sv-d" x="30" y="228" fill="var(--muted)" style="fill:var(--muted)">No row-by-row edits here, so normalization's cost driver (update anomalies) never arises</text></g>
+<g class="s3_k7"><text class="sv-d" x="30" y="256" fill="var(--tomb)" style="fill:var(--tomb)">In exchange, OLAP data is only as fresh as the last load — hours old is normal</text></g>
+<g class="s3_k8"><rect x="0.0" y="286.0" width="3.0" height="20.0" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="301" fill="var(--probe)" style="fill:var(--probe)">The standard OLAP table shape is the star schema, see data warehouse</text><text class="sv-d" x="14" y="318" fill="var(--muted)" style="fill:var(--muted)">The same data has two shapes because the two sides optimize for different jobs.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>OLTP normalizes: each fact in one place, change it once and you are done — fits because it writes constantly.</li>
+    <li>OLAP denormalizes: names are copied into a wide fact table so aggregation needs no JOIN.</li>
+    <li>Duplicate data here is not a bug — its cost (update anomalies) does not arise on the OLAP side.</li>
+    <li>The real cost is that data is only as fresh as the last load; hours stale is normal.</li>
+  </ul>
+</section>
+
+<section id="oltp-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Why split the systems</h2></div>
+  <p class="key">Running reports directly on the production database competes for <em>two</em> things — and the second one is often missed.</p>
+  <figure class="scrollx">
+    <svg viewBox="0 0 860 396" role="img" aria-label="Running reports directly on the transactional database competes for two things. Resources: a query scanning 50 million rows hogs CPU and IO for minutes, real customer transactions queue up, and the app times out. Locks, the one often missed: a long read holds a snapshot for a long time, so the database must keep every old version, tables bloat and cleanup falls behind. A SELECT that changes nothing still slows the whole system. Light reports read from a follower; heavy reports are copied to a separate OLAP system." data-anim><style>@keyframes s4_k1{0%{animation-timing-function:ease-in-out;opacity:0}2.000%{animation-timing-function:ease-in-out;opacity:0}7.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k2{0%{animation-timing-function:ease-in-out;opacity:0}11.250%{animation-timing-function:ease-in-out;opacity:0}16.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k3{0%{animation-timing-function:ease-in-out;opacity:0}20.500%{animation-timing-function:ease-in-out;opacity:0}26.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k4{0%{animation-timing-function:ease-in-out;opacity:0}29.750%{animation-timing-function:ease-in-out;opacity:0}35.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k5{0%{animation-timing-function:ease-in-out;opacity:0}39.000%{animation-timing-function:ease-in-out;opacity:0}44.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k6{0%{animation-timing-function:ease-in-out;opacity:0}48.250%{animation-timing-function:ease-in-out;opacity:0}53.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k7{0%{animation-timing-function:ease-in-out;opacity:0}57.500%{animation-timing-function:ease-in-out;opacity:0}63.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k8{0%{animation-timing-function:ease-in-out;opacity:0}66.750%{animation-timing-function:ease-in-out;opacity:0}72.250%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k9{0%{animation-timing-function:ease-in-out;opacity:0}76.000%{animation-timing-function:ease-in-out;opacity:0}81.500%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k10{0%{animation-timing-function:ease-in-out;opacity:0}85.250%{animation-timing-function:ease-in-out;opacity:0}90.750%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@keyframes s4_k11{0%{animation-timing-function:ease-in-out;opacity:0}94.500%{animation-timing-function:ease-in-out;opacity:0}100.000%{animation-timing-function:ease-in-out;opacity:1}100%{animation-timing-function:ease-in-out;opacity:1}}@media (prefers-reduced-motion:no-preference){.s4_k1{opacity:0;animation:s4_k1 12.0s linear 1 forwards}.s4_k2{opacity:0;animation:s4_k2 12.0s linear 1 forwards}.s4_k3{opacity:0;animation:s4_k3 12.0s linear 1 forwards}.s4_k4{opacity:0;animation:s4_k4 12.0s linear 1 forwards}.s4_k5{opacity:0;animation:s4_k5 12.0s linear 1 forwards}.s4_k6{opacity:0;animation:s4_k6 12.0s linear 1 forwards}.s4_k7{opacity:0;animation:s4_k7 12.0s linear 1 forwards}.s4_k8{opacity:0;animation:s4_k8 12.0s linear 1 forwards}.s4_k9{opacity:0;animation:s4_k9 12.0s linear 1 forwards}.s4_k10{opacity:0;animation:s4_k10 12.0s linear 1 forwards}.s4_k11{opacity:0;animation:s4_k11 12.0s linear 1 forwards}}</style>
+<text class="sv-hv" x="0" y="16" fill="var(--muted)" style="fill:var(--muted)">REPORTS ON THE TRANSACTIONAL DB · TWO THINGS GET CONTENDED</text>
+<g class="s4_k1"><rect x="30.0" y="28.0" width="350.7" height="26.0" rx="5" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)" stroke-width="1.6"/><text class="sv-d" x="41" y="46" style="fill:var(--tomb);font-family:ui-monospace,SFMono-Regular,Menlo,monospace">SELECT SUM(revenue) ... GROUP BY month  -- scans 50M rows</text></g>
+<g class="s4_k2"><text class="sv-d" x="30" y="86" fill="var(--tomb)" style="fill:var(--tomb)">resource fight</text></g>
+<g class="s4_k3"><rect x="30.0" y="96.0" width="390.0" height="78.0" rx="6" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="42" y="120" fill="var(--muted)" style="fill:var(--muted)">hogs all CPU and IO for minutes</text><text class="sv-d" x="42" y="142" fill="var(--muted)" style="fill:var(--muted)">real customer transactions queue up</text><text class="sv-d" x="42" y="164" fill="var(--tomb)" style="fill:var(--tomb)">the app starts timing out</text></g>
+<g class="s4_k4"><text class="sv-d" x="450" y="86" fill="var(--tomb)" style="fill:var(--tomb)">lock fight — often missed</text></g>
+<g class="s4_k5"><rect x="440.0" y="96.0" width="390.0" height="78.0" rx="6" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.5"/><text class="sv-d" x="452" y="120" fill="var(--muted)" style="fill:var(--muted)">a long read holds a snapshot open</text><text class="sv-d" x="452" y="142" fill="var(--muted)" style="fill:var(--muted)">the DB must keep old versions for it</text><text class="sv-d" x="452" y="164" fill="var(--tomb)" style="fill:var(--tomb)">tables bloat, cleanup lags</text></g>
+<g class="s4_k6"><text class="sv-d" x="30" y="204" fill="var(--probe)" style="fill:var(--probe)">A SELECT that changes nothing still slows the whole system — that surprises many</text></g>
+<g class="s4_k7"><text class="sv-d" x="30" y="234" fill="var(--text)" style="fill:var(--text)">Three fixes, cheap to dear:</text></g>
+<g class="s4_k8"><text class="sv-d" x="46" y="258" fill="var(--ok)" style="fill:var(--ok)">· light report, minutes-stale data is OK → read from a follower</text></g>
+<g class="s4_k9"><text class="sv-d" x="46" y="280" fill="var(--ok)" style="fill:var(--ok)">· heavy report, run regularly → copy to a separate OLAP system via ETL</text></g>
+<g class="s4_k10"><text class="sv-d" x="46" y="302" fill="var(--muted)" style="fill:var(--muted)">· neither needed yet → at least set a timeout on the report, never run unbounded</text></g>
+<g class="s4_k11"><rect x="0.0" y="332.0" width="3.0" height="20.0" rx="1.5" fill="rgba(var(--amber-a),1)" stroke="var(--probe)" stroke-width="0"/><text class="sv-d" x="14" y="347" fill="var(--probe)" style="fill:var(--probe)">The line blurs: Postgres has column indexes, Snowflake takes small writes — the rule holds</text><text class="sv-d" x="14" y="364" fill="var(--muted)" style="fill:var(--muted)">Split because two workloads compete, not because the tech differs.</text></g>
+</svg>
+  </figure>
+  <ul class="why">
+    <li>Resource contention: a query scanning tens of millions of rows hogs CPU and IO, and real transactions queue up.</li>
+    <li>Lock contention: a long read holds its snapshot for long, the database must keep every old version, and tables bloat.</li>
+    <li>Light reports → read from a <a href="../../../04-distributed/03-scaling/sharding-replication/index.html">follower</a>; heavy reports → copy to a separate OLAP system.</li>
+    <li>The line is blurring, but the reason to split is <b>two competing workloads</b>, not two technologies.</li>
+  </ul>
+</section>
+
+
+<script>
+/* Figures start when first scrolled into view, play once and hold their final state. Click a figure to replay. */
+(function () {
+  if (!window.IntersectionObserver || !document.getAnimations) return;
+  var svgs = [].slice.call(document.querySelectorAll("figure svg[data-anim]"));
+  if (!svgs.length) return;
+  function anims(s) {
+    return document.getAnimations().filter(function (a) { var t = a.effect && a.effect.target; return t && s.contains(t); });
+  }
+  function restart(s) { anims(s).forEach(function (a) { a.currentTime = 0; a.play(); }); }
+  svgs.forEach(function (s) { anims(s).forEach(function (a) { a.pause(); a.currentTime = 0; }); });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting || e.target.__played) return;
+      e.target.__played = true; restart(e.target); io.unobserve(e.target);
+    });
+  }, { threshold: 0.4 });
+  svgs.forEach(function (s) {
+    io.observe(s); s.style.cursor = "pointer";
+    s.addEventListener("click", function () { restart(s); });
+  });
+})();
+</script>
+
+<footer>Database · data systems · OLTP vs OLAP</footer>
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

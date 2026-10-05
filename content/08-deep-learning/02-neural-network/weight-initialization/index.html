@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weight initialization — MazeAI</title>
+<meta name="description" content="Why the formula has a square root of 1/n, Xavier versus He, and why a network initialized to zero learns nothing.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/08-deep-learning/02-neural-network/weight-initialization/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Weight initialization">
+<meta property="og:description" content="Why the formula has a square root of 1/n, Xavier versus He, and why a network initialized to zero learns nothing.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/08-deep-learning/02-neural-network/weight-initialization/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-init" data-title="Weight initialization" data-tag="Foundations" data-blurb="Why the formula has a square root of 1/n, Xavier versus He, and why a network initialized to zero learns nothing.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · foundations</p>
+  <h1>Weight <em>initialization</em></h1>
+  <p class="lede">Whether a deep network breaks or trains often comes down to nothing more than <b>the multiplier used at initialization</b>.</p>
+  <p>This lesson derives the <code>√(1/n)</code> formula from scratch and tells Xavier apart from He.</p>
+  <p>Then it shows why zero weights keep every neuron in a layer identical forever.</p>
+</header>
+
+<section id="init-s1">
+  <div class="sh"><b>01</b><h2>What weight initialization is</h2></div>
+<p class="key">Signal magnitude <em>drifts</em> as it passes through many layers — shrinking toward 0 or blowing up toward infinity. The gradient drifts with it, and the network stops learning.</p>
+  <div class="cmp two">
+    <div><h5>Initialization</h5><p>Sets the right magnitude <b>at the very first step</b> — Xavier, He.</p></div>
+    <div><h5>Normalization</h5><p>Forces the magnitude back into range <b>after every layer, throughout training</b> — BatchNorm, LayerNorm, RMSNorm.</p></div>
+  </div>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    Initialization is only right at <strong>the first step</strong> — after a few thousand updates, the weights have moved far from their initial values. Normalization is what keeps signal magnitude stable <strong>throughout</strong> training. That is why you need both, not one or the other.
+  </div>
+</section>
+
+<section id="init-s2">
+  <div class="sh"><b>02</b><h2>The root problem — magnitude drift</h2></div>
+<p>Each layer multiplies the signal by some factor. Across <code>L</code> layers, that factor gets <b>raised to a power</b>:</p>
+  <div class="bars">
+    <div class="b bad"><i>factor 0.8 · over 30 layers</i><u style="width:0.5%"></u><b>0.001 — vanishes</b></div>
+    <div class="b hi"><i>factor 1.0 · over 30 layers</i><u style="width:4%"></u><b>1.0 — unchanged</b></div>
+    <div class="b bad"><i>factor 1.2 · over 30 layers</i><u style="width:100%"></u><b>237 — explodes</b></div>
+  </div>
+  <p class="stripnote"><span>A small deviation from 1.0 is enough.</span><span>Over many layers it grows <em>exponentially</em>.</span></p>
+  <div class="cmp two">
+    <div><h5>Vanishing signal</h5>
+      <p>Activations in deep layers are nearly 0</p>
+      <p>Gradient reaching the early layers is nearly 0 → early layers do not learn</p>
+      <p>Loss drops very slowly or stalls</p></div>
+    <div><h5>Exploding signal</h5>
+      <p>Activations are huge, sigmoid and tanh saturate</p>
+      <p>Gradient is huge → update steps are too large → loss becomes <code>NaN</code></p>
+      <p>Loss oscillates wildly, then diverges</p></div>
+  </div>
+  <p>The key point: this is <strong>the same problem</strong> seen from two sides, both coming from magnitude that is not kept under control.</p>
+  <p>So the two fixes — proper initialization and normalization — aim at one goal: keep each layer's factor close to 1.</p>
+</section>
+
+<section id="init-s3">
+  <div class="sh"><b>03</b><h2>Initialization — deriving the formula</h2></div>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>z</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Σ w<sub>i</sub> x<sub>i</sub></span><em>one neuron with n inputs</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Var(z)</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>n · Var(w) · Var(x)</span><em>assuming w and x independent, zero mean</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Var(z) = Var(x)</span><em>want magnitude constant across layers</em></span>
+      <span class="op">⇒</span>
+      <span class="t g"><span>std(w) = √(1/n)</span><em>where the square root comes from</em></span>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="s ok"><b>Xavier / Glorot — <code>2 / (n_in + n_out)</code></b><span>for tanh, sigmoid: balances the forward pass (needs <code>1/n_in</code>) and backward pass (needs <code>1/n_out</code>) by averaging them</span></div>
+    <div class="s ok"><b>He / Kaiming — <code>2 / n_in</code></b><span>for ReLU: ReLU zeroes half its inputs, so output variance is halved; the factor 2 compensates exactly for that</span></div>
+    <div class="s"><b>Orthogonal — orthogonal matrix</b><span>for RNNs: preserves vector norm across many time steps</span></div>
+    <div class="s"><b>Truncated normal — cut at 2 standard deviations</b><span>for Transformers: avoids a few oversized weights from the distribution tails</span></div>
+  </div>
+  <div class="note key">
+    <h4>A concise answer</h4>
+    "The variance of a sum of n independent terms is n times the variance of each term, so to keep signal magnitude constant across layers you need <code>Var(w) = 1/n</code>. He adds a factor of 2 to make up for what ReLU cuts off; Xavier averages <code>n_in</code> and <code>n_out</code> to balance both directions of propagation." Being able to derive it like this is far better than just remembering the formula names.
+  </div>
+</section>
+
+<section id="init-s4">
+  <div class="sh"><b>04</b><h2>Lab: activations across layers</h2></div>
+  <p>Pass a signal through 20 layers and watch the standard deviation of the activations at each layer. Shrinking bars mean vanishing, growing bars mean exploding.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>initialization</label>
+        <select id="ninit">
+          <option value="tiny">small — std 0.01</option>
+          <option value="big">large — std 0.5</option>
+          <option value="xavier">Xavier — √(1/n)</option>
+          <option value="he" selected>He — √(2/n)</option>
+        </select>
+      </div>
+      <div><label>activation</label>
+        <select id="nact">
+          <option value="relu" selected>ReLU</option>
+          <option value="tanh">tanh</option>
+          <option value="none">linear</option>
+        </select>
+      </div>
+      <label class="chk"><input type="checkbox" id="nnorm"> enable LayerNorm</label>
+      <div><label>neurons per layer</label><input type="number" id="nwidth" value="128" min="8" max="512"></div>
+    </div>
+    <div id="nview3"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Try <strong>small — std 0.01</strong> with ReLU: the signal dies completely after a few layers.</p>
+  <p>Try <strong>large — std 0.5</strong>: exponential explosion. Try <strong>He</strong>:</p>
+  <p>The standard deviation stays almost flat across all 20 layers — exactly what the formula was designed to achieve.</p>
+  <p>Then enable <strong>LayerNorm</strong> with a bad initialization and see how it rescues the situation.</p>
+  </div>
+</section>
+
+<section id="init-s5">
+  <div class="sh"><b>05</b><h2>Why not initialize to zero or a constant</h2></div>
+<pre><code>If every weight in a layer is equal:
+
+    → every neuron in the layer computes the SAME value
+    → every neuron receives the SAME gradient
+    → every neuron is updated IDENTICALLY
+    → they stay identical forever
+
+The layer has 512 neurons but behaves like ONE single neuron.</code></pre>
+  <p>This is called the <strong>symmetry</strong> problem, and randomness in initialization exists precisely to break it.</p>
+  <p>Not because random is "better" in any sense.</p>
+  <p>But because it is the only way for neurons in the same layer to learn different things.</p>
+  <div class="note">
+    <h4>Three exceptions where zero initialization is right</h4>
+    <p><strong>Bias.</strong> Symmetry is already broken by the weights, so initializing bias to 0 is perfectly fine and is the default.</p>
+    <p><strong>Last layer of a residual block.</strong> Initializing <code>γ = 0</code> in the block's final BatchNorm makes the block an identity mapping at the start.</p>
+  <p>The network therefore starts out like a shallow network and gradually deepens.</p>
+  <p>This trick makes training very deep ResNets more stable.</p>
+    <p><strong>Forget-gate bias in LSTM.</strong> Initialized to 1 instead of 0, so the gate defaults to "remember" and information is not erased from the first step.</p>
+  </div>
+</section>
+
+<section id="init-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Common mistakes</h2></div>
+
+  <p class="key">Initialization bugs usually give no warning — the network still runs, it just does not learn.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Initializing every weight to zero</h4><p>The whole layer behaves like a single neuron, forever.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · weight initialization · keeping magnitude stable throughout training is covered in <a href="../normalization/index.html">Normalization</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

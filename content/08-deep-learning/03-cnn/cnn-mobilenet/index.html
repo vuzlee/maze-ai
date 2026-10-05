@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNN &amp; MobileNet — MazeAI</title>
+<meta name="description" content="Shape and cost formulas, why depthwise separable is 8–9× cheaper, inverted residual, linear bottleneck, quantization.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/08-deep-learning/03-cnn/cnn-mobilenet/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="CNN &amp; MobileNet">
+<meta property="og:description" content="Shape and cost formulas, why depthwise separable is 8–9× cheaper, inverted residual, linear bottleneck, quantization.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/08-deep-learning/03-cnn/cnn-mobilenet/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-cnn" data-title="CNN &amp; MobileNet" data-tag="Computer vision" data-blurb="Shape and cost formulas, why depthwise separable is 8–9× cheaper, inverted residual, linear bottleneck, quantization.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · vision &amp; edge devices</p>
+  <h1>CNN &amp;<br><em>MobileNet</em></h1>
+  <p class="lede">From the convolution operation to architectures that run on microcontrollers.</p>
+  <p>This lesson pins down <b>the shape and cost formulas</b>, shows with numbers why <b>depthwise separable convolution</b> is 8–9× cheaper, why MobileNetV2 is called an <b>inverted residual</b>,.</p>
+  <p>And why the last layer of the block has <b>no ReLU</b>.</p>
+</header>
+
+
+<section id="cnn-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Instead of connecting every pixel to every neuron, a CNN <em>slides a small kernel over the whole image</em> — the same set of weights reused at every position.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<text class="sv-hv" x="372" y="18">TWO IDEAS, ONLY</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Weights shared across image</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">an edge detector at left works at right too</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Link only to neighbors</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">far pixels: no direct link</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Everything else follows from those two</text>
+</svg>
+  <figcaption>Read the five boxes top to bottom: the red box is the problem, the middle three are the mechanism, the last is deployment. Each following section highlights exactly one box.</figcaption>
+  </figure>
+
+  <p class="key">This whole line of architectures is a sequence of <em>cutting multiplications while keeping representational power</em>.</p>
+  <div class="stack">
+    <div class="s warn"><b>Fully connected</b><span>every neuron sees the whole image → far too many parameters</span></div>
+    <div class="s"><b>Convolution</b><span>weight sharing + local connectivity · a small filter slides over the image → few parameters, catches edges</span></div>
+    <div class="s"><b>Deep CNN</b><span>stack many layers · receptive field grows → edges → shapes → concepts</span></div>
+    <div class="s"><b>Depthwise separable</b><span>split the operation in two · per-channel filtering + channel mixing → 8–9× cheaper</span></div>
+    <div class="s ok"><b>MobileNetV2</b><span>invert the residual block · expand → filter → compress, skip at the narrow ends → saves memory</span></div>
+  </div>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    Every advance in this group is a form of <strong>cutting multiplications while keeping representational power</strong>. Understand what each step trades off and you understand the whole line of architectures — and that is exactly what you get asked when you say you work on models for edge devices.
+  </div>
+</section>
+
+<section id="cnn-s2">
+  <div class="sh"><b>02</b><h2>Why not use fully connected for images</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHY NOT FC</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">224×224×3 image to 1000 units</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">over 150 million params, one layer</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Blind to neighbor pixels being related</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">shuffle pixels, it learns the same</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Shift 1 pixel and it must relearn</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">no translation invariance</text>
+</svg>
+  <figcaption>Three gaps, and all three are patched by the two ideas of convolution.</figcaption>
+  </figure>
+
+  <div class="bars">
+    <div class="b bad"><i>fully connected · 1000 neurons</i><u style="width:100%"></u><b>224 × 224 × 3 × 1000 = 150,528,000 params</b></div>
+    <div class="b hi"><i>convolution 3×3 · 3 → 64 channels</i><u style="width:0.4%"></u><b>3 × 3 × 3 × 64 = 1,728 params</b></div>
+  </div>
+  <p class="stripnote"><span>same 224×224×3 image</span><span><em>87,000× fewer</em></span></p>
+  <p>Convolution achieves this through two assumptions about image structure:</p>
+  <ul>
+    <li><strong>Local connectivity.</strong> A pixel relates to its neighbors, not directly to a pixel in the opposite corner. So each neuron only needs to look at a small region.</li>
+    <li><strong>Weight sharing.</strong> A vertical edge detector that is useful in the top-left corner is just as useful in the bottom-right. So use <em>the same</em> filter at every position instead of learning one per position.</li>
+  </ul>
+  <div class="note">
+    <h4>The second consequence of weight sharing</h4>
+    It gives the model <strong>translation invariance</strong>: a cat in the left or right corner is detected by the same filter. Fully connected has to relearn from scratch for each position, so it needs far more data to reach the same level of generalization. This is the clearest example of <em>building knowledge of the problem into the architecture</em> instead of leaving the model to learn it.
+  </div>
+</section>
+
+<section id="cnn-s3">
+  <div class="sh"><b>03</b><h2>Convolution and the shape formula</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — SHAPE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">out = (in + 2p − k) / s + 1</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">the one formula to memorize</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Params = k · k · C_in · C_out</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">independent of image size</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">FLOPs = params × H_out × W_out</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">this is what decides speed</text>
+</svg>
+  <figcaption>Three formulas are enough to compute any conv layer.</figcaption>
+  </figure>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>H<sub>out</sub></span><em>output side</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>⌊ (H + 2p − k) / s ⌋ + 1</span><em>k kernel · s stride · p padding</em></span>
+    </div>
+    <div class="line">
+      <span class="t p"><span>params</span><em>weights to learn</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>k · k · C<sub>in</sub> · C<sub>out</sub> + C<sub>out</sub></span><em>last term is the bias</em></span>
+    </div>
+    <div class="line">
+      <span class="t g"><span>MAC</span><em>multiply-accumulates</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>H<sub>out</sub> · W<sub>out</sub> · k · k · C<sub>in</sub> · C<sub>out</sub></span><em>times the number of output positions</em></span>
+    </div>
+    <dl>
+      <dt>input</dt><dd>H × W × C<sub>in</sub></dd>
+      <dt>filters</dt><dd>k × k × C<sub>in</sub>, C<sub>out</sub> of them</dd>
+    </dl>
+  </div>
+  <table>
+    <tr><th>Parameter</th><th>Effect</th><th>Typical value</th></tr>
+    <tr><td><code>k</code></td><td>Region each filter sees</td><td>3 — almost always 3, see why below</td></tr>
+    <tr><td><code>s</code></td><td>Step size; <code>s &gt; 1</code> reduces the size</td><td>1 to keep the size, 2 to halve it</td></tr>
+    <tr><td><code>p</code></td><td>Border padding to keep the size and not miss the edges</td><td><code>p = (k−1)/2</code> so that <code>H_out = H_in</code> when <code>s = 1</code></td></tr>
+    <tr><td><code>C_out</code></td><td>Number of filters, i.e. number of learned features</td><td>Grows with depth: 64 → 128 → 256</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Why it is almost always 3×3</h4>
+    Two stacked 3×3 layers have a 5×5 receptive field, but cost only <code>2 × 9 = 18</code> weights per channel versus <code>25</code> for one 5×5 layer. Three 3×3 layers give a 7×7 receptive field with 27 weights versus 49. <strong>Cheaper, and you also get two extra nonlinearities in between</strong>, so the representation is stronger. This was VGG's main contribution, and it is why 5×5 and 7×7 almost disappeared from later architectures except in the first layer.
+  </div>
+</section>
+
+<section id="cnn-s4">
+  <div class="sh"><b>04</b><h2>Lab: computing shape and cost</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — COST LAB</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Change k, s, p and watch shape</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Params and FLOPs don't track</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">1×1: few params, many FLOPs</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Late layers hold params, early eat FLOPs</text>
+</svg>
+  <figcaption>The lab turns the kernel knobs and shows the two kinds of cost diverging.</figcaption>
+  </figure>
+
+  <p>Enter a layer configuration and compare the cost of standard convolution with depthwise separable.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>input H = W</label><input type="number" id="cH" value="112" min="1"></div>
+      <div><label>C_in</label><input type="number" id="cCi" value="64" min="1"></div>
+      <div><label>C_out</label><input type="number" id="cCo" value="128" min="1"></div>
+      <div><label>kernel k</label><input type="number" id="cK" value="3" min="1" max="11"></div>
+      <div><label>stride s</label><input type="number" id="cS" value="1" min="1" max="4"></div>
+      <div><label>padding p</label><input type="number" id="cP" value="1" min="0" max="5"></div>
+    </div>
+    <div id="cview3"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">With <code>k = 3</code> and a large <code>C_out</code>, the savings ratio approaches <strong>k² = 9×</strong>.</p>
+  <p>Change <code>k</code> to 5 to see the ratio approach 25. Lower <code>C_out</code> to 8 to see the ratio drop —</p>
+  <p>Because then channel mixing no longer dominates.</p>
+  </div>
+</section>
+
+<section id="cnn-s5">
+  <div class="sh"><b>05</b><h2>Receptive field</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — RECEPTIVE FIELD</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Two 3×3 layers see like one 5×5</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">with fewer params, more nonlinearity</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Stride grows the field geometrically</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Field smaller than object: broken</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">model can't see all it must recognize</text>
+</svg>
+  <figcaption>Why stacking small layers beats one big layer.</figcaption>
+  </figure>
+
+  <p class="key">The receptive field is <em>the region of the original image that affects one neuron in a deep layer</em>.</p>
+  <div class="axis">
+    <div class="stop"><b>layer 1</b><span>3×3</span></div>
+    <div class="stop"><b>layer 2</b><span>5×5</span></div>
+    <div class="stop"><b>layer 3</b><span>7×7</span></div>
+    <div class="stop on"><b>+ one stride-2 layer</b><span>every layer after it doubles each step</span></div>
+  </div>
+  <p class="axiscap"><span>3×3 stride-1 layers</span><span>RF = 1 + 2L — linear growth</span><span>with stride — exponential growth</span></p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>RF<sub>l</sub></span><em>receptive field at layer l</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>RF<sub>l−1</sub> + (k<sub>l</sub> − 1) · ∏ s</span><em>product of all strides before layer l</em></span>
+    </div>
+  </div>
+  <div class="note">
+    <h4>Why receptive field matters in practice</h4>
+    If the object to recognize is larger than the last layer's receptive field, the model <strong>cannot</strong> see it whole — it only sees pieces. That is why object detection architectures combine multiple resolution levels (feature pyramid), and it is the answer to "why does my model recognize small objects well but large ones poorly".
+  </div>
+</section>
+
+<section id="cnn-s6">
+  <div class="sh"><b>06</b><h2>Downsampling — pooling or stride</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DOWNSAMPLING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Max pooling</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">keeps the strongest feature, no params</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Stride 2 in conv</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">learned shrink, today's norm</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Downsample too early: lose detail</text>
+</svg>
+  <figcaption>Two ways to shrink, and where it usually goes wrong.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th></th><th>Max pooling</th><th>Average pooling</th><th>Stride 2 in conv</th></tr>
+    <tr><td>Mechanism</td><td>Take the max value in the region</td><td>Take the average</td><td>Skip positions while sliding</td></tr>
+    <tr><td>Parameters</td><td>None</td><td>None</td><td>Yes — learnable</td></tr>
+    <tr><td>Keeps</td><td>Strongest feature</td><td>Average information</td><td>Whatever the model learns</td></tr>
+    <tr><td>Current trend</td><td>Still used, but less</td><td>Mostly in the last layer</td><td><strong>Preferred</strong></td></tr>
+  </table>
+  <p><strong>Why stride is gradually replacing pooling:</strong> it merges two jobs —</p>
+  <p>Feature filtering and downsampling — into one operation, so it is cheaper;</p>
+  <p>And the way of downsampling becomes something <em>learned</em> instead of a fixed rule.</p>
+  <p>MobileNet and ResNet both use stride for most of their downsampling steps.</p>
+  <p class="key">Global average pooling fully replaces the fully connected layer at the end: <em>7 × 7 × 512 → average over spatial dims → 1 × 1 × 512 → classifier layer</em>.</p>
+  <div class="bars">
+    <div class="b bad"><i>final FC layer</i><u style="width:100%"></u><b>7·7·512·1000 = 25 million params</b></div>
+    <div class="b hi"><i>global average pooling</i><u style="width:2%"></u><b>512·1000 = 512 thousand</b></div>
+  </div>
+  <p class="stripnote"><span>and the model accepts input images of many different sizes</span><span><em>49× fewer</em></span></p>
+</section>
+
+<section id="cnn-s7">
+  <div class="sh"><b>07</b><h2>Convolution 1×1 — small but important</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — CONV 1×1</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">No spatial view, only mixes channels</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Cheap channel swap</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">the bottleneck of ResNet</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">A piece of depthwise separable</text>
+</svg>
+  <figcaption>The smallest operation, yet present in every modern architecture.</figcaption>
+  </figure>
+
+  <p class="key">A 1×1 filter sees only <em>one pixel</em> — sounds pointless, but it sees <em>all the channels</em> of that pixel.</p>
+  <figure>
+    <svg viewBox="0 0 900 190" role="img" aria-label="A 1x1 convolution combines all channels of one pixel into new channels">
+      <g stroke="var(--filled)" fill="rgba(var(--blue-a),.14)">
+        <rect x="60" y="40" width="34" height="34" rx="4"/><rect x="72" y="52" width="34" height="34" rx="4"/>
+        <rect x="84" y="64" width="34" height="34" rx="4"/><rect x="96" y="76" width="34" height="34" rx="4"/>
+      </g>
+      <text x="95" y="132" text-anchor="middle" class="sv-t" fill="var(--filled)">C_in ch</text>
+      <text x="95" y="152" text-anchor="middle" class="sv-l" fill="var(--faint)">same position</text>
+
+      <rect x="360" y="52" width="120" height="46" rx="8" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)"/>
+      <text x="420" y="80" text-anchor="middle" class="sv-t" fill="var(--probe)">1 × 1 conv</text>
+      <text x="420" y="120" text-anchor="middle" class="sv-l" fill="var(--faint)">1 · 1 · C_in · C_out weights</text>
+
+      <g stroke="var(--ok)" fill="rgba(var(--green-a),.16)">
+        <rect x="700" y="46" width="34" height="34" rx="4"/><rect x="712" y="58" width="34" height="34" rx="4"/>
+        <rect x="724" y="70" width="34" height="34" rx="4"/>
+      </g>
+      <text x="735" y="132" text-anchor="middle" class="sv-t" fill="var(--ok)">C_out ch</text>
+
+      <g stroke="var(--rule-hi)" stroke-width="2" fill="none" marker-end="url(#c11a)">
+        <path d="M150 76 L354 76"/><path d="M486 76 L694 76"/>
+      </g>
+      <defs><marker id="c11a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--rule-hi)"/></marker></defs>
+      <text x="450" y="180" text-anchor="middle" class="sv-l" fill="var(--faint)">a linear map along the channel axis, applied independently at each spatial position</text>
+    </svg>
+    <figcaption>No spatial mixing, only channel mixing — so it costs 1/9 of a 3×3 layer on the same number of channels.</figcaption>
+  </figure>
+  <table>
+    <tr><th>Use</th><th>How</th></tr>
+    <tr><td><strong>Change the channel count</strong></td><td>Compress 256 channels to 64 before an expensive 3×3 conv — this is the ResNet bottleneck idea</td></tr>
+    <tr><td><strong>Mix information across channels</strong></td><td>The second half of depthwise separable convolution</td></tr>
+    <tr><td>Cheap extra nonlinearity</td><td>Add a ReLU after it, costs very little compute</td></tr>
+  </table>
+  <p>The cost of 1×1 relative to 3×3 on the same channel count is <strong>1/9</strong>.</p>
+  <p>That is why the ResNet bottleneck block — 1×1 compress, 3×3 process, 1×1 expand —</p>
+  <p>Is much cheaper than two 3×3 layers on the full channel count, despite having three layers instead of two.</p>
+</section>
+
+<section id="cnn-s8">
+  <div class="sh"><b>08</b><h2>Residual connection</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — RESIDUAL</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">y = x + f(x)</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">gradient passes straight thru 100 layers</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Before it, deeper was worse</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">not overfitting, just failing to learn</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Shape mismatch: add 1×1 on shortcut</text>
+</svg>
+  <figcaption>What unlocked deep networks, the same mechanism as in Transformers.</figcaption>
+  </figure>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>y</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>x</span><em>shortcut</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span>f(x)</span><em>residual to learn</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>∂y/∂x</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>1</span><em>gradient flows straight back, multiplied by nothing</em></span>
+      <span class="op">+</span>
+      <span class="t"><span>∂f/∂x</span></span>
+    </div>
+  </div>
+  <p>As explained in the <em>Backpropagation step by step</em> lesson: the <code>1</code> term creates a path through which the gradient flows without being multiplied by anything.</p>
+  <p>So even if <code>∂f/∂x</code> shrinks to 0, the gradient still reaches the first layers.</p>
+  <p>That is what makes it possible to train networks hundreds of layers deep.</p>
+  <p>A second view, useful in interviews: a residual block only has to learn <strong>the residual</strong> —</p>
+  <p>Instead of learning the target function <code>H(x)</code>, it learns <code>H(x) − x</code>.</p>
+  <p>If the optimal mapping is close to the identity, learning the residual is much easier, since the weights only need to be pushed toward 0.</p>
+  <p>In other words, <em>adding layers never makes the model worse</em> —</p>
+  <p>In the worst case it learns the zero function and the block becomes a straight pass-through.</p>
+  <div class="note warn">
+    <h4>The shape condition</h4>
+    The sum <code>x + f(x)</code> requires both sides to have the same shape. When the block downsamples or changes the channel count, you must insert a projection on the shortcut — usually a 1×1 conv with the same stride. This implementation detail is often missed when writing a ResNet by hand.
+  </div>
+</section>
+
+<section id="cnn-s9">
+  <div class="sh"><b>09</b><h2>Depthwise separable convolution</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DEPTHWISE SEPARABLE</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Split in two: filter space, then mix chans</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Depthwise: one kernel per channel</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">Pointwise 1×1: mix channels</text>
+<rect x="372" y="154" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--ok)">About 8–9× cheaper</text>
+<text class="sv-s" x="388" y="194" fill="var(--dim)">accuracy drops a few percent</text>
+</svg>
+  <figcaption>The split that built the whole MobileNet family.</figcaption>
+  </figure>
+
+  <p>The idea: a standard convolution does two jobs at once — <em>spatial filtering</em> and <em>channel mixing</em>. Separating them is far cheaper.</p>
+  <div class="cmp two">
+    <div><h5>Standard convolution — one op</h5><p>k×k×C<sub>in</sub>×C<sub>out</sub> does both jobs at once. Params: <b>k² · C<sub>in</sub> · C<sub>out</sub></b></p></div>
+    <div><h5>Depthwise separable — two steps</h5><p><b>1 · depthwise</b> one k×k filter per channel, no channel mixing — k² · C<sub>in</sub><br><b>2 · pointwise</b> 1×1 conv mixes channels — C<sub>in</sub> · C<sub>out</sub><br>Total: <b>k² · C<sub>in</sub> + C<sub>in</sub> · C<sub>out</sub></b></p></div>
+  </div>
+  <div class="eq">
+    <div class="line">
+      <span class="t g"><span>savings ratio</span><em>standard / separable</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>1 / ( 1/C<sub>out</sub> + 1/k² )</span><em>simplified from the two formulas above</em></span>
+    </div>
+    <p class="read">With k = 3, C<sub>out</sub> = 128: 1 / (0.0078 + 0.1111) = <b>8.4×</b>. When C<sub>out</sub> is large, the 1/C<sub>out</sub> term vanishes, so the ratio approaches k² = 9.</p>
+  </div>
+  <div class="note key">
+    <h4>The number to remember</h4>
+    With a 3×3 kernel, depthwise separable is about <strong>8–9× cheaper</strong> in both parameters and compute, in exchange for about 1 percentage point of accuracy. The trade is so good that MobileNet, EfficientNet and nearly every mobile architecture use it. Stating the number <em>and</em> how to derive it is the complete answer.
+  </div>
+  <div class="note warn">
+    <h4>But cheap in FLOPs does not mean fast</h4>
+    Depthwise convolution has a very low ratio of <em>compute per byte read from memory</em> — it reads a lot of data and does little work. On a GPU, where memory bandwidth is the bottleneck, a depthwise layer may be <strong>no faster</strong> than a standard conv despite 9× fewer FLOPs. It wins clearly on mobile CPUs and dedicated accelerators. This detail separates people who have actually measured from people who have only read the paper.
+  </div>
+</section>
+
+<section id="cnn-s10">
+  <div class="sh"><b>10</b><h2>MobileNetV2 — inverted residual and linear bottleneck</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — MOBILENETV2</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Inverted residual: expand, then shrink</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">opposite of ResNet bottleneck</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Depthwise needs many channels to work</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Linear bottleneck: no ReLU if narrow</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">ReLU in a narrow space destroys info</text>
+</svg>
+  <figcaption>Two counterintuitive designs, and the reason for each.</figcaption>
+  </figure>
+
+  <figure>
+    <svg viewBox="0 0 900 280" role="img" aria-label="Comparison of the ResNet residual block and the MobileNetV2 inverted residual block">
+      <text x="215" y="26" text-anchor="middle" class="sv-t" fill="var(--text)">Standard residual · ResNet</text>
+      <text x="675" y="26" text-anchor="middle" class="sv-t" fill="var(--text)">Inverted residual · MobileNetV2</text>
+
+      <g fill="rgba(var(--blue-a),.16)" stroke="var(--filled)">
+        <rect x="115" y="46" width="200" height="30" rx="5"/>
+        <rect x="175" y="106" width="80" height="30" rx="5"/>
+        <rect x="175" y="160" width="80" height="30" rx="5"/>
+        <rect x="115" y="220" width="200" height="30" rx="5"/>
+      </g>
+      <g class="sv-l" fill="var(--text)" text-anchor="middle">
+        <text x="215" y="66">wide</text><text x="215" y="126">narrow</text><text x="215" y="180">narrow</text><text x="215" y="240">wide</text>
+      </g>
+      <g class="sv-l" fill="var(--faint)" text-anchor="middle">
+        <text x="215" y="97">1×1 compress</text>
+        <text x="215" y="152">3×3</text>
+        <text x="215" y="211">1×1 expand</text>
+      </g>
+      <path d="M105 61 L60 61 L60 235 L105 235" stroke="var(--probe)" stroke-width="2" fill="none"/>
+      <text x="70" y="152" text-anchor="end" class="sv-l" fill="var(--probe)">skip</text>
+      <text x="70" y="168" text-anchor="end" class="sv-l" fill="var(--probe)">at wide</text>
+
+      <line x1="450" y1="20" x2="450" y2="260" stroke="var(--rule)"/>
+
+      <g fill="rgba(var(--green-a),.16)" stroke="var(--ok)">
+        <rect x="635" y="46" width="80" height="30" rx="5"/>
+        <rect x="575" y="106" width="200" height="30" rx="5"/>
+        <rect x="575" y="160" width="200" height="30" rx="5"/>
+        <rect x="635" y="220" width="80" height="30" rx="5"/>
+      </g>
+      <g class="sv-l" fill="var(--text)" text-anchor="middle">
+        <text x="675" y="66">narrow</text><text x="675" y="126">wide</text><text x="675" y="180">wide</text><text x="675" y="240">narrow</text>
+      </g>
+      <g class="sv-l" fill="var(--faint)" text-anchor="middle">
+        <text x="675" y="97">1×1 expand · t = 6×</text>
+        <text x="675" y="152">3×3 depthwise</text>
+        <text x="675" y="211">1×1 compress · no ReLU</text>
+      </g>
+      <path d="M625 61 L540 61 L540 235 L625 235" stroke="var(--probe)" stroke-width="2" fill="none"/>
+      <text x="532" y="152" text-anchor="end" class="sv-l" fill="var(--probe)">skip</text>
+      <text x="532" y="168" text-anchor="end" class="sv-l" fill="var(--probe)">at narrow</text>
+    </svg>
+    <figcaption>ResNet compresses in the middle and skips between the wide ends; MobileNetV2 does the opposite — so the tensor kept for the residual add is the <b>narrow</b> one, much smaller.</figcaption>
+  </figure>
+  <p><strong>Why it is called "inverted":</strong> the ResNet block compresses in the middle and skips between the wide ends. MobileNetV2 does the opposite — expands in the middle and skips between the narrow ends.</p>
+  <h3>Why inverting helps</h3>
+  <ul>
+    <li><strong>Memory savings.</strong> The tensor kept for the residual add is the one at the <em>narrow</em> end, much smaller. On a device with only a few hundred KB of SRAM, this is the difference between running and not running.</li>
+    <li><strong>Depthwise needs many channels to be effective.</strong> It does not mix channels, so with few channels its representational power is very limited. Expanding before filtering gives it room to work.</li>
+  </ul>
+  <h3>Linear bottleneck — why the last layer drops ReLU</h3>
+  <p class="key">ReLU sets every negative value to 0 — so it <em>destroys information</em>, and how much damage that does depends on the dimensionality.</p>
+  <div class="cmp two">
+    <div><h5>High-dimensional space</h5><p>Losing some is not too bad — the information survives in other dimensions.</p></div>
+    <div><h5>Low-dimensional space · the narrow part of the bottleneck</h5><p>Losing half the dimensions loses most of the information, with nowhere to make it up.</p></div>
+  </div>
+  <p class="stripnote"><span>so the 1×1 compress layer at the end of the block is linear, no ReLU</span><span><em>this is the "linear bottleneck" in the paper's title</em></span></p>
+  <div class="note key">
+    <h4>Four MobileNet questions you should be able to answer</h4>
+    <p><strong>Why is it suited to edge devices?</strong> Depthwise separable cuts compute 8–9×; inverted residual keeps intermediate tensors small, saving peak memory.</p>
+    <p><strong>What is depthwise separable?</strong> Splitting spatial filtering and channel mixing into two steps, cutting cost to about <code>1/k²</code>.</p>
+    <p><strong>What is an inverted residual?</strong> Expand the channels so depthwise has room to work, then compress back, and skip between the narrow ends instead of the wide ends.</p>
+    <p><strong>Why does the last layer have no ReLU?</strong> Because ReLU destroys information, and in a low-dimensional space that damage cannot be recovered.</p>
+  </div>
+</section>
+
+<section id="cnn-s11">
+  <div class="sh"><b>11</b><h2>Quantization for edge devices</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — QUANTIZATION</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">INT8: 4× smaller, 2–3× faster</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Post-training: fast, may lose acc</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--filled)">Quantization-aware training keeps accuracy</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">costlier, needs retraining</text>
+<rect x="372" y="174" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Depthwise is quant-sensitive</text>
+<text class="sv-s" x="388" y="214" fill="var(--dim)">keep that layer at more precision</text>
+</svg>
+  <figcaption>Four levels of trade-off between size and accuracy.</figcaption>
+  </figure>
+
+  <p class="key">Quantizing float32 → int8: <em>4× smaller</em>, and integer math is much faster on mobile CPUs and accelerators.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>real value</span><em>original float32</em></span>
+      <span class="op">≈</span>
+      <span class="t p"><span>scale</span><em>quantization step</em></span>
+      <span class="op">×</span>
+      <span class="t"><span>( integer − zero_point )</span><em>int8 stored in the model</em></span>
+    </div>
+  </div>
+  <table>
+    <tr><th>Method</th><th>Mechanism</th><th>Quality loss</th></tr>
+    <tr><td>Post-training, dynamic</td><td>Quantize weights; activation scale computed at runtime</td><td>Small; no data needed</td></tr>
+    <tr><td>Post-training, static</td><td>Use a calibration dataset to fix activation scales</td><td>Smaller; faster than dynamic</td></tr>
+    <tr><td><strong>QAT</strong> — training with simulated quantization</td><td>Simulates rounding during training so the model adapts</td><td><strong>Smallest</strong>; but requires retraining</td></tr>
+  </table>
+  <div class="note">
+    <h4>A detail worth mentioning: per-channel scale</h4>
+    With <em>one</em> scale for the whole weight tensor, channels with small amplitude get rounded to near 0 and lose all their information. A separate scale for <strong>each output channel</strong> fixes that at almost zero cost, and it is the default in every tool today. This is a good answer to "why did my model's score drop sharply after quantization".
+  </div>
+  <p>MobileNet has one specific caveat: depthwise convolution is very <em>sensitive</em> to quantization.</p>
+  <p>Each channel has only <code>k²</code> weights, so amplitudes vary a lot between channels.</p>
+  <p>This is a case where QAT or per-channel scale is practically mandatory.</p>
+</section>
+
+<section id="cnn-s12">
+  <div class="sh"><b>12</b><h2>On-device inference optimization</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — INFERENCE TUNING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Fuse conv w/ BatchNorm</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">merged into one op, for free</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">FLOPs don't measure real speed</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">depthwise: few FLOPs, memory-bound</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Measure latency on target device</text>
+</svg>
+  <figcaption>Why the numbers on paper often lie.</figcaption>
+  </figure>
+
+  <h3>Folding BatchNorm into convolution</h3>
+  <p class="key">At inference, BatchNorm is a linear operation with <em>fixed</em> parameters — so it can be folded straight into the conv right before it.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span>y</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>γ · (x − μ) / √(σ² + ε) + β</span><em>BatchNorm at inference</em></span>
+    </div>
+    <div class="line">
+      <span class="t g"><span>W′</span><em>new conv weights</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>γ · W / √(σ² + ε)</span></span>
+    </div>
+    <div class="line">
+      <span class="t g"><span>b′</span><em>new conv bias</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>β − γ · μ / √(σ² + ε)</span></span>
+    </div>
+    <p class="read">Drops a whole layer, fewer memory reads. The result is <b>identical</b>, nothing lost.</p>
+  </div>
+  <p>This is the first optimization every deployment tool performs, and it is free.</p>
+  <p>Mentioning it when asked about inference optimization is a clear plus.</p>
+  <table>
+    <tr><th>Technique</th><th>Effect</th><th>Cost</th></tr>
+    <tr><td>Fold BatchNorm</td><td>Drops a layer, fewer memory accesses</td><td>None</td></tr>
+    <tr><td>int8 quantization</td><td>4× smaller, 2–3× faster</td><td>About 1 point of accuracy lost</td></tr>
+    <tr><td>Weight pruning</td><td>Remove small weights</td><td>Only faster with structured (block) pruning; scattered pruning cannot be exploited by hardware</td></tr>
+    <tr><td>Knowledge distillation</td><td>A small model learns from a large one</td><td>Requires retraining and an existing large model</td></tr>
+    <tr><td>Lower input resolution</td><td>Cost drops quadratically</td><td>Loses the ability to recognize small details</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Measure, do not guess</h4>
+    On edge devices, the bottleneck is usually <strong>memory bandwidth</strong>, not compute. So a model with fewer FLOPs can be slower if it reads more data. Always measure real latency on the actual target device, and say so when discussing optimization — it shows you have worked with real hardware.
+  </div>
+</section>
+
+<section id="cnn-s13">
+  <div class="sh"><b>13</b><h2>Architecture selection table</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of CNNs: fully connected on images wastes parameters, a small kernel slides over the image with shared weights, stacking layers and downsampling widens the field of view, splitting the convolution into depthwise and 1x1 makes it cheap, then quantization lets it run on edge devices">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">FC on images is wasteful</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">millions of params per layer, blind to image structure</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Small kernel slides over</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">shared weights · sees only the neighborhood</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Stack layers, shrink</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">receptive field grows · stride and pooling</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Split the conv for cost</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">depthwise + 1×1 · inverted residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Run on edge devices</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">quantize · fuse · measure real latency</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — CHOOSING A MODEL</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Server, need accuracy</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">ResNet or ConvNeXt</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Phone, need low latency</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">MobileNetV3 or EfficientNet-Lite</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">MCU</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">Small MobileNetV2, INT8</text>
+</svg>
+  <figcaption>A lookup table — come back to it when starting a new project.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Situation</th><th>Choose</th><th>Why</th></tr>
+    <tr><td>GPU server, accuracy first</td><td>ResNet, ConvNeXt, or Vision Transformer</td><td>No resource limits</td></tr>
+    <tr><td>Phone</td><td>MobileNetV3, EfficientNet-Lite</td><td>Depthwise separable + tuned for real latency</td></tr>
+    <tr><td>Microcontroller, a few hundred KB of RAM</td><td>Scaled-down MobileNet, or FOMO for detection</td><td>Peak memory is a hard constraint</td></tr>
+    <tr><td>Very little data</td><td>Fine-tune a pretrained model</td><td>Training from scratch needs tens of thousands of images or more</td></tr>
+    <tr><td>Need under 10ms latency on CPU</td><td>Small model + int8 + folded BatchNorm</td><td>All techniques combined</td></tr>
+    <tr><td>Lots of data, very large scale</td><td>Vision Transformer</td><td>Beats CNNs with enough data; worse with little data because it lacks inductive bias about image structure</td></tr>
+  </table>
+</section>
+
+<section id="cnn-s14">
+  <div class="sh"><b>14</b><h2>Common mistakes</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Looking only at FLOPs when optimizing speed</h4><p>Depthwise has few FLOPs but is heavy on memory bandwidth. Measure real latency on the target device.</p></div>
+    <div class="card bad"><h4>Forgetting the projection on the shortcut</h4><p>When the block changes channel count or size, the residual add fails on shape. You need a 1×1 conv on the shortcut.</p></div>
+    <div class="card bad"><h4>Adding ReLU to the final compress layer</h4><p>Breaks the linear bottleneck. Information lost in low-dimensional space cannot be recovered.</p></div>
+    <div class="card bad"><h4>Using one scale for the whole tensor when quantizing</h4><p>Small-amplitude channels get rounded to 0. Use per-channel scale.</p></div>
+    <div class="card bad"><h4>Keeping bias in a conv right before BatchNorm</h4><p>Redundant — BatchNorm already has <code>β</code>. Set <code>bias=False</code>.</p></div>
+    <div class="card bad"><h4>Poor on large objects without checking receptive field</h4><p>If the object is larger than the receptive field, the model cannot see it whole.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · CNN &amp; MobileNet · parameter and MAC figures follow the formulas in this lesson, ignoring activation and bias costs when comparing ratios.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

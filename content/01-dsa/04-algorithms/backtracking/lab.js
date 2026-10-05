@@ -6,7 +6,7 @@ function kParse(){
   return (document.getElementById("karr").value || "")
     .split(/[\s,]+/).filter(Boolean).slice(0, 4);
 }
-/* sinh sẵn toàn bộ chuỗi sự kiện: choose / record / undo */
+/* pre-generate the whole event sequence: choose / record / undo */
 function kBuild(){
   const a = kParse().length ? kParse() : ["1","2","3"];
   document.getElementById("karr").value = a.join(" ");
@@ -55,16 +55,16 @@ function kBuild(){
 function kRender(note){
   const bars = KPATH.map(v =>
     `<div class="slot" style="min-width:38px;border-color:var(--probe)">
-       <u style="background:var(--probe);color:#14110E;font-weight:600">${v}</u></div>`).join("");
+       <u style="background:var(--probe);color:var(--on-fill);font-weight:600">${v}</u></div>`).join("");
   const res = KRES.map(r =>
     `<span style="font-family:var(--mono);font-size:11.5px;background:var(--raise);border:1px solid var(--rule);
       border-radius:4px;padding:2px 7px;margin:0 4px 4px 0;display:inline-block;color:var(--ok)">
       [${r.join(",")}]</span>`).join("");
   document.getElementById("kview").innerHTML =
-    `<p class="legend" style="margin:2px 0 5px"><span>đang dựng — mỗi ô là một lựa chọn đã chọn</span></p>
-     <div style="display:flex;gap:4px;min-height:44px">${bars || '<span class="legend"><span>rỗng</span></span>'}</div>
-     <p class="legend" style="margin:14px 0 6px"><span>kết quả đã ghi (${KRES.length})</span></p>
-     <div>${res || '<span class="legend"><span>chưa có</span></span>'}</div>`;
+    `<p class="legend" style="margin:2px 0 5px"><span>building — each cell is a choice made</span></p>
+     <div style="display:flex;gap:4px;min-height:44px">${bars || '<span class="legend"><span>empty</span></span>'}</div>
+     <p class="legend" style="margin:14px 0 6px"><span>results recorded (${KRES.length})</span></p>
+     <div>${res || '<span class="legend"><span>none yet</span></span>'}</div>`;
   document.getElementById("kpath").textContent = "[" + KPATH.join(",") + "]";
   document.getElementById("kdepth").textContent = KDEPTH;
   document.getElementById("kcnt").textContent = KCH + " / " + KUN;
@@ -78,12 +78,12 @@ function kRender(note){
 function kStep(){
   if(KDONE) return;
   if(KI >= KTRACE.length){ KDONE = true; kStop();
-    kRender(`xong — ${KRES.length} kết quả, ${KCH} lần chọn, ${KUN} lần hoàn tác`); return; }
+    kRender(`done — ${KRES.length} results, ${KCH} chooses, ${KUN} undos`); return; }
   const e = KTRACE[KI++];
   KPATH = e.p; KDEPTH = e.d;
-  if(e.t === "ch"){ KCH++; kRender(`chọn ${e.v} → đi sâu`); }
-  else if(e.t === "un"){ KUN++; kRender(`hoàn tác ${e.v} → thử nhánh khác`); }
-  else { KRES.push(e.p.slice()); kRender(`ghi kết quả [${e.p.join(",")}] — nhớ chép, không lưu tham chiếu`); }
+  if(e.t === "ch"){ KCH++; kRender(`choose ${e.v} → go deeper`); }
+  else if(e.t === "un"){ KUN++; kRender(`undo ${e.v} → try another branch`); }
+  else { KRES.push(e.p.slice()); kRender(`record result [${e.p.join(",")}] — copy it, don't store a reference`); }
 }
 function kReset(){
   kStop(); kBuild();
@@ -92,7 +92,7 @@ function kReset(){
   kRender(null);
 }
 function kStop(){ if(KTIMER){ clearInterval(KTIMER); KTIMER = null;
-  document.getElementById("kauto").textContent = "Tự chạy"; } }
+  document.getElementById("kauto").textContent = "Auto run"; } }
 
 document.getElementById("kstep").addEventListener("click", kStep);
 document.getElementById("krst").addEventListener("click", kReset);
@@ -100,7 +100,7 @@ document.getElementById("krst").addEventListener("click", kReset);
 document.getElementById("kauto").addEventListener("click", () => {
   if(KTIMER) return kStop();
   if(KDONE) kReset();
-  document.getElementById("kauto").textContent = "Dừng";
+  document.getElementById("kauto").textContent = "Stop";
   KTIMER = setInterval(() => { kStep(); if(KDONE) kStop(); }, 420);
 });
 kReset();

@@ -1,10 +1,10 @@
-/* Lab binary search — kể chuyện thay vì bảng điều khiển.
-   Ba phần: kịch bản → chạy từng bước có tô dòng code → câu chốt. */
+/* Lab binary search — a story instead of a control panel.
+   Three parts: scenario → step-by-step run with the code line highlighted → takeaway. */
 (function () {
   var el = function (id) { return document.getElementById(id); };
   if (!el("bslab")) return;
 
-  /* ---------- kịch bản ---------- */
+  /* ---------- scenarios ---------- */
   var A = [1, 3, 4, 4, 4, 7, 9, 11, 15, 20];
 
   var CODE = {
@@ -40,21 +40,21 @@
   };
 
   var SCEN = [
-    { id: "lower", t: 4, mode: "lower", label: "tìm mép TRÁI của 4",
-      ask: "Nhóm ba số 4 nằm ở chỉ số 2, 3, 4. lower_bound phải dừng đúng ở 2.",
-      end: function (r) { return "Trả về <b>" + r + "</b> — chỉ số đầu tiên có a[i] ≥ 4. Đây là <b>mép trái</b> của nhóm trùng, dùng cho câu hỏi “vị trí xuất hiện đầu tiên”."; } },
-    { id: "upper", t: 4, mode: "upper", label: "tìm mép PHẢI của 4",
-      ask: "Cùng mảng, cùng target, chỉ đổi một dấu = trong điều kiện so sánh.",
-      end: function (r) { return "Trả về <b>" + r + "</b> — chỉ số đầu tiên có a[i] > 4. Số lần xuất hiện của 4 = 5 − 2 = <b>3</b>."; } },
-    { id: "miss", t: 5, mode: "lower", label: "tìm số KHÔNG có (5)",
-      ask: "Số 5 không nằm trong mảng. Đoán xem hàm trả về gì thay vì báo lỗi?",
-      end: function (r) { return "Trả về <b>" + r + "</b> — vị trí <b>đáng lẽ phải chèn vào</b>, không phải −1. Vì vậy luôn phải kiểm <code>i &lt; len(a) and a[i] == t</code> trước khi dùng."; } },
-    { id: "exact", t: 4, mode: "exact", label: "mẫu 1 tìm 4",
-      ask: "Cùng mảng có ba số 4. Mẫu 1 sẽ dừng ở cái nào trong ba?",
-      end: function (r) { return "Trả về <b>" + r + "</b> — một vị trí <b>bất kỳ</b> trong nhóm trùng, không phải mép trái. Đó là lý do mẫu 1 không trả lời được câu hỏi về biên."; } }
+    { id: "lower", t: 4, mode: "lower", label: "find the LEFT edge of 4",
+      ask: "The three 4s sit at indices 2, 3, 4. lower_bound must stop exactly at 2.",
+      end: function (r) { return "Returns <b>" + r + "</b> — the first index with a[i] ≥ 4. This is the <b>left edge</b> of the duplicate group, used for “first occurrence” questions."; } },
+    { id: "upper", t: 4, mode: "upper", label: "find the RIGHT edge of 4",
+      ask: "Same array, same target, only one = sign changes in the comparison.",
+      end: function (r) { return "Returns <b>" + r + "</b> — the first index with a[i] > 4. The number of 4s = 5 − 2 = <b>3</b>."; } },
+    { id: "miss", t: 5, mode: "lower", label: "find a MISSING number (5)",
+      ask: "5 is not in the array. Guess what the function returns instead of an error?",
+      end: function (r) { return "Returns <b>" + r + "</b> — the position <b>where it would be inserted</b>, not −1. That is why you must always check <code>i &lt; len(a) and a[i] == t</code> before using it."; } },
+    { id: "exact", t: 4, mode: "exact", label: "template 1 finds 4",
+      ask: "The same array has three 4s. Which of the three will template 1 stop at?",
+      end: function (r) { return "Returns <b>" + r + "</b> — <b>some</b> position in the duplicate group, not the left edge. That is why template 1 cannot answer boundary questions."; } }
   ];
 
-  /* ---------- máy trạng thái ---------- */
+  /* ---------- state machine ---------- */
   var cur, lo, hi, mid, step, phase, result, timer = null;
 
   function build(sc) {
@@ -66,7 +66,7 @@
     el("bverdict").hidden = true;
     el("bstep").disabled = false;
     draw();
-    say("Trạng thái ban đầu", sc.ask);
+    say("Initial state", sc.ask);
   }
 
   function alive() {
@@ -81,8 +81,8 @@
       mid = lo + Math.floor((hi - lo) / 2);
       step++;
       draw();
-      say("Bước " + step + " — lấy điểm giữa",
-        "mid = " + lo + " + (" + hi + " − " + lo + ") // 2 = <b>" + mid + "</b>, giá trị a[" + mid + "] = <b>" + A[mid] + "</b>.");
+      say("Step " + step + " — take the midpoint",
+        "mid = " + lo + " + (" + hi + " − " + lo + ") // 2 = <b>" + mid + "</b>, value a[" + mid + "] = <b>" + A[mid] + "</b>.");
       return;
     }
     if (phase === "mid") {
@@ -99,20 +99,20 @@
       var why;
       if (goRight) {
         why = "a[" + mid + "] = " + v + (cur.mode === "upper" ? " ≤ " : " < ") + t +
-          " → mid <b>chắc chắn không phải</b> đáp án, loại luôn nó: <code>lo = mid + 1</code>.";
+          " → mid is <b>surely not</b> the answer, drop it too: <code>lo = mid + 1</code>.";
         lo = mid + 1;
       } else {
         why = "a[" + mid + "] = " + v + (cur.mode === "upper" ? " > " : " ≥ ") + t +
-          " → mid <b>có thể chính là</b> đáp án, nên giữ lại: <code>hi = mid</code>.";
+          " → mid <b>may be</b> the answer, so keep it: <code>hi = mid</code>.";
         hi = cur.mode === "exact" ? mid - 1 : mid;
       }
       if (cur.mode === "exact") {
         why = goRight
-          ? "a[" + mid + "] = " + v + " < " + t + " → đáp án nằm bên phải: <code>lo = mid + 1</code>."
-          : "a[" + mid + "] = " + v + " > " + t + " → đáp án nằm bên trái: <code>hi = mid - 1</code>.";
+          ? "a[" + mid + "] = " + v + " < " + t + " → the answer is to the right: <code>lo = mid + 1</code>."
+          : "a[" + mid + "] = " + v + " > " + t + " → the answer is to the left: <code>hi = mid - 1</code>.";
       }
       draw();
-      say("Bước " + step + " — so sánh rồi thu hẹp", why);
+      say("Step " + step + " — compare, then narrow", why);
       phase = "move";
       return;
     }
@@ -125,17 +125,17 @@
     el("bstep").disabled = true;
     stopAuto();
     draw();
-    say("Xong sau " + step + " bước", "Vòng lặp dừng vì khoảng đã rỗng." +
-      (cur.mode === "exact" ? "" : " Lúc này <b>lo == hi == " + lo + "</b> — chính là ranh giới cần tìm."));
+    say("Done after " + step + " steps", "The loop stops because the range is empty." +
+      (cur.mode === "exact" ? "" : " Now <b>lo == hi == " + lo + "</b> — exactly the boundary we were looking for."));
     var v = el("bverdict");
     v.hidden = false;
-    v.innerHTML = cur.end(r) + " Mảng 10 phần tử, đi hết <b>" + step + " bước</b> — log₂(10) ≈ 3,3.";
+    v.innerHTML = cur.end(r) + " A 10-element array, done in <b>" + step + " steps</b> — log₂(10) ≈ 3.3.";
   }
 
-  /* ---------- vẽ ---------- */
+  /* ---------- drawing ---------- */
   function draw() {
     var closed = cur.mode === "exact";
-    var hiIx = closed ? hi : hi - 1;      /* ô cuối còn trong khoảng */
+    var hiIx = closed ? hi : hi - 1;      /* last cell still in range */
     var h = '<div class="strip">';
     for (var i = 0; i < A.length; i++) {
       var out = result === null ? (i < lo || i > hiIx) : (i !== result);
@@ -143,19 +143,19 @@
       if (i === lo && result === null) mk += "lo";
       if (i === mid) mk += (mk ? " " : "") + "mid";
       if (i === hiIx && result === null) mk += (mk ? " " : "") + "hi";
-      if (result !== null && i === result) mk = "kết quả";
+      if (result !== null && i === result) mk = "result";
       h += '<div class="c' + (i === mid ? " on" : "") + (out ? " out" : "") + '">' +
         "<i>" + i + "</i><b>" + A[i] + "</b><u>" + mk + "</u></div>";
     }
     el("bview").innerHTML = h + "</div>";
 
     var note = el("bnote");
-    note.innerHTML = "<span>target = <em>" + cur.t + "</em> · khoảng còn lại <em>" +
-      (result !== null ? "rỗng" : (closed ? "[" + lo + ", " + hi + "]" : "[" + lo + ", " + hi + ")")) +
-      "</em> · còn <em>" + Math.max(0, hiIx - lo + 1) + "</em> ô chưa loại</span>" +
-      "<span>bước <em>" + step + "</em></span>";
+    note.innerHTML = "<span>target = <em>" + cur.t + "</em> · remaining range <em>" +
+      (result !== null ? "empty" : (closed ? "[" + lo + ", " + hi + "]" : "[" + lo + ", " + hi + ")")) +
+      "</em> · <em>" + Math.max(0, hiIx - lo + 1) + "</em> cells not yet ruled out</span>" +
+      "<span>step <em>" + step + "</em></span>";
 
-    /* code + dòng đang chạy */
+    /* code + the line now running */
     var lines = CODE[cur.mode];
     var active = { init: "init", mid: "mid", left: "left", right: "right", move: "loop", done: "done" }[phase] || "loop";
     el("bcode").innerHTML = lines.map(function (l) {
@@ -165,8 +165,8 @@
     }).join("");
 
     el("bstat").textContent = result !== null
-      ? "đã xong · " + step + " bước"
-      : "đã đi " + step + " bước";
+      ? "done · " + step + " steps"
+      : step + " steps so far";
   }
 
   function say(head, body) {
@@ -175,14 +175,14 @@
       "</b> · hi = <b>" + hi + "</b></p>";
   }
 
-  /* ---------- điều khiển ---------- */
+  /* ---------- controls ---------- */
   function stopAuto() {
-    if (timer) { clearInterval(timer); timer = null; el("bauto").textContent = "Tự chạy"; }
+    if (timer) { clearInterval(timer); timer = null; el("bauto").textContent = "Auto run"; }
   }
   el("bstep").onclick = function () { stopAuto(); next(); };
   el("bauto").onclick = function () {
     if (timer) { stopAuto(); return; }
-    el("bauto").textContent = "Dừng";
+    el("bauto").textContent = "Stop";
     timer = setInterval(function () {
       if (result !== null) { stopAuto(); return; }
       next();

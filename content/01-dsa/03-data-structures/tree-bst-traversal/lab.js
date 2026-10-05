@@ -1,5 +1,5 @@
 (function(){
-/* ---------------- lab: duyệt cây ---------------- */
+/* ---------------- lab: tree traversal ---------------- */
 /* BST: 8 / 3,10 / 1,6,-,14 / -,-,4,7,-,-,13,- */
 const TV = {8:{l:3,r:10}, 3:{l:1,r:6}, 10:{l:null,r:14}, 1:{l:null,r:null},
             6:{l:4,r:7}, 14:{l:13,r:null}, 4:{l:null,r:null}, 7:{l:null,r:null}, 13:{l:null,r:null}};
@@ -36,8 +36,8 @@ function tRender(note){
       const done = TORDER.includes(v);
       const hot = v === TCUR;
       let bg = "var(--raise)", fg = "var(--muted)";
-      if(done){ bg = "var(--ok)"; fg = "#14110E"; }
-      if(hot){ bg = "var(--probe)"; fg = "#14110E"; }
+      if(done){ bg = "var(--ok)"; fg = "var(--on-fill)"; }
+      if(hot){ bg = "var(--probe)"; fg = "var(--on-fill)"; }
       return `<div class="slot" style="border-color:${hot?'var(--probe)':'var(--rule)'};min-width:40px">
         <i>${done ? TORDER.indexOf(v)+1 : "&nbsp;"}</i>
         <u style="background:${bg};color:${fg};font-weight:${done||hot?600:400}">${v}</u></div>`;
@@ -45,8 +45,8 @@ function tRender(note){
     html += `<div style="display:flex;gap:4px;justify-content:center;margin-bottom:4px">${cells}</div>`;
   });
   document.getElementById("tview").innerHTML =
-    html + `<p class="legend" style="margin-top:8px"><span>số nhỏ phía trên ô là thứ tự thăm</span></p>`;
-  document.getElementById("torder").textContent = TORDER.length ? TORDER.join(" → ") : "chưa thăm nút nào";
+    html + `<p class="legend" style="margin-top:8px"><span>the small number above a cell is its visit order</span></p>`;
+  document.getElementById("torder").textContent = TORDER.length ? TORDER.join(" → ") : "no nodes visited yet";
   document.getElementById("tdepth").textContent = TSTACK.length;
   if(note){
     const log = document.getElementById("tlog");
@@ -57,16 +57,16 @@ function tRender(note){
 function tStep(){
   if(TDONE) return;
   if(!TQ.length){ TDONE = true; TCUR = null; TSTACK = [];
-    tRender("xong — " + TORDER.join(" ")); return; }
+    tRender("done — " + TORDER.join(" ")); return; }
   const {v, depth} = TQ.shift();
   TCUR = v; TORDER.push(v);
   TSTACK = new Array(depth).fill(0);
   const mode = document.getElementById("tmode").value;
-  const why = mode === "in"   ? "xong nhánh trái → thăm nút này"
-            : mode === "post" ? "xong cả hai nhánh → thăm nút này"
-            : mode === "pre"  ? "gặp nút → thăm ngay"
-            :                   "lấy ra từ hàng đợi";
-  tRender(`thăm ${v} — ${why}`);
+  const why = mode === "in"   ? "left branch done → visit this node"
+            : mode === "post" ? "both branches done → visit this node"
+            : mode === "pre"  ? "reached node → visit at once"
+            :                   "taken from the queue";
+  tRender(`visit ${v} — ${why}`);
 }
 function tReset(){
   tStop(); tBuild();
@@ -74,7 +74,7 @@ function tReset(){
   tRender(null);
 }
 function tStop(){ if(TTIMER){ clearInterval(TTIMER); TTIMER = null;
-  document.getElementById("tauto").textContent = "Tự chạy"; } }
+  document.getElementById("tauto").textContent = "Auto run"; } }
 
 document.getElementById("tstep").addEventListener("click", tStep);
 document.getElementById("trst").addEventListener("click", tReset);
@@ -82,7 +82,7 @@ document.getElementById("tmode").addEventListener("change", tReset);
 document.getElementById("tauto").addEventListener("click", () => {
   if(TTIMER) return tStop();
   if(TDONE) tReset();
-  document.getElementById("tauto").textContent = "Dừng";
+  document.getElementById("tauto").textContent = "Stop";
   TTIMER = setInterval(() => { tStep(); if(TDONE) tStop(); }, 600);
 });
 tReset();

@@ -42,7 +42,39 @@ ACC = ('àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếể�
        'ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ')
 
 
+def flatten(svg):
+    """Cộng translate của mọi <g> bao ngoài vào toạ độ của <text>/<rect> bên trong.
+
+    Phép 1b và 2 đọc thẳng thuộc tính x/y, nên một nhóm `<g transform="translate(
+    -360 60)">` làm chúng đo phần tử ở chỗ nó CHƯA dời tới — sinh cả loạt "ô tràn
+    ngang" và "chữ đè chữ" ma. Gặp thật 2026-09-26 ở `caching` (24 lỗi) và
+    `rest-api-design` (15 lỗi), ảnh chụp bản tĩnh sạch cả hai. Chỉ hiểu translate;
+    scale/rotate thì bỏ qua, và những hình đó vẫn phải soi bằng ảnh.
+    """
+    out, stack, pos = [], [(0.0, 0.0)], 0
+    TR = re.compile(r'translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)')
+    for m in re.finditer(r'<(/?)(g|text|rect)\b([^>]*?)(/?)>', svg):
+        out.append(svg[pos:m.start()]); pos = m.end()
+        close, tag, attrs, self_close = m.group(1), m.group(2), m.group(3), m.group(4)
+        dx, dy = stack[-1]
+        if tag == 'g':
+            if close:
+                if len(stack) > 1: stack.pop()
+            elif not self_close:
+                t = TR.search(attrs)
+                stack.append((dx + float(t.group(1)), dy + float(t.group(2))) if t
+                             else (dx, dy))
+            out.append(m.group(0)); continue
+        if close or (dx == 0 and dy == 0):
+            out.append(m.group(0)); continue
+        attrs = re.sub(r'\bx="([-\d.]+)"', lambda a: 'x="%g"' % (float(a.group(1)) + dx), attrs)
+        attrs = re.sub(r'\by="([-\d.]+)"', lambda a: 'y="%g"' % (float(a.group(1)) + dy), attrs)
+        out.append('<%s%s%s>' % (tag, attrs, self_close))
+    out.append(svg[pos:])
+    return ''.join(out)
+
 def parse(svg):
+    svg = flatten(svg)
     vb = re.search(r'viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"', svg)
     VW, VH = float(vb.group(1)), float(vb.group(2))
     texts, rects = [], []
@@ -147,6 +179,24 @@ def check(svg, name=''):
     return bad
 
 
+def kf_clash(src):
+    """@keyframes là toàn cục cho cả TRANG — <svg> không giới hạn nó.
+
+    Hai hình trong cùng một bài cùng đặt tên "k1" thì bản đứng sau ghi đè bản
+    trước, và mọi hình chạy theo mốc + chu kỳ của hình CUỐI. Máy không thấy gì
+    sai, mắt chỉ thấy hình chạy lệch nhịp — nên phải bắt ở đây.
+    """
+    defs = {}
+    for svg in re.findall(r'<svg\b[^>]*>.*?</svg>', src, flags=re.S):
+        st = re.search(r'<style>(.*?)</style>', svg, flags=re.S)
+        if not st:
+            continue
+        for m in re.finditer(r'@keyframes (\w+)\{(.*?)\}\}', st.group(1), flags=re.S):
+            defs.setdefault(m.group(1), set()).add(m.group(2))
+    return [f"@keyframes {k!r} có {len(v)} định nghĩa khác nhau trong cùng trang "
+            f"— bản cuối ghi đè hết, đặt tiền tố riêng cho từng hình"
+            for k, v in sorted(defs.items()) if len(v) > 1]
+
 if __name__ == '__main__':
     tot = 0
     for p in sys.argv[1:]:
@@ -160,6 +210,7 @@ if __name__ == '__main__':
             if not re.search(r'<text\b', svg):   # icon, logo — không có chữ để soi
                 continue
             b += [f"[svg {i}] {x}" for x in check(svg, p)]
+        b += kf_clash(src)
         tot += len(b)
         print(f"== {p}: {len(b)} lỗi")
         for x in b:

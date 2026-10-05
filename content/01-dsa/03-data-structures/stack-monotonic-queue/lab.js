@@ -10,8 +10,8 @@ function mRender(note){
   const cells = MA.map((v, i) => {
     const onStack = MST.includes(i);
     let bg = "var(--raise)", fg = "var(--muted)";
-    if(onStack){ bg = "var(--filled)"; fg = "#14110E"; }
-    if(i === MI){ bg = "var(--probe)"; fg = "#14110E"; }
+    if(onStack){ bg = "var(--filled)"; fg = "var(--on-fill)"; }
+    if(i === MI){ bg = "var(--probe)"; fg = "var(--on-fill)"; }
     if(MRES[i] !== undefined && MRES[i] !== -1 && !onStack && i !== MI){ bg = "var(--panel)"; fg = "var(--ok)"; }
     return `<div class="slot"><i>${i}</i>
       <u style="background:${bg};color:${fg};font-weight:${onStack||i===MI?600:400}">${v}</u></div>`;
@@ -22,11 +22,11 @@ function mRender(note){
   }).join("");
   const cols = Math.max(MA.length, 1);
   document.getElementById("mview").innerHTML =
-    `<p class="legend" style="margin:2px 0 5px"><span>mảng — vàng là phần tử đang xét, xanh là đang nằm trong stack</span></p>
+    `<p class="legend" style="margin:2px 0 5px"><span>array — amber is the element being considered, blue is currently in the stack</span></p>
      <div class="rail" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${cells}</div>
-     <p class="legend" style="margin:14px 0 5px"><span>kết quả — phần tử lớn hơn gần nhất bên phải</span></p>
+     <p class="legend" style="margin:14px 0 5px"><span>result — nearest larger element to the right</span></p>
      <div class="rail" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${res}</div>`;
-  document.getElementById("mstack").textContent = MST.length ? "[" + MST.join(", ") + "]" : "rỗng";
+  document.getElementById("mstack").textContent = MST.length ? "[" + MST.join(", ") + "]" : "empty";
   document.getElementById("mops").textContent = MOPS;
   if(note){
     const log = document.getElementById("mlog");
@@ -41,7 +41,7 @@ function mStep(){
     MDONE = true; mStop();
     MST.forEach(i => { if(MRES[i] === undefined) MRES[i] = -1; });
     MST = []; MI = -1;
-    mRender("hết mảng — phần còn lại trong stack không có ai lớn hơn → -1");
+    mRender("end of array — whatever is left in the stack has nothing larger → -1");
     return;
   }
   const x = MA[MI];
@@ -51,8 +51,8 @@ function mStep(){
   }
   MST.push(MI); MOPS++;
   const note = popped.length
-    ? `${x} giải quyết chỉ số ${popped.join(", ")} → pop, rồi push ${MI}`
-    : `không ai nhỏ hơn ${x} ở đỉnh → chỉ push ${MI}`;
+    ? `${x} resolves index ${popped.join(", ")} → pop, then push ${MI}`
+    : `nothing smaller than ${x} on top → just push ${MI}`;
   mRender(note);
 }
 function mReset(){
@@ -64,7 +64,7 @@ function mReset(){
   mRender(null);
 }
 function mStop(){ if(MT){ clearInterval(MT); MT = null;
-  document.getElementById("mauto").textContent = "Tự chạy"; } }
+  document.getElementById("mauto").textContent = "Auto run"; } }
 
 document.getElementById("mstep").addEventListener("click", mStep);
 document.getElementById("mrst").addEventListener("click", mReset);
@@ -72,7 +72,7 @@ document.getElementById("marr").addEventListener("change", mReset);
 document.getElementById("mauto").addEventListener("click", () => {
   if(MT) return mStop();
   if(MDONE) mReset();
-  document.getElementById("mauto").textContent = "Dừng";
+  document.getElementById("mauto").textContent = "Stop";
   MT = setInterval(() => { mStep(); if(MDONE) mStop(); }, 800);
 });
 mReset();

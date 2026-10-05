@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLOps &amp; model serving — MazeAI</title>
+<meta name="description" content="Three things that change, four deployment strategies with their blast radius, drift detection with PSI, point-in-time correctness.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/12-mlops/03-lifecycle/mlops-serving/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="MLOps &amp; model serving">
+<meta property="og:description" content="Three things that change, four deployment strategies with their blast radius, drift detection with PSI, point-in-time correctness.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/12-mlops/03-lifecycle/mlops-serving/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-mlops" data-title="MLOps &amp; model serving" data-tag="Operations" data-blurb="Three things that change, four deployment strategies with their blast radius, drift detection with PSI, point-in-time correctness.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Systems · ML operations</p>
+  <h1>MLOps &amp; model <em>serving</em></h1>
+  <p class="lede">Regular software has one thing that changes: code. An ML system has <b>three</b> —</p>
+  <p>Code, data, model — and every difficulty comes from that.</p>
+  <p>This lesson pins down four deployment strategies with their blast radius, how to <b>detect drift</b> with numbers, four monitoring layers, and the <b>point-in-time correctness</b> problem.</p>
+</header>
+
+
+<section id="mlops-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">MLOps answers exactly one question: <em>can someone else rebuild this model</em>, and who notices when it gets worse.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<text class="sv-hv" x="372" y="18">ONE SINGLE QUESTION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Can anyone rebuild this model</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">and get the same numbers back</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Answer that, and the rest is engineering</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Not a toolset but a discipline</text>
+</svg>
+  <figcaption>Read the five boxes top to bottom along the lifecycle: the top box is the starting point, the middle three are the process, the bottom box is why the loop never closes. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+  <p class="key">A model's lifecycle is a <em>closed loop</em>, and most ML incidents sit on the connecting arrows, not in the model itself.</p>
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="Closed MLOps lifecycle from data to monitoring, then back to retraining">
+      <g fill="rgba(var(--blue-a),.14)" stroke="var(--filled)">
+        <rect x="20" y="40" width="130" height="48" rx="8"/>
+        <rect x="196" y="40" width="150" height="48" rx="8"/>
+        <rect x="392" y="40" width="150" height="48" rx="8"/>
+        <rect x="588" y="40" width="130" height="48" rx="8"/>
+      </g>
+      <rect x="764" y="40" width="116" height="48" rx="8" fill="rgba(var(--amber-a),.16)" stroke="var(--probe)"/>
+      <g class="sv-t" fill="var(--text)" text-anchor="middle">
+        <text x="85" y="70">Data</text>
+        <text x="271" y="70">Training pipeline</text>
+        <text x="467" y="70">Model registry</text>
+        <text x="653" y="70">Deployment</text>
+        <text x="822" y="70">Monitoring</text>
+      </g>
+      <g stroke="var(--rule-hi)" stroke-width="2" fill="none" marker-end="url(#mlopa)">
+        <path d="M154 64 L192 64"/><path d="M350 64 L388 64"/><path d="M546 64 L584 64"/><path d="M722 64 L760 64"/>
+      </g>
+      <defs><marker id="mlopa" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--rule-hi)"/></marker></defs>
+      <path d="M822 96 L822 140 L85 140 L85 94" stroke="var(--probe)" stroke-width="2" fill="none" stroke-dasharray="5 4" marker-end="url(#mlopb)"/>
+      <defs><marker id="mlopb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--probe)"/></marker></defs>
+      <text x="450" y="132" text-anchor="middle" class="sv-l" fill="var(--probe)">retrain when a signal fires</text>
+      <text x="20" y="180" class="sv-l" fill="var(--faint)">every arrow is a place that can break — most production ML incidents live here, not in the model</text>
+    </svg>
+    <figcaption>The model is just one box of five; data, feature infrastructure, deployment and monitoring take most of the effort.</figcaption>
+  </figure>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    In an ML system, <strong>the model is only a very small part</strong>. Most of the effort and most of the incidents are in data, feature infrastructure, deployment and monitoring. Being able to say this is a sign you have run a real system, not just trained models in a notebook.
+  </div>
+</section>
+
+<section id="mlops-s2">
+  <div class="sh"><b>02</b><h2>Why ML differs from regular software</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHY ML DIFFERS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Behavior depends on data, not just code</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">same code + new data = new model</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">No clear-cut pass or fail</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">only metric distributions</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Degrades with no change at all</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">regular software does not</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">So you must monitor and retrain</text>
+</svg>
+  <figcaption>Three differences, and all three lead to the same conclusion.</figcaption>
+  </figure>
+
+  <div class="cmp two">
+    <div><h5>Regular software</h5>
+      <p><b>What changes</b> code</p>
+      <p><b>Testing</b> fixed input → fixed output</p>
+      <p><b>How it fails</b> throws, crashes, logs a stack trace</p>
+      <p><b>Decays over time</b> no — unchanged code means unchanged behavior</p>
+      <p><b>Reproducibility</b> same code gives the same result</p></div>
+    <div><h5>ML system</h5>
+      <p><b>What changes</b> code + data + model</p>
+      <p><b>Testing</b> output is a distribution; "correct" is a range</p>
+      <p><b>How it fails</b> silently gets worse with no error at all</p>
+      <p><b>Decays over time</b> yes — the world changes and the model goes stale even with identical code</p>
+      <p><b>Reproducibility</b> needs the same data, seed, libraries and hardware too</p></div>
+  </div>
+  <div class="note warn">
+    <h4>The two middle rows are the root of every difficulty</h4>
+    A broken API returns a 500 and you know immediately. A broken model still returns 200 with a number that <em>looks plausible</em> but is wrong. No exception, no alert from ordinary systems. That is why ML monitoring must be a <strong>separate</strong> layer, and why it cannot rely on infrastructure monitoring tools alone.
+  </div>
+</section>
+
+<section id="mlops-s3">
+  <div class="sh"><b>03</b><h2>Versioning — four things, not one</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — VERSIONING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Code</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">git, like regular software</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Data</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">DVC or a pointer to an immutable snapshot</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Config</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">hyperparameters, seed — kept in git</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Environment</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">image with pinned library versions</text>
+<rect x="372" y="276" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="298" fill="var(--tomb)">Missing any one breaks reproducibility</text>
+</svg>
+  <figcaption>Four things, and missing any one of them breaks the whole set.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>Code — Git</b><span>obvious</span></div>
+    <div class="s ok"><b>Data — DVC, LakeFS, or timestamped snapshots</b><span>if you don't know which data you trained on, you can neither reproduce nor debug</span></div>
+    <div class="s ok"><b>Model — MLflow, W&amp;B, platform registry</b><span>you need to know which artifact is running, from which commit, on which data</span></div>
+    <div class="s"><b>Feature definitions — feature store or versioned code</b><span>a feature whose definition changes without retraining the model is a silent form of skew</span></div>
+    <div class="s"><b>Environment — Docker, lock file</b><span>bumping one library version can change results</span></div>
+  </div>
+  <div class="note key">
+    <h4>The question that tests whether a system is mature enough</h4>
+    <strong>"Which commit and which data is the production model from, and how long does it take you to rebuild it?"</strong> If the answer is not clear and under a day, the system is not mature yet — and when an incident hits, nobody can debug it. Raising this exact question in an interview is the fastest way to show you understand the problem.
+  </div>
+</section>
+
+<section id="mlops-s4">
+  <div class="sh"><b>04</b><h2>Reproducibility — how much is enough</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — HOW REPRODUCIBLE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Level 1: rerun gives close metrics</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">enough for most teams</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Level 2: bit-identical weights</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">fixed seeds, nondeterministic ops off</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">GPUs are rarely fully deterministic</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">forcing it is much slower</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--filled)">Pick the level; don't chase level 2 idly</text>
+</svg>
+  <figcaption>Two levels, and the price of the higher one.</figcaption>
+  </figure>
+
+  <div class="strip">
+    <div class="c"><i>code</i><b>commit</b><u>git</u></div>
+    <div class="c"><i>data</i><b>snapshot</b><u>timestamped</u></div>
+    <div class="c"><i>config</i><b>hyperparameters</b><u>all of them</u></div>
+    <div class="c"><i>randomness</i><b>seed</b><u>every source</u></div>
+    <div class="c"><i>environment</i><b>libraries · CUDA</b><u>lock file</u></div>
+    <div class="c"><i>machine</i><b>hardware type</b><u>which GPU</u></div>
+  </div>
+  <p class="stripnote"><span>six things to record for every training run</span><span><em>miss one cell and you cannot rebuild it</em></span></p>
+  <div class="note">
+    <h4>But bit-exact reproduction on GPU is not feasible</h4>
+    The accumulation order in parallel operations is nondeterministic, so two runs with the same config still give weights that differ in the last digits. The practical goal is not bit-for-bit equality but <strong>equality within tolerance</strong>: a rerun must give metrics within the normal seed-to-seed variation. Knowing this boundary — and knowing how large the seed-to-seed variation is for your own problem — is the mark of someone who has measured.
+  </div>
+  <p>The practical consequence: if two models differ by 0.3% AUC and seed-to-seed variation is 0.5%, you have <em>not yet</em> shown that either model is better.</p>
+  <p>Running several seeds and reporting the mean with its standard deviation is the right way.</p>
+</section>
+
+<section id="mlops-s5">
+  <div class="sh"><b>05</b><h2>Model registry and the promotion process</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — REGISTRY AND PROMOTION</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">One place that knows which model is live</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Each version has metrics, data, approver</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Promote in stages: staging, then production</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--tomb)">No registry means rollback is guesswork</text>
+</svg>
+  <figcaption>The ledger of every model, and the precondition for fast rollback.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>Training → versioned artifact</b><span>gate 1 — offline metric above the bar?</span></div>
+    <div class="s"><b>Staging</b><span>runs in a production-like environment · gate 2 — regression, latency, edge-case data</span></div>
+    <div class="s warn"><b>Shadow</b><span>receives real traffic but does <b>not</b> return results to users · gate 3 — are predictions sane, is latency within budget?</span></div>
+    <div class="s"><b>Canary</b><span>1–5% of real traffic · gate 4 — guardrails not getting worse?</span></div>
+    <div class="s ok"><b>Production</b><span>ramp up gradually to 100%</span></div>
+  </div>
+  <div class="stack">
+    <div class="s"><b>Metric offline</b><span>model worse than baseline</span></div>
+    <div class="s"><b>Regression check</b><span>lost an old capability; wrong on known cases</span></div>
+    <div class="s"><b>Latency check</b><span>model is right but too slow for the budget</span></div>
+    <div class="s ok"><b>Shadow</b><span>training–serving skew — features at serving time differ from training</span></div>
+    <div class="s ok"><b>Canary</b><span>real impact on business metrics and guardrails</span></div>
+  </div>
+  <div class="note key">
+    <h4>Shadow is the most valuable gate and the most often skipped</h4>
+    It is the <em>only</em> way to catch training–serving skew before users are affected: the model receives real traffic, computes features through the real serving path, and you compare the prediction distribution with the offline one. If the two distributions diverge, something differs between the two feature paths — and you learn that with <strong>0% risk to users</strong>.
+  </div>
+</section>
+
+<section id="mlops-s6">
+  <div class="sh"><b>06</b><h2>Packaging and serving</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — PACKAGING AND SERVING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Online: low latency, one request at a time</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Batch: much cheaper, accepts delay</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">Streaming: near real-time, most complex</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--tomb)">Wrong pick costs many times more for nothing</text>
+</svg>
+  <figcaption>Three serving modes, chosen by the real latency requirement.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>Protocol — REST or gRPC</b><span>gRPC is faster for internal traffic thanks to binary encoding and HTTP/2; REST is easier to integrate</span></div>
+    <div class="s"><b>Model format — native, ONNX, TensorRT</b><span>ONNX for portability; TensorRT for speed on NVIDIA GPUs</span></div>
+    <div class="s"><b>Serving server — Triton, TorchServe, or hand-written FastAPI</b><span>dedicated servers ship with dynamic batching and multi-model management</span></div>
+    <div class="s ok"><b>Dynamic batching — group requests within a small window</b><span>large throughput gain for a small latency cost — almost always worth it</span></div>
+    <div class="s warn"><b>Autoscaling — on QPS or queue length</b><span>heavy models have long startup times, which must be factored into scaling thresholds</span></div>
+  </div>
+  <div class="note">
+    <h4>On dynamic batching</h4>
+    The server waits a very short window — say 5ms — to group the requests arriving in that span into one batch. It adds at most 5ms of latency but throughput can rise several-fold, because a GPU processes a batch at nearly the cost of a single sample. This is the same principle as batching in LLM inference: the hardware is bound by reading weights, not by the number of samples.
+  </div>
+  <p>An operational detail that is often overlooked: <strong>startup time</strong>.</p>
+  <p>Large models take tens of seconds to a few minutes to load, so when autoscaling fires the new machines are not ready right away.</p>
+  <p>You must keep some headroom, use preloading, or alert on trends instead of instantaneous thresholds.</p>
+</section>
+
+<section id="mlops-s7">
+  <div class="sh"><b>07</b><h2>Lab: deployment strategies</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DEPLOYMENT STRATEGY LAB</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Shadow: runs in parallel, returns nothing</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">measured with zero risk</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Canary: open up by percentage</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--filled)">A/B: measure real business impact</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Switching 100% at once: a gamble</text>
+</svg>
+  <figcaption>The lab turns on the promotion box and shows the risk of each approach.</figcaption>
+  </figure>
+
+  <p>Pick a strategy and enter a scenario to see <strong>how many users are affected</strong> before you can detect the problem and roll back.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>strategy</label>
+        <select id="dstrat">
+          <option value="shadow">shadow — 0% real traffic</option>
+          <option value="canary" selected>canary — gradual ramp</option>
+          <option value="bluegreen">blue-green — switch 100%</option>
+          <option value="all">direct rollout 100%</option>
+        </select>
+      </div>
+      <div><label>QPS</label><input type="number" id="dqps" value="5000" min="1"></div>
+      <div><label>% traffic to new model</label><input type="number" id="dpct" value="5" min="0" max="100"></div>
+      <div><label>time to detect (min)</label><input type="number" id="ddet" value="10" min="1"></div>
+      <div><label>time to roll back (min)</label><input type="number" id="drb" value="2" min="0"></div>
+      <div><label>% failed requests</label><input type="number" id="derr" value="20" min="0" max="100"></div>
+    </div>
+    <div id="depview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Compare a 5% canary with a direct 100% rollout: same faulty model, same detection time, yet the number of affected requests differs <strong>twentyfold</strong>.</p>
+  <p>Then try cutting detection time from 10 minutes to 1 —</p>
+  <p>Good monitoring is worth as much as cutting the traffic share.</p>
+  </div>
+</section>
+
+<section id="mlops-s8">
+  <div class="sh"><b>08</b><h2>Rollback and fallback paths</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — ROLLBACK</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Previous version always ready to restore</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Measured as time to revert, in minutes</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--tomb)">Features must roll back too</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">old model needs the old features</text>
+</svg>
+  <figcaption>Fallback paths, and the most often forgotten part is features.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>1 · Revert to the previous version</b><span>the old model is still in place, just change config — must take <b>minutes</b>, no rebuild</span></div>
+    <div class="s"><b>2 · Fall back to a simpler model</b><span>smaller, older, but sure to work</span></div>
+    <div class="s ok"><b>3 · Fall back to rules</b><span>static logic or default values — the feature degrades but does not die</span></div>
+  </div>
+  <div class="stack">
+    <div class="s ok"><b>Rollback must be a config change</b><span>not a redeploy — a rebuild costs 20 precious minutes</span></div>
+    <div class="s ok"><b>Never let the model block the main path</b><span>put a timeout on model calls; on timeout use a default value instead of leaving the request hanging</span></div>
+    <div class="s"><b>Rollback drills</b><span>a procedure never rehearsed does not exist — drill it regularly</span></div>
+    <div class="s"><b>Keep old models long enough</b><span>some incidents only surface after several days</span></div>
+  </div>
+  <div class="note key">
+    <h4>Graceful degradation</h4>
+    The most important design point: <strong>the system must survive when the model dies</strong>. A recommendation page can show popular content; a fraud system can fall back to rules; a search box can use plain keyword matching. A degraded feature always beats an error page, and raising this in a design round almost always earns credit.
+  </div>
+</section>
+
+<section id="mlops-s9">
+  <div class="sh"><b>09</b><h2>Monitoring layers</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — FOUR MONITORING LAYERS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Infrastructure</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">latency, errors, resources</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Input data</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">schema, missing values, value ranges</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Predictions</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">output distribution, per-class rates</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">Business metrics</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">true labels arrive late: the slowest layer</text>
+</svg>
+  <figcaption>Four layers: the lower you go, the closer to what matters and the slower.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>1 · Infrastructure — CPU, memory, p99, error and timeout rates</b><span>catches technical incidents · instant signal</span></div>
+    <div class="s ok"><b>2 · Data — feature distributions, missing values, out-of-range values, schema</b><span>catches dead data sources, format changes, drift · instant signal</span></div>
+    <div class="s"><b>3 · Model — prediction score distribution, rate above threshold, performance once labels arrive</b><span>catches stale models, feature-path skew · scores are instant, performance waits for labels</span></div>
+    <div class="s warn"><b>4 · Business — revenue, engagement, complaints</b><span>catches real impact · slow, noisy signal</span></div>
+  </div>
+  <div class="note key">
+    <h4>Layer 2 is the one most worth investing in</h4>
+    Because it gives an <strong>instant</strong> signal while true labels may arrive weeks later. And it catches a whole class of incidents no other layer catches: a field renamed at the source, an API returning empty, an ETL job dying silently. These incidents degrade the model immediately while every infrastructure metric stays green. Saying "I monitor feature distributions because labels arrive late" is a very strong answer.
+  </div>
+  <p>A detail worth adding: monitor <strong>by segment</strong>, not just overall.</p>
+  <p>A model can hold its overall performance yet drop sharply on one group —</p>
+  <p>A region, a device type, a customer segment —</p>
+  <p>And the average hides that completely.</p>
+</section>
+
+<section id="mlops-s10">
+  <div class="sh"><b>10</b><h2>Detecting drift with numbers</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — MEASURING DRIFT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">PSI or KS on each feature</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Separate data drift and concept drift</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">inputs shift vs relationship shifts</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Alerting on too many features is noise</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">pick the few key features</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--ok)">Drift does not mean worse</text>
+</svg>
+  <figcaption>Four things to remember to keep drift alerts useful.</figcaption>
+  </figure>
+
+  <div class="cmp two">
+    <div><h5>Data drift — P(x) changes</h5><p>The input distribution changes: a new user group behaves differently. Detectable <b>immediately</b>, no labels needed.</p></div>
+    <div><h5>Concept drift — P(y|x) changes</h5><p>The relationship between inputs and labels changes: fraudsters change tactics, so the same features now mean something else.</p>
+  <p>Only detectable once labels arrive — so <b>always late</b>.</p></div>
+  </div>
+  <div class="stack">
+    <div class="s ok"><b>PSI — Population Stability Index</b><span>for numeric or binned features · &lt; 0.1 stable · 0.1–0.25 worth watching · &gt; 0.25 clear drift</span></div>
+    <div class="s warn"><b>KS test</b><span>for continuous features · oversensitive on large data, the p-value is always tiny, so look at effect size instead</span></div>
+    <div class="s warn"><b>Chi-square</b><span>for categorical features · same caveat as above</span></div>
+    <div class="s ok"><b>Prediction score distribution</b><span>for the whole model · the best aggregate signal, it folds in every input change</span></div>
+  </div>
+  <div class="eq">
+    <div class="line">
+      <span class="t g"><span>PSI</span><em>distribution shift</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Σ (p<sub>new</sub> − p<sub>base</sub>)</span><em>share difference per bin</em></span>
+      <span class="op">×</span>
+      <span class="t p"><span>ln( p<sub>new</sub> / p<sub>base</sub> )</span><em>ratio difference</em></span>
+    </div>
+    <p class="read">Summed over the feature's bins. Below 0.1 is stable; above 0.25 is clear drift.</p>
+  </div>
+  <div class="note warn">
+    <h4>A warning about statistical tests for drift</h4>
+    With millions of samples, the KS test reports a "significant difference" for <em>every</em> feature, even completely harmless changes — this is exactly the problem from the <em>Statistics &amp; A/B testing</em> lesson: a large sample size makes every difference statistically significant. So use an <strong>effect size</strong> such as PSI, and always check by eye by overlaying the two distributions.
+  </div>
+</section>
+
+<section id="mlops-s11">
+  <div class="sh"><b>11</b><h2>Retraining — when and with what</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — RETRAINING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Scheduled: simple, but often over or under</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--ok)">Threshold: when a metric drops past a bar</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--filled)">Needs an automatic gate before going live</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--tomb)">Feedback loop: model shapes the data it learns</text>
+</svg>
+  <figcaption>Two kinds of trigger, and the trap of the feedback loop.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s ok"><b>Scheduled — daily, weekly, monthly</b><span>simplest and predictable — a good default</span></div>
+    <div class="s"><b>Drift-based — run the pipeline when PSI crosses a threshold</b><span>when drift is uneven: quiet at times, spiking at others</span></div>
+    <div class="s"><b>Performance-based — metric drops below the bar</b><span>only usable if labels arrive quickly</span></div>
+    <div class="s"><b>Data-volume-based — retrain after N new samples</b><span>early stage, while data is still scarce</span></div>
+  </div>
+  <p><strong>Choose the frequency by drift speed, not by habit.</strong> Fraud detection faces attackers who adapt constantly, so it may need daily retraining;</p>
+  <p>Product image classification can go monthly without losing anything.</p>
+  <p>And every retrain must pass the same gates as in section 05 —</p>
+  <p><em>A new model is not automatically better than the old one</em>.</p>
+  <div class="note">
+    <h4>Retrain from scratch or continue training</h4>
+    Retraining from scratch on the most recent data window is simple and predictable, but expensive. Continuing from the old weights is much cheaper, but errors accumulate over rounds and are hard to spot. The common pragmatic approach: continue training often, and <strong>periodically retrain from scratch</strong> as a reference point and to cut accumulated drift.
+  </div>
+</section>
+
+<section id="mlops-s12">
+  <div class="sh"><b>12</b><h2>Feature store and point-in-time correctness</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — FEATURE STORE</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">One feature definition for both train and serve</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">Training-serving skew is the top bug</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">two code paths compute differently</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Point-in-time correctness</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">never use future data to build past labels</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--ok)">Small teams can skip a feature store</text>
+</svg>
+  <figcaption>Where data meets code, and where leakage happens most.</figcaption>
+  </figure>
+
+  <p class="key">The same feature has to be computed <em>twice, in two different environments</em> — and the two paths easily drift apart without any error.</p>
+  <div class="cmp two">
+    <div><h5>Training path</h5><p>SQL on the data warehouse, batch processing, historical data.</p></div>
+    <div><h5>Serving path</h5><p>Python inside the service, one request at a time, live data.</p></div>
+  </div>
+  <p class="stripnote"><span>mismatches in missing values, time zones, rounding, event order</span><span><em>the model mysteriously gets worse, with no error at all</em></span></p>
+  <p>The fix: <strong>a single place that defines features</strong> and generates both paths.</p>
+  <h3>Point-in-time correctness — the hardest part</h3>
+  <p class="key">A training example's features must be the values <em>at the exact prediction time</em>, not today's values.</p>
+  <figure>
+    <svg viewBox="0 0 900 200" role="img" aria-label="Timeline: only orders before the prediction time may be used">
+      <line x1="40" y1="110" x2="860" y2="110" stroke="var(--rule-hi)" stroke-width="2"/>
+      <line x1="500" y1="46" x2="500" y2="150" stroke="var(--probe)" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="500" y="38" text-anchor="middle" class="sv-t" fill="var(--probe)">prediction time · 10:00, Mar 5</text>
+      <g fill="var(--ok)"><circle cx="110" cy="110" r="7"/><circle cx="230" cy="110" r="7"/><circle cx="350" cy="110" r="7"/><circle cx="440" cy="110" r="7"/></g>
+      <g fill="var(--tomb)"><circle cx="600" cy="110" r="7"/><circle cx="710" cy="110" r="7"/><circle cx="820" cy="110" r="7"/></g>
+      <text x="270" y="88" text-anchor="middle" class="sv-t" fill="var(--ok)">4 orders — usable</text>
+      <text x="710" y="88" text-anchor="middle" class="sv-t" fill="var(--tomb)">3 orders — in future</text>
+      <text x="270" y="140" text-anchor="middle" class="sv-l" fill="var(--faint)">order count = 4 ✓</text>
+      <text x="710" y="140" text-anchor="middle" class="sv-l" fill="var(--faint)">using total 7 → time leakage</text>
+      <line x1="40" y1="164" x2="860" y2="164" stroke="var(--rule)"/>
+      <text x="40" y="190" class="sv-l" fill="var(--faint)">taking today's value: great in testing, useless in production</text>
+    </svg>
+    <figcaption>A feature store keeps features with an <b>event timestamp</b>, and joins labels to features by "the latest value before the prediction time".</figcaption>
+  </figure>
+  <div class="note key">
+    <h4>Why feature stores exist</h4>
+    Point-in-time correctness is the <em>main</em> reason feature stores exist — not because they are a handy cache. Hand-writing point-in-time joins for dozens of features is very easy to get wrong, and getting it wrong creates time leakage with no visible sign. Understanding this is understanding why a feature store cannot be replaced by a cache.
+  </div>
+  <p>And you need to know when you do <em>not</em> need a feature store.</p>
+  <p>If you only have a few simple features, or everything can be computed from the request itself, adding another system is not worth the cost.</p>
+  <p>It starts paying off when many models share features, or when you have many time-window aggregate features.</p>
+</section>
+
+<section id="mlops-s13">
+  <div class="sh"><b>13</b><h2>Maturity levels</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of MLOps: a model that runs in a notebook is not usable by anyone and cannot be rebuilt, so you must version all four things — code, data, config and environment — package it and promote it under control through a registry and canary, monitor four layers once it is live, and quality still decays on its own because the world changes, so you must retrain">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model runs in a notebook</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">but nobody can use it, and nobody can rebuild it</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Version all four things</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">code · data · config · environment</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Package, then promote under control</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">registry · shadow · canary · rollback</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Monitor four layers once live</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">infra · input data · predictions · business metrics</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Quality decays with nobody touching it</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">the world shifts — drift — so you must retrain</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — MATURITY LEVELS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Manual</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">notebooks, hand deploys</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Automated pipeline</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">retraining runs with one command</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Full CI/CD</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">auto-evaluate, auto-promote, auto-rollback</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--filled)">Jumping levels before you need to is waste</text>
+</svg>
+  <figcaption>Three levels, and a reminder not to overbuild.</figcaption>
+  </figure>
+
+  <div class="axis">
+    <div class="stop"><b>0 — manual</b><span>train in a notebook, hand the model over manually</span></div>
+    <div class="stop on"><b>1 — automated pipeline</b><span>runs with one command; has a registry and monitoring</span></div>
+    <div class="stop"><b>2 — CI/CD for the pipeline</b><span>the pipeline itself is tested and deployed automatically</span></div>
+  </div>
+  <p class="axiscap"><span>nobody can rebuild the running model</span><span><em>retraining is routine</em></span><span>idea to production in a few hours</span></p>
+  <div class="note">
+    <h4>Which level is enough</h4>
+    <strong>Level 1 is enough for most organizations</strong>, and pushing to level 2 too early is a form of over-engineering — you build infrastructure for a retraining frequency you do not need yet. A strong interview answer states which level you are at, <em>why that level fits the problem</em>, and what the next step will be and when — instead of listing every MLOps tool.
+  </div>
+</section>
+
+<section id="mlops-s14">
+  <div class="sh"><b>14</b><h2>Common mistakes</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Not versioning data</h4><p>Cannot reproduce, cannot debug. Timestamped snapshots are the bare minimum.</p></div>
+    <div class="card bad"><h4>Skipping the shadow step</h4><p>You lose the only chance to catch training–serving skew at 0% risk.</p></div>
+    <div class="card bad"><h4>Rollback that needs a rebuild</h4><p>Tens of minutes lost in the middle of an incident. Rollback must be a config change.</p></div>
+    <div class="card bad"><h4>Monitoring only infrastructure</h4><p>A broken model still returns 200 with a plausible-looking number. You need a data monitoring layer.</p></div>
+    <div class="card bad"><h4>Using the KS test p-value to flag drift</h4><p>On large data every feature is "significant". Use an effect size such as PSI.</p></div>
+    <div class="card bad"><h4>Point-in-time-incorrect feature joins</h4><p>Time leakage. The model looks good in testing, useless in production.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · MLOps &amp; model serving · the PSI thresholds are common reference values; calibrate them to your own data.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG end-to-end — MazeAI</title>
+<meta name="description" content="Chunking, hybrid search, reranking, lost-in-the-middle, a five-step debug tree, and evaluation split into two layers.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/10-llm/05-rag/rag-end-to-end/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="RAG end-to-end">
+<meta property="og:description" content="Chunking, hybrid search, reranking, lost-in-the-middle, a five-step debug tree, and evaluation split into two layers.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/10-llm/05-rag/rag-end-to-end/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-rag" data-title="RAG end-to-end" data-tag="Retrieval" data-blurb="Chunking, hybrid search, reranking, lost-in-the-middle, a five-step debug tree, and evaluation split into two layers.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · retrieval systems</p>
+  <h1>RAG <em>end-to-end</em></h1>
+  <p class="lede">The answer "I used LangChain with a vector DB" says nothing.</p>
+  <p>This lesson walks the whole pipeline — <b>chunking</b>, embedding, index, <b>hybrid search</b>, reranking, context building, generation —</p>
+  <p>And most importantly: a <b>decision tree for debugging</b> when the system answers wrong, plus evaluation split into two layers.</p>
+</header>
+
+
+<section id="rag-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">RAG does not teach the model new knowledge — it <em>finds the right piece of a document and puts it into the question</em> before the model answers.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<text class="sv-hv" x="372" y="18">TWO PHASES, TWO MOMENTS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Ingest runs in batches</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">once for the whole corpus</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Retrieve + generate per query</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">in milliseconds</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Ingest errors can't be fixed downstream</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">it sets the quality ceiling</text>
+</svg>
+  <figcaption>Read the five boxes top to bottom, in the order data flows. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+  <p class="key">RAG is <em>two systems joined together</em>: a search system runs first, a text generator runs after.</p>
+  <figure>
+    <svg viewBox="0 0 900 300" role="img" aria-label="RAG pipeline: the offline branch builds the index, the online branch answers each question">
+      <text x="20" y="26" class="sv-l" fill="var(--faint)">OFFLINE — run once, rerun when docs change</text>
+      <g fill="rgba(var(--blue-a),.14)" stroke="var(--filled)">
+        <rect x="20" y="40" width="128" height="42" rx="7"/>
+        <rect x="180" y="40" width="128" height="42" rx="7"/>
+        <rect x="340" y="40" width="128" height="42" rx="7"/>
+        <rect x="500" y="40" width="128" height="42" rx="7"/>
+        <rect x="660" y="18" width="128" height="42" rx="7"/>
+        <rect x="660" y="72" width="200" height="42" rx="7"/>
+      </g>
+      <g class="sv-t" fill="var(--text)" text-anchor="middle">
+        <text x="84" y="66">docs</text>
+        <text x="244" y="66">parse &amp; clean</text>
+        <text x="404" y="66">chunk</text>
+        <text x="564" y="66">embedding</text>
+        <text x="724" y="44">vector index</text>
+        <text x="760" y="98">keyword index (BM25)</text>
+      </g>
+      <g stroke="var(--rule-hi)" stroke-width="2" fill="none">
+        <path d="M152 61 L176 61"/><path d="M312 61 L336 61"/><path d="M472 61 L496 61"/>
+        <path d="M632 61 L648 61 L648 39 L656 39"/>
+        <path d="M470 61 L470 93 L656 93"/>
+      </g>
+
+      <line x1="20" y1="140" x2="880" y2="140" stroke="var(--rule)"/>
+      <text x="20" y="168" class="sv-l" fill="var(--faint)">ONLINE — per query</text>
+      <g fill="rgba(var(--amber-a),.14)" stroke="var(--probe)">
+        <rect x="20" y="182" width="122" height="42" rx="7"/>
+        <rect x="166" y="182" width="140" height="42" rx="7"/>
+        <rect x="330" y="182" width="150" height="42" rx="7"/>
+        <rect x="504" y="182" width="110" height="42" rx="7"/>
+      </g>
+      <rect x="638" y="182" width="110" height="42" rx="7" fill="rgba(var(--green-a),.16)" stroke="var(--ok)"/>
+      <rect x="772" y="182" width="108" height="42" rx="7" fill="rgba(var(--green-a),.16)" stroke="var(--ok)"/>
+      <g class="sv-t" fill="var(--text)" text-anchor="middle">
+        <text x="81" y="208">query</text>
+        <text x="236" y="208">retrieve</text>
+        <text x="405" y="202">fuse</text>
+        <text x="405" y="219">+ rerank</text>
+        <text x="559" y="208">make prompt</text>
+        <text x="693" y="208">LLM</text>
+        <text x="826" y="202">answer</text>
+        <text x="826" y="219">+ cites</text>
+      </g>
+      <g stroke="var(--rule-hi)" stroke-width="2" fill="none">
+        <path d="M146 203 L162 203"/><path d="M310 203 L326 203"/><path d="M484 203 L500 203"/>
+        <path d="M618 203 L634 203"/><path d="M752 203 L768 203"/>
+      </g>
+      <path d="M724 118 L724 150 L236 150 L236 178" stroke="var(--rule-hi)" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+      <text x="20" y="264" class="sv-l" fill="var(--faint)">wrong answer → first find which layer failed: search (amber) or generation (green)</text>
+    </svg>
+    <figcaption>The top branch builds the index once; the bottom branch reruns for every question and reads that index.</figcaption>
+  </figure>
+  <div class="note key">
+    <h4>One sentence to remember</h4>
+    RAG is <strong>two systems joined together</strong>: a search system and a text generator. When it answers wrong, the first job is to find <em>which layer failed</em> — because the fixes are completely different. This is also what separates an answer from experience from an answer from the docs.
+  </div>
+</section>
+
+<section id="rag-s2">
+  <div class="sh"><b>02</b><h2>RAG or stuff it all into a long context</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — RAG OR LONG CONTEXT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Long context: easy, costly, slow</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">cost grows with every request</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">RAG</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">cheap at scale, updates incrementally</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Models lose accuracy mid-context</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">lost in the middle</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Small, static corpus? Skip RAG</text>
+</svg>
+  <figcaption>Four dimensions compared, and the case where RAG is not worth it.</figcaption>
+  </figure>
+
+  <p>With models that take a 200k-token context, the fair question is: why still need RAG?</p>
+  <div class="cmp two">
+    <div><h5>RAG</h5>
+      <p><b>Cost per question</b> pay for only a few thousand tokens</p>
+      <p><b>Latency</b> low — short prompt</p>
+      <p><b>Data scale</b> unlimited</p>
+      <p><b>Source citation</b> natural — you know which chunk was used</p>
+      <p><b>With few documents</b> can miss things if retrieval is weak</p>
+      <p><b>Data updates</b> re-embed only what changed</p></div>
+    <div><h5>Long context</h5>
+      <p><b>Cost per question</b> pay for the whole context, on every call</p>
+      <p><b>Latency</b> high — prefill scales with length</p>
+      <p><b>Data scale</b> hard-capped by the context window</p>
+      <p><b>Source citation</b> hard to tell what the model relied on</p>
+      <p><b>With few documents</b> more accurate — no step can miss anything</p>
+      <p><b>Data updates</b> nothing needed</p></div>
+  </div>
+  <div class="note">
+    <h4>The practical verdict</h4>
+    <strong>Few, fixed documents</strong> — under a few tens of thousands of tokens, say one contract or one product manual — then putting everything into the context is simpler and more accurate. <strong>A large or constantly changing corpus</strong> leaves RAG as the only option. And the common approach today is to <em>combine</em> them: use RAG to narrow down to 20–50 chunks and then put all of them into a long context, instead of only 3–5 chunks as before.
+  </div>
+</section>
+
+<section id="rag-s3">
+  <div class="sh"><b>03</b><h2>Ingestion — the step that sets the quality ceiling</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — INGESTION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Multi-column PDFs parse garbled</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">the quietest place to break</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Parse tables and figures apart</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Metadata: source, date, section</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">to filter and to cite</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--probe)">Read dozens of chunks by hand first</text>
+</svg>
+  <figcaption>The least glamorous step, yet it decides the quality ceiling.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s warn"><b>Parse documents — PDF, Word, HTML, tables, scans</b><span>multi-column PDFs get read out of order; tables turn into meaningless strings of numbers</span></div>
+    <div class="s warn"><b>Keep structure — headings, sections, hierarchy</b><span>lose the heading and the passage loses its context; you no longer know which product it is about</span></div>
+    <div class="s"><b>Attach metadata — source, date, author, access rights</b><span>without metadata you cannot filter by time or by permission</span></div>
+    <div class="s"><b>Clean — strip headers, footers, page numbers, menus</b><span>repeated strings add noise to every chunk's embedding</span></div>
+    <div class="s"><b>Deduplicate — the same content in many files</b><span>top-k gets taken over by five copies of the same passage</span></div>
+  </div>
+  <div class="note warn">
+    <h4>The most underrated and most expensive step</h4>
+    No retrieval technique can save a passage that was misread from a PDF. <strong>Ingestion quality is the ceiling of the whole system.</strong> In real projects this is usually the part that takes the most time — and saying so in an interview is a clear sign of someone who has built real RAG rather than run a demo.
+  </div>
+  <p>One technique worth knowing: <strong>prepend headings to every chunk</strong>. The passage "The warranty period is 24 months" does not say which product the warranty covers.</p>
+  <p>Add the heading path — "Product X &gt; Policy &gt;</p>
+  <p>Warranty" — to the start of the chunk and both the embedding and the LLM get the context.</p>
+</section>
+
+<section id="rag-s4">
+  <div class="sh"><b>04</b><h2>Chunking</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — CHUNKING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Too small loses context</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">Too big adds noise, dilutes embedding</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Start at 300–500 tokens, 10–20% overlap</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--probe)">Split by document structure, not char count</text>
+</svg>
+  <figcaption>Both extremes fail, plus a starting point for tuning.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>Fixed size — cut every N tokens, with overlap</b><span>unstructured text; the simplest</span></div>
+    <div class="s"><b>By paragraph / sentence — cut at natural boundaries</b><span>well-written text</span></div>
+    <div class="s ok"><b>By structure — cut at headings, sections, table rows</b><span>technical docs, regulations — usually the best</span></div>
+    <div class="s warn"><b>Semantic — cut where the embedding shifts sharply</b><span>sounds nice but is costly and rarely beats structure-based cuts clearly</span></div>
+    <div class="s"><b>Multi-level — embed small pieces to search, return large ones to read</b><span>when you need both search precision and full context</span></div>
+  </div>
+  <div class="cmp two">
+    <div><h5>Small chunks · 100–200 tokens</h5><p>Focused embeddings, more precise search — but context is lost, and the answer can get cut in two.</p></div>
+    <div><h5>Large chunks · 800–1500 tokens</h5><p>Keep full context — but one vector has to stand for many ideas so the embedding gets diluted, and the LLM's context is spent on irrelevant parts.</p></div>
+  </div>
+  <p class="stripnote"><span>common range</span><span><em>300–600 tokens, overlap 10–20%</em></span></p>
+  <div class="note key">
+    <h4>Why overlap is needed</h4>
+    So the answer is not <strong>cut across a chunk boundary</strong>. If the needed information spans two sentences and the cut lands right between them, no chunk holds all of it and the system is bound to answer wrong — even with a perfect embedding and index. This is the subtlest failure mode in RAG, and the lab below shows it happening.
+  </div>
+  <p>The <strong>multi-level</strong> technique is worth knowing because it breaks the trade-off above:</p>
+  <p>Embed sentences or small passages for precise search, but when a small passage is picked, return the whole larger section containing it for the LLM to read.</p>
+  <p>Precise when searching, full context when reading.</p>
+</section>
+
+<section id="rag-s5">
+  <div class="sh"><b>05</b><h2>Lab: chunking and retrieval</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — CHUNK AND RETRIEVAL LAB</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Change chunk size and watch recall</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">See the answer get cut in two</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">Overlap fixes it but costs room</text>
+</svg>
+  <figcaption>The lab turns the ingestion knob and shows the effect in the retrieval box.</figcaption>
+  </figure>
+
+  <p>One short document, one question. Change the chunk size and overlap to see whether the passage holding the answer <strong>stays whole</strong> inside some chunk.</p>
+  <div class="lab">
+    <div class="bar">
+      <div><label>chunk size (chars)</label><input type="number" id="rsize" value="180" min="40" max="600" step="10"></div>
+      <div><label>overlap %</label><input type="number" id="rov" value="0" min="0" max="50" step="5"></div>
+      <div><label>chunks retrieved (k)</label><input type="number" id="rk" value="2" min="1" max="5"></div>
+      <div><label>question</label>
+        <select id="rq">
+          <option value="0" selected>How long is the warranty period?</option>
+          <option value="1">How much is the exchange fee?</option>
+          <option value="2">Are installments available?</option>
+        </select>
+      </div>
+    </div>
+    <div id="rview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">The default setting — <code>chunk = 180, overlap = 0</code> —</p>
+  <p><strong>Fails</strong>: the answer sentence is cut between two chunks, so no chunk holds all of it.</p>
+  <p>So the system is bound to answer wrong even though retrieval works perfectly.</p>
+  <p>Raise overlap to <strong>30%</strong> to see it rescued; or keep overlap at 20% and raise the chunk to <strong>240</strong>.</p>
+  <p>Switch questions to see the same setting rescue one question but break another —</p>
+  <p>That is why you measure recall on a real question set instead of trying one question.</p>
+  <p>The lab uses keyword overlap instead of a real embedding, but the failure mode is the same as in a real system.</p>
+  </div>
+</section>
+
+<section id="rag-s6">
+  <div class="sh"><b>06</b><h2>Embedding</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — EMBEDDING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Same model for documents and queries</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">another model, another space</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Switch model, re-embed the corpus</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Choose by language and max length</text>
+<rect x="372" y="174" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--probe)">Measure recall on your own question set</text>
+<text class="sv-s" x="388" y="214" fill="var(--dim)">leaderboards don't replace it</text>
+</svg>
+  <figcaption>Four things to settle before embedding the whole corpus.</figcaption>
+  </figure>
+
+  <p class="key">An embedding turns a passage into a vector so that <em>similar meanings give nearby vectors</em>.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>cos(a, b)</span><em>similarity</em></span>
+      <span class="op">=</span>
+      <span class="t p"><span>(a·b)</span><em>dot product</em></span>
+      <span class="op">/</span>
+      <span class="t g"><span>(|a|·|b|)</span><em>two lengths</em></span>
+    </div>
+    <p class="read">If the vectors are normalized to length 1, the denominator is 1, so cosine <b>is exactly</b> the dot product — much faster. Most vector DBs assume this.</p>
+  </div>
+  <div class="stack">
+    <div class="s"><b>Choosing an embedding model</b><span>check that it handles your language well — many models are strong only in English</span></div>
+    <div class="s"><b>Dimensions — 384 to 1536</b><span>more dimensions are slightly more accurate but cost memory and run slower</span></div>
+    <div class="s"><b>Asymmetric prefixes</b><span>some models require <code>"query: "</code> before the question and <code>"passage: "</code> before the passage</span></div>
+    <div class="s warn"><b>Maximum length</b><span>past the limit the tail is cut off <em>silently</em> — a chunk larger than the limit loses data</span></div>
+    <div class="s warn"><b>Changing the embedding model</b><span>you must re-embed the whole corpus: vectors from two models cannot be compared</span></div>
+  </div>
+  <div class="note warn">
+    <h4>Two silent traps</h4>
+    <p><strong>Forgetting the prefix.</strong> With a model that requires asymmetric prefixes, leaving them out raises no error — it just drops retrieval quality noticeably with no sign at all.</p>
+    <p><strong>Chunks longer than the model limit.</strong> The excess is cut and never embedded.</p>
+  <p>The passage exists in the corpus, but its ending is invisible to search.</p>
+  </div>
+</section>
+
+<section id="rag-s7">
+  <div class="sh"><b>07</b><h2>Vector index</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — VECTOR INDEX</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Tens of thousands of chunks: flat scan</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--filled)">HNSW: fast, RAM-heavy, the default</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--probe)">IVF-PQ: compact, for huge corpora</text>
+<rect x="372" y="154" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="176" fill="var(--tomb)">Apply metadata filters during search</text>
+</svg>
+  <figcaption>Pick the index by corpus size; don't default to the complex one.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s ok"><b>Flat — compare against every vector</b><span>100% recall, memory equal to all the vectors · under ~100k vectors, and usually enough</span></div>
+    <div class="s ok"><b>HNSW — multi-layer graph, walk to nearby neighbors</b><span>very high recall, high memory since the graph is stored too · default at medium scale</span></div>
+    <div class="s"><b>IVF — partition into clusters, search only the few nearest</b><span>tunable recall, medium memory · many millions of vectors</span></div>
+    <div class="s warn"><b>IVF-PQ — IVF plus vector compression</b><span>lower recall, very low memory · hundreds of millions of vectors, RAM-bound</span></div>
+  </div>
+  <div class="note key">
+    <h4>The key point about choosing an index</h4>
+    <strong>Under roughly 100k chunks, use flat.</strong> Search is 100% exact, there are no hyperparameters to mistune, and latency stays under a few tens of milliseconds. A great many real RAG systems sit at this scale. Choosing HNSW or IVF before you need it adds a source of errors yourself — because they are <em>approximate</em> search, which means they sometimes miss exactly the chunk you need with no way of knowing.
+  </div>
+  <p>For HNSW, two parameters matter: <code>M</code> (connections per node, affects memory and quality) and <code>ef_search</code> (candidates considered at search time —</p>
+  <p><strong>this is the knob that trades recall for latency</strong>, adjustable at runtime without rebuilding the index).</p>
+</section>
+
+<section id="rag-s8">
+  <div class="sh"><b>08</b><h2>Hybrid search</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — HYBRID SEARCH</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Vector finds meaning</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">paraphrases still match</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">BM25: exact words</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">error codes, names, IDs</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Merge by RRF</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">usually beats either alone</text>
+</svg>
+  <figcaption>Two kinds of search that cover exactly each other's gaps.</figcaption>
+  </figure>
+
+  <div class="cmp two">
+    <div><h5>Vector search — catches meaning</h5><p>"how do I send something back" finds the passage on the <b>returns process</b>, even with no words in common.</p></div>
+    <div><h5>BM25 — catches exact words</h5><p>"error code E-4021", proper names, document numbers, rare terms — vector search can miss them entirely.</p></div>
+  </div>
+  <p>The two methods <strong>complement each other</strong>, and vector search's weakness is the part people tend to overlook:</p>
+  <p>It compresses a whole passage into one vector, so a specific error code is just a small detail that gets diluted.</p>
+  <p>BM25 matches that exact string.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t g"><span>score(d)</span><em>fused score</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Σ<sub>i</sub> 1 / (k + rank<sub>i</sub>(d))</span><em>summed over each ranking · k is usually 60</em></span>
+    </div>
+    <p class="read">A chunk ranked <b>2nd</b> by vector and <b>5th</b> by BM25 scores 1/62 + 1/65 = 0.0315.</p>
+  <p>RRF uses only <b>ranks</b>, not raw scores — so there is no need to normalize two kinds of score onto one scale.</p>
+  </div>
+  <div class="note">
+    <h4>Why RRF is popular</h4>
+    Cosine scores lie between −1 and 1, while BM25 scores have no upper bound and depend on document length. Normalizing these two scales onto a common basis so they can be added has no clean solution. RRF sidesteps it by using only ranks — simple, no tuning needed, and experiments show it is very strong.
+  </div>
+</section>
+
+<section id="rag-s9">
+  <div class="sh"><b>09</b><h2>Reranking</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — RERANKING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Fetch 50–100, rerank down to 5</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--ok)">Cross-encoder reads the query–chunk pair</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">far sharper than embeddings</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Costly, so only run on a shortlist</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--ok)">The biggest payoff for the effort</text>
+</svg>
+  <figcaption>The cheapest step for raising retrieval quality.</figcaption>
+  </figure>
+
+  <div class="cmp two">
+    <div><h5>Bi-encoder — used for retrieval</h5><p>Embeds the question and the passage <b>separately</b>, compares them by cosine. Passages can be embedded ahead of time, so it can search millions of them — but the two sides never see each other.</p></div>
+    <div><h5>Cross-encoder — used for reranking</h5><p>Feeds <b>both in at once</b>: [question] [SEP] [passage], with attention running across every word. Far more accurate — but the model must run on each pair.</p></div>
+  </div>
+  <div class="stack">
+    <div class="s"><b>Bi-encoder → top-50</b><span>fast, high recall, scans the whole corpus</span></div>
+    <div class="s"><b>Cross-encoder → top-5</b><span>slow, but only has to score 50 pairs</span></div>
+    <div class="s ok"><b>LLM</b><span>reads 5 chunks already in the right order</span></div>
+  </div>
+  <div class="note key">
+    <h4>Why reranking is the most profitable upgrade</h4>
+    By common experience, adding a reranker improves RAG quality more than almost any other tweak — more than switching the embedding model or adjusting chunks. The reason is that a bi-encoder must compress the passage into a vector <em>before</em> it knows the question, while a cross-encoder sees both at once. The cost is only a few tens of milliseconds of extra latency for 50 pairs.
+  </div>
+</section>
+
+<section id="rag-s10">
+  <div class="sh"><b>10</b><h2>Building the context</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — BUILDING CONTEXT</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Number chunks so the model can cite</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Put key chunks first or last</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">the middle is easily ignored</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Be explicit: not in the docs means “I don't know”</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Stuffing in more chunks dilutes, not improves</text>
+</svg>
+  <figcaption>Four rules for arranging context, with a direct effect on the answer.</figcaption>
+  </figure>
+
+  <div class="stack">
+    <div class="s"><b>Number of chunks — 3–10 after rerank</b><span>more usually dilutes rather than helps</span></div>
+    <div class="s ok"><b>Order</b><span>put the most relevant chunks <b>first or last</b>, not in the middle</span></div>
+    <div class="s"><b>Include metadata</b><span>source, date, section heading — so the LLM can cite and knows which is newer</span></div>
+    <div class="s"><b>Number the chunks</b><span>so the LLM can refer to them by number when citing</span></div>
+    <div class="s"><b>Token budget</b><span>fixed hard; drop the lowest-ranked chunks rather than cutting one in the middle</span></div>
+  </div>
+  <div class="note warn">
+    <h4>Lost in the middle</h4>
+    Experiments show LLMs pay <strong>the least attention to the middle</strong> of a long context — information at the start and end is used noticeably better. The direct consequence: after reranking, don't mechanically order chunks by descending score. Putting the best chunk first <em>and</em> the second best last is a simple trick with a measurable effect.
+  </div>
+  <p>On <strong>processing the question</strong> before retrieval, two techniques are worth knowing:</p>
+  <p><em>Query rewriting</em> for multi-turn chat — "what about the other one?" retrieves nothing unless it is rewritten into a full question;</p>
+  <p>And <em>generating multiple queries</em> from one question then fusing the results, useful when the question has several facets.</p>
+</section>
+
+<section id="rag-s11">
+  <div class="sh"><b>11</b><h2>Generation and citation</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — GENERATION AND CITING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Require chunk-number cites</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">readers can verify — that's the point</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Low temperature for lookup tasks</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">Docs don't stop fabrication</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">so cross-check answers against sources</text>
+</svg>
+  <figcaption>The generation box, and why citations are not decoration.</figcaption>
+  </figure>
+
+<pre><code>You are an assistant that answers from the provided documents.
+
+RULES:
+- Use only information in the passages below.
+- Cite the passage number for every claim, as [1], [2].
+- If the passages do NOT contain enough information, say so
+  clearly and do not guess.
+
+PASSAGE 1 (source: policy-2026.pdf, section Warranty):
+...
+
+QUESTION: ...</code></pre>
+  <div class="stack">
+    <div class="s ok"><b>Require citations</b><span>users can verify, and having to cite in itself reduces fabrication</span></div>
+    <div class="s ok"><b>Allow refusal</b><span>without this way out the model is forced to make things up when there is no evidence</span></div>
+    <div class="s"><b>State source and date</b><span>when two chunks conflict, the model knows which is newer</span></div>
+    <div class="s"><b>Say so when information conflicts</b><span>better than picking a side at random</span></div>
+  </div>
+  <div class="note key">
+    <h4>Allowing refusal is the single most effective change</h4>
+    If the prompt does not say clearly that "not found" is a valid answer, the model will always try to build an answer from whatever is in the context — even when the chunks are completely unrelated. This is the biggest source of fabrication in RAG systems, and it ties directly to the point in the fine-tuning lesson: training data also needs refusal examples.
+  </div>
+</section>
+
+<section id="rag-s12">
+  <div class="sh"><b>12</b><h2>Evaluation — the two layers must be split</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — TWO-LAYER EVALUATION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Retrieval: recall and precision@k</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">measured apart from the generator</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Generation: grounded, answers the question</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">One merged score hides what to fix</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--ok)">Need a golden question set from your domain</text>
+</svg>
+  <figcaption>Why a single overall number is useless when fixing things.</figcaption>
+  </figure>
+
+  <p class="key">Without splitting the two layers you <em>cannot debug</em> — because the fixes are completely different.</p>
+  <div class="cmp two">
+    <div><h5>Retrieval layer — did it fetch the right chunk?</h5><p><b>recall@k</b> is the answer chunk in the top-k · <b>MRR</b> what rank it got. Needs a golden dataset: questions plus which chunk holds the answer.</p></div>
+    <div><h5>Generation layer — did it use that chunk correctly?</h5><p><b>faithfulness</b> is the answer supported by the chunks or made up · <b>relevance</b> does it address the question · <b>citation</b> does it cite the right chunk.</p></div>
+  </div>
+  <p><strong>How to build the golden dataset</strong> — the hardest part, and unavoidable:</p>
+  <ul>
+    <li>Take <strong>real questions</strong> from user logs, don't invent them. Invented questions are always easier than real ones.</li>
+    <li>For each one, a human marks which chunk holds the answer. 50–200 questions are enough to catch most problems.</li>
+    <li>Keep questions that have <strong>no answer</strong> in the corpus too — to test whether the system knows how to refuse.</li>
+  </ul>
+  <div class="note">
+    <h4>Why recall@k is the most important metric</h4>
+    Because it is the <strong>ceiling</strong> of the whole system: if the right chunk is not in the context, no LLM, however good, can answer correctly. So when improving RAG, I always measure recall@k first — if it sits at 60%, all the effort spent tuning prompts is pointless next to fixing the retrieval layer.
+  </div>
+</section>
+
+<section id="rag-s13">
+  <div class="sh"><b>13</b><h2>Debug tree — when RAG answers wrong</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of RAG: the model does not know private data so it makes things up; ingestion cuts documents into chunks and builds an index; retrieval finds relevant chunks by vector and keyword, then reranks; generation answers only from retrieved chunks with citations; and evaluation must split the two layers to know where the error is">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Model doesn't know your private data</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">and makes things up fluently</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Ingest — split docs into chunks</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">parse · chunk · embed · index</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Retrieve — find related chunks</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">vector + keyword · rerank</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Generate — answer only from chunks found</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">build context · cite sources</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure each place it can fail</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">split: retrieval vs generation</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DEBUG TREE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">1. Is the right chunk in the store?</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">no → ingestion is broken</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">2. Does retrieval fetch it?</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">no → bug in chunking or embedding</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">3. Is it in the context that gets sent?</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">no → bug in rerank or truncation</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">4. Present yet wrong: blame the generator</text>
+</svg>
+  <figcaption>Four questions in order; stop at the first one that answers no.</figcaption>
+  </figure>
+
+  <p class="key">Go top to bottom and stop at the <em>first</em> question that answers "no" — that is exactly where it broke.</p>
+  <div class="stack">
+    <div class="s"><b>1 · Is that information in the corpus?</b><span>no → a data problem, not a RAG problem. Add documents.</span></div>
+    <div class="s"><b>2 · Is the answer passage still whole after chunking?</b><span>no → chunking split the information. Raise overlap, cut by structure.</span></div>
+    <div class="s"><b>3 · Does retrieval fetch that chunk? (measure recall@k)</b><span>no → try hybrid search if the question has codes or proper names · check the embedding model's prefixes · check whether the approximate index misses it · add a reranker</span></div>
+    <div class="s"><b>4 · Is that chunk in the context sent to the LLM?</b><span>no → cut by the token budget, or ranked outside the top-k. Raise k.</span></div>
+    <div class="s"><b>5 · Does the LLM use that chunk?</b><span>no → the chunk sits mid-context, reorder · the prompt is not clear enough about relying on the documents · the model is too weak</span></div>
+    <div class="s warn"><b>Used but still wrong</b><span>two chunks conflict, or the document itself is wrong</span></div>
+  </div>
+  <div class="note key">
+    <h4>Debugging a RAG system that answers wrong</h4>
+    When a RAG system answers wrong, follow <strong>exactly the five ordered steps</strong> above instead of guessing along the lines of "tweak the prompt, then swap the vector DB". Each step rules out one layer, so by the end you know for sure where the bug is.
+  </div>
+</section>
+
+<section id="rag-s14">
+  <div class="sh"><b>14</b><h2>Common mistakes</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>No evaluation set</h4><p>Every change is a guess. 50 real questions with their correct chunks are enough to start.</p></div>
+    <div class="card bad"><h4>Chunks without overlap</h4><p>The answer is cut across a boundary and no chunk holds all of it.</p></div>
+    <div class="card bad"><h4>Vector search only</h4><p>Misses error codes, proper names, document numbers. Add BM25 and fuse with RRF.</p></div>
+    <div class="card bad"><h4>Not letting the model refuse</h4><p>It is forced to make things up when the context lacks the answer.</p></div>
+    <div class="card bad"><h4>Putting the best chunk mid-context</h4><p>Lost in the middle — the model pays the least attention there.</p></div>
+    <div class="card bad"><h4>Changing embedding model without re-embedding</h4><p>Vectors from two models cannot be compared. Results become random.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · RAG end-to-end · the lab uses keyword overlap instead of a real embedding; the failure modes it shows are the same as in a real system.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCA &amp; dimensionality reduction — MazeAI</title>
+<meta name="description" content="Rotate the axes toward where the data spreads most, then drop some directions: choosing the number of components, why you must standardize, and why it is not feature selection.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/08-dimensionality/pca-dimensionality/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="PCA &amp; dimensionality reduction">
+<meta property="og:description" content="Rotate the axes toward where the data spreads most, then drop some directions: choosing the number of components, why you must standardize, and why it is not feature selection.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/08-dimensionality/pca-dimensionality/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-pca" data-title="PCA &amp; dimensionality reduction" data-tag="ML" data-blurb="Rotate the axes toward where the data spreads most, then drop some directions: choosing the number of components, why you must standardize, and why it is not feature selection.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Dimensionality reduction</p>
+  <h1>PCA &amp; dimensionality <em>reduction</em></h1>
+  <p class="lede">A hundred columns, most of them saying the same thing over and over. PCA <b>rotates the axes toward the direction the data spreads most</b> and then drops the directions with almost nothing in them — keeping 95% of the information in 12 new columns.</p>
+</header>
+
+<section id="pca-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The lesson is the <em>five parts</em> below. Every later section redraws this map and highlights the box being studied.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="five-part map of PCA: the high-dimension problem, the axis-rotation mechanism, the objective of keeping variance, choosing the number of components, and why PCA is not feature selection">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">many dims: slow, noisy, can't plot</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MECHANISM</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">rotate axes to max-variance direction</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">keep the most variance</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ HOW MANY PCs</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">keep 95% of variance</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NOT FEATURE SELECTION</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each new component mixes every old column</text>
+<text class="sv-hv" x="372" y="18">THE LESSON IN FIVE PARTS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Rotate axes, drop no col</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">new axes mix every old column — the most common confusion</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Rotate so variance piles onto the first few</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">then drop the last axes, they are nearly flat</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">The cost: interpretability</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">"component 1" means nothing in the problem's own terms</text>
+</svg>
+  <figcaption>Map of the whole lesson. Every later section redraws this figure and <strong>highlights the box being studied</strong>.</figcaption>
+  </figure>
+</section>
+
+<section id="pca-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>The problem it solves</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="five-part map of PCA: the high-dimension problem, the axis-rotation mechanism, the objective of keeping variance, choosing the number of components, and why PCA is not feature selection">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">many dims: slow, noisy, can't plot</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MECHANISM</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">rotate axes to max-variance direction</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">keep the most variance</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ HOW MANY PCs</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">keep 95% of variance</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NOT FEATURE SELECTION</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each new component mixes every old column</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">WHY MANY DIMS HURT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Slow, memory-hungry</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">every distance computation grows with dims</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Distance loses meaning</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">in high dims all points are nearly equidistant</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">You can't plot to look</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">and looking at data is usually the first step</text>
+</svg>
+  <figcaption>Box ① — what goes wrong with many dimensions.</figcaption>
+  </figure>
+
+
+  <p class="key">High dimensionality is not just slow. <em>It breaks exactly the models that rely on distance, and makes every model easier to overfit.</em></p>
+
+<div class="stack">
+    <div class="s warn"><b>Distance loses meaning</b><span>the nearest and farthest points draw close together → <a href="../../05-classical-ml/knn/index.html">KNN</a>, k-means, kernel SVM all get worse</span></div>
+    <div class="s warn"><b>Data gets sparse</b><span>the volume of the space grows exponentially, the number of samples does not — each region is left with only a few points</span></div>
+    <div class="s warn"><b>More parameters</b><span>more degrees of freedom on the same amount of data → high variance, easy to <a href="../../04-core-concepts/overfitting-regularization/index.html">overfit</a></span></div>
+    <div class="s warn"><b>Columns repeat information</b><span>multicollinearity makes regression coefficients swing wildly and lose their interpretability</span></div>
+    <div class="s warn"><b>Cannot be plotted</b><span>if you cannot see the data, you cannot spot its structure or the errors in it</span></div>
+  </div>
+
+  <p>What makes compression possible: real data is almost always <b>low-rank</b>.</p>
+  <p>Columns are tangled up with each other, so the real information lives in a subspace far smaller than the number of columns.</p>
+
+  <ul class="why">
+    <li>Height and weight are two columns but almost <b>one axis</b> — knowing one lets you guess the other.</li>
+    <li>PCA finds exactly those axes: the first is the direction the data spreads most, the next is perpendicular to it and spreads second most.</li>
+    <li>It is not the only way: feature selection, autoencoders, t-SNE, UMAP. PCA is <b>the cheapest and easiest to understand</b>, so start here.</li>
+  </ul>
+</section>
+
+<section id="pca-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>Mechanism</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="five-part map of PCA: the high-dimension problem, the axis-rotation mechanism, the objective of keeping variance, choosing the number of components, and why PCA is not feature selection">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">many dims: slow, noisy, can't plot</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--probe)">② MECHANISM</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">rotate axes to max-variance direction</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">keep the most variance</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ HOW MANY PCs</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">keep 95% of variance</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NOT FEATURE SELECTION</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each new component mixes every old column</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HOW THE AXES ROTATE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Standardize first, always</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">or a large-unit column takes over the first PC</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Compute covariance matrix</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">then take its eigenvectors</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Eigenvector = new axis, eigenvalue = variance along that axis</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">sort descending, keep the first few</text>
+</svg>
+  <figcaption>Box ② — how the axes rotate.</figcaption>
+  </figure>
+
+
+  <p class="key">The whole algorithm is: <em>compute the covariance matrix, take its eigenvectors, sort by eigenvalue.</em></p>
+
+  <div class="flow">
+    <div class="n"><h5>Raw data</h5><p>d columns, possibly on different scales</p></div>
+    <div class="a act"><i>standardize each column</i>&#8594;</div>
+    <div class="n"><h5>Covariance matrix</h5><p><span class="mth"><var>C</var> = <span class="frac"><i><var>X</var><sup>T</sup><var>X</var></i><i><var>n</var> &#8722; 1</i></span></span> &#183; a d&#215;d matrix</p></div>
+    <div class="a act"><i>eigendecomposition</i>&#8594;</div>
+    <div class="n"><h5>Directions with variance</h5><p>eigenvector = <b>direction</b>, eigenvalue = <b>variance along that direction</b></p></div>
+    <div class="a act"><i>project onto the first p directions</i>&#8594;</div>
+    <div class="n ok"><h5>p-dimensional data</h5><p>keeps most of the variance</p></div>
+  </div>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><var>C</var> &#183; <var>v</var></span><em>covariance matrix times a direction</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span><var>&#955;</var> &#183; <var>v</var></span><em>the same direction, just stretched &#955; times</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>share of variance kept</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span><span class="frac"><i><var>&#955;</var><sub>1</sub> + … + <var>&#955;</var><sub><var>p</var></sub></i><i><var>&#955;</var><sub>1</sub> + … + <var>&#955;</var><sub><var>d</var></sub></i></span></span><em>keep p directions out of d</em></span>
+    </div>
+    <dl>
+      <dt>v</dt><dd>principal direction — the new axis to project the data onto</dd>
+      <dt>λ</dt><dd>how much variance the data spreads along that direction</dd>
+    </dl>
+  </div>
+
+  <p>Why the <b>direction of largest variance</b>?</p>
+  <p>A direction along which the data barely changes does not help tell points apart — dropping it loses the least information.</p>
+  <p>The math background is in <a href="../../02-math-foundations/linear-algebra/index.html">Linear algebra</a>.</p>
+
+  <ul class="why">
+    <li>The components are <b>perpendicular to each other</b>, so the new columns are uncorrelated — the most thorough cure for multicollinearity.</li>
+    <li>Libraries <b>do not compute the eigen of the covariance matrix</b>; they run <b>SVD</b> directly on the mean-centered data.</li>
+    <li>The transform is <b>linear and invertible</b>, so PCA is also used for compression and denoising.</li>
+  </ul>
+</section>
+
+<section id="pca-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>Loss function</h2></div>
+  <p class="key">PCA minimizes <b>reconstruction error</b> — and that number is <em>exactly equal</em> to the variance it throws away.</p>
+
+  <figure>
+<svg viewBox="0 0 860 688" role="img" aria-label="PCA's loss function is the reconstruction error, exactly equal to the summed variance of the dropped directions; a table measured on 600 samples with 8 columns, and an example where rescaling one column makes it take over PC1">
+<text class="sv-hv" x="0" y="18">PCA HAS A LOSS FUNCTION — RECONSTRUCTION ERROR — AND IT IS THE VARIANCE THROWN AWAY</text>
+<rect x="0" y="54" width="300" height="44" rx="5" fill="rgba(var(--red-a),.12)" stroke="var(--tomb)" stroke-width="1.3"/>
+<text class="sv-n" x="150" y="82" fill="var(--tomb)" text-anchor="middle">Σ ‖ x − x̂ ‖²</text>
+<text class="sv-d" x="0" y="116" fill="var(--tomb)">compress to k dims, expand back — how far off</text>
+<text class="sv-n" x="330" y="82" fill="var(--muted)">=</text>
+<rect x="370" y="54" width="300" height="44" rx="5" fill="rgba(var(--blue-a),.12)" stroke="var(--filled)" stroke-width="1.3"/>
+<text class="sv-n" x="520" y="82" fill="var(--filled)" text-anchor="middle">Σ  λ  (from k+1 on)</text>
+<text class="sv-d" x="370" y="116" fill="var(--filled)">total variance of dropped directions</text>
+<text class="sv-s" x="0" y="146" fill="var(--dim)">Both sides are equal — so "keep the most variance" and "reconstruct with least error" are ONE problem, said two ways. That is why PCA</text>
+<text class="sv-s" x="0" y="164" fill="var(--dim)">solves via eigenvalues, no iteration.</text>
+<line x1="0" y1="194" x2="860" y2="194" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0" y="218">MEASURED · 600 samples · 8 cols · data generated from 3 directions</text>
+<text class="sv-s" x="0" y="244" fill="var(--dim)">k</text>
+<text class="sv-s" x="70" y="244" fill="var(--dim)">PC variance</text>
+<text class="sv-s" x="190" y="244" fill="var(--dim)">cumul.</text>
+<text class="sv-s" x="330" y="244" fill="var(--dim)">recon. error</text>
+<text class="sv-s" x="480" y="244" fill="var(--dim)">variance dropped</text>
+<text class="sv-n" x="0" y="272" fill="var(--muted)">1</text>
+<text class="sv-n" x="70" y="272" fill="var(--muted)">10.181</text>
+<text class="sv-n" x="190" y="272" fill="var(--muted)">62.0%</text>
+<text class="sv-n" x="330" y="272" fill="var(--muted)">6.236</text>
+<text class="sv-n" x="480" y="272" fill="var(--muted)">6.246</text>
+<text class="sv-n" x="0" y="297" fill="var(--muted)">2</text>
+<text class="sv-n" x="70" y="297" fill="var(--muted)">4.690</text>
+<text class="sv-n" x="190" y="297" fill="var(--muted)">90.5%</text>
+<text class="sv-n" x="330" y="297" fill="var(--muted)">1.553</text>
+<text class="sv-n" x="480" y="297" fill="var(--muted)">1.556</text>
+<rect x="0" y="306" width="600" height="23" rx="3" fill="none" stroke="var(--ok)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-n" x="0" y="322" fill="var(--ok)">3</text>
+<text class="sv-n" x="70" y="322" fill="var(--ok)">1.254</text>
+<text class="sv-n" x="190" y="322" fill="var(--ok)">98.2%</text>
+<text class="sv-n" x="330" y="322" fill="var(--ok)">0.302</text>
+<text class="sv-n" x="480" y="322" fill="var(--ok)">0.302</text>
+<text class="sv-d" x="620" y="322" fill="var(--ok)">← all 3 real directions, rest is noise</text>
+<text class="sv-n" x="0" y="347" fill="var(--muted)">4</text>
+<text class="sv-n" x="70" y="347" fill="var(--muted)">0.071</text>
+<text class="sv-n" x="190" y="347" fill="var(--muted)">98.6%</text>
+<text class="sv-n" x="330" y="347" fill="var(--muted)">0.231</text>
+<text class="sv-n" x="480" y="347" fill="var(--muted)">0.231</text>
+<text class="sv-n" x="0" y="372" fill="var(--muted)">5</text>
+<text class="sv-n" x="70" y="372" fill="var(--muted)">0.063</text>
+<text class="sv-n" x="190" y="372" fill="var(--muted)">99.0%</text>
+<text class="sv-n" x="330" y="372" fill="var(--muted)">0.168</text>
+<text class="sv-n" x="480" y="372" fill="var(--muted)">0.169</text>
+<text class="sv-n" x="0" y="397" fill="var(--muted)">8</text>
+<text class="sv-n" x="70" y="397" fill="var(--muted)">0.051</text>
+<text class="sv-n" x="190" y="397" fill="var(--muted)">100.0%</text>
+<text class="sv-n" x="330" y="397" fill="var(--muted)">0.000</text>
+<text class="sv-n" x="480" y="397" fill="var(--muted)">0.000</text>
+<text class="sv-d" x="620" y="397" fill="var(--faint)">keep all, no compression</text>
+<text class="sv-s" x="0" y="434" fill="var(--dim)">The last two columns match to three digits — that is the identity above, measured. And look at the variance: 10.181 → 4.690 → 1.254 then</text>
+<text class="sv-s" x="0" y="452" fill="var(--dim)">drops to 0.07 — that break reveals the data has only 3 directions; the rest is measurement noise.</text>
+<line x1="0" y1="480" x2="860" y2="480" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="0" y="504">THE PRICE OF A VARIANCE LOSS FUNCTION: RESCALE ONE COLUMN, CHANGE THE RESULT</text>
+<rect x="0" y="528" width="400" height="74" rx="5" fill="rgba(var(--green-a),.08)" stroke="var(--ok)" stroke-width="1.3"/>
+<text class="sv-d" x="14" y="552" fill="var(--ok)">before · 8 cols same scale</text>
+<text class="sv-d" x="14" y="574" fill="var(--muted)">PC1 explains 62.0% of variance</text>
+<text class="sv-d" x="14" y="592" fill="var(--muted)">weights spread over the real cols</text>
+<rect x="440" y="528" width="400" height="74" rx="5" fill="rgba(var(--red-a),.08)" stroke="var(--tomb)" stroke-width="1.3"/>
+<text class="sv-d" x="454" y="552" fill="var(--tomb)">after · NOISE col × 100</text>
+<text class="sv-d" x="454" y="574" fill="var(--muted)">PC1 explains 97.5% of variance</text>
+<text class="sv-d" x="454" y="592" fill="var(--muted)">weight 1.000 all on that column</text>
+<text class="sv-s" x="0" y="622" fill="var(--dim)">The rescaled column is the most useless one — almost pure noise. Multiply it by 100 and it takes over PC1; the columns with real information</text>
+<text class="sv-s" x="0" y="640" fill="var(--dim)">get pushed down. PCA seeks the direction of largest variance, and variance depends on the unit, so NOT standardizing first ruins the result</text>
+<text class="sv-s" x="0" y="658" fill="var(--dim)">silently.</text>
+</svg>
+    <figcaption>Two ways of stating the same problem, and the price you pay when the columns are on different scales.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li><b>"Keep the most variance" and "reconstruct with the least error" are the same thing.</b> Compress to <span class="mth"><var>k</var></span> dimensions and expand back, and the squared error equals exactly the sum of the eigenvalues from <span class="mth"><var>k</var> + 1</span> onward. Measured on 600 samples: at <span class="mth"><var>k</var> = 3</span>, reconstruction error 0.302 and variance dropped 0.302 — matching to three digits. Because the loss function is quadratic like that, PCA <em>solves in one shot</em> via eigenvalues, without iterating like k-means.</li>
+    <li><b>Where the eigenvalues break is the true dimensionality.</b> In the same table: 10.181 → 4.690 → 1.254 then straight down to 0.071. The data was generated from exactly 3 directions, the rest is measurement noise — and the table says so without knowing in advance.</li>
+    <li><b>The price: variance depends on the unit of measurement.</b> Take the same data, multiply the <em>most useless</em> column by 100, and PC1 jumps from 62.0% to 97.5% with a weight of 1.000 on that column — it takes over the first component and pushes all the real information down. Not standardizing first ruins the result silently, with no warning at all.</li>
+  </ul>
+</section>
+
+<section id="pca-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Choosing the number of components</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="five-part map of PCA: the high-dimension problem, the axis-rotation mechanism, the objective of keeping variance, choosing the number of components, and why PCA is not feature selection">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">many dims: slow, noisy, can't plot</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MECHANISM</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">rotate axes to max-variance direction</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">keep the most variance</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">④ HOW MANY PCs</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">keep 95% of variance</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ NOT FEATURE SELECTION</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each new component mixes every old column</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HOW MANY COMPONENTS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Sum variance shares up to 95%</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">a common threshold, not a law</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Or read the scree-plot elbow</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">where eigenvalues stop falling</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Or 2–3 if the goal is plotting</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">then don't train on that result</text>
+</svg>
+  <figcaption>Box ④ — how many components to keep.</figcaption>
+  </figure>
+
+
+  <p class="key">There is no right number. <em>There are three ways to choose, and each answers a different question.</em></p>
+
+  <div class="bars">
+    <div class="b hi"><i>PC1</i><u style="width:100%"></u><b>42% of variance</b></div>
+    <div class="b"><i>PC2</i><u style="width:55%"></u><b>23% · cumulative 65%</b></div>
+    <div class="b"><i>PC3</i><u style="width:29%"></u><b>12% · 77%</b></div>
+    <div class="b"><i>PC4</i><u style="width:17%"></u><b>7% · 84%</b></div>
+    <div class="b"><i>PC5</i><u style="width:12%"></u><b>5% · 89%</b></div>
+    <div class="b"><i>PC6…PC100</i><u style="width:5%"></u><b>11% spread thin — mostly noise</b></div>
+  </div>
+  <p class="stripnote"><span>scree plot: variance of each component</span><span><em>where the line drops sharply then flattens is a candidate</em></span></p>
+
+<div class="stack">
+    <div class="s ok"><b>Variance threshold — <code>PCA(n_components=0.95)</code></b><span>keep enough components to reach 90–95% cumulative variance · the default to use</span></div>
+    <div class="s"><b>Scree plot — cut where the line breaks and flattens</b><span>when you want to understand the data's structure, not just compress</span></div>
+    <div class="s ok"><b>Measure with the downstream model</b><span>put <code>n_components</code> into cross-validation along with the other hyperparameters · <b>most reliable</b></span></div>
+    <div class="s"><b>2 or 3 — just enough to draw on screen</b><span>only for looking; here t-SNE or UMAP usually give an easier-to-read picture</span></div>
+  </div>
+
+  <ul class="why">
+    <li>You must <b>standardize the scales first</b>. PCA looks for the direction of largest variance, and variance depends on the unit of measurement.</li>
+    <li>A salary column in VND has billions of times more variance than an age column, so the first component nearly coincides with salary — because the unit is big, not because it matters.</li>
+    <li>Use <code>StandardScaler</code> first, unless every column already shares the same unit (images, signal spectra).</li>
+  </ul>
+</section>
+
+<section id="pca-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>PCA is not feature selection</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="five-part map of PCA: the high-dimension problem, the axis-rotation mechanism, the objective of keeping variance, choosing the number of components, and why PCA is not feature selection">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① PROBLEM</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">many dims: slow, noisy, can't plot</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② MECHANISM</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">rotate axes to max-variance direction</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ OBJECTIVE</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">keep the most variance</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ HOW MANY PCs</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">keep 95% of variance</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="298" fill="var(--tomb)">⑤ NOT FEATURE SELECTION</text>
+<text class="sv-d" x="13" y="316" fill="var(--muted)">each new component mixes every old column</text>
+<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">PCA IS NOT FEATURE SELECTION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Feature selection: keep some old cols</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">column names stay readable, explainable</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">PCA: makes NEW cols from all old</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">drop one source column and every PC changes</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">So skip PCA when you must explain</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">use lasso or importance to pick real cols</text>
+</svg>
+  <figcaption>Box ⑤ — PCA is not feature selection.</figcaption>
+  </figure>
+
+
+  <p class="key">It does not drop any column. <em>It creates new columns, each a combination of all the old ones — and that is where the real loss is.</em></p>
+
+  <div class="cmp two">
+    <div>
+      <h5>Feature selection</h5>
+      <p>Keep <b>a subset of the original columns</b>: age, number of purchases, order value.</p>
+      <p>Kept columns <b>keep their names and meaning</b>.</p>
+      <p>When collecting new data you <b>only need to measure those columns</b>.</p>
+    </div>
+    <div>
+      <h5>PCA</h5>
+      <p>Creates new columns: <span class="mth">PC<sub>1</sub> = 0.3·age − 0.7·salary + 0.2·orders + …</span></p>
+      <p>No column has <b>a nameable meaning</b> anymore.</p>
+      <p>You still have to measure <b>every original column</b> to compute the PCs — no savings at collection time.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>So PCA <b>destroys interpretability</b>. A task that must answer "which variable matters" cannot pay that price.</li>
+    <li>It <b>does not look at labels</b>: the direction of largest variance does not necessarily separate the classes. If you need labels, use LDA.</li>
+    <li>It only captures <b>linear</b> relationships. Data lying on a curved surface is the territory of kernel PCA, autoencoders, UMAP.</li>
+      <li>PCA learns the mean, the standard deviation and the principal directions <b>from the data</b>, so it is a training step.</li>
+    <li>Calling <code>fit</code> on the full data before the train/test split is <b>data leakage</b>: information from the test set has leaked into the principal directions.</li>
+    <li>Put it inside a <code>Pipeline</code> and that cannot happen — see <a href="../../04-core-concepts/train-val-test-cv/index.html">Train, validation &amp; test</a>.</li>
+  </ul>
+</section>
+
+<section id="pca-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Pros and cons</h2></div>
+
+  <p class="key">Every strength of PCA comes from <em>keeping only a few directions of largest variance</em>. Every weakness comes from exactly the same place.</p>
+
+  <table>
+    <tr><th>Aspect</th><th>Pros</th><th>Cons</th></tr>
+    <tr><td>Dimensionality</td><td>Drops most columns while keeping nearly all the variance</td><td>&#8212;</td></tr>
+    <tr><td>Compute</td><td>One decomposition, no loop with parameters to tune</td><td>Cost grows with the square of the original dimension</td></tr>
+    <tr><td>New features</td><td>Axes are perpendicular, so multicollinearity is gone</td><td>No column has a nameable meaning anymore</td></tr>
+    <tr><td>Data collection</td><td>&#8212;</td><td>You still have to measure every original column to compute the components</td></tr>
+    <tr><td>Relationships</td><td>&#8212;</td><td>Only captures linear relationships</td></tr>
+    <tr><td>Labels</td><td>Needs no labels &#8212; works even on unlabeled data</td><td>So the direction of largest variance is not necessarily the one that separates classes</td></tr>
+    <tr><td>Preparation</td><td>&#8212;</td><td>Standardizing the scales is mandatory</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>Choose PCA when you need to <b>reduce dimensions before another model</b>, remove multicollinearity, or plot high-dimensional data on two axes to look at it.</li>
+    <li>If you must <b>keep column names</b> to explain decisions, this is the wrong choice &#8212; feature selection is the right tool.</li>
+    <li>PCA cannot unfold non-linear relationships; then use t-SNE or UMAP to look, but only to look.</li>
+  </ul>
+</section>
+
+<section id="pca-s8" class="lesson">
+  <div class="sh"><b>08</b><h2>Common mistakes</h2></div>
+
+  <p class="key">PCA always runs and always returns a result — even when it is the wrong step.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Not standardizing the scales</h4><p>The first component only reflects the column with the biggest unit. The most common and the most silent mistake.</p></div>
+    <div class="card bad"><h4>Fitting before the train/test split</h4><p>Data leakage. Test scores look falsely good, then collapse in production.</p></div>
+    <div class="card bad"><h4>Using it on tabular data and feeding a tree model</h4><p><a href="../../06-tree-models/xgboost/index.html">Tree ensembles</a> need no dimensionality reduction and handle useless columns very well. PCA only costs interpretability and gains nothing.</p></div>
+    <div class="card bad"><h4>Expecting it to raise accuracy</h4><p>PCA <em>throws away</em> information. It helps when what is dropped is mostly noise — nothing guarantees that.</p></div>
+    <div class="card bad"><h4>Feeding one-hot variables in directly</h4><p>The variance of a binary column is not the same kind as that of a continuous one. Consider MCA, or apply PCA only to the numeric part.</p></div>
+    <div class="card bad"><h4>Interpreting PC1 as a concept</h4><p>Calling PC1 "wealth" and believing it. It is just a linear combination, with no guarantee of matching any concept.</p></div>
+  </div>
+</section>
+
+
+<footer>Machine learning · Dimensionality reduction · math background in <a href="../../02-math-foundations/linear-algebra/index.html">Linear algebra</a>; often comes one step before <a href="../../07-clustering/clustering-overview/index.html">clustering</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

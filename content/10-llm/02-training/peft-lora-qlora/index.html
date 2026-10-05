@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEFT — LoRA & QLoRA — MazeAI</title>
+<meta name="description" content="Why a low-rank matrix is enough, how to pick r and alpha, how QLoRA compresses to 4-bit, and how far LoRA reduces forgetting of old knowledge.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/10-llm/02-training/peft-lora-qlora/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="PEFT — LoRA &amp; QLoRA">
+<meta property="og:description" content="Why a low-rank matrix is enough, how to pick r and alpha, how QLoRA compresses to 4-bit, and how far LoRA reduces forgetting of old knowledge.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/10-llm/02-training/peft-lora-qlora/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-lora" data-title="PEFT — LoRA & QLoRA" data-tag="LLM" data-blurb="Why a low-rank matrix is enough, how to pick r and alpha, how QLoRA compresses to 4-bit, and how far LoRA reduces forgetting of old knowledge.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · fine-tuning</p>
+  <h1>PEFT — <em>LoRA &amp; QLoRA</em></h1>
+  <p class="lede">Fully fine-tuning a 7B model needs <b>60–80 GB of VRAM</b>; LoRA brings that down to a single consumer GPU.</p>
+  <p>This lesson explains why learning a <b>low-rank</b> matrix is enough, and how to choose <code>r</code> and <code>alpha</code>.</p>
+  <p>Then how QLoRA compresses the base weights to 4-bit and still trains.</p>
+</header>
+
+<section id="lora-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Why not fine-tune all the weights</h2></div>
+
+  <p class="key">Fully fine-tuning a 7B model needs about <em>60–80 GB of VRAM</em> just for weights, gradients and optimizer state.</p>
+
+  <div class="bars">
+    <div class="b bad"><i>full fine-tune 7B</i><u style="width:100%"></u><b>~80 GB</b></div>
+    <div class="b"><i>weights alone</i><u style="width:18%"></u><b>14 GB</b></div>
+  </div>
+  <p class="stripnote"><span>Every parameter keeps <em>four copies</em>: weight, gradient, and Adam's two moments — this is where memory goes, not the forward pass.</span><span>On top of that, each task produces a full copy of the model: ten tasks means ten times 14 GB to store and load.</span></p>
+
+  <div class="note">
+    <h4>This lesson follows on from</h4>
+    Whether to fine-tune at all, SFT, masking the loss on the prompt, RLHF and DPO are covered in
+    <a href="../sft-alignment/index.html">SFT &amp; alignment</a>.
+  </div>
+</section>
+
+<section id="lora-s2">
+  <div class="sh"><b>02</b><h2>LoRA — Low-Rank Adaptation</h2></div>
+<p class="key">The <em>update</em> to a weight matrix usually has low rank, so it can be written as the product of two thin matrices.</p>
+  <figure>
+    <svg viewBox="0 0 900 250" role="img" aria-label="A large frozen weight matrix, plus the product of two thin matrices B and A">
+      <rect x="40" y="50" width="150" height="150" rx="6" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="115" y="130" class="sv-t" fill="var(--faint)" text-anchor="middle">W_0</text>
+      <text x="115" y="150" class="sv-l" fill="var(--faint)" text-anchor="middle">frozen</text>
+      <text x="115" y="228" class="sv-l" fill="var(--faint)" text-anchor="middle">4096 × 4096 = 16.7M</text>
+
+      <text x="215" y="135" class="sv-t" fill="var(--text)">+</text>
+
+      <rect x="250" y="50" width="36" height="150" rx="6" fill="rgba(var(--blue-a),.18)" stroke="var(--filled)"/>
+      <text x="268" y="132" class="sv-t" fill="var(--filled)" text-anchor="middle">B</text>
+      <text x="268" y="228" class="sv-l" fill="var(--filled)" text-anchor="middle">4096 × 16</text>
+
+      <text x="305" y="135" class="sv-t" fill="var(--text)">·</text>
+
+      <rect x="325" y="50" width="150" height="36" rx="6" fill="rgba(var(--blue-a),.18)" stroke="var(--filled)"/>
+      <text x="400" y="74" class="sv-t" fill="var(--filled)" text-anchor="middle">A</text>
+      <text x="400" y="110" class="sv-l" fill="var(--filled)" text-anchor="middle">16 × 4096</text>
+
+      <text x="345" y="170" class="sv-t" fill="var(--probe)">only the two blue blocks train</text>
+      <text x="345" y="192" class="sv-l" fill="var(--faint)">131K params — 0.8% of gray</text>
+
+      <line x1="560" y1="40" x2="560" y2="210" stroke="var(--rule)"/>
+      <text x="600" y="80" class="sv-t">r = 16 is the "width" of the path</text>
+      <text x="600" y="106" class="sv-l" fill="var(--faint)">every update passes through 16 dims</text>
+      <text x="600" y="140" class="sv-t">low r → few params, learns less</text>
+      <text x="600" y="166" class="sv-t">high r → nearer full fine-tune</text>
+    </svg>
+    <figcaption>Trainable parameters go from <code>d_in × d_out</code> down to <code>r × (d_in + d_out)</code>.</figcaption>
+  </figure>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>h</span></span>
+      <span class="op">=</span>
+      <span class="t"><span>W_0·x</span><em>original path, unchanged</em></span>
+      <span class="op">+</span>
+      <span class="t b"><span>(α/r) · B·A·x</span><em>added LoRA branch</em></span>
+    </div>
+  </div>
+  <p><code>α/r</code> is a scaling factor that lets you change <code>r</code> without re-tuning the learning rate.</p>
+  <p>After training you can <b>merge</b> <code>B·A</code> straight into <code>W_0</code> — inference then costs nothing extra over the base model.</p>
+  <div class="note key">
+    <h4>Why B is initialized to zero and A randomly</h4>
+    Because <code>ΔW = B·A = 0</code> at the start, the model begins <strong>identical to the base model</strong> — no shock at the first step. If both were random, <code>ΔW</code> would be random noise added to well-trained weights, wrecking quality immediately. If both were zero, both gradients would stay zero forever — nothing would be learned. One zero, one random is the only correct choice.
+  </div>
+  <table>
+    <tr><th>Parameter</th><th>Typical range</th><th>Notes</th></tr>
+    <tr><td><code>r</code> — rank</td><td>8–64</td><td>16 is a good starting point. The further the task is from the base model, the larger <code>r</code> needs to be</td></tr>
+    <tr><td><code>alpha</code></td><td>Usually <code>r</code> or <code>2r</code></td><td>Just a scaling factor; changing it is equivalent to changing the learning rate</td></tr>
+    <tr><td><code>target_modules</code></td><td><strong>All linear layers</strong></td><td>The original paper used only <code>q, v</code>; later experiments show applying it to the MLP too is clearly better</td></tr>
+    <tr><td><code>dropout</code></td><td>0.05–0.1</td><td>Applied to the LoRA branch</td></tr>
+  </table>
+  <p><strong>An under-mentioned benefit:</strong> the base weights never change.</p>
+  <p>So you can train <em>many adapters</em> for many tasks, then swap them on the same base model sitting in VRAM.</p>
+  <p>One GPU serves ten customers with ten separate adapters — something full fine-tuning cannot do.</p>
+</section>
+
+<section id="lora-s3">
+  <div class="sh"><b>03</b><h2>Lab: parameters and memory</h2></div>
+  <div class="lab">
+    <div class="bar">
+      <div><label>preset</label>
+        <select id="fpreset">
+          <option value="7b" selected>7B — d 4096, L 32</option>
+          <option value="13b">13B — d 5120, L 40</option>
+          <option value="70b">70B — d 8192, L 80</option>
+        </select>
+      </div>
+      <div><label>d_model</label><input type="number" id="fd" value="4096" min="64"></div>
+      <div><label>layers</label><input type="number" id="fL" value="32" min="1"></div>
+      <div><label>d_ff</label><input type="number" id="fff" value="11008" min="64"></div>
+      <div><label>rank r</label><input type="number" id="fr" value="16" min="1" max="256"></div>
+      <div><label>apply LoRA to</label>
+        <select id="ftgt">
+          <option value="attn">attention only (q,k,v,o)</option>
+          <option value="all" selected>all linear layers (+ MLP)</option>
+        </select>
+      </div>
+    </div>
+    <div id="fview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">The number that matters most is the memory column: fully fine-tuning a 7B model needs about 100+ GB, so it takes several GPUs.</p>
+  <p style="font-size:13.6px;color:var(--muted)">QLoRA brings it down to <strong>a single 24GB GPU</strong> — that is exactly why it changed the game.</p>
+  </div>
+</section>
+
+<section id="lora-s4">
+  <div class="sh"><b>04</b><h2>QLoRA</h2></div>
+<p class="key">The base model is compressed to <em>4-bit</em> and frozen; only the LoRA adapter stays in bf16 and is trained.</p>
+  <div class="stack">
+    <div class="s"><b>NF4 — NormalFloat 4-bit</b><span>quantization levels are placed by the normal distribution instead of evenly — since neural network weights are roughly normal, this loses less information</span></div>
+    <div class="s"><b>Double quantization</b><span>also quantizes the scale constants of the quantization step, saving about 0.4 more bits per parameter</span></div>
+    <div class="s ok"><b>Paged optimizer</b><span>pages optimizer state out to RAM when VRAM is full, avoiding out-of-memory errors on spikes</span></div>
+  </div>
+  <div class="bars">
+    <div class="b bad"><i>full fine-tune</i><u style="width:100%"></u><b>~100 GB</b></div>
+    <div class="b"><i>LoRA</i><u style="width:20%"></u><b>~20 GB</b></div>
+    <div class="b hi"><i>QLoRA</i><u style="width:6%"></u><b>~6 GB</b></div>
+  </div>
+  <p class="stripnote"><span>Memory to fine-tune a 7B model.</span><span>All three reach <em>about the same</em> quality — what QLoRA pays with is speed.</span></p>
+  <table>
+    <tr><th></th><th>Full fine-tune</th><th>LoRA</th><th>QLoRA</th></tr>
+    <tr><td>Memory for a 7B model</td><td>~100 GB</td><td>~20 GB</td><td><strong>~6 GB</strong></td></tr>
+    <tr><td>Quality</td><td>Reference baseline</td><td>Close</td><td>Close to LoRA</td></tr>
+    <tr><td>Training speed</td><td>Fastest per step</td><td>Fast</td><td>~30% slower from dequantizing</td></tr>
+    <tr><td>Merge adapter into model</td><td>—</td><td>Yes</td><td>Must dequantize the base model first</td></tr>
+  </table>
+  <div class="note">
+    <h4>The real trade-off of QLoRA</h4>
+    It trades <strong>time for memory</strong>: every forward pass must dequantize the 4-bit weights to bf16 to compute, so it is about 30% slower than LoRA. Worth it when VRAM is your limit — which is the situation of almost everyone without a GPU cluster. If you have enough VRAM, LoRA is usually the better choice.
+  </div>
+</section>
+
+<section id="lora-s5">
+  <div class="sh"><b>05</b><h2>Forgetting old knowledge</h2></div>
+<p class="key">Fine-tuning on narrow-domain data makes the model good at exactly that, but it loses things it already knew — called <em>catastrophic forgetting</em>.</p>
+  <div class="strip">
+    <div class="c t"><i>gains</i><b>narrow-domain skill</b><u>what you just taught</u></div>
+    <div class="cut"></div>
+    <div class="c f"><i>loses</i><b>instruction following</b><u>general ability</u></div>
+    <div class="c f"><i>loses</i><b>other knowledge</b><u>outside the narrow domain</u></div>
+    <div class="c f"><i>loses</i><b>safety</b><u>trained in earlier</u></div>
+  </div>
+  <table>
+    <tr><th>Mitigation</th><th>Mechanism</th></tr>
+    <tr><td><strong>Use LoRA</strong></td><td>Base weights do not change, so most old abilities are preserved — and you can switch off the adapter to get the base model back</td></tr>
+    <tr><td>Small learning rate, few epochs</td><td>Moving less from the starting point loses less</td></tr>
+    <tr><td><strong>Mix in general data</strong></td><td>Add 10–30% general instruction data to the fine-tuning set</td></tr>
+    <tr><td>Freeze early layers</td><td>Early layers learn general features; later layers specialize</td></tr>
+    <tr><td>Regression testing</td><td>Does not prevent it but <em>detects</em> it — a fixed test set run before and after</td></tr>
+  </table>
+  <p>The last row matters for process: you cannot fix what you do not measure.</p>
+  <p>A fixed set of 100–200 questions, run before and after fine-tuning, immediately catches the model losing some ability.</p>
+</section>
+
+<section id="lora-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Common mistakes</h2></div>
+
+  <p class="key">LoRA is easy to run, but these four points decide whether it learns anything.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>LoRA applied only to q and v</h4><p>That follows the original paper, but later experiments show applying it to all linear layers is clearly better.</p></div>
+    <div class="card bad"><h4>Setting <code>r</code> too small for a hard task</h4><p><code>r = 4</code> is enough to change writing style, not enough to learn a new domain. If the loss plateaus early, raise <code>r</code> before adding epochs.</p></div>
+    <div class="card bad"><h4>Changing <code>r</code> but forgetting <code>alpha</code></h4><p>The effective strength is <code>alpha / r</code>. Raising <code>r</code> while keeping <code>alpha</code> fixed silently weakens the adapter.</p></div>
+    <div class="card bad"><h4>Merging the adapter, then quantizing</h4><p>With QLoRA the base weights are already 4-bit. Merging and then compressing again loses most of what was just learned.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · PEFT — LoRA &amp; QLoRA · SFT, RLHF and DPO are covered in <a href="../sft-alignment/index.html">SFT &amp; alignment</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

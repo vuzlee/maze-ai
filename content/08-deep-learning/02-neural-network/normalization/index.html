@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Normalization — BatchNorm &amp; LayerNorm — MazeAI</title>
+<meta name="description" content="How BatchNorm depends on batch size, why Transformers use LayerNorm, Pre-LN vs Post-LN, and how to diagnose with activation statistics.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/08-deep-learning/02-neural-network/normalization/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Normalization — BatchNorm &amp; LayerNorm">
+<meta property="og:description" content="How BatchNorm depends on batch size, why Transformers use LayerNorm, Pre-LN vs Post-LN, and how to diagnose with activation statistics.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/08-deep-learning/02-neural-network/normalization/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-norm" data-title="Normalization — BatchNorm &amp; LayerNorm" data-tag="Foundations" data-blurb="How BatchNorm depends on batch size, why Transformers use LayerNorm, Pre-LN vs Post-LN, and how to diagnose with activation statistics.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Deep learning · foundations</p>
+  <h1>Normalization — BatchNorm &amp; <em>LayerNorm</em></h1>
+  <p class="lede">BatchNorm or LayerNorm is not a matter of taste — it decides whether your model <b>depends on batch size</b>, and whether it can run inference one sample at a time.</p>
+  <p>This lesson explains what BatchNorm really does, why Transformers dropped it, and whether to put norm before or after the residual block.</p>
+</header>
+
+<section id="norm-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Every variant is <em>the same normalization</em>; they differ only in the axis used to take the mean and standard deviation.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<text class="sv-hv" x="372" y="18">ONE OP, MANY VARIANTS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">All variants share one formula</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">(x − μ) / σ → γ·x̂ + β</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Only μ, σ axis differs</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">batch, layer, group, instance</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Pick variant = pick axis</text>
+</svg>
+  <figcaption>Read the five boxes top to bottom: the top red box is the problem, the three middle boxes are the mechanism, the bottom red box is the price. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+
+  <p class="key">Initialization only sets the right magnitude at <em>the first step</em>. Normalization is what keeps it right throughout training.</p>
+
+  <ul class="why">
+    <li>After a few hundred updates, each layer's input distribution has <b>drifted</b> from where it was at initialization — each layer has to keep chasing the one before it.</li>
+    <li>Normalization re-pins the mean and variance in the middle of the network, then adds two learned parameters <code>γ</code> and <code>β</code> so the network can regain its freedom if needed.</li>
+  </ul>
+
+  <div class="note">
+    <h4>This lesson follows on from</h4>
+    Setting the right magnitude at the start — the <code>√(1/n)</code> formula, Xavier and He — lives in
+    <a href="../weight-initialization/index.html">Weight initialization</a>.
+  </div>
+</section>
+
+<section id="norm-s2">
+  <div class="sh"><b>02</b><h2>BatchNorm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — BATCHNORM</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">μ, σ along the batch axis</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">a pair per channel, over N samples</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Training uses batch statistics</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--ok)">Inference: running average</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">hence you must call model.eval()</text>
+</svg>
+  <figcaption>The axis BatchNorm takes statistics over, and its two different running modes.</figcaption>
+  </figure>
+
+<p class="key">For each feature, compute statistics over <em>the whole batch</em> and force mean 0, variance 1.</p>
+  <div class="eq">
+    <div class="line"><span class="t"><span>x̂</span></span><span class="op">=</span><span class="t b"><span>(x − μ)</span><em>subtract the batch mean</em></span><span class="op">/</span><span class="t p"><span>√(σ² + ε)</span><em>divide by the batch std</em></span></div>
+    <div class="line"><span class="t"><span>y</span></span><span class="op">=</span><span class="t g"><span>γ · x̂ + β</span><em>two learned parameters restore freedom</em></span></div>
+    <dl>
+      <dt>μ, σ²</dt><dd>computed along the batch axis — separately per feature</dd>
+      <dt>ε</dt><dd>a tiny number to avoid division by 0</dd>
+    </dl>
+  </div>
+  <details class="deep">
+    <summary>Why are <code>γ</code> and <code>β</code> needed?</summary>
+    <div class="body">
+      <p>Hard normalization to mean 0 variance 1 can cost representational power — for example, sigmoid is nearly linear around 0. These two parameters let the network <em>re-learn</em> a suitable scale and shift, even learning the inverse transform if normalization is harmful.</p>
+    </div>
+  </details>
+  <h3>Two modes — the source of many bugs</h3>
+  <table>
+    <tr><th></th><th>During training</th><th>During inference</th></tr>
+    <tr><td>Statistics used</td><td>From the <strong>current batch</strong></td><td>From the <strong>running average</strong> accumulated during training</td></tr>
+    <tr><td>Same input</td><td>Gives <em>different</em> results depending on the other samples in the batch</td><td>Always gives the same result</td></tr>
+    <tr><td>Mode</td><td><code>model.train()</code></td><td><code>model.eval()</code></td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Forgetting <code>model.eval()</code></h4>
+    During evaluation, BatchNorm still uses the current batch's statistics. With small batches the statistics are very noisy, and worse — <strong>the prediction for one sample depends on the other samples in the batch</strong>. Evaluation results are not reproducible and usually worse than reality. This is the most common silent bug involving BatchNorm.
+  </div>
+</section>
+
+<section id="norm-s3">
+  <div class="sh"><b>03</b><h2>Batch size dependence — practical consequences</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — BATCH SIZE DEPENDENCE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Batch 2–4: μ, σ very noisy</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">few-sample estimates unreliable</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Detection, segmentation hit it</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">big images force small batches</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Multi-GPU: each has its own stats</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">must use SyncBN</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">Way out: GroupNorm or LayerNorm</text>
+</svg>
+  <figcaption>Four practical consequences of batch-dependent statistics.</figcaption>
+  </figure>
+
+<div class="axis">
+    <div class="stop"><b>batch = 256</b><span>stable, accurate statistics</span></div>
+    <div class="stop on"><b>batch = 8</b><span>noisy statistics, clear quality drop</span></div>
+    <div class="stop"><b>batch = 1</b><span>variance is 0 — BatchNorm is meaningless</span></div>
+  </div>
+  <p class="axiscap"><span>the larger the batch, the more reliable the statistics</span><span><em>BatchNorm borrows information from the other samples in the batch</em></span><span>a small batch leaves nothing to borrow</span></p>
+  <p>This is not a theoretical problem — it rules out some applications entirely:</p>
+  <table>
+    <tr><th>Situation</th><th>Problem</th><th>Solution</th></tr>
+    <tr><td>Object detection, image segmentation</td><td>High-resolution images limit the batch to 2–4</td><td><strong>GroupNorm</strong></td></tr>
+    <tr><td>Distributed multi-GPU training</td><td>Each GPU sees only part of the batch</td><td>SyncBatchNorm — syncs statistics across GPUs, at a communication cost</td></tr>
+    <tr><td>Sequences of varying length</td><td>Padding tokens pollute the statistics</td><td><strong>LayerNorm</strong></td></tr>
+    <tr><td>Serving single requests</td><td>No batch to compute statistics from</td><td>Use the running average — and remember <code>model.eval()</code></td></tr>
+    <tr><td>Reinforcement learning</td><td>The data distribution keeps changing, so the running average is always stale</td><td>LayerNorm or no norm</td></tr>
+  </table>
+  <p>This table explains why BatchNorm — despite dominating computer vision for years — barely appears in NLP and generative models.</p>
+</section>
+
+<section id="norm-s4">
+  <div class="sh"><b>04</b><h2>LayerNorm and its variants</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — LAYERNORM AND KIN</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">LayerNorm: along feature axis</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">per sample, batch untouched</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">GroupNorm: channels in groups</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">between Batch/Instance</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">RMSNorm: drops mean subtraction</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">cheaper; today's LLM default</text>
+</svg>
+  <figcaption>Three other axis choices, all free of batch dependence.</figcaption>
+  </figure>
+
+<p class="key">The four kinds of norm differ in exactly one thing: <em>which axis the statistics are pooled over</em>.</p>
+  <figure>
+    <svg viewBox="0 0 900 240" role="img" aria-label="BatchNorm pools along the sample axis, LayerNorm along the feature axis, GroupNorm over a channel group of each sample">
+      <text x="30" y="24" class="sv-l" fill="var(--faint)">TENSOR (N SAMPLES × C FEATURES)</text>
+      <g class="sv-b" stroke="var(--rule-hi)">
+        <rect x="30" y="44" width="230" height="150" rx="6"/>
+        <rect x="335" y="44" width="230" height="150" rx="6"/>
+        <rect x="640" y="44" width="230" height="150" rx="6"/>
+      </g>
+      <g stroke="var(--rule-hi)" stroke-width="1">
+        <path d="M30 94 H260 M30 144 H260"/><path d="M88 44 V194 M146 44 V194 M204 44 V194"/>
+        <path d="M335 94 H565 M335 144 H565"/><path d="M393 44 V194 M451 44 V194 M509 44 V194"/>
+        <path d="M640 94 H870 M640 144 H870"/><path d="M698 44 V194 M756 44 V194 M814 44 V194"/>
+      </g>
+      <rect x="88" y="44" width="58" height="150" fill="rgba(var(--blue-a),.3)" stroke="var(--filled)"/>
+      <rect x="335" y="94" width="230" height="50" fill="rgba(var(--amber-a),.3)" stroke="var(--probe)"/>
+      <rect x="640" y="94" width="116" height="50" fill="rgba(var(--green-a),.3)" stroke="var(--ok)"/>
+
+      <text x="145" y="216" text-anchor="middle" class="sv-t" fill="var(--filled)">BatchNorm</text>
+      <text x="145" y="234" text-anchor="middle" class="sv-l" fill="var(--faint)">column · all samples</text>
+      <text x="450" y="216" text-anchor="middle" class="sv-t" fill="var(--probe)">LayerNorm</text>
+      <text x="450" y="234" text-anchor="middle" class="sv-l" fill="var(--faint)">a row · all features of one sample</text>
+      <text x="755" y="216" text-anchor="middle" class="sv-t" fill="var(--ok)">GroupNorm</text>
+      <text x="755" y="234" text-anchor="middle" class="sv-l" fill="var(--faint)">half row · channel group, one sample</text>
+    </svg>
+    <figcaption>Only the shaded cells are pooled into one (μ, σ²) pair. InstanceNorm is GroupNorm with exactly one channel per group.</figcaption>
+  </figure>
+  <table>
+    <tr><th>Type</th><th>Statistics over</th><th>Batch-dependent</th><th>Used in</th></tr>
+    <tr><td>BatchNorm</td><td>Batch axis, per feature</td><td><strong>Yes</strong></td><td>CNNs with large batches</td></tr>
+    <tr><td>LayerNorm</td><td>Feature axis, per sample</td><td>No</td><td><strong>Transformer</strong>, RNN</td></tr>
+    <tr><td>GroupNorm</td><td>Channel groups, per sample</td><td>No</td><td>Detection, segmentation — small batches</td></tr>
+    <tr><td>InstanceNorm</td><td>Per channel, per sample</td><td>No</td><td>Image style transfer</td></tr>
+    <tr><td><strong>RMSNorm</strong></td><td>Like LayerNorm but <em>without subtracting the mean</em></td><td>No</td><td>LLaMA and most new LLMs</td></tr>
+  </table>
+  <div class="note key">
+    <h4>RMSNorm — why new models switched to it</h4>
+<pre style="margin:8px 0"><code>LayerNorm:  y = γ · (x - μ) / √(σ² + ε)
+RMSNorm:    y = γ · x / √(mean(x²) + ε)      ← drops the mean subtraction</code></pre>
+    Skipping one mean computation and one subtraction makes the norm layer about 10–15% faster with nearly unchanged quality. Experiments show that <em>dividing by the magnitude</em> is the part that matters, while <em>centering</em> contributes almost nothing. This is the kind of detail that shows you follow modern architectures.
+  </div>
+</section>
+
+<section id="norm-s5">
+  <div class="sh"><b>05</b><h2>What BatchNorm really does</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHAT IT REALLY DOES</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Not internal covariate shift</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">original story was refuted</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Smoother loss surface</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">larger LR without blowing up</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Noise from batch statistics</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">acts as mild regularization</text>
+</svg>
+  <figcaption>The real reason, different from the one in the original paper.</figcaption>
+  </figure>
+
+  <p>The original paper explained it with <em>internal covariate shift</em>: each layer's input distribution changes as earlier layers update, and BatchNorm keeps it stable.</p>
+  <p>This explanation is repeated everywhere — but later research showed it is <strong>probably not the main cause</strong>.</p>
+<div class="stack">
+    <div class="s"><b>Original hypothesis</b><span>BatchNorm helps because it keeps each layer's input distribution stable (internal covariate shift)</span></div>
+    <div class="s warn"><b>Counter-experiment · Santurkar 2018</b><span>deliberately inject noise right after the BatchNorm layer to break that stability</span></div>
+    <div class="s ok"><b>Result</b><span>the network still trains as fast and as well as usual → if stabilizing the distribution were the main mechanism, breaking it should lose the benefit; it did not</span></div>
+  </div>
+  <p>The explanation considered more accurate: BatchNorm <strong>makes the loss surface smoother</strong>.</p>
+  <p>It bounds the magnitude of the gradient and the curvature, so update steps become predictable —</p>
+  <p>Allowing a larger learning rate without diverging.</p>
+  <div class="note">
+    <h4>Why this detail is worth knowing</h4>
+    Not to refute anyone. But if you state flatly "BatchNorm reduces internal covariate shift" to an interviewer who has read the counter-paper, you lose points. A safe and accurate phrasing: <em>"The original paper explained it with internal covariate shift, but later work suggests the main mechanism is probably smoothing the loss surface, allowing a larger learning rate."</em> This shows you have read both.
+  </div>
+</section>
+
+<section id="norm-s6">
+  <div class="sh"><b>06</b><h2>Where to put the norm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — PLACEMENT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Post-LN: x + f(x), then norm</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">original; needs warmup, diverges</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Pre-LN: norm first, then f</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">today's default, clean residual</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Deeper nets: Pre-LN nearly a must</text>
+</svg>
+  <figcaption>Two placements, and why every large model moved to Pre-LN.</figcaption>
+  </figure>
+
+  <h3>Before or after activation</h3>
+<div class="stack">
+    <div class="s ok"><b>conv → BN → ReLU</b><span>original paper · still the most common default</span></div>
+    <div class="s"><b>conv → ReLU → BN</b><span>sometimes slightly better, rarely used</span></div>
+    <div class="s"><b>BN → ReLU → conv</b><span>pre-activation · ResNet v2 · more stable for very deep nets</span></div>
+  </div>
+  <h3>Pre-LN and Post-LN in Transformers</h3>
+<div class="cmp two">
+    <div><h5>Post-LN — original paper</h5><p><code>x = LN(x + attn(x))</code><br>LayerNorm sits <strong>on</strong> the residual path, cutting across it.</p></div>
+    <div><h5>Pre-LN — today's models</h5><p><code>x = x + attn(LN(x))</code><br>LayerNorm sits <strong>inside</strong> the side branch; the residual path is clean end to end.</p></div>
+  </div>
+  <table>
+    <tr><th></th><th>Post-LN</th><th>Pre-LN</th></tr>
+    <tr><td>Residual path</td><td>Cut by LayerNorm</td><td><strong>Completely clean</strong> end to end</td></tr>
+    <tr><td>Stability</td><td>Needs a careful learning-rate warmup</td><td>Stable, little warmup needed</td></tr>
+    <tr><td>Very deep nets</td><td>Hard to train</td><td>Trains hundreds of layers</td></tr>
+    <tr><td>Used in</td><td>Original Transformer, BERT</td><td><strong>GPT, LLaMA, almost every new model</strong></td></tr>
+  </table>
+  <p><strong>The deeper reason:</strong> with Pre-LN, the gradient has a path from the loss function back to the first layer that passes through no normalization at all —</p>
+  <p>Exactly the argument for residual connections in the backprop lesson. With Post-LN, every block has a LayerNorm blocking that path.</p>
+  <div class="note warn">
+    <h4>Implementation detail: drop the bias when a norm follows</h4>
+    With <code>conv → BN</code> the conv bias is <strong>redundant</strong>: BatchNorm subtracts the mean, so any added constant cancels out, and BN's <code>β</code> already plays the role of the bias. Set <code>bias=False</code> to save parameters and an addition. The same reasoning applies to <code>Linear → LayerNorm</code>.
+  </div>
+</section>
+
+<section id="norm-s7">
+  <div class="sh"><b>07</b><h2>Weight decay and norm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WEIGHT DECAY AND γ</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Norm makes W's scale meaningless</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">double W and the output is unchanged</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">So weight decay changes</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">no longer caps size; it sets the effective LR</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Don't decay γ, β, bias</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">standard in every recipe</text>
+</svg>
+  <figcaption>Why weight decay must be rethought once there is a norm.</figcaption>
+  </figure>
+
+<p class="key">Weight decay = L2 regularization: penalize the sum of squared weights — but <em>not</em> for every parameter.</p>
+  <div class="strip">
+    <div class="c t"><i>apply weight decay</i><b>weight matrices</b><u>conv, linear · multi-dim tensors</u></div>
+    <div class="c f"><i>do not apply</i><b>norm γ and β</b><u>scale parameters, not representation</u></div>
+    <div class="c f"><i>do not apply</i><b>bias</b><u>only shifts values</u></div>
+    <div class="c dim"><i>case by case</i><b>embedding</b><u>usually not</u></div>
+  </div>
+  <details class="deep">
+    <summary>Why doesn't weight decay penalize <code>γ</code>?</summary>
+    <div class="body">
+      <p>It is a scale parameter, not a representation parameter. Pushing <code>γ</code> to 0 means <em>switching off</em> the signal through that layer — not making the model simpler but making it less capable. Likewise, <code>β</code> and the bias only shift values and have nothing to do with the complexity of the function the model represents.</p>
+    </div>
+  </details>
+<pre><code><span class="cm"># the right way in PyTorch — split parameters into two groups</span>
+decay, no_decay = [], []
+<span class="kw">for</span> name, p <span class="kw">in</span> model.named_parameters():
+    <span class="kw">if</span> p.ndim &lt;= <span class="st">1</span> <span class="kw">or</span> name.endswith(<span class="st">".bias"</span>):   <span class="cm"># norm params and biases are 1-D tensors</span>
+        no_decay.append(p)
+    <span class="kw">else</span>:
+        decay.append(p)
+
+optimizer = torch.optim.AdamW([
+    {<span class="st">"params"</span>: decay,    <span class="st">"weight_decay"</span>: <span class="st">0.1</span>},
+    {<span class="st">"params"</span>: no_decay, <span class="st">"weight_decay"</span>: <span class="st">0.0</span>},
+])</code></pre>
+  <div class="note">
+    <h4>A note on Adam and AdamW</h4>
+    In the original Adam, weight decay is added to the gradient, so it gets divided by Adam's adaptive scale — the effective strength differs across parameters and is no longer true L2. AdamW decouples the decay from the gradient and applies it directly to the weights, so it is real L2. That is why <strong>AdamW is the default</strong> for every large model today.
+  </div>
+</section>
+
+<section id="norm-s8">
+  <div class="sh"><b>08</b><h2>Diagnosing with statistics</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — DIAGNOSIS</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Track activation μ, σ per layer</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--tomb)">σ falling with depth: grads will vanish</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--tomb)">γ near 0 in many chans</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">layer is nearly off</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--probe)">Good train, bad eval: running stats</text>
+</svg>
+  <figcaption>Four signs read straight from the statistics, not guessed.</figcaption>
+  </figure>
+
+  <p>When a network does not learn, two quantities are worth printing before anything else:</p>
+<pre><code><span class="cm"># 1. activation standard deviation per layer</span>
+<span class="kw">for</span> name, m <span class="kw">in</span> model.named_modules():
+    m.register_forward_hook(
+        <span class="kw">lambda</span> mod, inp, out, n=name: <span class="kw">print</span>(n, out.std().item()))
+
+<span class="cm"># 2. gradient norm per layer</span>
+<span class="kw">for</span> name, p <span class="kw">in</span> model.named_parameters():
+    <span class="kw">if</span> p.grad <span class="kw">is not</span> <span class="kw">None</span>:
+        <span class="kw">print</span>(name, p.grad.norm().item())</code></pre>
+  <table>
+    <tr><th>Observation</th><th>Diagnosis</th><th>Fix</th></tr>
+    <tr><td>Activation std shrinks to 0 with depth</td><td>Initialization too small, or missing norm</td><td>He init, add norm</td></tr>
+    <tr><td>Activation std grows exponentially</td><td>Initialization too large</td><td>Lower the init scale, add norm</td></tr>
+    <tr><td>Gradient norm near 0 in early layers, normal in late layers</td><td>Vanishing gradients</td><td>ReLU, residual, norm</td></tr>
+    <tr><td>Gradient norm <strong>exactly 0</strong></td><td>Computation graph is broken — a <code>detach()</code>, <code>no_grad()</code>, or in-place assignment</td><td>Trace the propagation path back</td></tr>
+    <tr><td>Gradient norm spikes abnormally</td><td>Exploding gradients, often from a batch with outliers</td><td>Gradient clipping</td></tr>
+    <tr><td>Loss becomes <code>NaN</code> after a few steps</td><td>Learning rate too large, or a division by 0 somewhere</td><td>Lower the learning rate; check for <code>log(0)</code> and <code>sqrt</code> of negatives</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Reference level</h4>
+    In a well-initialized network, <strong>activation standard deviation should be roughly flat across layers</strong> — fluctuating by a few tens of percent is normal, shrinking or growing tenfold is not. That is the whole point the lab in section 04 illustrates, and the first test to run on a hand-built architecture.
+  </div>
+</section>
+
+<section id="norm-s9">
+  <div class="sh"><b>09</b><h2>Choosing a norm</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of normalization: activations drift out of the good-gradient zone as the network gets deeper, normalization pulls them back to mean 0 variance 1 and the variants differ only in the axis used for statistics, two learned parameters restore the freedom to rescale, the placement in the block decides stability, and the price is batch dependence plus a gap between training and inference">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Activations drift off</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">deeper = drift, grads vanish</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Normalize to mean 0, variance 1</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">the only question: which axis for stats</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">γ and β restore the scale</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">model re-learns scale, not forced</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Where in the block</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">pre-LN or post-LN, before/after residual</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: batch dependence, train/eval gap</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">BatchNorm fails, small batch</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHICH NORM</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">CNN, big batch</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">BatchNorm</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">CNN, small bs</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">GroupNorm</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Transformer, seqs</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">LayerNorm or RMSNorm</text>
+</svg>
+  <figcaption>A reference table — come back when starting a new model.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Situation</th><th>Choose</th></tr>
+    <tr><td>CNN image classification, batch of 32 or more</td><td><strong>BatchNorm</strong></td></tr>
+    <tr><td>Object detection, segmentation, batch 2–8</td><td><strong>GroupNorm</strong></td></tr>
+    <tr><td>Transformer, NLP, generative models</td><td><strong>LayerNorm</strong> in Pre-LN placement</td></tr>
+    <tr><td>LLMs where every percent of speed matters</td><td><strong>RMSNorm</strong></td></tr>
+    <tr><td>RNN</td><td>LayerNorm — BatchNorm does not fit the time axis</td></tr>
+    <tr><td>Reinforcement learning</td><td>LayerNorm, or no norm</td></tr>
+    <tr><td>Serving single requests, no batch</td><td>Anything that does <em>not</em> depend on the batch</td></tr>
+  </table>
+  <p>And for initialization, the short rule: <strong>He for ReLU, Xavier for tanh and sigmoid</strong>, biases at 0.</p>
+  <p>For very deep ResNets, also set <code>γ = 0</code> in the last norm layer of each block.</p>
+</section>
+
+<section id="norm-s10" class="lesson">
+  <div class="sh"><b>10</b><h2>Common mistakes</h2></div>
+
+  <p class="key">These five mistakes account for almost all misuse of normalization layers.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Forgetting <code>model.eval()</code></h4><p>BatchNorm uses batch statistics during evaluation; one sample's prediction depends on the other samples in the batch.</p></div>
+    <div class="card bad"><h4>BatchNorm with very small batches</h4><p>Noisy statistics, quality drops. Use GroupNorm.</p></div>
+    <div class="card bad"><h4>Applying weight decay to <code>γ</code> and biases</h4><p>Pushing the scale to 0 switches the signal off; it does not regularize. Split parameters into two groups.</p></div>
+    <div class="card bad"><h4>Keeping a bias in the layer right before a norm</h4><p>Redundant, because the norm subtracts the mean and already has <code>β</code>.</p></div>
+    <div class="card bad"><h4>Flatly claiming BatchNorm reduces internal covariate shift</h4><p>There is research refuting it. Mention both explanations.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · normalization · setting the right magnitude at the start is covered in <a href="../weight-initialization/index.html">Weight initialization</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+</body>
+</html>

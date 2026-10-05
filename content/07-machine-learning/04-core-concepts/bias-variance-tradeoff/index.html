@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bias–variance tradeoff — MazeAI</title>
+<meta name="description" content="Decomposing error into three parts, the tradeoff curve, and which technique targets which part.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/07-machine-learning/04-core-concepts/bias-variance-tradeoff/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Bias–variance tradeoff">
+<meta property="og:description" content="Decomposing error into three parts, the tradeoff curve, and which technique targets which part.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/07-machine-learning/04-core-concepts/bias-variance-tradeoff/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-bv" data-title="Bias–variance tradeoff" data-tag="Generalization" data-blurb="Decomposing error into three parts, the tradeoff curve, and which technique targets which part.">
+        <header class="hero">
+  <p class="eyebrow">Machine learning · Core concepts</p>
+  <h1>Bias–variance <em>tradeoff</em></h1>
+  <p class="lede">The thread running through the whole shelf: <b>almost every ML technique trades bias for variance or the other way round</b>. This lesson splits error into three parts, then shows which technique targets which part.</p>
+</header>
+
+<section id="bv-s1" class="lesson">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">The lesson is the <em>five ideas</em> below. Each later section redraws this map and highlights the cell being studied.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="map of five ideas: decomposing error, what high bias looks like, what high variance looks like, the tradeoff curve, and which technique targets which part">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① ERROR SPLIT</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">error = bias² + variance + noise</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② BIAS CAO</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">too simple, wrong evenly</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VARIANCE CAO</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">too complex, wrong wildly</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ TRADEOFF CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">there is a just-right point</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ WHICH FIX HITS WHAT</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each fix targets one term</text>
+<text class="sv-hv" x="372" y="18">FIVE IDEAS, ONE LESSON</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Error splits into three parts</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">and only the first two can be acted on</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Those two pull in opposite ways</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">lowering one raises the other</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Know which part is short, know the fix</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">that is the whole practical value here</text>
+</svg>
+  <figcaption>Map of the lesson. Each later section redraws this figure and <strong>highlights the cell being studied</strong>.</figcaption>
+  </figure>
+</section>
+
+<section id="bv-s2" class="lesson">
+  <div class="sh"><b>02</b><h2>Error decomposition</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="map of five ideas: decomposing error, what high bias looks like, what high variance looks like, the tradeoff curve, and which technique targets which part">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--probe)">① ERROR SPLIT</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">error = bias² + variance + noise</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② BIAS CAO</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">too simple, wrong evenly</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VARIANCE CAO</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">too complex, wrong wildly</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ TRADEOFF CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">there is a just-right point</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ WHICH FIX HITS WHAT</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each fix targets one term</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">3 PARTS OF ERROR</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Bias — wrong: assumptions too narrow</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">a straight line can never fit a curve</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Variance — wrong: clings to the sample</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">new train set, new model</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Noise — error you can't drop</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">the floor for every model, however good data and method</text>
+</svg>
+  <figcaption>Cell ① — the three parts of error.</figcaption>
+  </figure>
+
+
+  <p class="key">A model's error isn't one lump. It splits into <em>three sources of different nature</em> — and each source needs a different fix.</p>
+
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><var>E</var>[(<var>y</var> − <var>f̂</var>(<var>x</var>))<sup>2</sup>]</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>( <var>E</var>[<var>f̂</var>(<var>x</var>)] − <var>f</var>(<var>x</var>) )<sup>2</sup></span><em>bias²</em></span>
+      <span class="op">+</span>
+      <span class="t p"><span><var>E</var>[( <var>f̂</var>(<var>x</var>) − <var>E</var>[<var>f̂</var>(<var>x</var>)] )<sup>2</sup>]</span><em>variance</em></span>
+      <span class="op">+</span>
+      <span class="t r"><span><var>σ</var><sup>2</sup></span><em>noise</em></span>
+    </div>
+    <dl>
+      <dt>f(x)</dt><dd>the truth, fixed and never knowable</dd>
+      <dt>f̂(x)</dt><dd>the learned model — <em>changes when the training set changes</em></dd>
+      <dt>E[·]</dt><dd>expectation over every training set that could be drawn</dd>
+    </dl>
+    <p class="read">Reading: <b>systematic</b> deviation from the truth, plus <b>fluctuation</b> around itself, plus the noise nobody can touch.</p>
+  </div>
+
+  <table>
+    <tr><th></th><th>Bias</th><th>Variance</th></tr>
+    <tr><td>Meaning</td><td>The model deviates <em>systematically</em> from the truth</td><td>The model <em>fluctuates</em> when the training set changes</td></tr>
+    <tr><td>Analogy</td><td>Aims off-center but shots are tightly grouped</td><td>Aims at the center but shots scatter everywhere</td></tr>
+    <tr><td>Example model</td><td>Linear regression on curved data</td><td>Deep, unpruned decision tree</td></tr>
+    <tr><td>Reduced by</td><td>A stronger model, better features</td><td>More data, ensembles, regularization</td></tr>
+  </table>
+
+  <p>A detail worth remembering: <strong>noise <code>σ²</code> is a floor you can't break through</strong>.</p>
+
+  <ul class="why">
+    <li>Two customers with identical features, one buys and one doesn't — <b>no model can predict both correctly</b>.</li>
+    <li>Once validation error has hit that floor, the fix is <em>new features</em> — not more model capacity.</li>
+  </ul>
+
+  <div class="note key">
+    <h4>One sentence to remember</h4>
+    The goal is neither the smallest bias nor the smallest variance, but the <strong>smallest total</strong>. That's why every regularization technique is the same deal: <em>give up a little bias to win back a lot of variance</em>.
+  </div>
+</section>
+
+<section id="bv-s3" class="lesson">
+  <div class="sh"><b>03</b><h2>What high bias looks like</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="map of five ideas: decomposing error, what high bias looks like, what high variance looks like, the tradeoff curve, and which technique targets which part">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① ERROR SPLIT</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">error = bias² + variance + noise</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">② BIAS CAO</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">too simple, wrong evenly</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VARIANCE CAO</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">too complex, wrong wildly</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ TRADEOFF CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">there is a just-right point</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ WHICH FIX HITS WHAT</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each fix targets one term</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HIGH BIAS — BY NUMBERS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Train error high, val error too</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">and the two are close</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">More data doesn't help</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">the learning curve flattens early, stays</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Fix: more complex model, more features</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">or less regularization</text>
+</svg>
+  <figcaption>Cell ② — spotting high bias from the numbers.</figcaption>
+  </figure>
+
+
+  <p class="key">High bias means <em>the model isn't expressive enough for the real relationship</em>. The tell-tale sign: lots of error <b>on the training set too</b>, not just on new data.</p>
+
+  <p>Fit a straight line to parabola-shaped data: however many points you add, the line stays off.</p>
+  <p>More data fixes nothing, because the error lies in the model's <em>shape</em>, not in the amount of data. Two error numbers give it away immediately:</p>
+
+  <div class="bars">
+    <div class="b bad"><i>error on train set</i><u style="width:82%"></u><b>high</b></div>
+    <div class="b bad"><i>error on test set</i><u style="width:88%"></u><b>high, about equal</b></div>
+  </div>
+  <p class="stripnote"><span>both bars high and close</span><span><em>↑ sign of high bias</em></span><span>small gap</span></p>
+
+  <ul class="why">
+    <li>Fixes: <b>new features</b> (<code>x²</code>, interaction terms), a stronger model, longer training, or less of a regularization that is too heavy.</li>
+    <li>Underfitting is rarely missed because it shows right away — the numbers are bad everywhere. Overfitting is more dangerous because it gives fake good numbers.</li>
+  </ul>
+</section>
+
+<section id="bv-s4" class="lesson">
+  <div class="sh"><b>04</b><h2>What high variance looks like</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="map of five ideas: decomposing error, what high bias looks like, what high variance looks like, the tradeoff curve, and which technique targets which part">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① ERROR SPLIT</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">error = bias² + variance + noise</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② BIAS CAO</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">too simple, wrong evenly</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--tomb)">③ VARIANCE CAO</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">too complex, wrong wildly</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ TRADEOFF CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">there is a just-right point</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">⑤ WHICH FIX HITS WHAT</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">each fix targets one term</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">HIGH VARIANCE — NUMBERS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Train error tiny, val error high</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">the gap between the curves is the sign</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">More data DOES help</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">the biggest difference from high bias</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">Fix: regularization, bagging, simplify</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">or collect more data</text>
+</svg>
+  <figcaption>Cell ③ — spotting high variance from the numbers.</figcaption>
+  </figure>
+
+
+  <p class="key">High variance means <em>the model memorizes even the random noise</em> of the data at hand. The sign: nearly perfect on the training set, a sharp drop on new data.</p>
+
+  <p>A test to grasp the essence: retrain the same model on two different halves of the data.</p>
+
+  <ul class="why">
+    <li>A <b>low-variance</b> model gives two nearly identical results.</li>
+    <li>A <b>high-variance</b> model gives two very different models — because each time it chases the noise of that half.</li>
+  </ul>
+
+  <div class="cmp two">
+    <div>
+      <h5>Gap between the two curves</h5>
+      <p>Train error very low, validation error much higher.</p>
+      <p>The <b>gap</b> between the two numbers is the measure of variance.</p>
+    </div>
+    <div>
+      <h5>Level of both curves</h5>
+      <p>Both high and stuck together.</p>
+      <p>That <b>shared level</b> is the measure of bias.</p>
+    </div>
+  </div>
+
+  <ul class="why">
+    <li>Read the two numbers along two dimensions: <b>level</b> is bias, <b>gap</b> is variance. Details in <a href="../overfitting-regularization/index.html">Overfitting &amp; regularization</a>.</li>
+    <li>Noise is exactly what the model memorizes. The less and noisier the data, the more easily a model falls into this.</li>
+  </ul>
+</section>
+
+<section id="bv-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Tradeoff curve</h2></div>
+
+  <p class="key">Push model complexity from low to high: bias falls steadily, variance rises steadily, and <em>their sum is U-shaped</em>. The bottom of the U is where to stop.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 232" role="img" aria-label="Bias falls, variance rises, their sum is U-shaped with the bottom in the middle">
+      <line x1="96" y1="26" x2="96" y2="190" stroke="var(--rule)"></line>
+      <line x1="96" y1="190" x2="740" y2="190" stroke="var(--rule)"></line>
+
+      <line x1="96" y1="170" x2="730" y2="170" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="4 4" opacity=".5"></line>
+      <text class="sv-l" x="744" y="160" fill="var(--tomb)">noise σ²</text>
+
+      <rect x="376" y="26" width="24" height="164" fill="rgba(var(--amber-a),.10)"></rect>
+      <line x1="388" y1="34" x2="388" y2="190" stroke="var(--probe)" stroke-width="1.4" stroke-dasharray="3 4"></line>
+      <circle cx="388" cy="120" r="5" fill="var(--probe)"></circle>
+      <text class="sv-t" x="388" y="22" text-anchor="middle" fill="var(--probe)">min</text>
+
+      <path d="M96 70 L119 83 L141 95 L164 105 L187 114 L209 122 L232 129 L254 135 L277 141 L300 146 L322 150 L345 154 L368 158 L390 161 L413 163 L436 166 L458 168 L481 170 L504 171 L526 173 L549 174 L572 175 L594 176 L617 177 L639 178 L662 179 L685 179 L707 180 L730 180"
+        fill="none" stroke="var(--filled)" stroke-width="2"></path>
+      <text class="sv-t" x="744" y="186" fill="var(--filled)">bias² ↓</text>
+
+      <path d="M96 177 L119 176 L141 176 L164 175 L187 174 L209 172 L232 171 L254 170 L277 168 L300 166 L322 164 L345 162 L368 159 L390 157 L413 154 L436 150 L458 146 L481 142 L504 137 L526 132 L549 126 L572 119 L594 112 L617 104 L639 95 L662 85 L685 74 L707 61 L730 47"
+        fill="none" stroke="var(--ok)" stroke-width="2"></path>
+      <text class="sv-t" x="744" y="58" fill="var(--ok)">variance ↑</text>
+
+      <path d="M96 50 L119 62 L141 73 L164 82 L187 90 L209 97 L232 103 L254 107 L277 111 L300 114 L322 117 L345 118 L368 119 L390 120 L413 119 L436 118 L458 116 L481 114 L504 111 L526 107 L549 102 L572 97 L594 91 L617 83 L639 75 L662 66 L685 55 L707 43 L730 30"
+        fill="none" stroke="var(--text)" stroke-width="2.6"></path>
+      <text class="sv-t" x="744" y="32" fill="var(--text)">total</text>
+
+      <text class="sv-l" x="88" y="32" text-anchor="end">err</text>
+      <text class="sv-l" x="172" y="208" text-anchor="middle">underfit</text>
+      <text class="sv-l" x="641" y="208" text-anchor="middle">overfit</text>
+      <text class="sv-l" x="418" y="226" text-anchor="middle">model complexity →</text>
+    </svg>
+    <figcaption>Falling bias and rising variance meet at the bottom of the U — <b>the bottom is not where bias is smallest</b>. The red dashed line is the noise floor σ²: total error never goes below it.</figcaption>
+  </figure>
+
+  <ul class="why">
+    <li>The bottom of the U <b>is not where bias is smallest</b>: the best model always keeps some bias, trading deviation for stability.</li>
+    <li>"Complexity" depends on the model: polynomial degree, <code>max_depth</code>, number of network layers, the inverse of the regularization strength. Same curve shape.</li>
+    <li>For <b>very large neural networks</b> there is <em>double descent</em>: once parameters far exceed samples, test error falls <em>again</em>.</li>
+  </ul>
+</section>
+
+<section id="bv-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Lab: turn up complexity</h2></div>
+
+  <p>Fit a degree-<code>d</code> polynomial to the same dataset. Raise the degree to see the U curve from the section above appear in real numbers.</p>
+
+  <div class="lab">
+    <div class="bar">
+      <div><label>polynomial degree</label><input type="number" id="odeg" value="3" min="0" max="5"></div>
+      <label class="chk"><input type="checkbox" id="onoise" checked> noise in the data</label>
+      <button class="ghost" id="orst">Reset</button>
+    </div>
+    <div id="oview"></div>
+    <div class="stat">
+      <u>train error <b id="oetr">–</b></u>
+      <u>validation error <b id="oeva">–</b></u>
+      <u>diagnosis <b id="odiag">–</b></u>
+    </div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">
+      Degree 0: both errors very high — clear <strong>underfit</strong>. Degree 2–3: both lowest — just right, matching the degree of the true function.</p>
+      <p>Degree 5: train error drops to <strong>0</strong> because the polynomial passes exactly through all 6 train points, but validation error <strong>doubles</strong> — overfit.</p>
+  <p>There are only 6 train points, so the maximum degree is 5.</p>
+      <p>Untick noise to see that with perfectly clean data a high degree does less harm: noise is exactly what the model memorizes.
+    </p>
+  </div>
+</section>
+
+<section id="bv-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Which technique targets which part</h2></div>
+
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="map of five ideas: decomposing error, what high bias looks like, what high variance looks like, the tradeoff curve, and which technique targets which part">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">① ERROR SPLIT</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">error = bias² + variance + noise</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">② BIAS CAO</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">too simple, wrong evenly</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">③ VARIANCE CAO</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">too complex, wrong wildly</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">④ TRADEOFF CURVE</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">there is a just-right point</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="298" fill="var(--ok)">⑤ WHICH FIX HITS WHAT</text>
+<text class="sv-d" x="13" y="316" fill="var(--muted)">each fix targets one term</text>
+<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">EACH FIX TARGETS ONE TERM</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Cut variance: L2, dropout, bagging, more data</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">random forest is the pure case</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">Cut bias: bigger model, new features, boosting</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">gradient boosting is the pure case</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Wrong term, worse the fix</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">more data for high bias is wasted effort</text>
+</svg>
+  <figcaption>Cell ⑤ — each fix targets one term.</figcaption>
+  </figure>
+
+
+  <p class="key">Read this table backwards: <em>diagnose bias or variance first, then pick the technique</em>. Picking the wrong direction makes the model worse.</p>
+
+  <table>
+    <tr><th>Technique</th><th>Bias</th><th>Variance</th><th>Notes</th></tr>
+    <tr><td>More data</td><td>unchanged</td><td><b>drops sharply</b></td><td>Useless when the problem is bias — draw a learning curve to tell</td></tr>
+    <tr><td>Stronger regularization</td><td>rises</td><td><b>drops</b></td><td>The classic deal: lose a little bias, win back a lot of variance</td></tr>
+    <tr><td>More features, stronger model</td><td><b>drops</b></td><td>rises</td><td>The reverse side of the same deal</td></tr>
+    <tr><td><b>Bagging</b> — Random Forest</td><td>almost unchanged</td><td><b>drops sharply</b></td><td>Averages many trees; the less alike the trees, the better it works</td></tr>
+    <tr><td><b>Boosting</b> — GBM, XGBoost</td><td><b>drops sharply</b></td><td>rises with rounds</td><td>Needs early stopping, or it will certainly overfit</td></tr>
+    <tr><td>Early stopping</td><td>rises slightly</td><td><b>drops</b></td><td>Cheapest in the table — adds no parameters</td></tr>
+  </table>
+
+  <ul class="why">
+    <li>The two ensemble rows show that <b>bagging and boosting target different parts</b>. See <a href="../../06-tree-models/tree-family-overview/index.html">Tree family overview</a>.</li>
+    <li>That's why Random Forest beats a single tree on <b>both fronts</b>: it cuts variance while losing almost no bias.</li>
+  </ul>
+</section>
+
+
+<footer>Machine learning · Core concepts · continued in <a href="../overfitting-regularization/index.html">Overfitting &amp; regularization</a> (diagnosis and fixes) and <a href="../train-val-test-cv/index.html">Train/val/test &amp; cross-validation</a> (measuring it right).</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Self-attention — MazeAI</title>
+<meta name="description" content="What Q/K/V are, why divide by √d_k, two masks not to confuse, multi-head, quadratic complexity, and how the KV cache sets serving cost.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/09-transformer/02-transformer-core/self-attention/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Self-attention">
+<meta property="og:description" content="What Q/K/V are, why divide by √d_k, two masks not to confuse, multi-head, quadratic complexity, and how the KV cache sets serving cost.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/09-transformer/02-transformer-core/self-attention/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-attn" data-title="Self-attention" data-tag="Transformer" data-blurb="What Q/K/V are, why divide by √d_k, two masks not to confuse, multi-head, quadratic complexity, and how the KV cache sets serving cost.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · Transformer · mechanism</p>
+  <h1>Self-<em>attention</em></h1>
+  <p class="lede">A weighted sum, but the weights are <b>decided by the data itself</b> —</p>
+  <p>That is the whole idea. This lesson goes from Q/K/V to scaled dot-product, explains why you must divide by √<code>d_k</code>, separates the two kinds of mask.</p>
+  <p>And shows how the KV cache trades memory for speed.</p>
+</header>
+
+<section id="attn-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Each token asks every other token one question, then <em>brings back the content of the tokens whose answers match best</em>.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<text class="sv-hv" x="372" y="18">THE MODEL: TWO JOBS</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--probe)">Attention — mixes across tokens</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--filled)">FFN — each token on its own</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">N times, plus residual</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">same shape through every block</text>
+</svg>
+  <figcaption>Read top to bottom: the top red box is where the RNN falls short, the three middle boxes are the mechanism, the bottom red box is the cost. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+  <p>A GPT model does exactly one thing: take a sequence of tokens and return a probability distribution over the next token. Everything below is detail of that one job.</p>
+<div class="stack">
+    <div class="s"><b>"The cat sat" → [1044, 8712, 3390]</b><span>tokenization — text into a list of numbers, (T,)</span></div>
+    <div class="s"><b>X — (3, 768)</b><span>embedding lookup, plus position information</span></div>
+    <div class="s ok"><b>× 12 blocks: x = x + attn(ln1(x)) then x = x + ffn(ln2(x))</b><span>shape unchanged through every block — still (3, 768)</span></div>
+    <div class="s"><b>logits — (3, 50257)</b><span>final LayerNorm, then multiply by W_out</span></div>
+    <div class="s"><b>p(next token) — (50257,)</b><span>take the last row, softmax</span></div>
+  </div>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    Attention <strong>mixes information across tokens</strong>. The FFN <strong>processes each token on its own</strong>. The whole model is just those two jobs repeated N times, plus the residual shortcut so gradients can flow.
+  </div>
+</section>
+
+<section id="attn-s2">
+  <div class="sh"><b>02</b><h2>Why attention is needed</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — RNN BOTTLENECK</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Bottleneck</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">whole sentence in one fixed vector</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Long gradient path</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">token 1 to 500 via 500 multiply steps</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Cannot parallelize</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">step t must finish before step t+1</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">Attention: every pair one step apart</text>
+</svg>
+  <figcaption>The three gaps of the RNN, and the one answer attention gives to all three.</figcaption>
+  </figure>
+
+  <p>Before the Transformer, sequences were handled by RNNs/LSTMs: read tokens in order, compress the entire past into one state vector. Three problems:</p>
+  <ul>
+    <li><strong>Bottleneck.</strong> An entire long sentence has to fit into one fixed-size vector.</li>
+    <li><strong>Long gradient path.</strong> Getting from token 1 to token 500 takes 500 matrix multiplications, and the gradient shrinks along the way.</li>
+    <li><strong>No parallelism during training.</strong> Step t must finish before step t+1 can be computed.</li>
+  </ul>
+  <p>Attention fixes all three with one idea: <strong>every token connects directly to every other token</strong>.</p>
+  <p>The path between any two tokens is always exactly one step long, and every position can be computed at once.</p>
+  <div class="note warn">
+    <h4>The cost</h4>
+    Connecting everything to everything means cost scales with <code>T²</code> instead of <code>T</code>. An RNN handles long sentences far more cheaply — that is why long context is still expensive today. Details in <a href="#attn-s9">section 09</a>.
+  </div>
+</section>
+
+<section id="attn-s3">
+  <div class="sh"><b>03</b><h2>What Q, K, V are</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — 3 ROLES</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Q query</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">what information I need</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">K key</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">which questions I can answer</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--filled)">V value</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">content I carry if I am chosen</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--probe)">Split W_q, W_k</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">so attention is asymmetric</text>
+</svg>
+  <figcaption>Three learned projection matrices, all projecting from the same x. The last row is why they must be separate.</figcaption>
+  </figure>
+
+  <p>From the same token vector <code>x</code>, we project through three learned matrices to get three different roles:</p>
+  <table>
+    <tr><th>Role</th><th>Literal meaning</th><th>Example</th></tr>
+    <tr><td><code>Q</code> query</td><td>What information I need</td><td>The token "it" asks: which earlier noun could be my referent?</td></tr>
+    <tr><td><code>K</code> key</td><td>Which kind of question I can answer</td><td>The token "cat" reports: I am a singular noun</td></tr>
+    <tr><td><code>V</code> value</td><td>The content I carry if chosen</td><td>The semantic information of "cat" to mix into "it"</td></tr>
+  </table>
+<pre><code>x:   (T, d)      = (3, 768)
+W_q: (d, d_k)    = (768, 64)      <span class="cm"># for one head</span>
+W_k: (d, d_k)    = (768, 64)
+W_v: (d, d_v)    = (768, 64)
+
+Q = x @ W_q      <span class="cm"># (3, 64)</span>
+K = x @ W_k      <span class="cm"># (3, 64)</span>
+V = x @ W_v      <span class="cm"># (3, 64)</span></code></pre>
+  <div class="note">
+    <h4>Why split into three instead of using x directly</h4>
+    With the product <code>x·xᵀ</code>, every token is always most similar to itself, and the relation is always symmetric: A attends to B exactly as much as B attends to A. But language is not symmetric — a pronoun needs its noun more than the noun needs the pronoun. Separating <code>W_q</code> and <code>W_k</code> lets the attention matrix be <strong>asymmetric</strong>. Adding a separate <code>W_v</code> makes the "search criterion" and the "content carried" two independent things.
+  </div>
+</section>
+
+<section id="attn-s4">
+  <div class="sh"><b>04</b><h2>Scaled dot-product attention</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — THE FOUR-LINE FORMULA</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">scores = Q·Kᵀ / √d_k</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">(T, T) — match for every pair</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">+ mask</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">hide future</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">weights = softmax(scores)</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">row-wise — each row sums to 1</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--ok)">out = weights · V</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">(T, d_v) — weighted sum of V</text>
+</svg>
+  <figcaption>Four lines, top to bottom; the softmax axis is where people slip most often.</figcaption>
+  </figure>
+
+  <p>The whole formula fits in four lines:</p>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>scores</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Q · K<sup>T</sup> / √d<sub>k</sub></span><em>(T, T) — how well every pair matches</em></span>
+      <span class="op">+</span>
+      <span class="t r"><span>mask</span><em>hides the future, see section 07</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>weights</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>softmax(scores)</span><em>row-wise — each row sums to 1</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>out</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>weights · V</span><em>(T, d_v) — weighted sum of V</em></span>
+    </div>
+  </div>
+  <h3>Each step in words</h3>
+  <ol>
+    <li><code>Q @ K.T</code> — for each token i, take the dot product of its query with the key of every token j. A large product means "what I need" matches "what you have".</li>
+    <li>Divide by <code>sqrt(d_k)</code> — keeps the magnitude of the scores stable. The full reason is in the next section.</li>
+    <li><code>softmax</code> along each <strong>row</strong> — turns scores into attention shares that sum to 1. This is where the axis most often gets mixed up when you code it yourself.</li>
+    <li><code>weights @ V</code> — token i receives a weighted average of the tokens' values. Paying 70% attention to token 2 means taking 70% of its content.</li>
+  </ol>
+<pre><code><span class="kw">import</span> torch, torch.nn.functional <span class="kw">as</span> F
+
+<span class="kw">def</span> attention(Q, K, V, mask=<span class="kw">None</span>):
+    d_k = Q.size(-1)
+    scores = Q @ K.transpose(-2, -1) / d_k ** <span class="st">0.5</span>   <span class="cm"># (T, T)</span>
+    <span class="kw">if</span> mask <span class="kw">is not None</span>:
+        scores = scores.masked_fill(mask == <span class="st">0</span>, <span class="kw">float</span>(<span class="st">"-inf"</span>))
+    w = F.softmax(scores, dim=-<span class="st">1</span>)
+    <span class="kw">return</span> w @ V, w</code></pre>
+</section>
+
+<section id="attn-s5">
+  <div class="sh"><b>05</b><h2>Why divide by √d_k</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHY DIVIDE BY √d_k</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Var[q·k] = d_k</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">variance adds up over d_k terms</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">d_k = 64 means scores swing ±8</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">softmax spikes to one-hot</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">derivative goes to 0, gradient stops</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--ok)">Divide by √d_k: variance 1</text>
+</svg>
+  <figcaption>The causal chain from variance to vanishing gradients.</figcaption>
+  </figure>
+
+  <p>This is a classic interview question, and the answer "to normalize" is taken as not really understanding it.</p>
+  <p>Assume the components of <code>q</code> and <code>k</code> are independent, with mean 0 and variance 1. The dot product of two <code>d_k</code>-dimensional vectors is a sum of <code>d_k</code> independent terms:</p>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>q·k</span></span>
+      <span class="op">=</span>
+      <span class="t b"><span>Σ q<sub>i</sub> · k<sub>i</sub></span><em>i = 1..d<sub>k</sub></em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>E[q·k]</span></span>
+      <span class="op">=</span>
+      <span class="t"><span>0</span></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>Var[q·k]</span></span>
+      <span class="op">=</span>
+      <span class="t p"><span>d<sub>k</sub></span><em>variances add up</em></span>
+    </div>
+    <div class="line">
+      <span class="t"><span>std[q·k]</span></span>
+      <span class="op">=</span>
+      <span class="t g"><span>√d<sub>k</sub></span><em>with d<sub>k</sub> = 64, scores swing around ±8</em></span>
+    </div>
+  </div>
+  <p>The larger the scores, the sharper the softmax. When one value clearly dominates, the distribution approaches one-hot, and <strong>the softmax derivative goes to 0</strong> —</p>
+  <p>The gradient cannot flow back, and the model stops learning from the very start.</p>
+  <p>Dividing by <code>sqrt(d_k)</code> brings the variance back to 1, whatever <code>d_k</code> you choose. That way you can increase the dimension without re-tuning the initialization.</p>
+  <div class="note key">
+    <h4>In one sentence</h4>
+    The dot product has variance proportional to <code>d_k</code>. Without dividing, a large <code>d_k</code> saturates softmax into one-hot and the gradient vanishes. Dividing by <code>sqrt(d_k)</code> keeps the variance at 1, so softmax stays in the region with good gradients.
+  </div>
+  <p>The lab in the next section lets you toggle this division yourself and watch the distribution collapse into one-hot.</p>
+</section>
+
+<section id="attn-s6">
+  <div class="sh"><b>06</b><h2>Lab: watch the attention weights change</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — THE LAB TURNS THIS BOX</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">d_k</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">scales the scores</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">÷ √d_k</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">toggle to watch it collapse</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">temperature</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">flattens or sharpens softmax</text>
+<rect x="372" y="214" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">causal mask</text>
+<text class="sv-s" x="388" y="254" fill="var(--dim)">hides the upper triangle</text>
+</svg>
+  <figcaption>All four lab controls act on the match-score box; none of them touches any other box.</figcaption>
+  </figure>
+
+  <p>Six tokens, one head. The table below is the attention matrix: <strong>row i</strong> shows how token i spreads its attention across the tokens.</p>
+  <p>Every row always sums to 1.</p>
+
+  <div class="lab">
+    <div class="bar">
+      <div>
+        <label>d_k (dimensions)</label>
+        <select id="dk">
+          <option value="8">8</option>
+          <option value="64" selected>64</option>
+          <option value="256">256</option>
+          <option value="1024">1024</option>
+        </select>
+      </div>
+      <div>
+        <label>temperature</label>
+        <input type="number" id="temp" value="1" step="0.1" min="0.1" max="5">
+      </div>
+      <label class="chk"><input type="checkbox" id="scale" checked> divide by sqrt(d_k)</label>
+      <label class="chk"><input type="checkbox" id="causal" checked> causal mask</label>
+      <button class="ghost" id="reset">Reset</button>
+    </div>
+    <div class="hm" id="hm"></div>
+    <div class="stat">
+      <u>std of scores <b id="sd">–</b></u>
+      <u>mean entropy per row <b id="ent">–</b></u>
+      <u>largest weight <b id="mx">–</b></u>
+    </div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Try: pick <code>d_k = 1024</code> and <strong>untick</strong> the sqrt division. Entropy drops to almost 0 and every row keeps only one bright cell —</p>
+  <p>That is softmax saturation. Turn the division back on and the distribution softens again, even though <code>d_k</code> is still 1024.</p>
+  </div>
+</section>
+
+<section id="attn-s7">
+  <div class="sh"><b>07</b><h2>Masking — two kinds, do not confuse them</h2></div>
+  <h3>Causal mask (hides the future)</h3>
+  <p>During training, we feed the whole sentence at once and make the model predict the next token at <em>every</em> position in parallel.</p>
+  <p>If token 3 could see token 4, it would simply copy the answer.</p>
+  <p>Masking the upper triangle with <code>-inf</code> prevents that.</p>
+<figure>
+    <svg viewBox="0 0 1000 260" role="img" aria-label="Score matrix before and after masking the upper triangle with negative infinity">
+      <text x="40" y="32" class="sv-l" fill="var(--faint)">PRE-SOFTMAX SCORES</text>
+      <text x="520" y="32" class="sv-l" fill="var(--faint)">AFTER ADDING CAUSAL MASK</text>
+      <rect x="40" y="50" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="79" y="75" class="sv-t" fill="var(--text)" text-anchor="middle">2.1</text>
+      <rect x="124" y="50" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="163" y="75" class="sv-t" fill="var(--text)" text-anchor="middle">0.4</text>
+      <rect x="208" y="50" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="247" y="75" class="sv-t" fill="var(--text)" text-anchor="middle">1.3</text>
+      <rect x="292" y="50" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="331" y="75" class="sv-t" fill="var(--text)" text-anchor="middle">0.8</text>
+      <rect x="40" y="96" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="79" y="121" class="sv-t" fill="var(--text)" text-anchor="middle">0.9</text>
+      <rect x="124" y="96" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="163" y="121" class="sv-t" fill="var(--text)" text-anchor="middle">1.7</text>
+      <rect x="208" y="96" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="247" y="121" class="sv-t" fill="var(--text)" text-anchor="middle">0.2</text>
+      <rect x="292" y="96" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="331" y="121" class="sv-t" fill="var(--text)" text-anchor="middle">1.1</text>
+      <rect x="40" y="142" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="79" y="167" class="sv-t" fill="var(--text)" text-anchor="middle">1.4</text>
+      <rect x="124" y="142" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="163" y="167" class="sv-t" fill="var(--text)" text-anchor="middle">0.3</text>
+      <rect x="208" y="142" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="247" y="167" class="sv-t" fill="var(--text)" text-anchor="middle">2.2</text>
+      <rect x="292" y="142" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="331" y="167" class="sv-t" fill="var(--text)" text-anchor="middle">0.6</text>
+      <rect x="40" y="188" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="79" y="213" class="sv-t" fill="var(--text)" text-anchor="middle">0.7</text>
+      <rect x="124" y="188" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="163" y="213" class="sv-t" fill="var(--text)" text-anchor="middle">1.2</text>
+      <rect x="208" y="188" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="247" y="213" class="sv-t" fill="var(--text)" text-anchor="middle">0.5</text>
+      <rect x="292" y="188" width="78" height="40" rx="4" fill="var(--raise)" stroke="var(--rule-hi)"/>
+      <text x="331" y="213" class="sv-t" fill="var(--text)" text-anchor="middle">1.9</text>
+      <rect x="520" y="50" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="559" y="75" class="sv-t" fill="var(--filled)" text-anchor="middle">2.1</text>
+      <rect x="604" y="50" width="78" height="40" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)"/>
+      <text x="643" y="75" class="sv-t" fill="var(--tomb)" text-anchor="middle">-inf</text>
+      <rect x="688" y="50" width="78" height="40" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)"/>
+      <text x="727" y="75" class="sv-t" fill="var(--tomb)" text-anchor="middle">-inf</text>
+      <rect x="772" y="50" width="78" height="40" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)"/>
+      <text x="811" y="75" class="sv-t" fill="var(--tomb)" text-anchor="middle">-inf</text>
+      <rect x="520" y="96" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="559" y="121" class="sv-t" fill="var(--filled)" text-anchor="middle">0.9</text>
+      <rect x="604" y="96" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="643" y="121" class="sv-t" fill="var(--filled)" text-anchor="middle">1.7</text>
+      <rect x="688" y="96" width="78" height="40" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)"/>
+      <text x="727" y="121" class="sv-t" fill="var(--tomb)" text-anchor="middle">-inf</text>
+      <rect x="772" y="96" width="78" height="40" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)"/>
+      <text x="811" y="121" class="sv-t" fill="var(--tomb)" text-anchor="middle">-inf</text>
+      <rect x="520" y="142" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="559" y="167" class="sv-t" fill="var(--filled)" text-anchor="middle">1.4</text>
+      <rect x="604" y="142" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="643" y="167" class="sv-t" fill="var(--filled)" text-anchor="middle">0.3</text>
+      <rect x="688" y="142" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="727" y="167" class="sv-t" fill="var(--filled)" text-anchor="middle">2.2</text>
+      <rect x="772" y="142" width="78" height="40" rx="4" fill="rgba(var(--red-a),.16)" stroke="var(--tomb)"/>
+      <text x="811" y="167" class="sv-t" fill="var(--tomb)" text-anchor="middle">-inf</text>
+      <rect x="520" y="188" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="559" y="213" class="sv-t" fill="var(--filled)" text-anchor="middle">0.7</text>
+      <rect x="604" y="188" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="643" y="213" class="sv-t" fill="var(--filled)" text-anchor="middle">1.2</text>
+      <rect x="688" y="188" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="727" y="213" class="sv-t" fill="var(--filled)" text-anchor="middle">0.5</text>
+      <rect x="772" y="188" width="78" height="40" rx="4" fill="rgba(var(--blue-a),.16)" stroke="var(--filled)"/>
+      <text x="811" y="213" class="sv-t" fill="var(--filled)" text-anchor="middle">1.9</text>
+      <text x="40" y="248" class="sv-l" fill="var(--faint)">token 1 sees itself only · token 4 sees all 4</text>
+    </svg>
+    <figcaption>Red cells are the future — set to <code>-inf</code>, so softmax gives exactly 0. Set them to 0 instead and <code>exp(0) = 1</code>, so masked cells still get real weight.</figcaption>
+  </figure>
+  <p>Use <code>-inf</code>, not 0, because <code>softmax(-inf) = 0</code> exactly. Set them to 0 and <code>exp(0) = 1</code>, so masked cells still get real weight.</p>
+  <div class="note key">
+    <h4>Why the mask is what makes parallel training possible</h4>
+    Without a mask you would need T passes, one per position. With the mask, a single pass yields T predictions, each based only on its own past. That is why a Transformer trains many times faster than an RNN, even though generation is still sequential.
+  </div>
+  <h3>Padding mask (hides padding)</h3>
+  <p>Packing sentences of different lengths into one batch means padding them to equal length. Padding cells carry no meaning and must be masked, or the model learns garbage statistics from them.</p>
+  <div class="note warn">
+    <h4>Trap</h4>
+    The two masks must be <strong>combined</strong>, not substituted for each other. Forgetting the padding mask usually causes no runtime error — quality just drops for no obvious reason, and the bug is very hard to trace.
+  </div>
+</section>
+
+<section id="attn-s8">
+  <div class="sh"><b>08</b><h2>Multi-head attention</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">T² products · KV cache grows with T</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — MANY HEADS MIXING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">d split in h heads</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">each head has its own smaller Q, K, V</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Each head learns one relation</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">syntax, coreference, nearby position</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Concat, then × W_o</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">same total cost as one big head</text>
+</svg>
+  <figcaption>The value-mixing box is replicated h times and then concatenated, at no extra cost.</figcaption>
+  </figure>
+
+  <p>One head can only learn one kind of relation. With <code>h</code> heads, we run <code>h</code> independent attentions on smaller subspaces, then concatenate them.</p>
+<div class="stack">
+    <div class="s"><b>x — (T, 768)</b><span>d = 768, h = 12 → each head gets d_k = 768 / 12 = 64 dimensions</span></div>
+    <div class="s"><b>Q, K, V — (12, T, 64)</b><span>project through W_q, W_k, W_v (768, 768) then split into 12 groups of 64 — 12 heads run in parallel</span></div>
+    <div class="s"><b>concat — (T, 768)</b><span>attention per head, then concatenate along the last dimension</span></div>
+    <div class="s ok"><b>out — (T, 768)</b><span>multiply by W_o (768, 768) to mix information across heads</span></div>
+  </div>
+  <p><strong>Total cost is unchanged.</strong> Split 768 dimensions over 12 heads, 64 each — they still add up to 768. Multi-head is nearly free compared with one big head.</p>
+  <h3>What each head learns</h3>
+  <p>Analysis of trained models shows that heads specialize:</p>
+  <p>A head that tracks the previous token, a head that links a pronoun to its noun, a head that matches opening and closing brackets, a head that follows the main verb.</p>
+  <p>Nobody programmed this — it emerges from the data.</p>
+  <div class="note">
+    <h4>Why W_o is needed</h4>
+    After concat, the heads only sit side by side; they have not talked to each other yet. <code>W_o</code> is the mixing layer that lets the model combine the conclusions of many heads into one unified representation. Drop <code>W_o</code> and multi-head is just several disconnected parallel channels.
+  </div>
+</section>
+
+<section id="attn-s9">
+  <div class="sh"><b>09</b><h2>Complexity — why long context is expensive</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="298" fill="var(--tomb)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--muted)">T² products · KV cache grows with T</text>
+<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — WHY T² IS COSTLY</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Score matrix is T × T</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">2× the length, 4× the compute</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Memory: T² too</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">breaks before speed</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">FFN is only linear in T</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">so at large T attention dominates</text>
+</svg>
+  <figcaption>The cost lies in the size of the score matrix, not in the number of parameters.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Step</th><th>Time</th><th>Memory</th></tr>
+    <tr><td>Project to Q, K, V</td><td><code>O(T · d²)</code></td><td><code>O(T · d)</code></td></tr>
+    <tr><td><code>Q @ K.T</code></td><td><code>O(T² · d)</code></td><td><code>O(T²)</code> ← attention matrix</td></tr>
+    <tr><td><code>weights @ V</code></td><td><code>O(T² · d)</code></td><td><code>O(T · d)</code></td></tr>
+    <tr><td>FFN</td><td><code>O(T · d²)</code></td><td><code>O(T · d)</code></td></tr>
+  </table>
+  <p>Total: <code>O(T²·d + T·d²)</code>. Which term is larger depends on how <code>T</code> compares with <code>d</code>:</p>
+  <ul>
+    <li><code>T = 512, d = 768</code> — the FFN and projections take most of the time. Attention is not yet the bottleneck.</li>
+    <li><code>T = 32000, d = 768</code> — the <code>T²</code> term dominates. Double the context and attention cost quadruples.</li>
+  </ul>
+  <div class="note warn">
+    <h4>A common misstatement</h4>
+    Many people say "attention is always the bottleneck". Not true at short context. The correct answer: cost has two terms, <code>T²d</code> and <code>Td²</code>, and which dominates depends on the ratio of <code>T</code> to <code>d</code>.
+  </div>
+  <h3>What FlashAttention solves</h3>
+  <p>It does <strong>not</strong> reduce the computational complexity — it is still <code>O(T²·d)</code>.</p>
+  <p>What it removes is <em>writing the T×T matrix out to main memory</em>:</p>
+  <p>It computes block by block right inside the GPU's fast on-chip memory, so memory drops from <code>O(T²)</code> to <code>O(T)</code> and speed rises several times because less data moves.</p>
+  <p>This question separates those who read carefully from those who only know the name.</p>
+</section>
+
+<section id="attn-s10">
+  <div class="sh"><b>10</b><h2>KV cache — what sets serving cost</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="298" fill="var(--tomb)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--muted)">T² products · KV cache grows with T</text>
+<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — KV CACHE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Emit token t</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">K, V of the t−1 prior tokens fixed</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Store, don't recompute</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">each step: one new score row only</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--tomb)">Price: memory grows linearly</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">2 · L · h · d_head · T values/seq</text>
+</svg>
+  <figcaption>The cache turns per-step cost from quadratic into linear, paid for with memory.</figcaption>
+  </figure>
+
+  <p>Generation is sequential: emit one token at a time, append it to the input, and run again.</p>
+  <p>Recomputing from scratch at every step would make 1000 tokens cost about a thousand times more work than needed.</p>
+  <p>The key observation: with a causal mask, <strong>the K and V of earlier tokens never change</strong>. So store them.</p>
+<div class="cmp two">
+    <div><h5>No cache</h5><p>Each step recomputes Q, K, V for all <code>t</code> tokens: <code>O(t · d²)</code> per step, <code>O(N² · d²)</code> for the whole sequence.</p></div>
+    <div><h5>With cache</h5><p>Compute only for the new token: <code>O(d²)</code> per step, plus <code>O(t · d)</code> for it to look at the <code>t</code> stored keys.</p></div>
+  </div>
+  <h3>Two phases with completely different behavior</h3>
+  <table>
+    <tr><th></th><th>Prefill</th><th>Decode</th></tr>
+    <tr><td>What it does</td><td>Processes the whole prompt in one pass</td><td>Generates one token at a time</td></tr>
+    <tr><td>Bottleneck</td><td>Compute — the GPU runs at full capacity</td><td>Memory bandwidth — all weights must be re-read for every token</td></tr>
+    <tr><td>Metric to watch</td><td>Time to first token</td><td>Time between tokens</td></tr>
+    <tr><td>How to speed up</td><td>Chunking, parallel processing</td><td>Batch many requests, quantization, fewer KV heads</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Why decode is memory-bound rather than compute-bound</h4>
+    Generating one token requires reading <em>all</em> model weights from VRAM, but performs only a tiny amount of computation on them. The GPU sits idle waiting for data. That is exactly why batching is so effective: once you have paid to read the weights, serving 32 requests at once costs almost nothing extra.
+  </div>
+  <h3>How much the cache costs</h3>
+<div class="eq">
+    <div class="line">
+      <span class="t"><span>bytes / token</span></span>
+      <span class="op">=</span>
+      <span class="t"><span>2</span><em>K and V</em></span>
+      <span class="op">×</span>
+      <span class="t b"><span>n_layers</span><em>32</em></span>
+      <span class="op">×</span>
+      <span class="t p"><span>n_kv_heads</span><em>32</em></span>
+      <span class="op">×</span>
+      <span class="t"><span>d_head</span><em>128</em></span>
+      <span class="op">×</span>
+      <span class="t"><span>bytes</span><em>2 — fp16</em></span>
+    </div>
+    <p class="read">LLaMA-2 7B with full MHA: <b>≈ 0.5 MB per token</b>.</p>
+  </div>
+  <div class="bars">
+    <div class="b"><i>one 8,000-token context</i><u style="width:3%"></u><b>~4 GB</b></div>
+    <div class="b bad"><i>32 concurrent requests</i><u style="width:100%"></u><b>~128 GB</b></div>
+  </div>
+  <p class="stripnote"><span>An 80 GB GPU cannot hold it.</span><span>That is why <em>GQA</em>, cache quantization and <em>PagedAttention</em> exist.</span></p>
+  <p>This number is why GQA, cache quantization, and PagedAttention exist. It is also why context length is billed.</p>
+</section>
+
+<section id="attn-s11">
+  <div class="sh"><b>11</b><h2>MHA, MQA, GQA</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of self-attention: an RNN squeezes the past into one vector and bottlenecks, attention projects each token into three roles Q K V, scores how well every pair matches and normalizes with softmax, mixes the values by those weights, and pays with a cost quadratic in length">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">RNN — whole past in one vector</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">bottleneck · long gradient path · not parallel</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Three roles from one token</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">Q needs · K offers · V carries</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Match score for every pair</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">Q·Kᵀ / √d_k then row-wise softmax</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Mix values by weight</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">out = weights · V — what it gets</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="298" fill="var(--tomb)">Cost: every pair is computed</text>
+<text class="sv-d" x="13" y="316" fill="var(--muted)">T² products · KV cache grows with T</text>
+<line x1="340" y1="298.5" x2="372" y2="298.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM — HOW MUCH CACHE IS CUT</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">MHA</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">one K, V set per head — largest cache</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">MQA</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">all heads share one K, V set</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">GQA</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">head groups share a set — the norm</text>
+</svg>
+  <figcaption>Three trade-off points between cache size and quality.</figcaption>
+  </figure>
+
+  <p>All three differ in only one way: <strong>how many heads share one K/V set</strong>. The number of query heads always stays the same.</p>
+  <table>
+    <tr><th>Type</th><th>K/V heads</th><th>KV cache</th><th>Quality</th></tr>
+    <tr><td>MHA</td><td>Same as query heads (32)</td><td>Baseline, 100%</td><td>Highest</td></tr>
+    <tr><td>MQA</td><td>Exactly 1, shared by all heads</td><td>1/32 — 32× smaller</td><td>Clear drop on hard tasks</td></tr>
+    <tr><td>GQA</td><td>A group, e.g. 8</td><td>1/4</td><td>Close to MHA</td></tr>
+  </table>
+  <p>GQA is the balance point, so almost every open model today uses it.</p>
+  <p>Queries still have 32 separate views, but every four adjacent heads share the same set of keys and values.</p>
+  <div class="note">
+    <h4>Tying back to the previous section</h4>
+    This is exactly the <code>n_kv_heads</code> variable in the cache formula. Going from 32 down to 8 cuts the cache fourfold, so the same GPU can serve four times as many concurrent requests. That is the whole motivation for GQA — not to make the model smarter.
+  </div>
+</section>
+
+<section id="attn-s12" class="lesson">
+  <div class="sh"><b>12</b><h2>Common mistakes when coding it yourself</h2></div>
+
+  <p class="key">All five of these bugs leave the model <em>still running with loss still falling</em> — so they survive for a long time.</p>
+
+  <div class="grid2">
+    <div class="card bad"><h4>Softmax on the wrong axis</h4><p><code>softmax(scores, dim=0)</code> instead of <code>dim=-1</code>. The model still runs and the loss still creeps down, but it never gets good. Check that <code>w.sum(-1)</code> gives all ones.</p></div>
+    <div class="card bad"><h4>Masking with 0 instead of -inf</h4><p><code>exp(0)=1</code>, so masked cells still get weight. The model peeks at the future, loss is artificially low in training, then it generates nonsense in real use.</p></div>
+    <div class="card bad"><h4>Forgetting to divide by sqrt(d_k)</h4><p>With a small <code>d_k</code> it still learns, so this bug survives for a long time. With a large <code>d_k</code> the loss is flat from the very first step.</p></div>
+    <div class="card bad"><h4>Wrong reshape order when splitting heads</h4><p>It must be <code>view(T, h, d_k).transpose(1,2)</code>. Do it the other way and dimensions get mixed across heads — no shape error, just a model that cannot learn.</p></div>
+    <div class="card bad"><h4>KV cache not trimmed by length</h4><p>The cache keeps growing across conversation turns until VRAM runs out. This only shows up in long chat sessions, so it often slips through testing.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · self-attention · tokenization, embedding, the block and the output live in the lesson <a href="../transformer-architecture/index.html">Transformer architecture</a>.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>

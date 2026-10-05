@@ -1,11 +1,11 @@
-/* Lab hash map — chèn từng khoá, xem va chạm và lần nới bảng. */
+/* Lab hash map — insert keys one by one, watch collisions and resizes. */
 (function () {
   var el = function (id) { return document.getElementById(id); };
   if (!el("hmlab")) return;
 
   var keys, i, size, slots, used, collisions, resizes, log, timer = null, lastIx = -1, probed = [];
 
-  function h(s) {                       /* hàm băm nhỏ, đủ rải đều cho lab */
+  function h(s) {                       /* a tiny hash function, spreads well enough for the lab */
     var v = 0;
     for (var k = 0; k < s.length; k++) v = (v * 131 + s.charCodeAt(k)) >>> 0;
     return v;
@@ -25,7 +25,7 @@
     while (slots[ix] !== null && slots[ix] !== key) {
       probed.push(ix);
       collisions++; hops++;
-      ix = (ix + 1) % size;                 /* dò tuyến tính cho dễ nhìn */
+      ix = (ix + 1) % size;                 /* linear probing so it is easy to see */
     }
     var fresh = slots[ix] === null;
     slots[ix] = key;
@@ -39,15 +39,15 @@
     size *= 2; slots = new Array(size).fill(null); used = 0; resizes++;
     old.forEach(function (k) { if (k !== null) { var ix = h(k) % size; while (slots[ix] !== null) ix = (ix + 1) % size; slots[ix] = k; used++; } });
     probed = []; lastIx = -1;
-    log.unshift(["nới bảng", size / 2 + " → " + size + " ô", "băm lại " + used + " khoá"]);
+    log.unshift(["resize", size / 2 + " → " + size + " slots", "rehash " + used + " keys"]);
   }
 
   function step() {
     if (i >= keys.length) return;
     var key = keys[i++];
     var r = insert(key);
-    log.unshift([key, "ô " + r.ix, r.hops ? "dò thêm " + r.hops + " ô" : "vào thẳng"]);
-    if (used * 3 > size * 2) grow();       /* Python nới khi dùng quá 2/3 */
+    log.unshift([key, "slot " + r.ix, r.hops ? "probed " + r.hops + " more" : "direct hit"]);
+    if (used * 3 > size * 2) grow();       /* Python resizes once past 2/3 full */
     draw();
   }
 
@@ -68,11 +68,11 @@
     }).join("");
   }
 
-  function stopAuto() { if (timer) { clearInterval(timer); timer = null; el("hmauto").textContent = "Tự chạy"; } }
+  function stopAuto() { if (timer) { clearInterval(timer); timer = null; el("hmauto").textContent = "Auto run"; } }
   el("hmstep").onclick = function () { stopAuto(); step(); };
   el("hmauto").onclick = function () {
     if (timer) { stopAuto(); return; }
-    el("hmauto").textContent = "Dừng";
+    el("hmauto").textContent = "Stop";
     timer = setInterval(function () { if (i >= keys.length) { stopAuto(); return; } step(); }, 700);
   };
   el("hmrst").onclick = build;

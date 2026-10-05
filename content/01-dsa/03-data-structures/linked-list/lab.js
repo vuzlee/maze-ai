@@ -1,4 +1,4 @@
-/* Lab linked list — đảo danh sách từng bước, tô dòng code đang chạy. */
+/* Lab linked list — reverse the list step by step, highlighting the running code line. */
 (function () {
   var el = function (id) { return document.getElementById(id); };
   if (!el("lllab")) return;
@@ -22,7 +22,7 @@
     phase = "init"; step = 0;
     el("lverdict").hidden = true;
     draw();
-    say("Trạng thái ban đầu", "<code>prev = None</code>, <code>cur</code> đứng ở nút đầu. Mỗi vòng sẽ quay đúng một mũi tên.");
+    say("Initial state", "<code>prev = None</code>, <code>cur</code> sits at the first node. Each loop will flip exactly one arrow.");
   }
 
   function next_() {
@@ -32,17 +32,17 @@
       phase = "save"; step++;
       nxt = next[cur];
       draw();
-      say("Bước " + step + " — giữ lại nút sau",
-        "<code>nxt = cur.next</code> → giữ <b>" + (nxt === null ? "∅" : vals[nxt]) +
-        "</b>. Không giữ trước là mất sạch phần đuôi.");
+      say("Step " + step + " — save the next node",
+        "<code>nxt = cur.next</code> → saves <b>" + (nxt === null ? "∅" : vals[nxt]) +
+        "</b>. Without saving it first, the whole tail is lost.");
       return;
     }
     if (phase === "save") {
       phase = "flip";
       next[cur] = prev;
       draw();
-      say("Bước " + step + " — quay mũi tên",
-        "<code>cur.next = prev</code> → nút <b>" + vals[cur] + "</b> giờ trỏ ngược về <b>" +
+      say("Step " + step + " — flip the arrow",
+        "<code>cur.next = prev</code> → node <b>" + vals[cur] + "</b> now points back to <b>" +
         (prev === null ? "∅" : vals[prev]) + "</b>.");
       return;
     }
@@ -50,19 +50,19 @@
       phase = "move";
       prev = cur; cur = nxt; nxt = null;
       draw();
-      say("Bước " + step + " — đi tiếp",
-        "<code>prev, cur = cur, nxt</code>. Phần bên trái đã đảo xong, phần bên phải còn nguyên.");
+      say("Step " + step + " — advance",
+        "<code>prev, cur = cur, nxt</code>. The left part is reversed, the right part is untouched.");
     }
   }
 
   function finish() {
     phase = "done";
     draw();
-    say("Xong sau " + step + " vòng", "<code>cur</code> đã ra khỏi danh sách nên vòng lặp dừng.");
+    say("Done after " + step + " loops", "<code>cur</code> has left the list, so the loop stops.");
     var v = el("lverdict");
     v.hidden = false;
-    v.innerHTML = "Trả về <b>prev</b>, không phải <code>cur</code> — lúc này <code>cur</code> đã là <code>None</code>. " +
-      "Mỗi nút được chạm <b>đúng một lần</b>: O(n) thời gian, O(1) bộ nhớ.";
+    v.innerHTML = "Return <b>prev</b>, not <code>cur</code> — by now <code>cur</code> is <code>None</code>. " +
+      "Each node is touched <b>exactly once</b>: O(n) time, O(1) memory.";
   }
 
   function draw() {
@@ -78,8 +78,8 @@
     });
     el("lview").innerHTML = h + "</div>";
     el("lnote").innerHTML =
-      "<span>số nhỏ phía trên mỗi ô = <em>nút mà nó đang trỏ tới</em></span>" +
-      "<span>ô xanh = <em>đã quay xong</em></span>";
+      "<span>small number above each cell = <em>the node it points to</em></span>" +
+      "<span>green cell = <em>already flipped</em></span>";
 
     var active = { init: "init", save: "save", flip: "flip", move: "move", done: "done" }[phase] || "loop";
     el("lcode").innerHTML = CODE.map(function (l) {
@@ -88,7 +88,7 @@
       return '<div class="ln' + (l.k === active ? " on" : "") + '">' + txt + "</div>";
     }).join("");
 
-    el("lstat").textContent = phase === "done" ? "đã xong · " + step + " vòng" : "vòng " + step;
+    el("lstat").textContent = phase === "done" ? "done · " + step + " loops" : "loop " + step;
   }
 
   function say(head, body) {
@@ -98,11 +98,11 @@
       "</b> · nxt = <b>" + (nxt === null || nxt === undefined ? "–" : vals[nxt]) + "</b></p>";
   }
 
-  function stopAuto() { if (timer) { clearInterval(timer); timer = null; el("lauto").textContent = "Tự chạy"; } }
+  function stopAuto() { if (timer) { clearInterval(timer); timer = null; el("lauto").textContent = "Auto run"; } }
   el("lstep").onclick = function () { stopAuto(); next_(); };
   el("lauto").onclick = function () {
     if (timer) { stopAuto(); return; }
-    el("lauto").textContent = "Dừng";
+    el("lauto").textContent = "Stop";
     timer = setInterval(function () { if (phase === "done") { stopAuto(); return; } next_(); }, 800);
   };
   el("lrst").onclick = build;

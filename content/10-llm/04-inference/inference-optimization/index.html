@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en" data-base="../../../../">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference &amp; cost optimization — MazeAI</title>
+<meta name="description" content="Prefill vs decode, sizing the KV cache, GQA, continuous batching, speculative decoding, a cost-cutting table.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#E3E6F5">
+<meta property="og:url" content="https://maze-ai-lemon.vercel.app/content/10-llm/04-inference/inference-optimization/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MazeAI">
+<meta property="og:title" content="Inference &amp; cost optimization">
+<meta property="og:description" content="Prefill vs decode, sizing the KV cache, GQA, continuous batching, speculative decoding, a cost-cutting table.">
+<meta property="og:image" content="https://maze-ai-lemon.vercel.app/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../../../assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../../../../assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="../../../../assets/apple-touch-icon.png">
+<link rel="canonical" href="https://maze-ai-lemon.vercel.app/content/10-llm/04-inference/inference-optimization/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..700,0..100,0..1;1,9..144,300..700,0..100,0..1&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../../assets/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="in">
+  <a class="brand" href="../../../../index.html"><b class="mk" aria-hidden="true"></b><span class="wm">Maze<i>AI</i></span></a>
+  <label class="find"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16.7 16.7"/></svg><input id="q" type="search" placeholder="Search: probe, softmax, KV cache…" aria-label="Search"><span class="kbd">/</span></label>
+</div></div>
+
+<div class="wrap">
+
+<div id="results" class="res" hidden></div>
+
+<div id="reader">
+  <p class="crumb"><a href="../../../../index.html">← All lessons</a> <span id="crumbTitle"></span></p>
+  <div class="cols">
+    <nav class="toc"><p>Contents</p><div class="list" id="toc"></div></nav>
+    <main class="reader" id="stage">
+      <article class="doc" id="art-inference" data-title="Inference &amp; cost optimization" data-tag="Operations" data-blurb="Prefill vs decode, sizing the KV cache, GQA, continuous batching, speculative decoding, a cost-cutting table.">
+        <header class="hero">
+  <p class="eyebrow">Deep dive · LLM · operations</p>
+  <h1>Inference &amp; cost <em>optimization</em></h1>
+  <p class="lede">Once a model is trained, every remaining problem is systems engineering.</p>
+  <p>This lesson pins down the difference between <b>prefill and decode</b> — the thing that decides every optimization that follows.</p>
+  <p>Then how to <b>size the KV cache</b>, why <b>continuous batching</b> multiplies throughput, and a cost-cutting table ranked by payoff.</p>
+</header>
+
+
+<section id="inference-s1">
+  <div class="sh"><b>01</b><h2>Mental model</h2></div>
+  <p class="key">Generation is bottlenecked by <em>memory bandwidth</em>, not compute — every technique is a way to fit more tokens into one read of the weights.</p>
+
+  <figure class="gist">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<text class="sv-hv" x="372" y="18">ONE SINGLE QUESTION</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Tokens served per weight byte read</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Every technique here raises that number</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Training optimizes FLOPs, inference bandwidth</text>
+</svg>
+  <figcaption>Read the five boxes top to bottom: the first two are the bottleneck, the middle two are the two fixes, the last is how to measure. Each later section highlights exactly one box.</figcaption>
+  </figure>
+
+  <p class="key">A request goes through <em>two phases with opposite characteristics</em> — and every optimization targets only one of them.</p>
+  <div class="cmp two">
+    <div><h5>Prefill — process the whole prompt in one pass</h5><p>Many tokens at once → <b>compute-bound</b>. Determines <b>TTFT</b>, the time to first token.</p></div>
+    <div><h5>Decode — generate one token at a time</h5><p>All weights must be read for every token → <b>memory-bound</b>. Determines <b>TPOT</b>, the time per token after that.</p></div>
+  </div>
+  <p class="stripnote"><span>prefill lacks compute · decode lacks bandwidth</span><span><em>an optimization helps only one phase</em></span></p>
+  <div class="note key">
+    <h4>Remember one sentence</h4>
+    Prefill lacks <strong>compute</strong>; decode lacks <strong>memory bandwidth</strong>. Knowing which phase an optimization acts on tells you whether it helps your problem — and that is what separates a systematic answer from listing tool names.
+  </div>
+</section>
+
+<section id="inference-s2">
+  <div class="sh"><b>02</b><h2>Prefill and decode — why they differ fundamentally</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="46" fill="var(--tomb)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--muted)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="46.5" x2="372" y2="46.5" stroke="var(--tomb)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — PREFILL AND DECODE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Prefill: the whole prompt</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">parallel, compute-bound</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--tomb)">Decode: one token per step</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">not parallel, memory-bound</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Tune the two phases separately</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">TTFT is prefill, TPOT is decode</text>
+</svg>
+  <figcaption>The two phases differ fundamentally; optimizing them as one is wrong from the start.</figcaption>
+  </figure>
+
+  <div class="bars">
+    <div class="b hi"><i>prefill · 2000-token prompt</i><u style="width:100%"></u><b>1 read / 2000 tokens — GPU at full capacity</b></div>
+    <div class="b bad"><i>decode · generating token 2001</i><u style="width:0.05%"></u><b>1 read / 1 token — GPU waits on memory</b></div>
+  </div>
+  <p class="stripnote"><span>compute per byte read</span><span><em>differs by exactly the number of prompt tokens</em></span></p>
+  <div class="eq">
+    <div class="line">
+      <span class="t b"><span>15 ms</span><em>one full read of the weights</em></span>
+      <span class="op">=</span>
+      <span class="t"><span>14 GB</span><em>7B model weights in fp16</em></span>
+      <span class="op">/</span>
+      <span class="t p"><span>900 GB/s</span><em>mid-range GPU bandwidth</em></span>
+    </div>
+    <p class="read">At batch = 1, max generation speed ≈ <b>65 tokens/second</b> — and this number does <b>not</b> depend on how many FLOPs the GPU has.</p>
+  </div>
+  <div class="note key">
+    <h4>The most important consequence of decode being memory-bound</h4>
+    At batch = 1, the GPU reads all the weights just to generate <em>one</em> token. At batch = 32, it reads <strong>the same amount of weights</strong> but produces 32 tokens. So <strong>throughput rises nearly 32× while per-request latency stays almost the same</strong> — until you hit the compute limit. This is why batching is the most profitable optimization, and the foundation of every LLM serving system.
+  </div>
+</section>
+
+<section id="inference-s3">
+  <div class="sh"><b>03</b><h2>KV cache</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — KV CACHE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Past tokens' K, V stay fixed</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">so cache, don't recompute</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">Step cost: T² down to T</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--tomb)">But memory grows linearly with length</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">cache often exceeds the weights</text>
+</svg>
+  <figcaption>The most basic trade-off, and every later technique revolves around this cache.</figcaption>
+  </figure>
+
+  <div class="cmp two">
+    <div><h5>Without a cache</h5><p>Generating token n recomputes K and V for all n−1 previous tokens → <b>O(n²)</b> cost for the whole sequence, redoing finished work.</p></div>
+    <div><h5>With a cache</h5><p>Store K, V for every processed token; a new token computes only its own K, V and attends to the cache → <b>O(n)</b> cost.</p></div>
+  </div>
+  <p class="stripnote"><span>the price is memory</span><span><em>and it is the main constraint of LLM serving</em></span></p>
+  <div class="eq">
+    <div class="line">
+      <span class="t g"><span>bytes</span><em>KV cache</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span>2 · L · n<sub>kv</sub> · d<sub>head</sub></span><em>factor 2 for K and V</em></span>
+      <span class="op">×</span>
+      <span class="t p"><span>seq_len · batch · bytes/value</span><em>the part that grows without bound</em></span>
+    </div>
+    <p class="read">A Llama-3-style 8B model (L = 32, n<sub>kv</sub> = 8, d<sub>head</sub> = 128, fp16): each token costs 2 × 32 × 8 × 128 × 2 = <b>128 KB</b>.</p>
+  </div>
+  <div class="bars">
+    <div class="b"><i>context 8,000 · batch 1</i><u style="width:3%"></u><b>~1 GB</b></div>
+    <div class="b bad"><i>context 8,000 · batch 32</i><u style="width:100%"></u><b>~32 GB — larger than the model weights</b></div>
+  </div>
+  <div class="note warn">
+    <h4>The KV cache usually runs out first, not the weights</h4>
+    Weights are a <strong>constant</strong> — loaded once, shared by every request. The KV cache <strong>scales with batch × context length</strong>, so it is the part that grows without bound. On an 80GB GPU serving an 8B model, weights take only 16GB and the remaining 64GB is the KV cache budget — and that number decides how many concurrent requests you can serve.
+  </div>
+</section>
+
+<section id="inference-s4">
+  <div class="sh"><b>04</b><h2>Lab: KV cache and cost</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — CACHE COST LAB</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Vary layers, heads, length</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">See where cache overtakes weights</text>
+<rect x="372" y="112" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">That is your batch size ceiling</text>
+</svg>
+  <figcaption>The lab turns the KV cache box and shows where memory breaks.</figcaption>
+  </figure>
+
+  <div class="lab">
+    <div class="bar">
+      <div><label>layers</label><input type="number" id="iL" value="32" min="1"></div>
+      <div><label>head_dim</label><input type="number" id="ihd" value="128" min="8"></div>
+      <div><label>Q heads</label><input type="number" id="inq" value="32" min="1"></div>
+      <div><label>attention type</label>
+        <select id="iatt">
+          <option value="mha">MHA — n_kv = n_q</option>
+          <option value="gqa" selected>GQA — n_kv = n_q / 4</option>
+          <option value="mqa">MQA — n_kv = 1</option>
+        </select>
+      </div>
+      <div><label>context length</label><input type="number" id="iseq" value="8192" min="128"></div>
+      <div><label>batch</label><input type="number" id="ibs" value="32" min="1"></div>
+      <div><label>number type</label>
+        <select id="idt"><option value="2" selected>fp16 — 2 bytes</option><option value="1">int8 — 1 byte</option></select>
+      </div>
+      <div><label>VRAM available for cache (GB)</label><input type="number" id="ivram" value="64" min="1"></div>
+    </div>
+    <div id="iview"></div>
+    <p style="font-size:13.6px;color:var(--muted);margin-top:12px">Switch attention from GQA to MHA: the KV cache grows <strong>fourfold</strong> and max concurrent requests drop fourfold —</p>
+  <p>Same GPU, same model. That is why every new model uses GQA.</p>
+  <p>Quantizing the cache to int8 doubles it once more.</p>
+  </div>
+</section>
+
+<section id="inference-s5">
+  <div class="sh"><b>05</b><h2>GQA and MQA — shrinking the KV cache through architecture</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — GQA AND MQA</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">MHA</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">one K, V set per head — largest cache</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">MQA</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">all heads share one — smallest, quality drops</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">GQA</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">head groups share one — today's norm</text>
+</svg>
+  <figcaption>Cut the cache in the architecture itself, before running a single line of code.</figcaption>
+  </figure>
+
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="MHA, GQA and MQA differ in how many K V pairs the Q heads share">
+      <g class="sv-t" fill="var(--text)" text-anchor="middle">
+        <text x="150" y="26">MHA</text><text x="450" y="26">GQA</text><text x="750" y="26">MQA</text>
+      </g>
+      <g class="sv-l" fill="var(--faint)" text-anchor="middle">
+        <text x="150" y="44">each Q head: own K,V</text>
+        <text x="450" y="44">4 Q heads share one pair</text>
+        <text x="750" y="44">all Q heads share one pair</text>
+      </g>
+      <g fill="rgba(var(--blue-a),.2)" stroke="var(--filled)">
+        <rect x="60" y="62" width="26" height="22" rx="3"/><rect x="98" y="62" width="26" height="22" rx="3"/><rect x="136" y="62" width="26" height="22" rx="3"/><rect x="174" y="62" width="26" height="22" rx="3"/><rect x="212" y="62" width="26" height="22" rx="3"/>
+        <rect x="360" y="62" width="26" height="22" rx="3"/><rect x="398" y="62" width="26" height="22" rx="3"/><rect x="436" y="62" width="26" height="22" rx="3"/><rect x="474" y="62" width="26" height="22" rx="3"/><rect x="512" y="62" width="26" height="22" rx="3"/>
+        <rect x="660" y="62" width="26" height="22" rx="3"/><rect x="698" y="62" width="26" height="22" rx="3"/><rect x="736" y="62" width="26" height="22" rx="3"/><rect x="774" y="62" width="26" height="22" rx="3"/><rect x="812" y="62" width="26" height="22" rx="3"/>
+      </g>
+      <g class="sv-l" fill="var(--filled)"><text x="20" y="79">Q</text><text x="320" y="79">Q</text><text x="620" y="79">Q</text></g>
+
+      <g fill="rgba(var(--amber-a),.2)" stroke="var(--probe)">
+        <rect x="60" y="130" width="26" height="22" rx="3"/><rect x="98" y="130" width="26" height="22" rx="3"/><rect x="136" y="130" width="26" height="22" rx="3"/><rect x="174" y="130" width="26" height="22" rx="3"/><rect x="212" y="130" width="26" height="22" rx="3"/>
+        <rect x="398" y="130" width="26" height="22" rx="3"/><rect x="474" y="130" width="26" height="22" rx="3"/>
+        <rect x="736" y="130" width="26" height="22" rx="3"/>
+      </g>
+      <g class="sv-l" fill="var(--probe)"><text x="12" y="147">K,V</text><text x="312" y="147">K,V</text><text x="612" y="147">K,V</text></g>
+
+      <g stroke="var(--rule-hi)" stroke-width="1.4">
+        <path d="M73 88 L73 126"/><path d="M111 88 L111 126"/><path d="M149 88 L149 126"/><path d="M187 88 L187 126"/><path d="M225 88 L225 126"/>
+        <path d="M373 88 L405 126"/><path d="M411 88 L411 126"/><path d="M449 88 L417 126"/><path d="M487 88 L487 126"/><path d="M525 88 L493 126"/>
+        <path d="M673 88 L744 126"/><path d="M711 88 L748 126"/><path d="M749 88 L749 126"/><path d="M787 88 L754 126"/><path d="M825 88 L758 126"/>
+      </g>
+      <g class="sv-t" text-anchor="middle">
+        <text x="150" y="184" fill="var(--tomb)">KV cache 1×</text>
+        <text x="450" y="184" fill="var(--ok)">1/4 · quality nearly unchanged</text>
+        <text x="750" y="184" fill="var(--probe)">1/32 · quality drops more</text>
+      </g>
+    </svg>
+    <figcaption>The number of K,V pairs sets the KV cache; the number of Q heads is unchanged, so attention quality drops very little when only K,V are merged.</figcaption>
+  </figure>
+  <table>
+    <tr><th></th><th>MHA</th><th>GQA</th><th>MQA</th></tr>
+    <tr><td>Relative KV cache</td><td>1×</td><td><strong>1/4</strong></td><td>1/32</td></tr>
+    <tr><td>Quality</td><td>Baseline</td><td>Nearly equal</td><td>Noticeable drop</td></tr>
+    <tr><td>Used in</td><td>Early models</td><td><strong>Llama-2 70B, Llama-3, Mistral, nearly every new model</strong></td><td>PaLM, some aggressively optimized models</td></tr>
+  </table>
+  <div class="note">
+    <h4>Why GQA is the most balanced choice</h4>
+    It cuts the KV cache fourfold — i.e. four times as many concurrent requests on the same hardware — with a quality loss that is barely measurable. MQA cuts even more but at a real cost. That nearly every new model picks GQA shows it is the best trade-off in the range, and being able to say so shows you understand architectures are chosen <em>for operational reasons</em>, not just for quality.
+  </div>
+</section>
+
+<section id="inference-s6">
+  <div class="sh"><b>06</b><h2>Batching — static and continuous</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — BATCHING</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--tomb)">Static: wait for a full batch</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">a long one stalls all</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Continuous: release each when done</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">no idle gaps on the GPU</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Throughput up several-fold, TTFT about the same</text>
+</svg>
+  <figcaption>The cheapest way for many tokens to share one read of the weights.</figcaption>
+  </figure>
+
+  <figure>
+    <svg viewBox="0 0 900 272" role="img" aria-label="Static batching leaves many empty slots, continuous batching fills them right away">
+      <text x="20" y="24" class="sv-t" fill="var(--tomb)">Static batching — runs until all finish</text>
+      <g class="sv-l" fill="var(--faint)"><text x="20" y="52">A</text><text x="20" y="76">B</text><text x="20" y="100">C</text><text x="20" y="124">D</text></g>
+      <g fill="var(--filled)">
+        <rect x="50" y="40" width="140" height="14" rx="3"/>
+        <rect x="50" y="64" width="700" height="14" rx="3"/>
+        <rect x="50" y="88" width="230" height="14" rx="3"/>
+        <rect x="50" y="112" width="100" height="14" rx="3"/>
+      </g>
+      <g fill="rgba(var(--red-a),.18)" stroke="var(--tomb)" stroke-dasharray="3 3">
+        <rect x="190" y="40" width="560" height="14" rx="3"/>
+        <rect x="280" y="88" width="470" height="14" rx="3"/>
+        <rect x="150" y="112" width="600" height="14" rx="3"/>
+      </g>
+      <text x="470" y="146" text-anchor="middle" class="sv-l" fill="var(--tomb)">finished slots still held — GPU runs while most slots sit idle</text>
+
+      <line x1="20" y1="160" x2="880" y2="160" stroke="var(--rule)"/>
+      <text x="20" y="184" class="sv-t" fill="var(--ok)">Continuous batching — scheduled per decode step</text>
+      <g class="sv-l" fill="var(--faint)"><text x="20" y="212">A→E</text><text x="20" y="236">B</text></g>
+      <rect x="50" y="200" width="140" height="14" rx="3" fill="var(--filled)"/>
+      <rect x="194" y="200" width="300" height="14" rx="3" fill="var(--ok)"/>
+      <rect x="498" y="200" width="252" height="14" rx="3" fill="var(--ok)"/>
+      <rect x="50" y="224" width="700" height="14" rx="3" fill="var(--filled)"/>
+      <text x="470" y="258" class="sv-l" fill="var(--ok)" text-anchor="middle">A leaves as soon as it ends, E joins the freed slot</text>
+    </svg>
+    <figcaption>Response lengths are highly skewed in practice — some requests are 10 tokens, some 2,000 — so the gaps in the top half are most of the GPU capacity.</figcaption>
+  </figure>
+  <p><strong>Why the gap is so large:</strong> response lengths in practice are highly skewed —</p>
+  <p>Some requests generate 10 tokens, some generate 2000. With static batching, the whole batch is held by the longest request, so most slots in the batch run idle.</p>
+  <p>Continuous batching delivers several times more throughput on the same hardware, and it is the main contribution of serving engines like vLLM and TGI.</p>
+  <div class="note warn">
+    <h4>The throughput vs latency trade-off</h4>
+    A large batch gives high throughput but <strong>raises TPOT</strong> — each decode step has to compute for more requests. So choose by product requirements: a chatbot needs tokens out fast, so keep the batch moderate; bulk processing pushes the batch to the max. Stating this trade-off instead of "bigger batch is always better" is a clear differentiator.
+  </div>
+</section>
+
+<section id="inference-s7">
+  <div class="sh"><b>07</b><h2>PagedAttention</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — PAGEDATTENTION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Cache split into small pages</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">no contiguous block needed</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">No over-allocating for max length</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">fragmentation from ~60% down to a few %</text>
+<rect x="372" y="152" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Shared prefix means shared pages</text>
+</svg>
+  <figcaption>Exactly the operating system paging idea, applied to the KV cache.</figcaption>
+  </figure>
+
+  <p class="key">You cannot know in advance how many tokens a request will generate, so the naive approach must <em>allocate the cache for the max length</em> — and most of that space sits empty.</p>
+  <div class="strip">
+    <div class="c on"><i>actually used</i><b>200 tokens</b><u>holds data</u></div>
+    <div class="c dim"><i>allocated</i><b>4,096 tokens</b><u>sits empty</u></div>
+  </div>
+  <p class="stripnote"><span>contiguous allocation for the max length</span><span><em>fragmentation; most allocated VRAM is wasted</em></span></p>
+  <div class="stack">
+    <div class="s"><b>Logical cache</b><span>[block 0][block 1][block 2]… — contiguous from the request's view</span></div>
+    <div class="s"><b>Physical cache</b><span>blocks scattered across VRAM, joined by a mapping table — like OS paging</span></div>
+    <div class="s ok"><b>Result</b><span>allocation on real demand, almost no fragmentation · and requests with <b>the same prefix</b> share blocks</span></div>
+  </div>
+  <p>The second benefit — <strong>prefix sharing</strong> — matters more than it looks.</p>
+  <p>In practice, thousands of requests often share one long system prompt.</p>
+  <p>With PagedAttention, the KV cache of that prefix is stored <em>once</em> and every request points to the same blocks, instead of each request keeping its own copy.</p>
+  <div class="note">
+    <h4>The short version</h4>
+    "PagedAttention manages the KV cache in fixed-size blocks, like memory paging, so it does not pre-allocate for the max length — this removes fragmentation and lets many requests share the blocks of an identical prefix. The result is significantly more concurrent requests on the same amount of VRAM."
+  </div>
+</section>
+
+<section id="inference-s8">
+  <div class="sh"><b>08</b><h2>Quantization at inference</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="172" fill="var(--probe)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--muted)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="172.5" x2="372" y2="172.5" stroke="var(--probe)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — QUANTIZATION</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">INT8 or INT4 for weights</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">fewer bytes to read, faster decode</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">AWQ, GPTQ keep quality nearly intact</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Quantize KV cache too</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">2× the batch that fits</text>
+<rect x="372" y="194" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="216" fill="var(--tomb)">Too low and reasoning tasks clearly suffer</text>
+</svg>
+  <figcaption>The most direct way to cut the bytes read per step.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>What to quantize</th><th>Effect</th><th>Notes</th></tr>
+    <tr><td><strong>Weights</strong> — int8, int4</td><td>Model 2–4× smaller; faster decode from reading fewer bytes</td><td>Hits exactly where decode is bound: fewer bytes to read</td></tr>
+    <tr><td><strong>KV cache</strong> — int8, fp8</td><td>Cache 2× smaller → twice the concurrent requests</td><td>Usually costs very little quality; worth doing almost always</td></tr>
+    <tr><td>Activation</td><td>Needed for integer-only hardware</td><td>Harder, easily loses quality</td></tr>
+  </table>
+  <div class="note key">
+    <h4>Why weight quantization helps <em>speed</em>, not just size</h4>
+    Because decode is bound by memory bandwidth. int4 weights need only <strong>1/4 of the bytes</strong> read compared with fp16, so each decode step takes nearly proportionally less time — even though the number of operations is unchanged. Here a memory saving turns directly into a speedup, unlike compute-bound problems. Explaining this mechanism is a systems-level answer.
+  </div>
+  <p>A measurement caveat: <em>weight-only</em> quantization helps most at small batch sizes, where bandwidth is the bottleneck.</p>
+  <p>But at very large batch sizes the system becomes compute-bound, so the gain shrinks — and the weights must also be dequantized into a computable format.</p>
+</section>
+
+<section id="inference-s9">
+  <div class="sh"><b>09</b><h2>Speculative decoding</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — SPECULATIVE DECODING</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">A small model drafts tokens</text>
+<rect x="372" y="70" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--probe)">Big model checks them all in one pass</text>
+<rect x="372" y="112" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="134" fill="var(--ok)">Same output distribution</text>
+<text class="sv-s" x="388" y="152" fill="var(--dim)">not an approximation, a pure speedup</text>
+<rect x="372" y="174" width="488" height="54" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--tomb)">Many misses mean a loss</text>
+<text class="sv-s" x="388" y="214" fill="var(--dim)">draft must be close</text>
+</svg>
+  <figcaption>Many tokens per read of the weights, without changing the result.</figcaption>
+  </figure>
+
+  <p class="key">Use a <em>small</em> model to propose several tokens ahead, then the large model checks them all in <em>one</em> forward pass.</p>
+  <div class="stack">
+    <div class="s"><b>1 · Draft model proposes</b><span>a small, fast model generates k = 4 tokens</span></div>
+    <div class="s"><b>2 · Main model verifies</b><span>a single forward pass over all 4 of those tokens</span></div>
+    <div class="s"><b>3 · Accept up to the first mismatch</b><span>matching tokens are kept, everything from the mismatch on is dropped</span></div>
+    <div class="s ok"><b>4 · Repeat</b><span>accept 3 of 4 → 3 tokens for roughly the cost of 1</span></div>
+  </div>
+  <div class="note key">
+    <h4>Why this works and does not change the result</h4>
+    <p><strong>It works</strong> because decode is memory-bound: verifying 4 tokens in one forward pass costs about as much as generating 1 token, since the weights are still read only once.</p>
+  <p>Compute capacity that used to sit idle is now put to use.</p>
+    <p><strong>The result is unchanged</strong> because the acceptance rule is designed so the output distribution is <em>identical</em> to normal decoding.</p>
+  <p>It is not an approximation — it is a pure speedup, and this point is very often misunderstood.</p>
+  </div>
+  <p>The real-world speedup is about 1.5–3×, depending on the <strong>acceptance rate</strong> —</p>
+  <p>That is, how closely the draft model matches the main model. For predictable text (code, structured text) the acceptance rate is high, so the gain is large;</p>
+  <p>For creative text it is smaller. Variants without a separate draft model also exist, using n-grams from the prompt itself to propose tokens.</p>
+</section>
+
+<section id="inference-s10">
+  <div class="sh"><b>10</b><h2>Prompt caching</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="109" fill="var(--filled)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--muted)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="235" fill="var(--dim)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--dim)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="109.5" x2="372" y2="109.5" stroke="var(--filled)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — PROMPT CACHE</text>
+<rect x="372" y="28" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">System prompt repeats on every call</text>
+<rect x="372" y="70" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="92" fill="var(--ok)">Keep KV of the shared part</text>
+<text class="sv-s" x="388" y="110" fill="var(--dim)">skip that prefill</text>
+<rect x="372" y="132" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Pays most with long, fixed prompts</text>
+<text class="sv-s" x="388" y="172" fill="var(--dim)">RAG, agent, few-shot</text>
+</svg>
+  <figcaption>The easiest win, and the one most often forgotten.</figcaption>
+  </figure>
+
+  <div class="strip">
+    <div class="c t"><i>system prompt</i><b>2,000 tokens</b><u>identical on every request</u></div>
+    <div class="c t"><i>RAG documents</i><b>3,000 tokens</b><u>identical within a session</u></div>
+    <div class="c on"><i>question</i><b>50 tokens</b><u>varies</u></div>
+  </div>
+  <p class="stripnote"><span>no cache: re-prefill 5,050 tokens every time</span><span><em>with cache: prefill only the 50 new tokens</em></span></p>
+  <table>
+    <tr><th>Benefit</th><th>Magnitude</th></tr>
+    <tr><td>Lower TTFT</td><td>Very significant when the prefix is most of the prompt</td></tr>
+    <tr><td>Lower cost</td><td>Many providers bill cached tokens at a much lower price</td></tr>
+    <tr><td>Higher throughput</td><td>The GPU does not redo old work</td></tr>
+  </table>
+  <div class="note key">
+    <h4>A prompt design consequence — easy to miss</h4>
+    The cache only applies to <strong>an exactly identical leading part</strong>. So put everything stable first and everything that changes last: system prompt, then few-shot examples, then documents, and finally the user's question. Inserting a timestamp or request id at the <em>start</em> of the prompt wipes out the cache — a small ordering mistake that loses the entire benefit.
+  </div>
+</section>
+
+<section id="inference-s11">
+  <div class="sh"><b>11</b><h2>Metrics to measure</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — 4 METRICS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">TTFT — wait until first token</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">the user's instant impression</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--filled)">TPOT — gap between later tokens</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">sets reading speed</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--probe)">Throughput — total tokens/second</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">sets the unit cost</text>
+<rect x="372" y="214" width="488" height="34" rx="5" fill="rgba(var(--red-a),.10)" stroke="var(--tomb)" stroke-width="1"/>
+<text class="sv-t" x="388" y="236" fill="var(--tomb)">Bigger batch: more throughput, worse TTFT</text>
+</svg>
+  <figcaption>The four metrics pull against each other; you cannot optimize them all at once.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Metric</th><th>Meaning</th><th>Matters for</th></tr>
+    <tr><td><strong>TTFT</strong><br>time to first token</td><td>From receiving the request to the first token. Dominated by prefill</td><td>Perceived responsiveness; most important for chatbots</td></tr>
+    <tr><td><strong>TPOT</strong><br>time per output token</td><td>Time for each token after that. Dominated by decode</td><td>How fast text streams out; must beat human reading speed</td></tr>
+    <tr><td><strong>Throughput</strong></td><td>Total tokens/second across the system</td><td>Cost per request; most important for bulk processing</td></tr>
+    <tr><td><strong>p99 latency</strong></td><td>The slowest 1% of cases</td><td>Real experience — the average hides the problem</td></tr>
+  </table>
+  <div class="note warn">
+    <h4>Throughput and latency are opposed</h4>
+    A larger batch raises throughput and degrades TPOT. No configuration is optimal for both, so <strong>pin down the requirements first</strong>: a chatbot needs TPOT under roughly 50ms so text streams faster than people read, while bulk jobs care only about throughput and can push the batch to the max. Answering "optimize both" is the wrong answer.
+  </div>
+</section>
+
+<section id="inference-s12">
+  <div class="sh"><b>12</b><h2>Cutting cost at the application layer — ranked by payoff</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — APP-LAYER SAVINGS</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--ok)">Trim prompt and output</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">biggest win, doable today</text>
+<rect x="372" y="90" width="488" height="34" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--ok)">Cache repeated answers</text>
+<rect x="372" y="132" width="488" height="34" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="154" fill="var(--probe)">Route easy ones to a small model</text>
+<rect x="372" y="174" width="488" height="34" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="196" fill="var(--filled)">Then tune the serving layer</text>
+</svg>
+  <figcaption>Ranked by payoff per effort; work from the top down.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Technique</th><th>Savings</th><th>Notes</th></tr>
+    <tr><td><strong>1. Response caching</strong></td><td>Equal to the duplicate rate — possibly 30–70%</td><td>Cheapest and most profitable. Real questions repeat more than you think</td></tr>
+    <tr><td><strong>2. Pick the model by difficulty</strong></td><td>Very large — small models are tens of times cheaper</td><td>Classify difficulty, then route; escalate to the large model only when needed</td></tr>
+    <tr><td><strong>3. Prompt caching</strong></td><td>Significant when the prefix is long and reused</td><td>Requires ordering the prompt correctly</td></tr>
+    <tr><td>4. Shorten the prompt</td><td>Directly proportional to the tokens removed</td><td>Check whether the few-shot examples are still needed</td></tr>
+    <tr><td>5. Cap output tokens</td><td>Output tokens usually cost several times more than input tokens</td><td>Set <code>max_tokens</code> and ask for concise answers in the prompt</td></tr>
+    <tr><td>6. Batch processing</td><td>Many APIs offer a lower price tier for batch mode</td><td>Only usable when an immediate answer is not needed</td></tr>
+    <tr><td>7. Self-host an open model</td><td>Cheaper at large scale</td><td>Only pays off when traffic keeps the GPU busy; add operating costs</td></tr>
+  </table>
+  <div class="note key">
+    <h4>The top two rows hold almost all the benefit</h4>
+    Response caching and difficulty-based routing usually save more than all model-layer optimizations combined — and both live at the application layer, without touching the GPU. Raising them <em>before</em> quantization and speculative decoding is the right order, because it shows you optimize for real cost, not for technical interest.
+  </div>
+</section>
+
+<section id="inference-s13">
+  <div class="sh"><b>13</b><h2>Decision table</h2></div>
+  <figure class="scrollx">
+<svg viewBox="0 0 860 323" role="img" aria-label="Five-box map of inference optimization: generation is a loop of one token per step, so every step re-reads all the weights; the bottleneck is memory bandwidth, not compute; the two fixes are packing more work into one read and making the data smaller; and every choice must be measured on four metrics, because improving one trades off another">
+<rect x="0" y="26" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="46" fill="var(--dim)">Generation: one token per step</text>
+<text class="sv-d" x="13" y="64" fill="var(--dim)">each step re-reads all the weights</text>
+<line x1="170.0" y1="67" x2="170.0" y2="77" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,85 165.8,77 174.2,77" fill="var(--rule-hi)"/>
+<rect x="0" y="89" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="109" fill="var(--dim)">Bound by memory bandwidth, not compute</text>
+<text class="sv-d" x="13" y="127" fill="var(--dim)">GPU idle, still slow</text>
+<line x1="170.0" y1="130" x2="170.0" y2="140" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,148 165.8,140 174.2,140" fill="var(--rule-hi)"/>
+<rect x="0" y="152" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="172" fill="var(--dim)">Pack more work into one read</text>
+<text class="sv-d" x="13" y="190" fill="var(--dim)">batching · KV cache · speculative decoding</text>
+<line x1="170.0" y1="193" x2="170.0" y2="203" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,211 165.8,203 174.2,203" fill="var(--rule-hi)"/>
+<rect x="0" y="215" width="340" height="41" rx="6" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1.6"/>
+<text class="sv-t" x="13" y="235" fill="var(--ok)">Shrink weights and cache</text>
+<text class="sv-d" x="13" y="253" fill="var(--muted)">quantization · GQA · PagedAttention</text>
+<line x1="170.0" y1="256" x2="170.0" y2="266" stroke="var(--rule-hi)" stroke-width="1.2"/><polygon points="170.0,274 165.8,266 174.2,266" fill="var(--rule-hi)"/>
+<rect x="0" y="278" width="340" height="41" rx="6" fill="none" stroke="var(--rule)" stroke-width="1"/>
+<text class="sv-t" x="13" y="298" fill="var(--dim)">Measure TTFT, TPOT, throughput, cost</text>
+<text class="sv-d" x="13" y="316" fill="var(--dim)">improving one metric costs another</text>
+<line x1="340" y1="235.5" x2="372" y2="235.5" stroke="var(--ok)" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text class="sv-hv" x="372" y="18">ZOOM IN — DECISION TABLE</text>
+<rect x="372" y="28" width="488" height="54" rx="5" fill="rgba(var(--blue-a),.10)" stroke="var(--filled)" stroke-width="1"/>
+<text class="sv-t" x="388" y="50" fill="var(--filled)">Need low TTFT</text>
+<text class="sv-s" x="388" y="68" fill="var(--dim)">low batch, prompt cache</text>
+<rect x="372" y="90" width="488" height="54" rx="5" fill="rgba(var(--amber-a),.10)" stroke="var(--probe)" stroke-width="1"/>
+<text class="sv-t" x="388" y="112" fill="var(--probe)">High throughput</text>
+<text class="sv-s" x="388" y="130" fill="var(--dim)">continuous batching, big batch</text>
+<rect x="372" y="152" width="488" height="54" rx="5" fill="rgba(var(--green-a),.10)" stroke="var(--ok)" stroke-width="1"/>
+<text class="sv-t" x="388" y="174" fill="var(--ok)">Low memory</text>
+<text class="sv-s" x="388" y="192" fill="var(--dim)">quantization, GQA, PagedAttention</text>
+</svg>
+  <figcaption>A lookup table to come back to when choosing a serving configuration.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Problem</th><th>Target</th><th>What to do</th></tr>
+    <tr><td>TTFT too high</td><td>Prefill</td><td>Prompt caching, shorter prompts, chunked prefill</td></tr>
+    <tr><td>Text streams out too slowly</td><td>Decode</td><td>Smaller batch, weight quantization, speculative decoding</td></tr>
+    <tr><td>Low throughput, idle GPU</td><td>Scheduling</td><td>Continuous batching, raise max batch</td></tr>
+    <tr><td>Out of VRAM under many requests</td><td>KV cache</td><td>GQA, cache quantization, PagedAttention, lower max context</td></tr>
+    <tr><td>API cost too high</td><td>Application layer</td><td>Response caching, model routing, cap output tokens</td></tr>
+    <tr><td>p99 far worse than the average</td><td>Queueing</td><td>Limit concurrent requests, set quotas, separate queues by request type</td></tr>
+  </table>
+</section>
+
+<section id="inference-s14">
+  <div class="sh"><b>14</b><h2>Common mistakes</h2></div>
+  <div class="grid2">
+    <div class="card bad"><h4>Sizing VRAM by weights alone</h4><p>At high batch the KV cache is often larger than the weights. Count both.</p></div>
+    <div class="card bad"><h4>Using static batching</h4><p>The whole batch is held by the longest request. Continuous batching gives several times more throughput.</p></div>
+    <div class="card bad"><h4>Putting a timestamp at the start of the prompt</h4><p>It wipes out the prefix cache. Stable things first, changing things last.</p></div>
+    <div class="card bad"><h4>Trying to optimize both throughput and latency</h4><p>They are opposed. Pin down the product requirements first.</p></div>
+    <div class="card bad"><h4>Reporting only average latency</h4><p>The average hides the tail. Report p95 and p99.</p></div>
+    <div class="card bad"><h4>Optimizing the model before caching at the application layer</h4><p>Response caching and model routing usually pay more than all GPU optimizations combined.</p></div>
+  </div>
+</section>
+
+
+<footer>Deep dive · inference &amp; cost optimization · bandwidth and memory figures are typical values, meant for order-of-magnitude estimates, not benchmarks.</footer>
+
+      </article>
+      <div class="nextprev" id="np"></div>
+    </main>
+  </div>
+</div>
+
+</div>
+
+<script src="../../../../assets/catalog.js"></script>
+<script src="../../../../assets/search-index.js"></script>
+<script src="../../../../assets/app.js"></script>
+<script src="lab.js"></script>
+</body>
+</html>
