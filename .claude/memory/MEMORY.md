@@ -10,6 +10,7 @@ browser before writing a new lesson.
 | Note | Contents |
 |---|---|
 | [Lesson standard](standards/lesson-standard.md) | **read first.** Language rule (repo English, chat Vietnamese) + seven rules: no Q&A · every section and subsection animated · text supports figures · sections → subsections · minimal common knowledge · one lesson one topic. Figure traps from the SQL shelf and how to check |
+| [DSA lesson prompt](standards/dsa-lesson-prompt.md) | **the prompt for one DSA lesson**: Mental model · Properties · Patterns, figure script, blue–violet palette, checks. Pilot `binary-search` |
 | [Animated figures](standards/animated-figures.md) | cover-the-text test, nine construction rules, technical traps, four-layer check |
 | [Equations](standards/equations.md) | LaTeX-looking formulas in HTML/CSS, no library |
 | [Tools and checks](standards/tools-and-checks.md) | `soat.py`, svgkit, what machines miss, how many review rounds |
@@ -24,5 +25,5 @@ browser before writing a new lesson.
 
 Read this file at the start of a session. Record **why** and **where things stand**; do not record
 what `CLAUDE.md`, the folder tree or git already says. Delete wrong notes instead of appending
-corrections. Keep it under six notes.
+corrections. Keep it under seven notes.
 Frontmatter: `name` · `description` · `metadata.type` · `updated: YYYY-MM-DD`. Notes are English.

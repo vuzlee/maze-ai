@@ -87,3 +87,5 @@ Learned on the SQL shelf:
 touched, then **screenshot with headless Chrome** (`--force-prefers-reduced-motion` shows the end
 state) and look at every figure. The SQL figure generator script is not in the repo — rebuild from
 the existing HTML.
+
+DSA lessons follow [[dsa-lesson-prompt]] on top of these rules.

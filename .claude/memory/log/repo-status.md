@@ -17,7 +17,8 @@ next one starts.
 |---|---|
 | 04 Distributed systems | ✅ done 2026-10-05 — 6 lessons, HLD icon figures |
 | 05 SQL & relational | ✅ done — 12 lessons, English, subsections, every section animated |
-| 01–03, 06–12 | ⏳ still Vietnamese, old template (Q&A, labs) |
+| 01 DSA | 🔄 all 24 lessons rewritten 2026-10-05 per [[dsa-lesson-prompt]] (pilot `binary-search` approved); the other 23 await user review; figures overflow at ~490px |
+| 02–03, 06–12 | ⏳ still Vietnamese, old template (Q&A, labs) |
 
 ## Shared UI
 
