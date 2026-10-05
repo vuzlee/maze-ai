@@ -103,3 +103,24 @@ In order; a layer must be clean before the next:
 5. **Run `check.py`**, fix geometry.
 6. **Run the four-layer check.**
 7. `python3 tools/build.py`, then open in a browser — [[tools-and-checks]].
+
+## Traps found reviewing the ML shelf (2026-10-06)
+
+- **Splice must replace, never wrap.** Several splice scripts wrapped a new `<figure class="gist">` around an
+  existing one, so the figure showed 2–4 nested grey frames. Replace the whole old `<figure>…</figure>`.
+  Check: `<figure` and `</figure>` counts match and no `<figure…>\s*<figure` on the page.
+- **Measure the viewBox in a browser, not by guessing.** `python3 tools/svgkit/clipcheck.py <pages>` renders
+  each figure's final state and lists content spilling past the viewBox; `tools/svgkit/fitviewbox.py` grows
+  the viewBox to fit. Regex checks missed every case (moved `<g transform>` groups).
+- **Math is always LaTeX-looking**: in SVG use `class="sv-m"` with variables in `<tspan class="v">`, never a
+  monospace font; in HTML use `.eq` / `span.mth`. `x_i^2` must stack: `<var>x</var><span class="ss"><sup>2</sup><sub>i</sub></span>`.
+  Monospace stays only for real code (`JOIN … ON`, `x = "local"`).
+- **Worked math beats labels**: the chain rule reads best as stacked fractions filled in step by step
+  (dy/du = 2u = 14, × du/dx = 2 → 28); growth/decay as small plots of cⁿ with one word each, not a legend.
+- **General notation first**: column heads `x₁, x₂` with the domain name small under them; end with the
+  general form (`x′ = f(x₁, x₂)`).
+- **Highlight rings sit outside the cells they ring** (e.g. `R(x-3, …)` around a row starting at x=0), so they
+  poke past the viewBox and get sliced on the left. Two fixes, both in place since 2026-10-06:
+  `figure.gist svg{overflow:visible}` in style.css, and `python3 tools/svgkit/padviewbox.py <pages>` which
+  measures every element with all opacity forced on (mid-animation rings included) and widens the viewBox by
+  8px where needed. **Run padviewbox on every page after generating figures.** clipcheck only sees the final frame.

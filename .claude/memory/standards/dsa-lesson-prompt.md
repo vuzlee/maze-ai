@@ -103,7 +103,7 @@ rounds ("oke rồi đấy"). Everything below was learned from those rounds. Han
   stack code under the data on mobile.
 - All 24 DSA lessons follow this prompt (2026-10-05); only `binary-search` is user-approved so far.
 
-## Same palette on the Python shelf (2026-10-05)
+## Same palette on the Python and CS shelves (2026-10-05/06)
 
 The user asked for the analogous palette there too. Done by a token swap in figures only:
 `--probe`→`--violet`, `--ok`→`--filled`, `--tomb`→`--rose` (new token, `#B83A86`), old

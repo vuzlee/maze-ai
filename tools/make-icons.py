@@ -18,59 +18,67 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets"
 
-BG = (253, 253, 255, 255)       # --bg #FDFDFF — maze walls
-CLAY_HI = (133, 147, 216)       # --brand-lt #8593D8
-CLAY_LO = (64, 69, 106)         # --brand-ink #40456A
-DOT = (173, 183, 235, 255)      # --brand-line #ADB7EB — the goal
+BG = (253, 253, 255, 255)       # --bg, only behind the iOS icon
+LO = (64, 69, 106)              # --brand-ink #40456A, bottom-left
+HI = (133, 147, 216)            # --brand-lt #8593D8, top-right
 
 SS = 8                          # supersample, then downscale
 
-# coordinates on the 32-unit grid of assets/favicon.svg
-RADIUS = 9
-WALLS = [[(8, 8), (24, 8), (24, 18)], [(8, 8), (8, 24), (19, 24)], [(13, 13), (19, 13), (19, 19)]]
-STROKE = 2.6
-GOAL = (24, 24, 2.4)
+# coordinates on the 32-unit grid of assets/favicon.svg — no tile, just the mark
+# the soft M: straight points and ("Q", control, end) quadratic curves, as in the SVG path
+PATH = [(5, 26), (5, 10), ("Q", (5, 7), (8, 7)), ("Q", (11, 7), (11, 10)), (11, 15),
+        ("Q", (11, 18), (13.5, 18)), ("Q", (16, 18), (16, 15)), (16, 14),
+        ("Q", (16, 11), (18.5, 11)), ("Q", (21, 11), (21, 9)), ("Q", (21, 7), (24, 7)),
+        ("Q", (27, 7), (27, 10)), (27, 26)]
+STROKE = 3
+GOAL = [(16, 22), (18.5, 24.5), (16, 27), (13.5, 24.5)]   # the ◆
+
+def flatten(path, n=24):
+    """Turn PATH into a polyline, sampling each quadratic curve into n segments."""
+    pts = [path[0]]
+    for seg in path[1:]:
+        if seg[0] == "Q":
+            (x0, y0), (cx, cy), (x1, y1) = pts[-1], seg[1], seg[2]
+            for i in range(1, n + 1):
+                t = i / n
+                pts.append(((1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * x1,
+                            (1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * y1))
+        else:
+            pts.append(seg)
+    return pts
 
 def gradient(size):
-    """Chéo 145° từ --clay-hi xuống nhánh tối, xấp xỉ bằng nội suy theo (x+y)."""
+    """Chéo từ góc dưới-trái (tối) lên góc trên-phải (sáng), như x1=0 y1=1 → x2=1 y2=0 trong SVG."""
     g = Image.new("RGB", (size, size))
     px = g.load()
     for y in range(size):
         for x in range(size):
-            t = (x + y) / (2 * size - 2)
-            px[x, y] = tuple(round(a + (b - a) * t) for a, b in zip(CLAY_HI, CLAY_LO))
+            t = (x + (size - 1 - y)) / (2 * size - 2)
+            px[x, y] = tuple(round(a + (b - a) * t) for a, b in zip(LO, HI))
     return g
-
 
 def mark(px, pad_ratio=0.0, opaque=False):
     """Một icon vuông cạnh `px`. pad_ratio > 0 thì chừa lề để iOS bo góc không cắt vào nét."""
     side = px * SS
     pad = round(side * pad_ratio)
     inner = side - 2 * pad
-    u = inner / 32.0                                   # 1 đơn vị khung 32
+    u = inner / 32.0
 
-    tile = gradient(inner)
     mask = Image.new("L", (inner, inner), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, inner - 1, inner - 1], radius=round(RADIUS * u), fill=255)
+    d = ImageDraw.Draw(mask)
+    w = max(1, round(STROKE * u))
+    pts = [(x * u, y * u) for x, y in flatten(PATH)]
+    d.line(pts, fill=255, width=w, joint="curve")
+    for x, y in pts:                                       # round caps + joins (no gaps on curves)
+        d.ellipse([x - w / 2, y - w / 2, x + w / 2, y + w / 2], fill=255)
+    d.polygon([(x * u, y * u) for x, y in GOAL], fill=255)
 
     plate = Image.new("RGBA", (inner, inner), (0, 0, 0, 0))
-    plate.paste(tile, (0, 0), mask)
-
-    d = ImageDraw.Draw(plate)
-    w = max(1, round(STROKE * u))
-    for poly in WALLS:
-        pts = [(x * u, y * u) for x, y in poly]
-        d.line(pts, fill=BG, width=w, joint="curve")
-        for x, y in pts:                                   # round caps
-            r = w / 2
-            d.ellipse([x - r, y - r, x + r, y + r], fill=BG)
-    gx, gy, gr = GOAL
-    d.ellipse([(gx - gr) * u, (gy - gr) * u, (gx + gr) * u, (gy + gr) * u], fill=DOT)
+    plate.paste(gradient(inner), (0, 0), mask)
 
     canvas = Image.new("RGBA", (side, side), BG if opaque else (0, 0, 0, 0))
     canvas.paste(plate, (pad, pad), plate)
     return canvas.resize((px, px), Image.LANCZOS)
-
 
 def main():
     mark(512).save(OUT / "icon-512.png")
