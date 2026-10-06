@@ -316,11 +316,11 @@ def fig_collinear():
     f.show(S(t.colx(1), t.bottom(N) + 22, 'x₂ ≈ 0.9 · x₁, correlation 0.9999', VI), .5)
     cx = 450
     f.show(S(cx, 70, 'fit on all 6 rows', MU), 1.8)
-    f.show(M(cx, 100, '{w}₁ = %s     {w}₂ = %s' % (sgn(c1[1]), sgn(c1[2])), BR, 'start'), 2.0)
+    f.show(M(cx, 100, '{w}₁ = %s,   {w}₂ = %s' % (sgn(c1[1]), sgn(c1[2])), BR, 'start'), 2.0)
     for i in range(N): f.show(T(t.cx(4), t.ry(i) + 17, sgn(p1[i], 1), BR, mono=True), 2.3 + i * .08)
-    f.show(R(t.x, t.ry(1), t.w, t.rh, SUNK, RULE_HI, 3) + T(t.cx(0), t.ry(1) + 17, 'B', GH) + L(t.x + 6, t.ry(1) + 13, t.colx(4) - 6, t.ry(1) + 13, GH, 1.2), 3.4)
+    f.show(R(t.x + 1, t.ry(1) + 1, t.colx(4) - t.x - 4, t.rh - 2, SUNK, 'none', 3) + T(t.cx(0), t.ry(1) + 17, 'B', GH) + L(t.x + 6, t.ry(1) + 13, t.colx(4) - 6, t.ry(1) + 13, GH, 1.2), 3.4)
     f.show(S(cx, 150, 'drop row B, refit', MU), 3.6)
-    f.show(M(cx, 180, '{w}₁ = %s     {w}₂ = %s' % (sgn(c2[1]), sgn(c2[2])), RO, 'start'), 4.0)
+    f.show(M(cx, 180, '{w}₁ = %s,   {w}₂ = %s' % (sgn(c2[1]), sgn(c2[2])), RO, 'start'), 4.0)
     for i in range(N): f.show(T(t.cx(5), t.ry(i) + 17, sgn(p2[i], 1), FI, mono=True), 4.4 + i * .08)
     f.show(S(cx, 224, 'both weights flip sign', RO, bold=True), 5.0)
     f.show(S(cx, 246, 'predictions move at most %.1f' % shift, FI, bold=True), 5.4)
@@ -329,7 +329,7 @@ def fig_collinear():
 BODY = r'''<header class="hero">
   <p class="eyebrow">Machine learning · Classical models</p>
   <h1>Linear <em>regression</em></h1>
-  <p class="lede">Draw the straight line that misses a cloud of points by the least. The model learns two numbers, <span class="mth"><var>w</var></span> and <span class="mth"><var>b</var></span>; every choice lives in what "misses by the least" means.</p>
+  <p class="lede">Draw the straight line that misses a cloud of points by the least. The model learns two numbers, <span class="mth"><var>w</var></span> and <span class="mth"><var>b</var></span>; every choice lives in what "misses by the least" means. Use it to read a relationship, or as the baseline before stronger models.</p>
 </header>
 
 <section id="lr-s1" class="lesson">
@@ -338,7 +338,7 @@ BODY = r'''<header class="hero">
 {lr1}
   <ul class="why">
     <li>Running example: six customers A–F, <span class="mth"><var>x</var></span> is income, <span class="mth"><var>y</var></span> is extra spending.</li>
-    <li>With <span class="mth"><var>w</var> = 0.31</span>: one unit more income goes with 0.31 more spending, other columns held fixed — a relationship in the data, not a cause.</li>
+    <li>Every result below comes from that one assumption: the relationship is a straight line.</li>
   </ul>
 </section>
 
@@ -447,32 +447,33 @@ BODY = r'''<header class="hero">
 </section>
 
 <section id="lr-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Where it breaks</h2></div>
-  <p class="key">Every strength comes from assuming <em>a straight line with even noise</em>; every failure comes from the same place. Plot the residuals to see it.</p>
-  <div class="subsec" id="lr-s5-1">
-    <h3 class="ssh"><b>5.1</b>Curved relationship</h3>
+  <div class="sh"><b>05</b><h2>Reading coefficients</h2></div>
+  <p class="key">A coefficient reads as a sentence — but when two columns say the same thing, <em>they share the weight arbitrarily</em> and the signs flip (multicollinearity).</p>
+{lr10}
+  <ul class="why">
+    <li><span class="mth"><var>w</var> = 0.31</span> means one unit more income goes with 0.31 more spending — it needs the units, "other columns held fixed", and is a relationship in the data, not a cause.</li>
+    <li>It breaks reading coefficients, not predicting. Measure it with VIF (above 5–10 is a worry); absurdly large weights flag it and overfitting alike — fix by dropping or merging copies, or with <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>.</li>
+  </ul>
+</section>
+
+<section id="lr-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Four assumptions</h2></div>
+  <p class="key">Linearity, independence, even spread and normal residuals are needed for <em>p-values and confidence intervals</em>; for prediction checked on a test set they matter much less. Plot residuals against ŷ to see the first ones.</p>
+  <div class="subsec" id="lr-s6-1">
+    <h3 class="ssh"><b>6.1</b>Linearity</h3>
     <p class="skey">If the truth bends, the residuals <em>bend too</em>: a U instead of a flat band.</p>
 {lr8}
     <ul class="why">
-      <li>The model underfits no matter how much data you add; add curved features or use a tree model.</li>
+      <li>The model underfits no matter how much data you add; add curved features such as <span class="mth"><var>x</var><sup>2</sup></span> or use a tree model.</li>
     </ul>
   </div>
-  <div class="subsec" id="lr-s5-2">
-    <h3 class="ssh"><b>5.2</b>Uneven spread</h3>
+  <div class="subsec" id="lr-s6-2">
+    <h3 class="ssh"><b>6.2</b>Even spread</h3>
     <p class="skey">When errors grow with the prediction, <em>the residuals fan out</em> like a funnel (heteroscedasticity).</p>
 {lr9}
     <ul class="why">
       <li>Predictions stay usable; confidence intervals and p-values do not.</li>
-      <li>Two more assumptions matter for p-values: independent rows (check how data was collected) and normal residuals (Q-Q plot).</li>
-    </ul>
-  </div>
-  <div class="subsec" id="lr-s5-3">
-    <h3 class="ssh"><b>5.3</b>Correlated features</h3>
-    <p class="skey">Two columns that say the same thing <em>share the weight arbitrarily</em>: drop one row and the signs flip (multicollinearity).</p>
-{lr10}
-    <ul class="why">
-      <li>It breaks reading coefficients, not predicting. Measure it with VIF; above 5–10 is a worry.</li>
-      <li>Fix: drop or merge the copies, or shrink the weights with <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>.</li>
+      <li>The other two cannot be seen in this plot: independent rows (check how the data was collected) and normal residuals (Q-Q plot).</li>
     </ul>
   </div>
 </section>
@@ -485,5 +486,5 @@ def build():
     return re.sub(r'\{(lr\d+)\}', lambda m: figs[m.group(1)], BODY)
 
 if __name__ == '__main__':
-    splice(PAGE, build(), 'Fit the straight line with the smallest squared error — closed form or gradient descent, the knobs that change it, and the residual patterns that show where it breaks.')
+    splice(PAGE, build(), 'Fit the straight line with the smallest squared error — closed form or gradient descent, the knobs that change it, reading coefficients, and the four assumptions.')
     print('ok')

@@ -1,4 +1,5 @@
 (function(){
+const el = id => document.getElementById(id);
 /* ---------------- lab 2: param & memory calculator ---------------- */
 const PRESETS = {
   gpt2s:  {d:768,  L:12, H:12, KH:12, F:3072,  V:50257, S:1024},

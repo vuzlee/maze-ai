@@ -8,7 +8,7 @@ sys.path.insert(0, HERE)
 from linear_algebra import Anim, T, R, L, arrow, MU, TX, FA, RULE_HI, BR, VI, FI, RO, GH, RULE, SUNK, BG, tn, M, S, chip, dot, poly, Plane, finish
 from calculus_chain import frac, hl
 PAGE = os.path.join(HERE, '../../../content/07-machine-learning/05-classical-ml/naive-bayes/index.html')
-ORIG = '/tmp/cml/naive-bayes-orig.html'
+ORIG = '/tmp/cml2/naive-bayes-old.html'
 ln = math.log
 
 # ---------- data: 10 emails, vocabulary win prize meet plan ----------
@@ -114,27 +114,31 @@ def fig_score():
 
 # ---------- 4.1 alpha ----------
 def fig_alpha():
-    f = Anim('nb5-', 720, 0, 'The ham row of the count table: 1, 0, 4, 4 out of 9 words. With alpha 0 the prize probability '
-             'is exactly 0, so any email containing prize gets ham score minus infinity. Adding alpha 1 to every count gives '
-             '2, 1, 5, 5 out of 13: prize becomes 0.08 and the ham score is a normal number, minus 5.39.',
-             'HAM ROW · ONE ZERO CELL KILLS THE CLASS')
-    x0, cw = 150, 90
+    f = Anim('nb5-', 720, 0, 'The ham row of the count table, 1, 0, 4, 4 out of 9 words, smoothed three ways. With alpha 0 '
+             'the prize probability is exactly 0, the ham score becomes minus infinity and the email is wrongly called spam. '
+             'With alpha 1 the counts become 2, 1, 5, 5 out of 13, no cell is 0 and ham wins with minus 5.39. With alpha 50 '
+             'every cell is about 0.25: the counts no longer matter.',
+             'HAM ROW · THREE VALUES OF α')
+    x0, cw = 130, 92
     for j, w in enumerate(W):
-        f.static(T(x0 + j * cw + cw / 2, 50, w, MU, mono=True))
-    rows = [('α = 0', P('ham', 0), '1 0 4 4'.split(), '9'), ('α = 1', P('ham', 1), '2 1 5 5'.split(), '13')]
-    for k, (lab, p, cnt, den) in enumerate(rows):
-        Y = 80 + k * 110; t = .4 + k * 2.6
-        f.show(M(40, Y + 24, lab.replace('α', '{α}'), BR, 'start'), t)
+        f.static(T(x0 + j * cw + cw / 2, 46, w, MU, mono=True))
+    def cnt(a): return [str(k + a) for k in CNT['ham']], str(9 + 4 * a)
+    rows = [(0, 'log 0 → −∞ · picks spam', RO), (1, 'score(ham) = −5.39 · picks ham', FI),
+            (50, 'all ≈ 0.25 · counts erased', RO)]
+    for k, (a, note, nc) in enumerate(rows):
+        Y = 62 + k * 92; t = .4 + k * 2.4
+        p = P('ham', a); cn, den = cnt(a)
+        f.show(M(30, Y + 30, '{α} = %d' % a, BR, 'start'), t)
         for j in range(4):
             bad = p[j] == 0
             c = RO if bad else TX
-            f.show(R(x0 + j * cw + 6, Y, cw - 12, 50, tn(RO, '.10') if bad else BG, RO if bad else RULE_HI, 5, 1.5 if bad else 1) +
-                   frac(x0 + j * cw + cw / 2, Y + 18, cnt[j], den, c, 26), t + .2 + j * .2)
-            f.show(T(x0 + j * cw + cw / 2, Y + 66, '%.2f' % p[j], c, mono=True, bold=bad), t + 1.2)
-    f.show(txt(x0 + 4 * cw + 14, 108, 'log 0 → score = −∞', RO, 'start', True), 2.3)
-    f.show(txt(x0 + 4 * cw + 14, 218, 'score(ham) = −5.39', FI, 'start', True), 5.4)
+            f.show(R(x0 + j * cw + 6, Y, cw - 12, 48, tn(RO, '.10') if bad else BG, RO if bad else RULE_HI, 5, 1.5 if bad else 1) +
+                   frac(x0 + j * cw + cw / 2, Y + 18, cn[j], den, c, 34), t + .2 + j * .2)
+            f.show(T(x0 + j * cw + cw / 2, Y + 64, '%.2f' % p[j], c, mono=True, bold=bad), t + 1.2)
+        f.show(txt(x0 + 4 * cw + 12, Y + 30, note, nc, 'start', True), t + 1.6)
     assert P('ham', 0)[1] == 0 and round(P('ham', 1)[1], 2) == .08
-    return finish(f, 270)
+    assert [round(v, 2) for v in P('ham', 50)] == [.24, .24, .26, .26]
+    return finish(f, 336)
 
 # ---------- 4.2 log space ----------
 def fig_log():
@@ -163,36 +167,46 @@ def fig_log():
         for i in range(0, len(pts) - 1, 16):
             f.show(poly(pts[i:i + 17], col, 2.6), t0 + i / len(pts) * 1.4, d=.1)
         f.show(dot(*pts[-1], col, 4.5), t0 + 1.5)
-        f.show(txt(pts[-1][0] - 4, pts[-1][1] - 24, 'rounds to 0' if k == 0 else '%.0f, fine' % fn(n + 1), col, 'end', True), t0 + 1.6)
-    f.show(M(360, 290, '3 words:   0.38 · 0.38 · 0.08 = 0.011        vs        −0.96 − 0.96 − 2.56 = −4.48', MU), 5.0)
+        if k == 0:
+            f.show(txt(pts[-1][0] - 4, pts[-1][1] - 24, 'rounds to 0', col, 'end', True), t0 + 1.6)
+        else:
+            f.show(txt(x0 + 20, top + H - 12, '%.0f at 40 words, fine' % fn(n + 1), col, 'start', True), t0 + 1.6)
+    f.show(T(70, 290, '3 words:', MU, 'start', 'sv-s') + M(150, 290, '0.38 · 0.38 · 0.08 = 0.011', RO, 'start') +
+           T(380, 290, 'vs', MU, 'middle', 'sv-s') + M(420, 290, '−0.96 − 0.96 − 2.56 = −4.48', FI, 'start'), 5.0)
     assert round(40 * ln(.1) + ln(.1)) == -94 or True
     return finish(f, 306)
 
-# ---------- 4.3 Bernoulli ----------
-def fig_bern():
-    f = Anim('nb7-', 720, 0, 'The email win win win prize turned into numbers two ways. Multinomial counts: win 3, prize 1, '
-             'meet 0, plan 0. Bernoulli keeps only present or absent: 1, 1, 0, 0, and it also scores the absent words with '
-             'one minus their probability, so missing meet and plan is evidence too.',
-             'SAME EMAIL, TWO WAYS TO READ IT')
+# ---------- 5.1 / 5.2 Multinomial, Bernoulli ----------
+def _read(pre, title, aria, nm, sub, v, extra):
+    f = Anim(pre, 720, 0, aria, title)
     em = ['win', 'win', 'win', 'prize']
     for i, w in enumerate(em):
         f.static(R(40 + i * 62, 44, 56, 28, BG, RULE_HI, 6) + T(68 + i * 62, 63, w, TX, mono=True))
     x0, cw = 260, 70
     for j, w in enumerate(W):
         f.static(T(x0 + j * cw + cw / 2, 108, w, MU, mono=True))
-    rows = [('Multinomial', [3, 1, 0, 0], 'counts'), ('Bernoulli', [1, 1, 0, 0], 'present?')]
-    for k, (nm, v, sub) in enumerate(rows):
-        Y = 124 + k * 70; t = .5 + k * 2.4
-        f.show(txt(40, Y + 18, nm, BR, 'start', True) + T(40, Y + 34, sub, MU, 'start', 'sv-d'), t)
-        for j in range(4):
-            f.show(R(x0 + j * cw + 6, Y, cw - 12, 36, BG, RULE_HI, 5) + T(x0 + j * cw + cw / 2, Y + 23, str(v[j]), TX if v[j] else FA, mono=True, bold=True), t + .3 + j * .25)
-        if k == 0:
-            f.show(R(x0 + 4, Y - 2, cw - 8, 40, 'none', VI, 6, 2), t + .3, hide=t + 2)
-            f.show(txt(x0 - 6 + 4 * cw + 30, Y + 22, 'win counts 3 times', VI, 'start'), t + .5, hide=t + 2.1)
-    Y = 194
-    f.show(R(x0 + 2 * cw + 2, Y - 4, 2 * cw - 4, 44, 'none', VI, 6, 2), 3.9)
-    f.show(txt(x0 + 4 * cw + 24, Y + 14, 'absent words score', VI, 'start') + M(x0 + 4 * cw + 24, Y + 34, 'log (1 − {P}({t} | {c}))', VI, 'start'), 4.1)
-    return finish(f, 250)
+    Y = 124
+    f.show(txt(40, Y + 18, nm, BR, 'start', True) + T(40, Y + 34, sub, MU, 'start', 'sv-d'), .4)
+    for j in range(4):
+        f.show(R(x0 + j * cw + 6, Y, cw - 12, 36, BG, RULE_HI, 5) + T(x0 + j * cw + cw / 2, Y + 23, str(v[j]), TX if v[j] else FA, mono=True, bold=True), .7 + j * .4)
+    extra(f, x0, cw, Y)
+    return finish(f, 196)
+
+def fig_multi():
+    def ex(f, x0, cw, Y):
+        f.show(R(x0 + 4, Y - 2, cw - 8, 40, 'none', VI, 6, 2), 2.6)
+        f.show(M(x0 + 4 * cw + 20, Y + 12, '3 · log {P}(win | {c})', VI, 'start'), 2.8)
+        f.show(txt(x0 + 4 * cw + 20, Y + 34, 'win counts 3 times', VI, 'start'), 3.0)
+    return _read('nb7-', 'MULTINOMIAL · HOW MANY TIMES', 'The email win win win prize read as counts: win 3, prize 1, meet 0, '
+                 'plan 0. The word win adds three times log P of win given the class.', 'Multinomial', 'counts', [3, 1, 0, 0], ex)
+
+def fig_bern():
+    def ex(f, x0, cw, Y):
+        f.show(R(x0 + 2 * cw + 2, Y - 4, 2 * cw - 4, 44, 'none', VI, 6, 2), 2.6)
+        f.show(txt(x0 + 4 * cw + 20, Y + 12, 'absent words score', VI, 'start') + M(x0 + 4 * cw + 20, Y + 34, 'log (1 − {P}({t} | {c}))', VI, 'start'), 2.8)
+    return _read('nb11-', 'BERNOULLI · PRESENT OR NOT', 'The same email win win win prize read as present or absent: 1, 1, 0, 0. '
+                 'Repeats are ignored, and the absent words meet and plan are scored too, with one minus their probability.',
+                 'Bernoulli', 'present?', [1, 1, 0, 0], ex)
 
 # ---------- 4.4 Gaussian ----------
 def fig_gauss():
@@ -226,7 +240,7 @@ def fig_corr():
     assert round(pw, 2) == .98 and round(pp, 2) == 1.52
     f = Anim('nb9-', 720, 0, 'The email win prize. Each word adds its own push toward spam: win adds 0.98, prize adds 1.52, '
              'total 2.5. But in the training data prize almost always comes with win, so it is one fact counted twice; the '
-             'model is far more sure of spam than the data justifies.', 'HOW HARD EACH WORD PUSHES TOWARD SPAM')
+             'model is far more sure of spam than the data justifies.', 'EMAIL "win prize" · PUSH TOWARD SPAM')
     sc = 180
     x0, y = 120, 90
     f.static(L(x0, 60, x0, 200, MU, 1.1) + T(x0, 214, '0', FA, cls='sv-d'))
@@ -308,44 +322,58 @@ EQ_GAUSS = '''    <div class="eq">
       </div>
     </div>'''
 
+EQ_SOFT = """    <div class="eq">
+      <div class="line">
+        <span class="t"><span><var>P</var>(<var>c</var> | <var>x</var>)</span><em>the probability it reports</em></span>
+        <span class="op">=</span>
+        <span class="t b"><span><span class="frac"><i><b class="fn">exp</b> score(<var>c</var>)</i><i>Σ<sub><var>c′</var></sub> <b class="fn">exp</b> score(<var>c′</var>)</i></span></span><em>scores normalised over the classes</em></span>
+      </div>
+    </div>"""
+
 def body():
     s = SEC.format(n=1, h='Mental model', k='Naive Bayes asks <em>which class most often writes these words</em>, and answers by counting.',
                    body=fig_mental() + '\n  <ul class="why">' + ul(
-                       'The whole lesson runs on 10 labelled emails (6 spam, 4 ham) and four words: win, prize, meet, plan.',
-                       'Training is one counting pass, no loop and no gradient — the trade-off is that the probabilities it outputs are too confident.',
-                       'Same job as <a href="../logistic-regression/index.html">Logistic regression</a>, which learns weights by gradient descent instead.') + '</ul>')
+                       'The whole lesson runs on 10 labelled emails (6 spam, 4 ham) and four words — win, prize, meet, plan — and asks one question: is "plan meet prize" spam or ham?',
+                       'Same job as <a href="../logistic-regression/index.html">Logistic regression</a>, which learns weights by gradient descent; Naive Bayes is the text baseline that trains in seconds and works with a few hundred samples.') + '</ul>')
     s += SEC.format(n=2, h='General formula', k='Bayes flips <em>P(class | words)</em> into things you can count; assuming words are independent turns it into a sum of logs.',
-                    body=EQ_BAYES + '\n' + fig_formula() + '\n  <ul class="why">' + ul(
-                        '<span class="mth"><var>P</var>(<var>x</var>)</span> is the same for every class, so it never changes the winner.',
-                        '<b>Naive</b> = independence: once the class is known, one word says nothing about another.',
-                        'There is no loss to minimise: the counts are already the maximum-likelihood estimate.') + '</ul>')
+                    body='\n'.join([
+                        SUB.format(n=2, m=1, h='Bayes rule and the score', k='Drop the shared denominator, split per word, take logs: <em>one sum per class</em>.',
+                                   fig=EQ_BAYES + '\n' + fig_formula(), li=ul(
+                                       '<span class="mth"><var>P</var>(<var>x</var>)</span> is the same for every class, so it never changes the winner — only the ordering of scores matters.',
+                                       'No loss and no gradient: the counts already are the maximum-likelihood estimate.')),
+                        SUB.format(n=2, m=2, h='Independence assumption', k='<b>Naive</b> = once the class is known, <em>one word says nothing about another</em>.',
+                                   fig=fig_corr(), li=ul(
+                                       'It is what makes counting possible: word pairs would already need 16 cells for 4 words, with only 10 emails to fill them.',
+                                       'Its price: words that travel together (win, prize) are the same evidence counted twice, and the model cannot learn interactions — logistic regression splits the weight instead.'))]))
     s += SEC.format(n=3, h='Train and predict', k='Train = <em>count</em> words per class. Predict = <em>add up</em> the logs of those counts.',
                     body='\n'.join([
                         SUB.format(n=3, m=1, h='Count', k='One pass over the 10 emails fills a 2 × 4 table: <em>that table is the model</em>.',
                                    fig=recolour(orig_fig('ct'), 'ct', 'nb3-'), li=ul(
-                                       'A new labelled email just adds to the counts — no retraining.',
+                                       'A new labelled email just adds to the counts — no retraining; read the table directly to see which word leans toward which class.',
                                        'Ham never used <b>prize</b>: that 0 is the problem of 4.1.')),
                         SUB.format(n=3, m=2, h='Score a new email', k='Fill one log per word, add the prior, <em>the larger sum wins</em>.',
                                    fig=fig_score(), li=ul(
                                        'Fractions use α = 1 (section 4.1): ham’s 1, 0, 4, 4 of 9 words become 2, 1, 5, 5 of 13.',
-                                       'Only the ordering matters; scores are negative because logs of probabilities are.'))]))
-    s += SEC.format(n=4, h='Knobs and variants', k='Two tricks keep the arithmetic sane; three variants differ only in <em>how a sample becomes numbers</em>.',
+                                       'Scores are negative because logs of probabilities are; closer to 0 is better.')),
+                        SUB.format(n=3, m=3, h='Probabilities', k='Normalising the scores gives a probability — <em>the label is usable, the number is overconfident</em>.',
+                                   fig=EQ_SOFT + '\n' + recolour(orig_fig('sc'), 'sc', 'nb10-'), li=ul(
+                                       'Repeated or correlated evidence pushes every class’s score the same way, so the ranking survives while the probability races toward 1.',
+                                       'Trust the ranking, not 0.99: calibrate before using it as a threshold, or switch to logistic regression.'))]))
+    s += SEC.format(n=4, h='Laplace and log', k='Two tricks fix two different problems: <em>a zero cell wipes out the evidence</em>, and <em>multiplying many probabilities underflows</em>.',
                     body='\n'.join([
                         SUB.format(n=4, m=1, h='Laplace smoothing α', k='Add <em>α</em> to every count so no cell is 0.', fig=EQ_LAPLACE + '\n' + fig_alpha(), li=ul(
-                            'α = 1 is Laplace (sklearn default); too large an α flattens every word to the same probability — tune it with cross-validation.')),
+                            'Adding α is like having seen every word α times before reading the data; both extremes break — 0 leaves a zero cell, 50 erases the counts.',
+                            'α = 1 is Laplace (sklearn default); with a large vocabulary a smaller α usually works better — tune it with cross-validation, do not just keep the default.')),
                         SUB.format(n=4, m=2, h='Log space', k='A product of many small numbers <em>underflows to 0</em>; a sum of logs never does.', fig=fig_log(), li=ul(
-                            'log is increasing, so the class with the larger product also has the larger log sum.')),
-                        SUB.format(n=4, m=3, h='Multinomial vs Bernoulli', k='Multinomial reads <em>how many times</em>; Bernoulli reads <em>present or not</em>.', fig=fig_bern(), li=ul(
-                            'Multinomial is the default for text; Bernoulli suits very short texts, where absence carries signal.')),
-                        SUB.format(n=4, m=4, h='Gaussian Naive Bayes', k='For continuous features, each class gets <em>a bell curve per feature</em>.', fig=EQ_GAUSS + '\n' + fig_gauss(), li=ul(
-                            'Training = one mean and one standard deviation per class per feature.'))]))
-    s += SEC.format(n=5, h='Where it breaks', k='Independence is almost always false. The <em>label</em> often survives; the <em>probability</em> does not.',
+                            'log is increasing, so the class with the larger product also has the larger log sum: the winner is unchanged.'))]))
+    s += SEC.format(n=5, h='Variants', k='The three variants differ only in <em>how a sample becomes numbers</em>.',
                     body='\n'.join([
-                        SUB.format(n=5, m=1, h='Correlated features', k='Words that travel together are <em>the same evidence counted twice</em>.', fig=fig_corr(), li=ul(
-                            'Same failure for duplicated or near-duplicate features; logistic regression splits the weight between them instead.')),
-                        SUB.format(n=5, m=2, h='Overconfident probabilities', k='More repeated evidence pushes the probability toward 1 <em>without the label changing</em>.',
-                                   fig=recolour(orig_fig('sc'), 'sc', 'nb10-'), li=ul(
-                                       'Trust the ranking, not 0.99; calibrate first if the number is used as a threshold.'))]))
+                        SUB.format(n=5, m=1, h='Multinomial', k='Reads <em>how many times</em> each word appears.', fig=fig_multi(), li=ul(
+                            'The default for text, and the one used throughout this lesson; tens of thousands of words are no problem.')),
+                        SUB.format(n=5, m=2, h='Bernoulli', k='Reads <em>present or not</em>, and scores missing words too.', fig=fig_bern(), li=ul(
+                            'Suits very short texts, where a word’s absence carries signal.')),
+                        SUB.format(n=5, m=3, h='Gaussian', k='For continuous features, each class gets <em>a bell curve per feature</em>.', fig=EQ_GAUSS + '\n' + fig_gauss(), li=ul(
+                            'Training = one mean and one standard deviation per class per feature.'))]))
     return s
 
 if __name__ == '__main__':

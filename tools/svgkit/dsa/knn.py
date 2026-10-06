@@ -48,7 +48,7 @@ def star(x, y, c=VI, r=9):
     return '<polygon points="%s" fill="%s"/>' % (' '.join(p), c)
 
 def scatter_plane():
-    return Plane(70, 290, 52)  # z in about [-1.5, 1.5] mapped after shift
+    return Plane(200, 376, 52)  # z in about [-1.5, 1.5] mapped after shift
 
 def zp(P, zz): return P(zz[0] + 1.6, zz[1] + 1.9)
 
@@ -58,20 +58,21 @@ def fig_mental():
              'appears; a dashed circle grows until it holds the three nearest customers D, B and E; they vote one buy '
              'against two no, so X is predicted no.', 'PREDICT = FIND THE k NEAREST ROWS, LET THEM DECIDE')
     P = scatter_plane()
-    f.static(L(P.X(0), P.Y(0), P.X(3.6), P.Y(0), RULE_HI, 1.3) + L(P.X(0), P.Y(0), P.X(0), P.Y(4.3), RULE_HI, 1.3) +
-             S(P.X(3.6), P.Y(0) + 18, 'age (scaled)', MU, 'end') + S(P.X(0) - 4, P.Y(4.3) - 6, 'income (scaled)', MU))
-    f.static(legend(P.X(0) + 10, 326))
+    f.static(L(P.X(0), P.Y(0), P.X(3.6), P.Y(0), RULE_HI, 1.3) + L(P.X(0), P.Y(0), P.X(0), P.Y(6.4), RULE_HI, 1.3) +
+             S(P.X(3.6), P.Y(0) + 18, 'age (scaled)', MU, 'end') + S(P.X(0) - 4, P.Y(6.4) - 6, 'income (scaled)', MU))
+    f.static(legend(P.X(0) + 10, 416))
     for i, r in enumerate(DATA):
         x, y = zp(P, z(r))
         f.show(pt(x, y, r[3]) + T(x + 11, y + 4, r[0], MU, 'start', bold=True), .2 + i * .15)
     xx, xy = zp(P, ZX)
     f.show(star(xx, xy) + T(xx - 10, xy + 4, 'X', VI, 'end', bold=True), 1.4)
-    rad = SC['E'] * 66 + 9
+    rad = (SC['E'] + SC['C']) / 2 * 52
     for k, n in enumerate('DBE'):
         r = [d for d in DATA if d[0] == n][0]; x, y = zp(P, z(r)); t = 2.4 + k * .7
         f.show(L(xx, xy, x, y, VI, 1.4, '4 3'), t, hide=t + .6)
         f.show('<circle cx="%.1f" cy="%.1f" r="11" fill="none" stroke="%s" stroke-width="1.8"/>' % (x, y, VI), t + .4)
-    X0 = 400
+    f.show('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="%s" stroke-width="1.6" stroke-dasharray="5 4"/>' % (xx, xy, rad, tn(VI, '.06'), VI), 4.6)
+    X0 = 440
     f.show(S(X0, 70, '1 · the table is the model — nothing is fitted', MU), .6)
     f.show(S(X0, 110, '2 · a new row X arrives with no label', MU), 1.4)
     f.show(S(X0, 150, '3 · take the k = 3 nearest rows', MU), 2.4)
@@ -80,7 +81,7 @@ def fig_mental():
                S(X0 + 4 + k * 64, 204, LAB[n], CL[LAB[n]]), 2.8 + k * .7)
     f.show(S(X0, 240, '4 · they vote: 1 buy · 2 no', MU), 5.0)
     f.show(chip(X0 + 60, 272, 'X → no', FI, 110), 5.7)
-    return finish(f, 338)
+    return finish(f, 430)
 
 # ---------- 2 General formula: distance worked ----------
 def fig_dist():
@@ -170,19 +171,22 @@ def fig_combine():
     f.show(M(X1 + 66, y - 6, '1 + (−1) + 7', TX) + L(X1 + 30, y, X1 + 102, y, TX, 1) + M(X1 + 66, y + 15, '3', TX), 3.4)
     f.show(M(X1 + 112, y + 4, '=', TX, 'start') + M(X1 + 144, y - 6, '7', TX) + L(X1 + 134, y, X1 + 154, y, TX, 1) + M(X1 + 144, y + 15, '3', TX), 4.1)
     f.show(chip(X1 + 220, y, 'ŷ = 2.33', FI, 92, False), 4.7)
-    f.show(t.outline(2, 2, 2, 2, RO), 5.5)
-    f.show(S(X1, 216, 'E = +7 drags the mean up · the median gives 1.00', RO), 5.5)
-    return finish(f, 244)
+    f.show(S(X1, 216, 'regression · median', MU, bold=True), 5.4)
+    f.show(M(X1, 244, 'sorted: −1, 1, 7 → middle = 1', TX, 'start'), 5.9)
+    f.show(chip(X1 + 300, 240, 'ŷ = 1.00', FI, 92, False), 6.4)
+    f.show(t.outline(2, 2, 2, 2, RO), 7.0)
+    f.show(S(0, 200, 'E = +7 is an outlier:', RO) + S(0, 218, 'it drags the mean,', RO) + S(0, 236, 'not the median', RO), 7.0)
+    return finish(f, 262)
 
 # ---------- 4.3 metric ----------
 def fig_metric():
     f = Anim('kn6-', 720, 0, 'Points a at (1, 1) and b at (4, 3). Euclidean distance is the straight line, 3.61. Manhattan '
              'distance walks the grid, 3 plus 2 equals 5. Cosine distance ignores length and measures the angle between '
              'the two arrows from the origin.', 'THREE WAYS TO MEASURE "CLOSE"')
-    P = Plane(50, 230, 46)
+    P = Plane(50, 250, 46)
     f.static(P.grid(0, 5, 0, 4, labels=True, xl='{x}₁', yl='{x}₂'))
     a, b = P(1, 1), P(4, 3)
-    f.static(dot(*a, BR, 5) + M(a[0] + 4, a[1] + 20, '{a}', BR) + dot(*b, BR, 5) + M(b[0] + 12, b[1] - 6, '{b}', BR))
+    f.static(dot(*a, BR, 5) + M(a[0] - 4, a[1] - 10, '{a}', BR) + dot(*b, BR, 5) + M(b[0] + 12, b[1] - 6, '{b}', BR))
     X1 = 340
     f.show(L(a[0], a[1], b[0], b[1], VI, 2.6), .6)
     f.show(S(X1, 62, 'Euclidean (L2) · straight line', VI, bold=True), .6)
@@ -200,7 +204,7 @@ def fig_metric():
     f.show(S(X1, 194, 'Cosine · only the angle', RO, bold=True), 4.1)
     f.show(M(X1, 220, '1 − cos θ = 1 − %.2f = %.2f' % (cos, 1 - cos), TX, 'start'), 4.6)
     f.show(S(X1, 250, 'text and embeddings: length ≈ document size, angle ≈ topic', MU), 5.3)
-    return finish(f, 280)
+    return finish(f, 290)
 
 # ---------- 5.1 scale ----------
 def fig_scale():
@@ -305,7 +309,7 @@ BODY = r'''<header class="hero">
   </div>
 {kn2}
   <ul class="why">
-    <li>The raw distance 13.3 is in mixed units (years and millions); section 5.1 shows why that matters.</li>
+    <li>The raw distance 13.3 is in mixed units (years and millions); section 4.4 shows why that matters.</li>
   </ul>
 </section>
 
@@ -315,7 +319,7 @@ BODY = r'''<header class="hero">
 {kn3}
   <ul class="why">
     <li>New customer X: age 25, income 35M; both columns scaled before measuring.</li>
-    <li>The cost moves to prediction time: one full scan per new row (section 5.3).</li>
+    <li>Training is free, so every prediction pays: <span class="mth"><var>O</var>(<var>n</var> · <var>d</var>)</span> per query and the whole table stays in memory; large sets need an index (KD-tree, HNSW).</li>
   </ul>
 </section>
 
@@ -332,8 +336,8 @@ BODY = r'''<header class="hero">
     </ul>
   </div>
   <div class="subsec" id="knn-s4-2">
-    <h3 class="ssh"><b>4.2</b>Vote or mean</h3>
-    <p class="skey">Classification takes the <em>most common label</em>; regression takes the <em>mean value</em>.</p>
+    <h3 class="ssh"><b>4.2</b>Vote, mean or median</h3>
+    <p class="skey">Classification takes the <em>most common label</em>; regression takes the <em>mean</em>, or the <em>median</em> when outliers sit among the neighbours.</p>
 {kn5}
     <ul class="why">
       <li>For long-tailed targets use the median, the same story as MAE vs MSE in <a href="../linear-regression/index.html">Linear regression</a>.</li>
@@ -348,13 +352,8 @@ BODY = r'''<header class="hero">
       <li>Euclidean for continuous columns of the same kind; Manhattan is less hurt by one huge difference; cosine for text and embeddings.</li>
     </ul>
   </div>
-</section>
-
-<section id="knn-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Where it breaks</h2></div>
-  <p class="key">Every weakness comes from the same place as its strength: <em>everything rides on raw distance</em>.</p>
-  <div class="subsec" id="knn-s5-1">
-    <h3 class="ssh"><b>5.1</b>Unscaled columns</h3>
+  <div class="subsec" id="knn-s4-4">
+    <h3 class="ssh"><b>4.4</b>Feature scaling</h3>
     <p class="skey">The column with the widest range <em>decides the distance alone</em> unless you scale first.</p>
 {kn7}
     <ul class="why">
@@ -362,30 +361,23 @@ BODY = r'''<header class="hero">
       <li>Trees compare one column at a time, so they do not care; every distance-based model does.</li>
     </ul>
   </div>
-  <div class="subsec" id="knn-s5-2">
-    <h3 class="ssh"><b>5.2</b>Curse of dimensionality</h3>
-    <p class="skey">As dimensions grow, <em>every point is about equally far from every other</em>.</p>
+</section>
+
+<section id="knn-s5" class="lesson">
+  <div class="sh"><b>05</b><h2>Curse of dimensionality</h2></div>
+  <p class="key">As dimensions grow, <em>every point is about equally far from every other</em>, and "nearest" loses its meaning.</p>
 {kn8}
-    <ul class="why">
-      <li>Reduce dimensions first (<a href="../../08-dimensionality/pca-dimensionality/index.html">PCA</a>, feature selection) or switch to trees.</li>
-      <li>Learned embeddings still work in hundreds of dimensions because the data lies on a low-dimensional surface.</li>
-    </ul>
-  </div>
-  <div class="subsec" id="knn-s5-3">
-    <h3 class="ssh"><b>5.3</b>Slow prediction</h3>
-    <p class="skey">Training is free, so <em>every prediction pays</em>: <span class="mth"><var>O</var>(<var>n</var> · <var>d</var>)</span> per query, and the whole table stays in memory.</p>
-{kn9}
-    <ul class="why">
-      <li>Good as a quick baseline or for similarity search; for many rows or columns prefer trees or boosting.</li>
-    </ul>
-  </div>
+  <ul class="why">
+    <li>Hits every distance-based model (k-means, RBF-kernel SVM); reduce dimensions first (<a href="../../08-dimensionality/pca-dimensionality/index.html">PCA</a>, feature selection).</li>
+    <li>KNN fits a quick baseline or low-dimensional similarity search; with many rows or columns prefer trees or boosting.</li>
+  </ul>
 </section>
 
 '''
 
 def build():
     figs = dict(kn1=fig_mental(), kn2=fig_dist(), kn3=fig_table(), kn4=fig_k(), kn5=fig_combine(), kn6=fig_metric(),
-                kn7=fig_scale(), kn8=fig_curse(), kn9=fig_cost())
+                kn7=fig_scale(), kn8=fig_curse())
     return re.sub(r'\{(kn\d+)\}', lambda m: figs[m.group(1)], BODY)
 
 def splice(page, body, blurb):

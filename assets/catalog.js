@@ -1151,7 +1151,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1165,7 +1165,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      }
     ]
@@ -1185,7 +1185,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      }
     ]
@@ -1232,7 +1232,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1246,7 +1246,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1260,7 +1260,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1274,7 +1274,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1406,13 +1406,13 @@ window.CATALOG = [
       "slug": "lr",
       "title": "Linear regression",
       "tag": "ML",
-      "blurb": "Fit the straight line with the smallest squared error — closed form or gradient descent, the knobs that change it, and the residual patterns that show where it breaks.",
-      "n": 5,
+      "blurb": "Fit the straight line with the smallest squared error — closed form or gradient descent, the knobs that change it, reading coefficients, and the four assumptions.",
+      "n": 6,
       "path": "content/07-machine-learning/05-classical-ml/linear-regression/index.html",
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1421,12 +1421,12 @@ window.CATALOG = [
       "title": "Logistic regression",
       "tag": "ML",
       "blurb": "A straight line squashed by a sigmoid into a probability, trained with log loss, read through odds ratios and cut by a threshold you choose.",
-      "n": 5,
+      "n": 7,
       "path": "content/07-machine-learning/05-classical-ml/logistic-regression/index.html",
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1435,12 +1435,12 @@ window.CATALOG = [
       "title": "Ridge, Lasso & Elastic Net",
       "tag": "ML",
       "blurb": "Add a penalty on weight size to linear regression: L2 shrinks every weight, L1 sets some to exactly 0, Elastic Net mixes both.",
-      "n": 5,
+      "n": 4,
       "path": "content/07-machine-learning/05-classical-ml/ridge-lasso-elasticnet/index.html",
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1448,13 +1448,13 @@ window.CATALOG = [
       "slug": "svm",
       "title": "SVM",
       "tag": "ML",
-      "blurb": "Separate two classes with the widest empty band: support vectors, hinge loss, C, the kernel trick and gamma.",
-      "n": 5,
+      "blurb": "Separate two classes with the widest empty band: margin, support vectors, hard and soft margin, hinge loss, C, and linear, polynomial and RBF kernels.",
+      "n": 4,
       "path": "content/07-machine-learning/05-classical-ml/svm/index.html",
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1468,7 +1468,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1482,7 +1482,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": true,
       "v2": true,
-      "progress": true,
+      "progress": false,
       "lc": 0
      }
     ]
@@ -1516,7 +1516,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": false,
       "v2": false,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1530,7 +1530,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": false,
       "v2": false,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1544,7 +1544,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": false,
       "v2": false,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1558,7 +1558,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": false,
       "v2": false,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1572,7 +1572,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": false,
       "v2": false,
-      "progress": true,
+      "progress": false,
       "lc": 0
      },
      {
@@ -1586,7 +1586,7 @@ window.CATALOG = [
       "skeleton": false,
       "reviewed": false,
       "v2": false,
-      "progress": true,
+      "progress": false,
       "lc": 0
      }
     ]

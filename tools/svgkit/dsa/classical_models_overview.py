@@ -118,7 +118,9 @@ def fig_mental():
     ab, ar, ak = acc(lb, te_b), acc(lr_, te_r), acc(kr, te_r)
     f = Anim('cm1-', 720, 0, 'Two datasets of 60 points. On the left the two classes are separated by a straight border: a linear '
              'model draws its straight boundary and scores %d%%. On the right one class forms a ring around the other: the same '
-             'linear model still draws a straight boundary and scores %d%%; 5-nearest-neighbours bends around the ring and scores %d%%.'
+             'linear model still draws a straight boundary and scores %d%%; 5-nearest-neighbours bends around the ring and scores %d%%. '
+             'Below each panel, test accuracy as the training set grows from 60 to 6,000 points: on the straight data both models '
+             'end near the top; on the ring the linear model stays flat near 50%% while 5-NN climbs.'
              % (ab * 100, ar * 100, ak * 100), 'SAME MODEL, TWO DATA SHAPES · THE ASSUMPTION DECIDES')
     A = Box(0, 54, 300, 200, -2, 2, -1.8, 1.8); B = Box(380, 54, 300, 200, -1.9, 1.9, -1.8, 1.8)
     f.static(A.frame() + B.frame())
@@ -130,9 +132,38 @@ def fig_mental():
     f.show(chip(470, 280, 'linear · %d%%' % round(ar * 100), RO, 130), 4.0)
     f.show(B.frame() + B.region(kr) + B.pts(tr_r), 5.2, d=.6)
     f.show(chip(610, 280, '5-NN · %d%%' % round(ak * 100), FI, 120), 6.0)
-    f.show(S(380, 310, 'more data cannot bend a straight line around a ring', MU), 6.6)
-    f.h = 322
-    return f.render(), (ab, ar, ak)
+    # accuracy vs training size: same models, 60 -> 600 -> 6000 points (computed)
+    NS = (60, 600, 6000); curves = {}
+    for key, gen, seed, te in (('A', blobs, 11, te_b), ('B', ring, 21, te_r)):
+        la, ka = [], []
+        for k, n in enumerate(NS):
+            tr = gen(n, seed + k)
+            la.append(acc(logreg(tr, it=600), te)); ka.append(acc(knn(tr), te))
+        curves[key] = (la, ka)
+    assert curves['B'][0][-1] < .6 and curves['B'][1][-1] > .9, curves
+    py0, ph = 352, 120
+    for key, bx, t0 in (('A', 0, 7.0), ('B', 380, 8.4)):
+        la, ka = curves[key]
+        X = lambda k: bx + 46 + k * 95
+        Y = lambda a: py0 + ph - (a - .4) / .6 * ph
+        ax = (L(bx + 40, py0, bx + 40, py0 + ph, RULE_HI, 1) + L(bx + 40, py0 + ph, bx + 246, py0 + ph, RULE_HI, 1) +
+              ''.join(L(bx + 40, Y(v), bx + 246, Y(v), RULE, .8, '2 3') + T(bx + 34, Y(v) + 4, '%d%%' % (v * 100), MU, 'end')
+                      for v in (.4, .6, .8, 1.0)) +
+              ''.join(T(X(k), py0 + ph + 16, '%s' % format(n, ','), MU) for k, n in enumerate(NS)) +
+              T(bx + 143, py0 + ph + 32, 'training points', MU))
+        f.static(S(bx, py0 - 14, 'test accuracy as data grows ×100', MU))
+        f.static(ax)
+        def line(vals, c):
+            return (poly([(X(k), Y(v)) for k, v in enumerate(vals)], c, 2) +
+                    ''.join('<circle cx="%.1f" cy="%.1f" r="3.2" fill="%s"/>' % (X(k), Y(v), c) for k, v in enumerate(vals)))
+        lc = FI if key == 'A' else RO
+        f.show(line(la, lc) + T(bx + 254, Y(la[-1]) + 4, 'linear %d%%' % round(la[-1] * 100), lc, 'start', bold=True), t0)
+        f.show(line(ka, VI) + T(bx + 254, Y(ka[-1]) + 4 + (12 if abs(Y(ka[-1]) - Y(la[-1])) < 14 and ka[-1] < la[-1] else (-12 if abs(Y(ka[-1]) - Y(la[-1])) < 14 else 0)),
+               '5-NN %d%%' % round(ka[-1] * 100), VI, 'start', bold=True), t0 + .7)
+    f.show(S(380, py0 + ph + 56, 'linear stays flat: data cannot bend a line', MU), 9.6)
+    f.show(S(0, py0 + ph + 56, 'assumption fits: 60 points reach the top', MU), 8.0)
+    f.h = py0 + ph + 70
+    return f.render(), (ab, ar, ak, curves)
 
 MODELS = [('Linear regression', 'straight line', lambda D: linreg(D)),
           ('Logistic regression', 'straight line', lambda D: logreg(D)),
@@ -189,17 +220,17 @@ def fig_order():
     f = Anim('cm3-', 720, 0, 'The learning order as a chain. Linear regression comes first, then logistic regression, both required. '
              'From there three branches open: ridge and lasso then SVM, KNN, and naive Bayes, in any order. Each box carries what '
              'it teaches.', 'LEARNING ORDER · TWO REQUIRED STEPS, THEN THREE FREE BRANCHES')
-    BW, BH = 150, 92
-    nodes = {'lin': (0, 120, 'Linear regression', 'loss + gradient', 'line'),
-             'log': (190, 120, 'Logistic regression', 'probabilities', 'sig'),
-             'rid': (390, 32, 'Ridge / Lasso', 'penalty on w', 'pen'),
-             'svm': (570, 32, 'SVM', 'margin + kernel', 'svm'),
-             'knn': (390, 150, 'KNN', 'distance, k', 'knn'),
-             'nb':  (390, 262, 'Naive Bayes', 'Bayes, counting', 'nb')}
+    BW, BH = 156, 108
+    nodes = {'lin': (0, 150, 'Linear regression', ('loss, gradient descent,', 'coefficients first appear'), 'line'),
+             'log': (190, 150, 'Logistic regression', ('same line, new wrapper', 'and loss → classifier'), 'sig'),
+             'rid': (390, 32, 'Ridge / Lasso', ('penalize weight size —', 'reused in SVM, boosting, NN'), 'pen'),
+             'svm': (570, 32, 'SVM', ('after Ridge: max margin', 'is L2 in geometry'), 'svm'),
+             'knn': (390, 170, 'KNN', ('high variance, curse', 'of dimensionality'), 'knn'),
+             'nb':  (390, 308, 'Naive Bayes', ('Bayes → classifier with no', 'optimization; text baseline'), 'nb')}
     def box(k, c, t):
         x, y, name, sub, g = nodes[k]
         return (R(x, y, BW, BH, BG, 'none', 8) + R(x, y, BW, BH, tn(c, '.08'), c, 8, 1.5) + glyph(g, x + BW / 2, y + 28, c) +
-                T(x + BW / 2, y + 64, name, c, bold=True) + T(x + BW / 2, y + 81, sub, MU))
+                T(x + BW / 2, y + 64, name, c, bold=True) + T(x + BW / 2, y + 81, sub[0], MU) + T(x + BW / 2, y + 95, sub[1], MU))
     def edge(a, b, t):
         xa, ya = nodes[a][0] + BW, nodes[a][1] + BH / 2; xb, yb = nodes[b][0], nodes[b][1] + BH / 2
         if ya == yb: return arrow(xa + 4, ya, xb - 4, yb, MU, 1.4)
@@ -207,14 +238,13 @@ def fig_order():
         return poly([(xa + 4, ya), (mx, ya), (mx, yb), (xb - 8, yb)], MU, 1.4) + arrow(xb - 12, yb, xb - 4, yb, MU, 1.4)
     f.show(box('lin', BR, 0), .3)
     f.show(edge('lin', 'log', 0), 1.0); f.show(box('log', BR, 0), 1.3)
-    f.show(T(170, 108, 'required, in this order', VI, bold=True) + L(0, 98, 340, 98, VI, 1.4, '4 3'), 1.8)
+    f.show(T(173, 138, 'required, in this order', VI, bold=True) + L(0, 128, 346, 128, VI, 1.4, '4 3'), 1.8)
     t = 2.6
     for k in ('rid', 'knn', 'nb'):
         f.show(edge('log', k, 0), t); f.show(box(k, FI, 0), t + .3); t += .7
     f.show(edge('rid', 'svm', 0), t + .2); f.show(box('svm', FI, 0), t + .5)
-    f.show(S(570, 150, 'SVM after Ridge:', MU) + S(570, 168, 'max margin = L2', MU) + S(570, 186, 'penalty in geometry', MU), t + 1.1)
-    f.show(S(390, 372, 'the three branches: any order', MU), t + 1.6)
-    f.h = 380
+    f.show(S(570, 200, 'the three branches:', MU) + S(570, 218, 'any order', MU), t + 1.1)
+    f.h = 430
     return f.render()
 
 BODY = r'''<header class="hero">
@@ -240,9 +270,9 @@ BODY = r'''<header class="hero">
   </div>
 {cm1}
   <ul class="why">
-    <li><b>When the assumption fits</b>, the model works with very little data; when it is wrong, more data does not save it — change the model.</li>
     <li>So read the lookup table by the <b>Believes that…</b> column first: which assumption does your data look like?</li>
-    <li>A loose assumption (KNN) bends anywhere but needs more data — <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">bias–variance</a> seen from model choice.</li>
+    <li>The plots below the panels: on the ring, 100× more data leaves the linear model flat near 50% while 5-NN climbs past 99% — <b>change the model, not the data size</b>.</li>
+    <li>A loose assumption (KNN) bends anywhere but pays in variance and needs more data as dimensions grow — <a href="../../04-core-concepts/bias-variance-tradeoff/index.html">bias–variance</a> seen from model choice.</li>
   </ul>
 </section>
 

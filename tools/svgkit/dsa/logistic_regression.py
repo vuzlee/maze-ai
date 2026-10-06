@@ -190,11 +190,11 @@ def fig_sigmoid():
              'probability. Right: the sigmoid curve stays between 0 and 1 for every age.', 'A LINE LEAVES [0, 1] · SIGMOID NEVER DOES')
     for k, (title, kind) in enumerate((('straight line', 'line'), ('sigmoid', 'sig'))):
         x0 = 50 + k * 350
-        P = Plane(x0, 220, 2.8, 140)
+        P = Plane(x0, 262, 2.8, 140)
         f.static(L(x0, P.Y(0), x0 + 290, P.Y(0), MU, 1.1) + L(x0, P.Y(-.45), x0, P.Y(1.45), MU, 1.1) +
                  L(x0, P.Y(1), x0 + 290, P.Y(1), RULE, 1, '2 4') + T(x0 - 6, P.Y(1) + 4, '1', FA, 'end') +
                  T(x0 - 6, P.Y(0) + 4, '0', FA, 'end') + T(x0 + 290, P.Y(0) + 16, 'age 100', FA, 'end') +
-                 T(x0 + 145, 44, title, BR if kind == 'line' else FI, cls='sv-s', bold=True))
+                 T(x0 + 145, 36, title, BR if kind == 'line' else FI, cls='sv-s', bold=True))
         f.static(R(x0 + 1, P.Y(1.45), 289, P.Y(1) - P.Y(1.45), tn(RO, '.07'), 'none', 0) +
                  R(x0 + 1, P.Y(0), 289, P.Y(-.45) - P.Y(0), tn(RO, '.07'), 'none', 0))
         for (n, x, y, *_r) in ROWS:
@@ -211,11 +211,11 @@ def fig_sigmoid():
         if kind == 'line':
             lo, hi = a * 0 + c, a * 100 + c
             f.show(dot(*P(0, lo), RO, 5) + S(x0 + 8, P.Y(lo) + 4, '%s at age 0' % N(lo), RO), t0 + 1.4)
-            f.show(dot(*P(100, hi), RO, 5) + S(x0 + 280, P.Y(hi) + 4, '%s at age 100' % N(hi), RO, 'end'), t0 + 1.8)
+            f.show(dot(*P(100, hi), RO, 5) + S(x0 + 270, P.Y(hi) + 4, '%s at age 100' % N(hi), RO, 'end'), t0 + 1.8)
         else:
             f.show(S(x0 + 150, P.Y(.5) + 30, 'always between 0 and 1', FI), t0 + 1.4)
     assert a * 100 + c > 1.05 and c < -0.05
-    return finish(f, 292)
+    return finish(f, 334)
 
 # ---------- 4.2 why log loss ----------
 def fig_logloss():
@@ -284,7 +284,7 @@ def fig_odds():
 def fig_threshold():
     f = Anim('lr8-', 720, 0, 'The six customers on a probability axis; filled dots bought, hollow dots did not. A threshold mark slides '
              'from 0.35 to 0.5 to 0.75; everyone to its right is flagged as a buyer. At 0.35 all 3 buyers are caught with 1 false '
-             'alarm (E). At 0.5, 2 of 3 buyers and 1 false alarm. At 0.75, only 1 of 3 buyers and no false alarm.',
+             'alarm (E). At 0.5, 2 of 3 buyers and 1 false alarm. At 0.75, only 1 of 3 buyers and no false alarm. Precision goes 0.75, 0.67, 1.00 while recall goes 1.00, 0.67, 0.33.',
              'MOVE THE THRESHOLD · WHO GETS FLAGGED')
     X0, X1, Y = 40, 680, 120
     sx = lambda p: X0 + p * (X1 - X0)
@@ -303,11 +303,13 @@ def fig_threshold():
         hide = t + 2.4 if k < 2 else None
         f.show(R(sx(c), Y - 34, X1 - sx(c) + 6, 58, tn(VI, '.10'), 'none', 4) + L(sx(c), Y - 40, sx(c), Y + 30, VI, 2) +
                T(sx(c), Y - 46, 'threshold %g' % c, VI, cls='sv-s', bold=True), t, hide=hide)
-        f.show(T(360, 200, 'caught %d of 3 buyers  ·  %d false alarm%s' % (tp, fp, '' if fp == 1 else 's'),
+        f.show(T(360, 196, 'caught %d of 3 buyers  ·  %d false alarm%s' % (tp, fp, '' if fp == 1 else 's'),
                  FI, cls='sv-s', bold=True), t + .5, hide=hide)
+        prec, rec = tp / len(flagged), tp / 3
+        f.show(T(360, 218, 'precision %.2f  ·  recall %.2f' % (prec, rec), VI, cls='sv-s'), t + 1.0, hide=hide)
         t += 2.8
-    f.show(T(360, 226, 'lower it to miss fewer buyers · raise it to cut false alarms', MU, cls='sv-s'), t - .5)
-    return finish(f, 240)
+    f.show(T(360, 248, 'lower it to miss fewer buyers · raise it to cut false alarms', MU, cls='sv-s'), t - .5)
+    return finish(f, 262)
 
 # ---------- 4.5 softmax ----------
 def fig_softmax():
@@ -401,7 +403,7 @@ BODY = r'''<header class="hero">
 {lr1}
   <ul class="why">
     <li>Running example all lesson: six customers A–F, <span class="mth"><var>x</var></span> is age, the label is bought or not.</li>
-    <li>The model stops at <span class="mth"><var>p</var></span>; the label step is a business decision (section 4.4).</li>
+    <li>The model stops at <span class="mth"><var>p</var></span>, and that p is well calibrated out of the box; the label step is a threshold you choose (section 06).</li>
   </ul>
 </section>
 
@@ -436,12 +438,12 @@ BODY = r'''<header class="hero">
 {lr3}
     <ul class="why">
       <li>Customer E (52, did not buy) costs most: the model is sure older customers buy.</li>
-      <li>One feature means one flat boundary, so no w can fit E without hurting the others.</li>
+      <li>The boundary is always flat, so no w can fit E without hurting the others; a curved boundary needs squares or interactions you add yourself (<a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>).</li>
     </ul>
   </div>
   <div class="subsec" id="logreg-s3-2">
     <h3 class="ssh"><b>3.2</b>Gradient step</h3>
-    <p class="skey">The slope is the mean of <em>error × input</em>, the same shape as in linear regression with ŷ replaced by p.</p>
+    <p class="skey">The slope is the mean of <em>error × input</em>, the same shape as in linear regression with ŷ replaced by p, not a coincidence but a property of the canonical link.</p>
     <div class="eq">
       <div class="line">
         <span class="t"><span><span class="frac"><i>∂<var>L</var></i><i>∂<var>w</var></i></span></span></span>
@@ -460,8 +462,8 @@ BODY = r'''<header class="hero">
 </section>
 
 <section id="logreg-s4" class="lesson">
-  <div class="sh"><b>04</b><h2>Key choices</h2></div>
-  <p class="key">Two design choices make it work, and three knobs decide <em>how you read and use</em> the output.</p>
+  <div class="sh"><b>04</b><h2>Why sigmoid and log loss</h2></div>
+  <p class="key">A straight line does not stop at 0 and 1, and MSE paired with a sigmoid <em>kills the learning signal</em> exactly on the worst mistakes.</p>
   <div class="subsec" id="logreg-s4-1">
     <h3 class="ssh"><b>4.1</b>Sigmoid</h3>
     <p class="skey">A straight line <em>does not stop at 0 and 1</em>; the sigmoid does, for any input.</p>
@@ -475,75 +477,56 @@ BODY = r'''<header class="hero">
     <p class="skey">With a sigmoid, MSE <em>stops pushing</em> exactly on the worst mistakes; log loss keeps pushing.</p>
 {lr6}
     <ul class="why">
-      <li>MSE with a sigmoid is also non-convex; log loss is convex, so the start point does not matter.</li>
-      <li>Regularize like any linear model: add L1 or L2 as in <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>. In scikit-learn <code>C</code> is 1/λ.</li>
-    </ul>
-  </div>
-  <div class="subsec" id="logreg-s4-3">
-    <h3 class="ssh"><b>4.3</b>Odds ratio</h3>
-    <p class="skey">The linear part is the <em>log-odds</em>, so one more unit of x <em>multiplies</em> the odds by <span class="mth"><var>e</var><sup><var>w</var></sup></span>.</p>
-    <div class="eq">
-      <div class="line">
-        <span class="t"><span><b class="fn">log</b> <span class="frac"><i><var>p</var></i><i>1 − <var>p</var></i></span></span><em>log-odds</em></span>
-        <span class="op">=</span>
-        <span class="t b"><span><var>w</var>·<var>x</var> + <var>b</var></span><em>the linear part</em></span>
-        <span class="op">,</span>
-        <span class="t p"><span><var>e</var><sup><var>w</var></sup></span><em>odds ratio: odds multiply by this per unit of x</em></span>
-      </div>
-    </div>
-{lr7}
-    <ul class="why">
-      <li>Add on log-odds, multiply on odds, no tidy rule on probability.</li>
-      <li>For a non-specialist audience just say "from 30% to 46%".</li>
-    </ul>
-  </div>
-  <div class="subsec" id="logreg-s4-4">
-    <h3 class="ssh"><b>4.4</b>Decision threshold</h3>
-    <p class="skey">The cut from p to a label is a <em>business decision</em>, not a model parameter.</p>
-{lr8}
-    <ul class="why">
-      <li>0.5 is nothing special; choose by the cost of a missed buyer versus a false alarm.</li>
-      <li>Measuring the trade-off: <a href="../../09-evaluation/metrics-confusion-matrix/index.html">precision and recall</a>, and <a href="../../09-evaluation/roc-auc-pr/index.html">ROC and PR curves</a> over every threshold.</li>
-    </ul>
-  </div>
-  <div class="subsec" id="logreg-s4-5">
-    <h3 class="ssh"><b>4.5</b>Softmax for many classes</h3>
-    <p class="skey">With K classes, give each its own score and <em>exponentiate then normalise</em>; with two classes this is the sigmoid again.</p>
-{lr9}
-    <ul class="why">
-      <li>Called multinomial logistic regression; the loss becomes cross-entropy over K classes.</li>
-      <li>The other option, one-vs-rest, trains K separate binary models.</li>
+      <li>MSE with a sigmoid is also non-convex, so where you stop depends on where you start; log loss is convex, with a single minimum.</li>
+      <li>Regularize like any linear model with L1 or L2, as in <a href="../ridge-lasso-elasticnet/index.html">Ridge, Lasso &amp; Elastic Net</a>; in scikit-learn <code>C</code> is 1/λ, so raising <code>C</code> means less regularization. Without it, perfectly separable classes push <span class="mth"><var>w</var></span> to infinity and every p to 0 or 1.</li>
     </ul>
   </div>
 </section>
 
 <section id="logreg-s5" class="lesson">
-  <div class="sh"><b>05</b><h2>Where it breaks</h2></div>
-  <p class="key">Every weakness comes from the same place as every strength: <em>one straight line through a sigmoid</em>.</p>
-  <div class="subsec" id="logreg-s5-1">
-    <h3 class="ssh"><b>5.1</b>Curved boundary</h3>
-    <p class="skey">The boundary is always straight in the inputs; a curve needs <em>features you build by hand</em>.</p>
-{lr10}
-    <ul class="why">
-      <li>Squares and interactions are covered in <a href="../../04-core-concepts/feature-engineering/index.html">Feature engineering</a>; tree models find such shapes on their own.</li>
-    </ul>
+  <div class="sh"><b>05</b><h2>Odds ratio</h2></div>
+  <p class="key">The linear part is the <em>log-odds</em>, so one more unit of x <em>multiplies</em> the odds by <span class="mth"><var>e</var><sup><var>w</var></sup></span> rather than adding to them.</p>
+  <div class="eq">
+    <div class="line">
+      <span class="t"><span><b class="fn">log</b> <span class="frac"><i><var>p</var></i><i>1 − <var>p</var></i></span></span><em>log-odds</em></span>
+      <span class="op">=</span>
+      <span class="t b"><span><var>w</var>·<var>x</var> + <var>b</var></span><em>exactly the linear part</em></span>
+      <span class="op">,</span>
+      <span class="t p"><span><var>e</var><sup><var>w</var></sup></span><em>odds ratio: odds multiply by this per unit of x</em></span>
+    </div>
   </div>
-  <div class="subsec" id="logreg-s5-2">
-    <h3 class="ssh"><b>5.2</b>Perfect separation</h3>
-    <p class="skey">If a line splits the classes perfectly, the loss keeps falling as <em>w grows forever</em>.</p>
-{lr11}
-    <ul class="why">
-      <li>Symptom: huge coefficients and probabilities stuck at 0 or 1; regularization or more data fixes it.</li>
-      <li>The trade-off overall: trustworthy probabilities and readable coefficients, but less accuracy than <a href="../../06-tree-models/gradient-boosting/index.html">gradient boosting</a> on tabular data.</li>
-    </ul>
-  </div>
+{lr7}
+  <ul class="why">
+    <li>Add on log-odds, multiply on odds, no tidy rule on probability: the odds double, but p only rises from 30% to 46%, which is what to tell a non-specialist audience.</li>
+    <li>Readable coefficients and a stable fit on few samples make it the default baseline; when only accuracy on tabular data matters, <a href="../../06-tree-models/gradient-boosting/index.html">gradient boosting</a> usually wins.</li>
+  </ul>
+</section>
+
+<section id="logreg-s6" class="lesson">
+  <div class="sh"><b>06</b><h2>Decision threshold</h2></div>
+  <p class="key">The model stops at a probability. The cut from p to a label is a <em>business decision</em>, not a model parameter.</p>
+{lr8}
+  <ul class="why">
+    <li>0.5 is nothing special; choose by the cost of a missed buyer versus a false alarm. With heavily imbalanced classes, also reweight the classes or move the threshold far from 0.5.</li>
+    <li>Measuring the trade-off: <a href="../../09-evaluation/metrics-confusion-matrix/index.html">precision and recall</a>, and <a href="../../09-evaluation/roc-auc-pr/index.html">ROC and PR curves</a> over every threshold.</li>
+  </ul>
+</section>
+
+<section id="logreg-s7" class="lesson">
+  <div class="sh"><b>07</b><h2>Softmax for many classes</h2></div>
+  <p class="key">With K classes, give each its own score and <em>exponentiate then normalise</em>; with two classes this is the sigmoid again.</p>
+{lr9}
+  <ul class="why">
+    <li>Called multinomial logistic regression; the loss becomes cross-entropy over K classes.</li>
+    <li>The other option, one-vs-rest, trains K separate binary models.</li>
+  </ul>
 </section>
 
 '''
 
 def build():
     figs = dict(lr1=fig_mental(), lr2=fig_worked(), lr3=fig_forward(), lr4=fig_gradient(), lr5=fig_sigmoid(), lr6=fig_logloss(),
-                lr7=fig_odds(), lr8=fig_threshold(), lr9=fig_softmax(), lr10=fig_curve(), lr11=fig_separation())
+                lr7=fig_odds(), lr8=fig_threshold(), lr9=fig_softmax())
     return re.sub(r'\{(lr\d+)\}', lambda m: figs[m.group(1)], BODY)
 
 def splice(page, body, blurb):
