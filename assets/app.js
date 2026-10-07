@@ -194,16 +194,28 @@
       return '<a href="#' + s.id + '"><span>' + (n ? n.textContent : "") + "</span>" + h.textContent + "</a>" + subs;
     }).join("");
 
-    var links = [].slice.call(tocBox.querySelectorAll("a:not(.sub)"));
+    /* scrollspy: the reading line sits 22% down the viewport; the last section or subsection whose top has
+       passed it is the one being read. A subsection lights up itself and, softer, its parent section. */
+    var links = [].slice.call(tocBox.querySelectorAll("a"));
     var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
-    var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        var ix = targets.indexOf(e.target);
-        links.forEach(function (l, j) { l.classList.toggle("on", j === ix); });
+    function spy() {
+      var line = innerHeight * 0.22, cur = -1;
+      targets.forEach(function (t, j) { if (t && t.getBoundingClientRect().top <= line) cur = j; });
+      if (cur < 0) cur = 0;
+      var par = cur;
+      while (par > 0 && links[par].classList.contains("sub")) par--;
+      links.forEach(function (l, j) {
+        l.classList.toggle("on", j === cur);
+        l.classList.toggle("in", j === par && par !== cur);
       });
-    }, { rootMargin: "-10% 0px -78% 0px" });
-    targets.forEach(function (t) { if (t) io.observe(t); });
+    }
+    var spyQ = false;
+    addEventListener("scroll", function () {
+      if (spyQ) return; spyQ = true;
+      requestAnimationFrame(function () { spyQ = false; spy(); });
+    }, { passive: true });
+    addEventListener("resize", spy);
+    spy();
   }
 
   /* ---------------- trang bài: breadcrumb + bài trước / bài sau ---------------- */

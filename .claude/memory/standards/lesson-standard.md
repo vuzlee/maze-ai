@@ -39,6 +39,12 @@ writing a new lesson.
    NOT NULL/UNIQUE/CHECK/DEFAULT, RANK/DENSE_RANK, each anomaly, each isolation anomaly), each one is
    its own subsection with its own figure — never one combined figure for all of them. The user
    asked for this on 2026-10-05.
+   **Up to 4 levels** (user, 2026-10-07): section `03` → `3.1` → `3.1.2` → `3.1.2.1`. Nest a
+   `.subsec` inside a `.subsec`; numbering lives in `h3.ssh b`. Figures sit only on leaf levels; a
+   middle level carries one `.skey` line. Open a level only when it has ≥2 children, and use depth
+   only where the topic needs it — a lesson should stay **minimal** (the user cut the decision-tree
+   3-level plan back to a simpler one the same day). **Symmetric pairs** (classification ↔
+   regression) get the same children, same order, same figure kind.
 6. **Minimal but complete common knowledge** — what a beginner will certainly meet. The SQL shelf
    needed DDL/DML/DCL, data types, composite/surrogate keys, self join, CASE/COALESCE, UNION,
    locks/deadlock. Drop deep material (MVCC, N+1, formal functional dependencies).
