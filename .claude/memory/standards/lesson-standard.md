@@ -95,3 +95,38 @@ state) and look at every figure. The SQL figure generator script is not in the r
 the existing HTML.
 
 DSA lessons follow [[dsa-lesson-prompt]] on top of these rules.
+
+## Shelf overviews
+
+No Mental model section (user, 2026-10-08). A shelf overview answers four learner questions —
+what is it · where am I / what is in this shelf · how did it grow · in what order to learn — but
+**each shelf draws them with the picture its own field uses**. Do not stamp one template (rings +
+building + generic timeline) on every shelf: the user rejected that on 2026-10-08 ("dập khuôn quá";
+DSA history should be a family tree of structures, not a dated timeline).
+History is drawn only when it explains why things look the way they do.
+
+**How to work (user, 2026-10-08):** act as a design pair. Before building, look at outside sources
+(roadmaps, textbooks, classic diagrams of the field), then **propose first** — a table per overview
+with sections and the figure for each — and wait for approval. The user liked this flexible
+proposal style.
+
+Applied to shelves 01–08 on 2026-10-09 (user: "apply hết đi"). Shape of every overview now:
+**01 = gallery of the field's real pictures** (tiles drawing each concept's classic shape, each a
+link — `gallery()` in `tools/svgkit/overview.py`), then 1–2 field-specific figures (DSA family tree
++ problem→technique; Python life of a line + lineage; CS type-a-URL; Distributed growing with load
++ what becomes hard; SQL pendulum + types + commands; NoSQL one data system; ML taxonomy + AI
+summers/winters; DL learned features + timeline), then Learning order. Trees read top-down
+(NeetCode style). One script per page in `tools/svgkit/<shelf>/<slug>_overview*.py`.
+Content with no owning lesson stays in the overview: SQL commands (DDL/DML/DCL), RL subsection in ML.
+
+Accent colours (user, 2026-10-08): the palette is blue-periwinkle, so figures use only its
+neighbours — `--brand`, `--filled`, `--violet` (pointer/highlight), `--rose` (wall/wrong). No
+amber/brown `--probe` and no green `--ok` in new figures.
+
+**Group overviews (2026-10-09, pilot Optimizer):** a group overview must not teach its lessons.
+The old Optimizer overview held all content while its five lessons were skeletons; it was split
+(`tools/svgkit/08-deep-learning/optimizer_split.py`, sections moved verbatim) and rebuilt as family
+tree (top-down, arrows labelled "what it fixes") · same-valley race · comparison table · learning
+order (`optimizer_overview_v2.py`). Applied the same day to every written group overview
+(variant groups: tree + side-by-side + table; sequential groups: short map, `tools/svgkit/groupmap.py`).
+Known gaps with no owning lesson: agglomerative + GMM clustering, ranking metrics (MAP/NDCG), RL, SQL DDL/DCL.

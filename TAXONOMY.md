@@ -163,9 +163,9 @@ Distributed systems, gom Math foundations còn 4 bài). Số ở đây **chốt 
 | **Generative models** (DL) | gộp còn **một bài**: autoencoder là cầu nối lịch sử dẫn tới VAE, VAE bắc cầu sang Diffusion (rõ **vì sao Diffusion thắng thế**), GAN chỉ cần nhận ra tên — **không đào sâu training GAN** |
 | **Multimodal** (LLM) | ba bài: `clip-vlm` (CLIP và VLM chung một mạch contrastive → nối vào LLM) · `diffusion-models` · `audio-models`. Chưa chẻ Diffusion thành overview + DDPM + score-based + latent |
 
-> **Còn mở, chưa quyết:** `optimizer-sgd-adam` đang gộp SGD/Momentum/AdaGrad/RMSProp/Adam/AdamW.
-> Theo B1②, Adam và SGD chắc đáng bài riêng (hay bị hỏi "vì sao Adam mà không SGD"); AdaGrad/RMSProp
-> có thể chỉ cần làm mục trong bài Adam. Quyết khi thật sự ngồi viết.
+> **Đã quyết (2026-10-08):** optimizer là một nhóm riêng `03-optimizer` của kệ Deep learning:
+> `optimizer-overview` (bài cũ `optimizer-sgd-adam`, giữ vai trò so sánh trên cùng một thung lũng loss) +
+> mỗi thuật toán một bài: `sgd`, `momentum`, `adagrad-rmsprop`, `adam`, `adamw`.
 
 ## B4. Làm gì trước
 
